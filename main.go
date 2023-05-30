@@ -9,14 +9,8 @@ import (
 )
 
 func main() {
-	fmt.Println("Hello World!")
+	fmt.Println("Welcome to Harness CLI!")
 
-	//customers := GetCustomers()
-
-	//for _, customer := range customers {
-	//we can access the "customer" variable in this approach
-	//fmt.Println(customer)
-	//}
 	globalFlags := []cli.Flag{
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:  "target-api-key",
