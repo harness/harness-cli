@@ -8,28 +8,44 @@ import (
 	"os"
 )
 
+type cliFnWrapper func(ctx *cli.Context) error
+
+var cliCdReq = struct {
+	AuthToken   string `survey:"authToken"`
+	AuthType    string `survey:"authType"`
+	Account     string `survey:"account"`
+	OrgName     string `survey:"default"`
+	ProjectName string `survey:"default"`
+	Debug       bool   `survey:"debug"`
+	Json        bool   `survey:"json"`
+	BaseUrl     string `survey:"https://app.harness.io/gateway/ng"` //TODO : make it environment specific in utils
+}{}
+
 func main() {
 	fmt.Println("Welcome to Harness CLI!")
 
 	globalFlags := []cli.Flag{
 		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:  "target-api-key",
-			Usage: "`API_KEY` for the target account to authenticate & authorise the migration."}),
+			Name:        "api-key",
+			Usage:       "`API_KEY` for the target account to authenticate & authorise the migration.",
+			Destination: &cliCdReq.AuthToken,
+		}),
 	}
 	app := &cli.App{
 		Name:                 "harness-cli",
-		Usage:                "Upgrade Harness CD from Current Gen to Next Gen!",
+		Usage:                "Harness CLI Onboarding tool!",
 		EnableBashCompletion: true,
 		Suggest:              true,
 		Commands: []*cli.Command{
 			{
 				Name:    "login",
 				Aliases: []string{"login"},
-				Usage:   "Check for updates and upgrade the CLI",
+				Usage:   "Login with account identifier and api key.",
+				Flags:   globalFlags,
 				Action: func(context *cli.Context) error {
-					//return cliWrapper(Update, context)
 					fmt.Println("Try to login here.")
-					return nil
+					return cliWrapper(Login, context)
+					//return nil
 				},
 			},
 		},
@@ -40,4 +56,15 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
+
+}
+
+func cliWrapper(fn cliFnWrapper, ctx *cli.Context) error {
+	if cliCdReq.Debug {
+		log.SetLevel(log.DebugLevel)
+	}
+	if cliCdReq.Json {
+		log.SetFormatter(&log.JSONFormatter{})
+	}
+	return fn(ctx)
 }

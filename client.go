@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"net/http"
@@ -33,6 +34,8 @@ func Get(reqUrl string, auth string) (respBodyObj ResponseBody, err error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(AuthHeaderKey(auth), auth)
+	fmt.Println("reqUrl", reqUrl)
+	printJson(req.Header)
 	return handleResp(req)
 }
 
