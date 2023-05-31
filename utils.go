@@ -8,6 +8,15 @@ import (
 	"os"
 )
 
+func ConfirmInput(question string) bool {
+	confirm := false
+	prompt := &survey.Confirm{
+		Message: question,
+	}
+	_ = survey.AskOne(prompt, &confirm)
+	return confirm
+}
+
 func TextInput(question string) string {
 	var text = ""
 	prompt := &survey.Input{
