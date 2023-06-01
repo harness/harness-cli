@@ -1,13 +1,17 @@
 package main
 
-func PromptEnvDetails() bool {
+func PromptAccountDetails() bool {
 	promptConfirm := false
 
-	if len(cliCdReq.Account) == 0 {
+	if len(cliCdRequestData.Account) == 0 {
 		promptConfirm = true
-		cliCdReq.Account = TextInput("Account that you wish to login to:")
+		cliCdRequestData.Account = TextInput("Account that you wish to login to:")
 	}
 
+	if len(cliCdRequestData.AuthToken) == 0 {
+		promptConfirm = true
+		cliCdRequestData.AuthToken = TextInput("Provide your api-key:")
+	}
 	return promptConfirm
 }
 

@@ -8,9 +8,9 @@ import (
 func getAccountDetails(ctx *cli.Context) error {
 	// Getting the account details
 	url := GetUrlWithQueryParams("", "", "accounts", map[string]string{
-		"accountIdentifier": cliCdReq.Account,
+		"accountIdentifier": cliCdRequestData.Account,
 	})
-	resp, err := Get(url, cliCdReq.AuthToken)
+	resp, err := Get(url, cliCdRequestData.AuthToken)
 
 	if err == nil {
 		fmt.Printf("Response status: %s \n", resp.Status)

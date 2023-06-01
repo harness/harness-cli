@@ -8,11 +8,12 @@ import (
 	log "github.com/sirupsen/logrus"
 	"io"
 	"net/http"
+	"net/http/httputil"
 	"strconv"
 	"strings"
 )
 
-func Post(reqUrl string, auth string, body interface{}) (respBodyObj ResponseBody, err error) {
+func Post(reqUrl string, auth string, body interface{}, contentType string) (respBodyObj ResponseBody, err error) {
 	postBody, _ := json.Marshal(body)
 	requestBody := bytes.NewBuffer(postBody)
 	log.WithFields(log.Fields{
@@ -22,8 +23,16 @@ func Post(reqUrl string, auth string, body interface{}) (respBodyObj ResponseBod
 	if err != nil {
 		return
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", contentType)
 	req.Header.Set(AuthHeaderKey(auth), auth)
+
+	b, err := httputil.DumpRequest(req, true)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	fmt.Printf("Request = %s\n", string(b))
+
 	return handleResp(req)
 }
 
@@ -55,6 +64,12 @@ func handleResp(req *http.Request) (respBodyObj ResponseBody, err error) {
 	if err != nil {
 		return
 	}
+	b, err := httputil.DumpResponse(resp, true)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	fmt.Printf("Response content: %s\n", string(b))
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
 	}(resp.Body)
@@ -65,6 +80,7 @@ func handleResp(req *http.Request) (respBodyObj ResponseBody, err error) {
 	log.WithFields(log.Fields{
 		"body": string(respBody),
 	}).Debug("The response body")
+	//fmt.Printf("Response Headers: %s, status: %s", resp.Header.Get("Content-Type"), resp.Status)
 	err = json.Unmarshal(respBody, &respBodyObj)
 	if err != nil {
 		log.Fatalln("There was error while parsing the response from server. Exiting...", err)

@@ -36,9 +36,9 @@ func GetUrlWithQueryParams(environment string, service string, endpoint string, 
 		params = params + k + "=" + v + "&"
 	}
 
-	fmt.Println("baseUrl", cliCdReq.BaseUrl)
-	//return fmt.Sprintf("%s/api/accounts/%s?%s", cliCdReq.BaseUrl, cliCdReq.Account, params)
-	return fmt.Sprintf("%s/api/accounts/%s?%s", "https://app.harness.io/gateway/ng", cliCdReq.Account, params)
+	fmt.Println("baseUrl", cliCdRequestData.BaseUrl)
+	//return fmt.Sprintf("%s/api/accounts/%s?%s", cliCdRequestData.BaseUrl, cliCdRequestData.Account, params)
+	return fmt.Sprintf("%s/api/%s/%s?%s", "https://app.harness.io/gateway/ng", endpoint, cliCdRequestData.Account, params)
 }
 
 func printJson(v any) {

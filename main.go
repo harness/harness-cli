@@ -12,13 +12,12 @@ var Version = "development"
 
 type cliFnWrapper func(ctx *cli.Context) error
 
-var cliCdReq = struct {
+var cliCdRequestData = struct {
 	AuthToken   string `survey:"authToken"`
 	AuthType    string `survey:"authType"`
 	Account     string `survey:"account"`
 	OrgName     string `survey:"default"`
 	ProjectName string `survey:"default"`
-	File        string `survey:"File"`
 	Debug       bool   `survey:"debug"`
 	Json        bool   `survey:"json"`
 	BaseUrl     string `survey:"https://app.harness.io/gateway/ng"` //TODO : make it environment specific in utils
@@ -44,42 +43,66 @@ func main() {
 	CheckGithubForReleases()
 	globalFlags := []cli.Flag{
 		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:        "api-key",
-			Usage:       "`API_KEY` for the target account to authenticate & authorise the user.",
-			Destination: &cliCdReq.AuthToken,
-		}),
-		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:        "base-url",
 			Usage:       "provide the `BASE_URL` for self managed platforms",
-			Destination: &cliCdReq.BaseUrl,
+			Destination: &cliCdRequestData.BaseUrl,
 		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "api-key",
+			Usage:       "`API_KEY` for the target account to authenticate & authorise the user.",
+			Destination: &cliCdRequestData.AuthToken,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "load",
+			Usage:       "`FILE` to load flags from.",
+			Destination: &cliCdRequestData.AuthToken,
+		}),
+
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:        "debug",
 			Usage:       "prints debug level logs",
-			Destination: &cliCdReq.Debug,
+			Destination: &cliCdRequestData.Debug,
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:        "json",
 			Usage:       "log as JSON instead of standard ASCII formatter",
-			Destination: &cliCdReq.Json,
+			Destination: &cliCdRequestData.Json,
 		}),
 	}
 	app := &cli.App{
 		Name:                 "harness-cli",
 		Version:              Version,
-		Usage:                "Harness CLI Onboarding tool!",
+		Usage:                "Setup Harness CD & GitOps in a few commands.",
 		EnableBashCompletion: true,
 		Suggest:              true,
 		Commands: []*cli.Command{
 			{
-				Name:    "connector",
-				Aliases: []string{"conn"},
-				Usage:   "Connector specific commands, eg: apply (create/update), delete, list",
+				Name:    "update",
+				Aliases: []string{"upgrade"},
+				Usage:   "Check for updates and upgrade the CLI",
+				Action: func(context *cli.Context) error {
+					return cliWrapper(Update, context)
+				},
+			},
+			{
+				Name:    "secret",
+				Aliases: []string{"secret"},
+				Usage:   "Secrets apply (create or update), delete",
+				Flags:   globalFlags,
+				Action: func(context *cli.Context) error {
+					fmt.Println("Secrets command.")
+					return nil
+				},
+			},
+			{
+				Name:    "service",
+				Aliases: []string{"svc"},
+				Usage:   "Service specific commands, eg: apply (create/update), delete, list",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:        "file",
 						Usage:       "`YAML` file path for the connector",
-						Destination: &cliCdReq.File,
+						Destination: &cliCdRequestData.ServiceYamlFile,
 					},
 				},
 				Subcommands: []*cli.Command{
@@ -100,11 +123,31 @@ func main() {
 				},
 			},
 			{
-				Name:    "update",
-				Aliases: []string{"upgrade"},
-				Usage:   "Check for updates and upgrade the CLI",
-				Action: func(context *cli.Context) error {
-					return cliWrapper(Update, context)
+				Name:    "connector",
+				Aliases: []string{"conn"},
+				Usage:   "Connector specific commands, eg: apply (create/update), delete, list",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:        "file",
+						Usage:       "`YAML` file path for the connector",
+						Destination: &cliCdRequestData.File,
+					},
+				},
+				Subcommands: []*cli.Command{
+					{
+						Name:  "apply",
+						Usage: "Create a new connector or Update  an existing one.",
+						Action: func(context *cli.Context) error {
+							return cliWrapper(applyConnector, context)
+						},
+					},
+					{
+						Name:  "delete",
+						Usage: "Delete a connector.",
+						Action: func(context *cli.Context) error {
+							return cliWrapper(deleteConnector, context)
+						},
+					},
 				},
 			},
 			{
@@ -129,10 +172,10 @@ func main() {
 }
 
 func cliWrapper(fn cliFnWrapper, ctx *cli.Context) error {
-	if cliCdReq.Debug {
+	if cliCdRequestData.Debug {
 		log.SetLevel(log.DebugLevel)
 	}
-	if cliCdReq.Json {
+	if cliCdRequestData.Json {
 		log.SetFormatter(&log.JSONFormatter{})
 	}
 	return fn(ctx)

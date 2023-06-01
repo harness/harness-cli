@@ -6,11 +6,9 @@ import (
 )
 
 func Login(ctx *cli.Context) (err error) {
-	apiKey := ctx.String("api-key")
-	fmt.Println("API-Key is", apiKey)
-	PromptEnvDetails()
+	PromptAccountDetails()
 
-	fmt.Println("Account is=", cliCdReq.Account)
+	fmt.Println("Account is=", cliCdRequestData.Account)
 	getAccountDetails(ctx)
 	return nil
 }
