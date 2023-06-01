@@ -18,6 +18,7 @@ var cliCdReq = struct {
 	Account     string `survey:"account"`
 	OrgName     string `survey:"default"`
 	ProjectName string `survey:"default"`
+	File        string `survey:"File"`
 	Debug       bool   `survey:"debug"`
 	Json        bool   `survey:"json"`
 	BaseUrl     string `survey:"https://app.harness.io/gateway/ng"` //TODO : make it environment specific in utils
@@ -47,6 +48,11 @@ func main() {
 			Usage:       "`API_KEY` for the target account to authenticate & authorise the user.",
 			Destination: &cliCdReq.AuthToken,
 		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:        "base-url",
+			Usage:       "provide the `BASE_URL` for self managed platforms",
+			Destination: &cliCdReq.BaseUrl,
+		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:        "debug",
 			Usage:       "prints debug level logs",
@@ -65,6 +71,34 @@ func main() {
 		EnableBashCompletion: true,
 		Suggest:              true,
 		Commands: []*cli.Command{
+			{
+				Name:    "connector",
+				Aliases: []string{"conn"},
+				Usage:   "Connector specific commands, eg: apply (create/update), delete, list",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:        "file",
+						Usage:       "`YAML` file path for the connector",
+						Destination: &cliCdReq.File,
+					},
+				},
+				Subcommands: []*cli.Command{
+					{
+						Name:  "apply",
+						Usage: "Create a new connector or Update  an existing one.",
+						Action: func(context *cli.Context) error {
+							return cliWrapper(applyConnector, context)
+						},
+					},
+					{
+						Name:  "delete",
+						Usage: "Delete a connector.",
+						Action: func(context *cli.Context) error {
+							return cliWrapper(deleteConnector, context)
+						},
+					},
+				},
+			},
 			{
 				Name:    "update",
 				Aliases: []string{"upgrade"},

@@ -10,3 +10,8 @@ func PromptEnvDetails() bool {
 
 	return promptConfirm
 }
+
+func PromptConnectorDetails() bool {
+
+	return false
+}
