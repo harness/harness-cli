@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/urfave/cli/v2"
+	"gopkg.in/yaml.v3"
 )
 
 // apply(create or update) connector
@@ -11,16 +12,20 @@ func applyConnector(c *cli.Context) error {
 	fmt.Println("Trying to create or update a connector using the connector yaml")
 
 	// Getting the account details
-	/*reqUrl := GetUrlWithQueryParams("", "", "connectors", map[string]string{
-		"accountIdentifier": cliCdRequestData.Account,
-	})*/
 	reqUrl := GetUrlWithQueryParams("", "", "connectors", map[string]string{
-		"accountIdentifier": "vpCkHKsDSxK9_KYfjCTMKA",
+		"accountIdentifier": cliCdRequestData.Account,
 	})
-	var body = readFromFile(c.String("file"))
+	var content = readFromFile(c.String("file"))
+	//requestBody := getJsonFromYaml(content)
+	requestBody := &map[string]interface{}{}
+	if err := yaml.Unmarshal([]byte(content), requestBody); err != nil {
+		return err
+	}
+
 	fmt.Println("reqUrl: ", reqUrl)
+	fmt.Println("requestBody: ", requestBody)
 	//resp, err := Post(reqUrl, cliCdRequestData.AuthToken, body, "text/yaml")
-	resp, err := Post(reqUrl, "pat.vpCkHKsDSxK9_KYfjCTMKA.64769c0d2b0261625f875f13.8IhErJ1DSmu7KKHPLya4", body, "text/yaml")
+	resp, err := Post(reqUrl, cliCdRequestData.AuthToken, requestBody, "application/json")
 
 	fmt.Println("Response Headers: ", resp)
 	if err == nil {

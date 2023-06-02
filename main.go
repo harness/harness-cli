@@ -131,6 +131,10 @@ func main() {
 						Usage: "`YAML` file path for the connector",
 					},
 				},
+				Before: func(context *cli.Context) error {
+					hydrateCredsFromPersistence()
+					return nil
+				},
 				Subcommands: []*cli.Command{
 					{
 						Name:  "apply",
@@ -187,4 +191,8 @@ func cliWrapper(fn cliFnWrapper, ctx *cli.Context) error {
 		log.SetFormatter(&log.JSONFormatter{})
 	}
 	return fn(ctx)
+}
+
+func beforeAction(globalFlags []cli.Flag) {
+	altsrc.InitInputSourceWithContext(globalFlags, altsrc.NewYamlSourceFromFlagFunc("load"))
 }

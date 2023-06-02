@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/AlecAivazis/survey/v2"
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 	"io"
 	"os"
 	"strings"
@@ -40,7 +41,7 @@ func GetUrlWithQueryParams(environment string, service string, endpoint string, 
 
 	fmt.Println("baseUrl", cliCdRequestData.BaseUrl)
 	//return fmt.Sprintf("%s/api/accounts/%s?%s", cliCdRequestData.BaseUrl, cliCdRequestData.Account, params)
-	return fmt.Sprintf("%s/api/%s/%s?%s", "https://app.harness.io/gateway/ng", endpoint, cliCdRequestData.Account, params)
+	return fmt.Sprintf("%s/api/%s/?%s", "https://app.harness.io/gateway/ng", endpoint, params)
 }
 
 func printJson(v any) {
@@ -115,4 +116,13 @@ func getParsedAuthKey(credsText string) (token string) {
 func getParsedAccountId(credsText string) (token string) {
 	accid := strings.Split(credsText, ":")[1]
 	return accid
+}
+
+func getJsonFromYaml(content string) (requestBody map[string]interface{}) {
+	//respObj := &map[string]interface{}{}
+	if err := yaml.Unmarshal([]byte(content), requestBody); err != nil {
+		return nil
+	}
+
+	return requestBody
 }
