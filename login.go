@@ -10,5 +10,6 @@ func Login(ctx *cli.Context) (err error) {
 
 	fmt.Println("Account is=", cliCdRequestData.Account)
 	getAccountDetails(ctx)
+	saveCredentials()
 	return nil
 }

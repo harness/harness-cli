@@ -6,6 +6,7 @@ import (
 )
 
 func getAccountDetails(ctx *cli.Context) error {
+	hydrateCredsFromPersistence()
 	// Getting the account details
 	url := GetUrlWithQueryParams("", "", "accounts", map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,

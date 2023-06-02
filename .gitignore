@@ -1,2 +1,4 @@
 .idea/
-./harness-cli
+harness-cli
+harness-upgrade
+./.temp.data

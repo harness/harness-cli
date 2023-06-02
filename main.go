@@ -100,9 +100,8 @@ func main() {
 				Usage:   "Service specific commands, eg: apply (create/update), delete, list",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
-						Name:        "file",
-						Usage:       "`YAML` file path for the connector",
-						Destination: &cliCdRequestData.ServiceYamlFile,
+						Name:  "file",
+						Usage: "`YAML` file path for the connector",
 					},
 				},
 				Subcommands: []*cli.Command{
@@ -128,9 +127,8 @@ func main() {
 				Usage:   "Connector specific commands, eg: apply (create/update), delete, list",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
-						Name:        "file",
-						Usage:       "`YAML` file path for the connector",
-						Destination: &cliCdRequestData.File,
+						Name:  "file",
+						Usage: "`YAML` file path for the connector",
 					},
 				},
 				Subcommands: []*cli.Command{
@@ -158,6 +156,16 @@ func main() {
 				Action: func(context *cli.Context) error {
 					fmt.Println("Trying to login here.")
 					return cliWrapper(Login, context)
+				},
+			},
+			{
+				Name:    "account",
+				Aliases: []string{"acc"},
+				Usage:   "Fetch Account details",
+				Flags:   globalFlags,
+				Action: func(context *cli.Context) error {
+					fmt.Println("Trying to login here.")
+					return cliWrapper(getAccountDetails, context)
 				},
 			},
 		},
