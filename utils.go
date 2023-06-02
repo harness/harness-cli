@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"github.com/AlecAivazis/survey/v2"
 	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
 	"io"
 	"os"
-	"strings"
 )
 
 func ConfirmInput(question string) bool {
@@ -90,32 +90,38 @@ func readFromFile(filepath string) (s string) {
 }
 
 func saveCredentials() (err error) {
-	credString := ""
-	credString += "token:" + cliCdRequestData.AuthToken
-	credString += "\n"
-	credString += "accountId:" + cliCdRequestData.Account
-	writeToFile(credString, TEMP_FILE_NAME, true)
+	authCredentials := SecretStore{
+		ApiKey:    cliCdRequestData.AuthToken,
+		AccountId: cliCdRequestData.Account,
+	}
+	jsonObj, err := json.MarshalIndent(authCredentials, "", "  ")
+	if err != nil {
+		fmt.Println("Error creating secrets json:", err)
+		return
+	}
+
+	writeToFile(string(jsonObj), SECRETS_STORE_PATH, true)
 	return nil
 }
-func hydrateCredsFromPersistence() (token string, id string) {
+func hydrateCredsFromPersistence(c *cli.Context) {
 	if cliCdRequestData.AuthToken != "" && cliCdRequestData.Account != "" {
 		return
 	}
-	credsText := readFromFile(TEMP_FILE_NAME)
-	credentialsArray := strings.Split(credsText, "\n")
-	cliCdRequestData.AuthToken = getParsedAuthKey(credentialsArray[0])
-	cliCdRequestData.Account = getParsedAccountId(credentialsArray[1])
-	return cliCdRequestData.AuthToken, cliCdRequestData.Account
-}
-
-func getParsedAuthKey(credsText string) (token string) {
-	authKey := strings.Split(credsText, ":")[1]
-	return authKey
-}
-
-func getParsedAccountId(credsText string) (token string) {
-	accid := strings.Split(credsText, ":")[1]
-	return accid
+	credsJson, err := os.ReadFile(SECRETS_STORE_PATH)
+	if err != nil {
+		fmt.Println("Error reading creds file:", err)
+		return
+	}
+	var secretstore SecretStore
+	err = json.Unmarshal(credsJson, &secretstore)
+	if err != nil {
+		fmt.Println("Error:", err)
+		Login(c)
+		return
+	}
+	cliCdRequestData.AuthToken = secretstore.ApiKey
+	cliCdRequestData.Account = secretstore.AccountId
+	return
 }
 
 func getJsonFromYaml(content string) (requestBody map[string]interface{}) {
