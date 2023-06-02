@@ -101,20 +101,24 @@ func main() {
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:  "file",
-						Usage: "`YAML` file path for the connector",
+						Usage: "`YAML` file path for the service",
 					},
+				},
+				Before: func(context *cli.Context) error {
+					hydrateCredsFromPersistence()
+					return nil
 				},
 				Subcommands: []*cli.Command{
 					{
 						Name:  "apply",
-						Usage: "Create a new connector or Update  an existing one.",
+						Usage: "Create a new service or Update  an existing one.",
 						Action: func(context *cli.Context) error {
-							return cliWrapper(applyConnector, context)
+							return cliWrapper(applyService, context)
 						},
 					},
 					{
 						Name:  "delete",
-						Usage: "Delete a connector.",
+						Usage: "Delete a service.",
 						Action: func(context *cli.Context) error {
 							return cliWrapper(deleteConnector, context)
 						},

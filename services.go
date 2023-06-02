@@ -6,13 +6,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// apply(create or update) connector
-func applyConnector(c *cli.Context) error {
+func applyService(c *cli.Context) error {
 	fmt.Println("File path: ", c.String("file"))
-	fmt.Println("Trying to create or update a connector using the provided connector yaml")
+	fmt.Println("Trying to create or update a service using the service yaml.")
 
 	// Getting the account details
-	reqUrl := GetUrlWithQueryParams("", "", "connectors", map[string]string{
+	reqUrl := GetUrlWithQueryParams("", "", "services", map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 	var content = readFromFile(c.String("file"))
@@ -24,7 +23,6 @@ func applyConnector(c *cli.Context) error {
 
 	fmt.Println("reqUrl: ", reqUrl)
 	fmt.Println("requestBody: ", requestBody)
-	//resp, err := Post(reqUrl, cliCdRequestData.AuthToken, body, "text/yaml")
 	resp, err := Post(reqUrl, cliCdRequestData.AuthToken, requestBody, JSON_CONTENT_TYPE)
 
 	fmt.Println("Response Headers: ", resp)
@@ -41,14 +39,6 @@ func applyConnector(c *cli.Context) error {
 	return nil
 }
 
-// Delete an existing connector
-func deleteConnector(*cli.Context) error {
+func deleteService() {
 	fmt.Println(NOT_IMPLEMENTED)
-	return nil
-}
-
-// Delete an existing connector
-func listConnector(*cli.Context) error {
-	fmt.Println(NOT_IMPLEMENTED)
-	return nil
 }

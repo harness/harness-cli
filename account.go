@@ -8,7 +8,8 @@ import (
 func getAccountDetails(ctx *cli.Context) error {
 	hydrateCredsFromPersistence()
 	// Getting the account details
-	url := GetUrlWithQueryParams("", "", "accounts", map[string]string{
+	accountsEndpoint := "accounts/" + cliCdRequestData.Account
+	url := GetUrlWithQueryParams("", "", accountsEndpoint, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 	resp, err := Get(url, cliCdRequestData.AuthToken)
