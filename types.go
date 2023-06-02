@@ -193,3 +193,8 @@ type ProjectCSV struct {
 	ProjectIdentifier string `json:"projectIdentifier"`
 	OrgIdentifier     string `json:"orgIdentifier"`
 }
+
+type SecretStore struct {
+	ApiKey    string `json:"apiKey"`
+	AccountId string `json:"accountId"`
+}
