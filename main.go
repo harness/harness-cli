@@ -104,8 +104,8 @@ func main() {
 						Usage: "`YAML` file path for the service",
 					},
 				},
-				Before: func(context *cli.Context) error {
-					hydrateCredsFromPersistence()
+				Before: func(ctx *cli.Context) error {
+					hydrateCredsFromPersistence(ctx)
 					return nil
 				},
 				Subcommands: []*cli.Command{
