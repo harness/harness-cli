@@ -93,6 +93,27 @@ func main() {
 					fmt.Println("Secrets command.")
 					return nil
 				},
+				Before: func(ctx *cli.Context) error {
+					hydrateCredsFromPersistence(ctx)
+					return nil
+				},
+				Subcommands: []*cli.Command{
+					{
+						Name:  "apply",
+						Usage: "Create a new secret or Update  an existing one.",
+						Action: func(context *cli.Context) error {
+							println("secret calld")
+							return cliWrapper(applySecret, context)
+						},
+					},
+					{
+						Name:  "delete",
+						Usage: "Delete a secret.",
+						Action: func(context *cli.Context) error {
+							return cliWrapper(deleteConnector, context)
+						},
+					},
+				},
 			},
 			{
 				Name:    "service",
@@ -103,10 +124,6 @@ func main() {
 						Name:  "file",
 						Usage: "`YAML` file path for the service",
 					},
-				},
-				Before: func(ctx *cli.Context) error {
-					hydrateCredsFromPersistence(ctx)
-					return nil
 				},
 				Subcommands: []*cli.Command{
 					{
@@ -135,10 +152,6 @@ func main() {
 						Usage: "`YAML` file path for the connector",
 					},
 				},
-				Before: func(ctx *cli.Context) error {
-					hydrateCredsFromPersistence(ctx)
-					return nil
-				},
 				Subcommands: []*cli.Command{
 					{
 						Name:  "apply",
@@ -162,7 +175,7 @@ func main() {
 				Usage:   "Login with account identifier and api key.",
 				Flags:   globalFlags,
 				Action: func(context *cli.Context) error {
-					fmt.Println("Trying to login here.")
+
 					return cliWrapper(Login, context)
 				},
 			},
@@ -172,7 +185,6 @@ func main() {
 				Usage:   "Fetch Account details",
 				Flags:   globalFlags,
 				Action: func(context *cli.Context) error {
-					fmt.Println("Trying to login here.")
 					return cliWrapper(getAccountDetails, context)
 				},
 			},

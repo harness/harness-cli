@@ -198,3 +198,23 @@ type SecretStore struct {
 	ApiKey    string `json:"apiKey"`
 	AccountId string `json:"accountId"`
 }
+type SecretSpec struct {
+	Value                   string `json:"value"`
+	SecretManagerIdentifier string `json:"secretManagerIdentifier"`
+	ValueType               string `json:"valueType"`
+}
+type Secret struct {
+	Type        string `json:"type"`
+	Name        string `json:"name"`
+	Identifier  string `json:"identifier"`
+	Description string `json:"description,omitempty"`
+	Tags        struct {
+	} `json:"tags,omitempty"`
+	OrgIdentifier     string     `json:"orgIdentifier,omitempty"`
+	ProjectIdentifier string     `json:"projectIdentifier,omitempty"`
+	Spec              SecretSpec `json:"spec"`
+}
+
+type HarnessSecret struct {
+	Secret `json:"secret"`
+}

@@ -8,14 +8,19 @@ import (
 
 // apply(create or update) connector
 func applyConnector(c *cli.Context) error {
-	fmt.Println("File path: ", c.String("file"))
+	filePath := c.String("file")
+	if filePath == "" {
+		fmt.Println("Please enter valid filename")
+		return nil
+	}
+	fmt.Println("File path: ", filePath)
 	fmt.Println("Trying to create or update a connector using the provided connector yaml")
 
 	// Getting the account details
 	reqUrl := GetUrlWithQueryParams("", "", "connectors", map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
-	var content = readFromFile(c.String("file"))
+	var content = readFromFile(filePath)
 	//requestBody := getJsonFromYaml(content)
 	requestBody := &map[string]interface{}{}
 	if err := yaml.Unmarshal([]byte(content), requestBody); err != nil {

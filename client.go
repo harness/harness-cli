@@ -42,7 +42,8 @@ func Get(reqUrl string, auth string) (respBodyObj ResponseBody, err error) {
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set(AuthHeaderKey(auth), auth)
+	printJson(cliCdRequestData)
+	req.Header.Set(AuthHeaderKey(auth), cliCdRequestData.AuthToken)
 	fmt.Println("reqUrl", reqUrl)
 	printJson(req.Header)
 	return handleResp(req)

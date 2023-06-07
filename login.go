@@ -7,7 +7,6 @@ import (
 
 func Login(ctx *cli.Context) (err error) {
 	PromptAccountDetails()
-
 	fmt.Println("Account is=", cliCdRequestData.Account)
 	getAccountDetails(ctx)
 	saveCredentials()

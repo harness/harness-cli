@@ -121,6 +121,7 @@ func hydrateCredsFromPersistence(c *cli.Context) {
 	}
 	cliCdRequestData.AuthToken = secretstore.ApiKey
 	cliCdRequestData.Account = secretstore.AccountId
+
 	return
 }
 
