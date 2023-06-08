@@ -46,8 +46,6 @@ func GetUrlWithQueryParams(environment string, service string, endpoint string, 
 			if currentIndex == totalItems {
 				params = params + k + "=" + v
 			} else {
-
-				println("adding khali key", k, v)
 				params = params + k + "=" + v + "&"
 			}
 		}
@@ -57,7 +55,8 @@ func GetUrlWithQueryParams(environment string, service string, endpoint string, 
 	if lastChar == '&' {
 		params = strings.TrimSuffix(params, string('&'))
 	}
-	return fmt.Sprintf("%s/api/%s?%s", "https://app.harness.io/gateway/ng", endpoint, params)
+
+	return fmt.Sprintf("%s/api/%s?%s", BASE_URL, endpoint, params)
 }
 
 func printJson(v any) {
@@ -196,16 +195,16 @@ func getColoredText(text string, textColor color.Attribute) string {
 }
 
 func getEntity(reqURL string, projectIdentifier string, orgIdentifier string) bool {
-
-	queryparams := map[string]string{
+	queryParams := map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 		"routingId":         cliCdRequestData.Account,
 		"projectIdentifier": projectIdentifier,
 		"orgIdentifier":     orgIdentifier,
 	}
-	entityGetURL := GetUrlWithQueryParams("", "", reqURL, queryparams)
-	_, fetchEntityError := Get(entityGetURL, cliCdRequestData.AuthToken)
-	
+
+	urlWithQueryParams := GetUrlWithQueryParams("", "", reqURL, queryParams)
+	_, fetchEntityError := Get(urlWithQueryParams, cliCdRequestData.AuthToken)
+
 	if fetchEntityError != nil {
 		return false
 	} else {
