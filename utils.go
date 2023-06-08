@@ -204,8 +204,8 @@ func getEntity(reqURL string, projectIdentifier string, orgIdentifier string) bo
 		"orgIdentifier":     orgIdentifier,
 	}
 	entityGetURL := GetUrlWithQueryParams("", "", reqURL, queryparams)
-	_a, fetchEntityError := Get(entityGetURL, cliCdRequestData.AuthToken)
-	printJson(_a)
+	_, fetchEntityError := Get(entityGetURL, cliCdRequestData.AuthToken)
+	
 	if fetchEntityError != nil {
 		return false
 	} else {
