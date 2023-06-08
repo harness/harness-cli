@@ -6,22 +6,20 @@ import (
 )
 
 func getAccountDetails(ctx *cli.Context) error {
-	//hydrateCredsFromPersistence(ctx)
 	// Getting the account details
 	accountsEndpoint := "accounts/" + cliCdRequestData.Account
 	url := GetUrlWithQueryParams("", "", accountsEndpoint, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
-	println("Before Get Account zdetails:")
-	printJson(cliCdRequestData)
+
 	resp, err := Get(url, cliCdRequestData.AuthToken)
 
-	if err == nil {
+	if err != nil {
 		fmt.Printf("Response status: %s \n", resp.Status)
 		fmt.Printf("Response code: %s \n", resp.Code)
 		fmt.Printf("Response resource: %s \n", resp.Resource)
 		fmt.Printf("Response messages: %s \n", resp.Messages)
-		printJson(resp.Data)
+		//printJson(resp.Data)
 		return nil
 	}
 

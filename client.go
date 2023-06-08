@@ -64,10 +64,10 @@ func Get(reqUrl string, auth string) (respBodyObj ResponseBody, err error) {
 	if err != nil {
 		return
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", JSON_CONTENT_TYPE)
 	req.Header.Set(AuthHeaderKey(auth), cliCdRequestData.AuthToken)
 	fmt.Println("reqUrl", reqUrl)
-	printJson(req.Header)
+
 	return handleResp(req)
 }
 
@@ -76,7 +76,7 @@ func Delete(reqUrl string, auth string) (respBodyObj ResponseBody, err error) {
 	if err != nil {
 		return
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", JSON_CONTENT_TYPE)
 	req.Header.Set(AuthHeaderKey(auth), auth)
 	return handleResp(req)
 }

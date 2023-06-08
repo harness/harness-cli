@@ -39,8 +39,6 @@ func applyConnector(c *cli.Context) error {
 
 		println("Creating connector with id: ", getColoredText(identifier, color.FgGreen))
 		resp, err = Post(createConnectorURL, cliCdRequestData.AuthToken, requestBody, JSON_CONTENT_TYPE)
-		//fmt.Println("reqUrl: ", createConnectorURL)
-		//fmt.Println("requestBody: ", requestBody)
 		if err == nil {
 			println(getColoredText("Connector created successfully!", color.FgGreen))
 			printJson(resp.Data)
@@ -51,8 +49,6 @@ func applyConnector(c *cli.Context) error {
 
 		println(getColoredText("Updating connector details....", color.FgGreen))
 		resp, err = Put(createConnectorURL, cliCdRequestData.AuthToken, requestBody, JSON_CONTENT_TYPE)
-		//fmt.Println("reqUrl: ", createConnectorURL)
-		//fmt.Println("requestBody: ", requestBody)
 		if err == nil {
 			println(getColoredText("Connector updated successfully!", color.FgGreen))
 			//printJson(resp.Data)
