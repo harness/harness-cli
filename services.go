@@ -23,7 +23,7 @@ func applyService(c *cli.Context) error {
 	orgIdentifier := "default"
 	//setup payload for svc create / update
 	svcPayload := HarnessService{Identifier: identifier, Name: name, ProjectIdentifier: projectIdentifier, OrgIdentifier: orgIdentifier, Yaml: content}
-	entityExists := getEntity(fmt.Sprintf("servicesV2/%s", identifier), projectIdentifier, orgIdentifier)
+	entityExists := getEntity(fmt.Sprintf("servicesV2/%s", identifier), projectIdentifier, orgIdentifier, map[string]string{})
 	var resp ResponseBody
 	var err error
 	if !entityExists {
@@ -41,7 +41,8 @@ func applyService(c *cli.Context) error {
 		println(getColoredText("Updating service details....", color.FgGreen))
 		resp, err = Put(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, JSON_CONTENT_TYPE)
 		if err == nil {
-			println(getColoredText("Connector updated successfully!", color.FgGreen))
+			println(getColoredText("Service updated successfully!", color.FgGreen))
+			//printJson(resp.Data)
 			return nil
 		}
 	}
