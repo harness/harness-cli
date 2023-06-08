@@ -125,6 +125,10 @@ func main() {
 						Usage: "`YAML` file path for the service",
 					},
 				},
+				Before: func(ctx *cli.Context) error {
+					hydrateCredsFromPersistence(ctx)
+					return nil
+				},
 				Subcommands: []*cli.Command{
 					{
 						Name:  "apply",
@@ -151,6 +155,10 @@ func main() {
 						Name:  "file",
 						Usage: "`YAML` file path for the connector",
 					},
+				},
+				Before: func(ctx *cli.Context) error {
+					hydrateCredsFromPersistence(ctx)
+					return nil
 				},
 				Subcommands: []*cli.Command{
 					{

@@ -36,13 +36,35 @@ func Post(reqUrl string, auth string, body interface{}, contentType string) (res
 	return handleResp(req)
 }
 
+func Put(reqUrl string, auth string, body interface{}, contentType string) (respBodyObj ResponseBody, err error) {
+	postBody, _ := json.Marshal(body)
+	requestBody := bytes.NewBuffer(postBody)
+	log.WithFields(log.Fields{
+		"body": string(postBody),
+	}).Debug("The request body")
+	req, err := http.NewRequest("PUT", reqUrl, requestBody)
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", contentType)
+	req.Header.Set(AuthHeaderKey(auth), auth)
+
+	b, err := httputil.DumpRequest(req, true)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	fmt.Printf("Request = %s\n", string(b))
+
+	return handleResp(req)
+}
+
 func Get(reqUrl string, auth string) (respBodyObj ResponseBody, err error) {
 	req, err := http.NewRequest("GET", reqUrl, nil)
 	if err != nil {
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-	printJson(cliCdRequestData)
 	req.Header.Set(AuthHeaderKey(auth), cliCdRequestData.AuthToken)
 	fmt.Println("reqUrl", reqUrl)
 	printJson(req.Header)
