@@ -3,14 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
+	"strings"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/fatih/color"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
-	"io"
-	"os"
-	"strings"
 )
 
 func ConfirmInput(question string) bool {
@@ -211,4 +212,18 @@ func getEntity(reqURL string, projectIdentifier string, orgIdentifier string) bo
 	} else {
 		return true
 	}
+}
+
+func mergeMaps(map1 map[string]string, map2 map[string]string) map[string]string {
+	mergedMap := func() map[string]string {
+		result := make(map[string]string)
+		for k, v := range map1 {
+			result[k] = v
+		}
+		for k, v := range map2 {
+			result[k] = v
+		}
+		return result
+	}()
+	return mergedMap
 }

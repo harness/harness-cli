@@ -209,6 +209,37 @@ func main() {
 				},
 			},
 			{
+				Name:    "infrastructure-definition",
+				Aliases: []string{"infra"},
+				Usage:   "Infrastructure Definition specific commands, eg: apply (create/update), delete, list",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "file",
+						Usage: "`YAML` file path for the connector",
+					},
+				},
+				Before: func(ctx *cli.Context) error {
+					hydrateCredsFromPersistence(ctx)
+					return nil
+				},
+				Subcommands: []*cli.Command{
+					{
+						Name:  "apply",
+						Usage: "Create a new infrastructure or Update  an existing one.",
+						Action: func(context *cli.Context) error {
+							return cliWrapper(applyInfraDefinition, context)
+						},
+					},
+					{
+						Name:  "delete",
+						Usage: "Delete a infrastructure.",
+						Action: func(context *cli.Context) error {
+							return cliWrapper(deleteInfraDefinition, context)
+						},
+					},
+				},
+			},
+			{
 				Name:    "login",
 				Aliases: []string{"login"},
 				Usage:   "Login with account identifier and api key.",

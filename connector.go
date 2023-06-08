@@ -32,7 +32,7 @@ func applyConnector(c *cli.Context) error {
 	identifier := valueToString(GetNestedValue(requestBody, "connector", "identifier").(string))
 	projectIdentifier := valueToString(GetNestedValue(requestBody, "connector", "projectIdentifier").(string))
 	orgIdentifier := valueToString(GetNestedValue(requestBody, "connector", "orgIdentifier").(string))
-	entityExists := getEntity(fmt.Sprintf("connectors/%s", identifier), projectIdentifier, orgIdentifier)
+	entityExists := getEntity(fmt.Sprintf("connectors/%s", identifier), projectIdentifier, orgIdentifier, map[string]string{})
 	var resp ResponseBody
 	var err error
 	if !entityExists {

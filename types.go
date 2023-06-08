@@ -229,7 +229,7 @@ type HarnessService struct {
 	} `json:"tags,omitempty"`
 	Yaml string `json:"yaml"`
 }
-
+type HarnessInfra struct{ HarnessService }
 type HarnessEnvironment struct {
 	Identifier        string `json:"identifier"`
 	Name              string `json:"name"`
