@@ -1,13 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"github.com/urfave/cli/v2"
 	"strings"
 )
 
 func applySecret(ctx *cli.Context) error {
-	gitPat := getGitSecret(ctx)
+	gitPat := getGitSecret()
 	if gitPat == "" {
 		println("Secret cannot be an empty string")
 		return nil
@@ -16,7 +15,7 @@ func applySecret(ctx *cli.Context) error {
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 	printJson(cliCdRequestData)
-	secretBody := createTextSecret("Harness Git Pat", "harness_gitpat", gitPat)
+	secretBody := createTextSecret("Harness Git Pat", GITHUB_SECRET_IDENTIFIER, gitPat)
 	resp, err := Post(reqUrl, cliCdRequestData.AuthToken, secretBody, JSON_CONTENT_TYPE)
 	if err != nil {
 		println("Error creating secrets")
@@ -26,7 +25,7 @@ func applySecret(ctx *cli.Context) error {
 	return nil
 }
 
-func getGitSecret(ctx *cli.Context) string {
+func getGitSecret() string {
 
 	gitPat := ""
 
@@ -36,7 +35,6 @@ func getGitSecret(ctx *cli.Context) string {
 		println("Please enter valid git pat: ")
 		return ""
 	}
-	fmt.Printf("You entered gitpat: %s", gitPat)
 	return gitPat
 }
 

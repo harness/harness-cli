@@ -10,6 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"io"
 	"os"
+	"strings"
 )
 
 func ConfirmInput(question string) bool {
@@ -41,19 +42,21 @@ func GetUrlWithQueryParams(environment string, service string, endpoint string, 
 	currentIndex := 0
 	for k, v := range queryParams {
 		currentIndex++
-		if v == "" {
-			continue
-		}
-		if currentIndex == totalItems {
-			params = params + k + "=" + v
-		} else {
-			params = params + k + "=" + v + "&"
-		}
+		if v != "" {
+			if currentIndex == totalItems {
+				params = params + k + "=" + v
+			} else {
 
+				println("adding khali key", k, v)
+				params = params + k + "=" + v + "&"
+			}
+		}
 	}
-
-	//fmt.Println("baseUrl", cliCdRequestData.BaseUrl)
-	//return fmt.Sprintf("%s/api/accounts/%s?%s", cliCdRequestData.BaseUrl, cliCdRequestData.Account, params)
+	// remove trailing & char
+	lastChar := params[len(params)-1]
+	if lastChar == '&' {
+		params = strings.TrimSuffix(params, string('&'))
+	}
 	return fmt.Sprintf("%s/api/%s?%s", "https://app.harness.io/gateway/ng", endpoint, params)
 }
 
@@ -138,12 +141,12 @@ func hydrateCredsFromPersistence(c *cli.Context) {
 	return
 }
 
-func getJsonFromYaml(content string) (requestBody map[string]interface{}) {
-	//respObj := &map[string]interface{}{}
-	if err := yaml.Unmarshal([]byte(content), requestBody); err != nil {
+func getJsonFromYaml(content string) map[string]interface{} {
+	requestBody := make(map[string]interface{})
+	err := yaml.Unmarshal([]byte(content), requestBody)
+	if err != nil {
 		return nil
 	}
-
 	return requestBody
 }
 func GetNestedValue(data map[string]interface{}, keys ...string) interface{} {
@@ -193,14 +196,16 @@ func getColoredText(text string, textColor color.Attribute) string {
 }
 
 func getEntity(reqURL string, projectIdentifier string, orgIdentifier string) bool {
+
 	queryparams := map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 		"routingId":         cliCdRequestData.Account,
 		"projectIdentifier": projectIdentifier,
 		"orgIdentifier":     orgIdentifier,
 	}
-	getConnectorURL := GetUrlWithQueryParams("", "", reqURL, queryparams)
-	_, fetchEntityError := Get(getConnectorURL, cliCdRequestData.AuthToken)
+	entityGetURL := GetUrlWithQueryParams("", "", reqURL, queryparams)
+	_a, fetchEntityError := Get(entityGetURL, cliCdRequestData.AuthToken)
+	printJson(_a)
 	if fetchEntityError != nil {
 		return false
 	} else {
