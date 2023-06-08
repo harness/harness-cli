@@ -229,6 +229,7 @@ type HarnessService struct {
 	} `json:"tags,omitempty"`
 	Yaml string `json:"yaml"`
 }
+<<<<<<< HEAD
 type HarnessInfra struct{ HarnessService }
 type HarnessEnvironment struct {
 	Identifier        string `json:"identifier"`
@@ -241,4 +242,9 @@ type HarnessEnvironment struct {
 	Color string `json:"color,omitempty"`
 	Type  string `json:"type,omitempty"`
 	Yaml  string `json:"yaml"`
+=======
+
+type HarnessInfra struct {
+	HarnessService
+>>>>>>> aca241a (fix: extended existing type)
 }
