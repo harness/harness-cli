@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/fatih/color"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
@@ -35,13 +36,25 @@ func TextInput(question string) string {
 
 func GetUrlWithQueryParams(environment string, service string, endpoint string, queryParams map[string]string) string {
 	params := ""
+
+	totalItems := len(queryParams)
+	currentIndex := 0
 	for k, v := range queryParams {
-		params = params + k + "=" + v + "&"
+		currentIndex++
+		if v == "" {
+			continue
+		}
+		if currentIndex == totalItems {
+			params = params + k + "=" + v
+		} else {
+			params = params + k + "=" + v + "&"
+		}
+
 	}
 
-	fmt.Println("baseUrl", cliCdRequestData.BaseUrl)
+	//fmt.Println("baseUrl", cliCdRequestData.BaseUrl)
 	//return fmt.Sprintf("%s/api/accounts/%s?%s", cliCdRequestData.BaseUrl, cliCdRequestData.Account, params)
-	return fmt.Sprintf("%s/api/%s/?%s", "https://app.harness.io/gateway/ng", endpoint, params)
+	return fmt.Sprintf("%s/api/%s?%s", "https://app.harness.io/gateway/ng", endpoint, params)
 }
 
 func printJson(v any) {
@@ -132,4 +145,65 @@ func getJsonFromYaml(content string) (requestBody map[string]interface{}) {
 	}
 
 	return requestBody
+}
+func GetNestedValue(data map[string]interface{}, keys ...string) interface{} {
+	if len(keys) == 0 {
+		return nil
+	}
+
+	value, ok := data[keys[0]]
+	if !ok {
+		return nil
+	}
+
+	for _, key := range keys[1:] {
+		nested, ok := value.(map[string]interface{})
+		if !ok {
+			return nil
+		}
+		value, ok = nested[key]
+		if !ok {
+			return nil
+		}
+	}
+
+	return value
+}
+
+func valueToString(value interface{}) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case int, int8, int16, int32, int64:
+		return fmt.Sprintf("%d", v)
+	case uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprintf("%d", v)
+	case float32:
+		return fmt.Sprintf("%f", v)
+	case float64:
+		return fmt.Sprintf("%f", v)
+	default:
+		return ""
+	}
+}
+
+func getColoredText(text string, textColor color.Attribute) string {
+	colored := color.New(textColor).SprintFunc()
+	return colored(text)
+}
+
+func getEntity(reqURL string, projectIdentifier string, orgIdentifier string) bool {
+	queryparams := map[string]string{
+		"accountIdentifier": cliCdRequestData.Account,
+		"routingId":         cliCdRequestData.Account,
+		"projectIdentifier": projectIdentifier,
+		"orgIdentifier":     orgIdentifier,
+	}
+	getConnectorURL := GetUrlWithQueryParams("", "", reqURL, queryparams)
+	_, fetchEntityError := Get(getConnectorURL, cliCdRequestData.AuthToken)
+	if fetchEntityError != nil {
+		return false
+	} else {
+		return true
+	}
 }
