@@ -218,3 +218,14 @@ type Secret struct {
 type HarnessSecret struct {
 	Secret `json:"secret"`
 }
+
+type HarnessService struct {
+	Identifier        string `json:"identifier"`
+	Name              string `json:"name"`
+	ProjectIdentifier string `json:"projectIdentifier,omitempty"`
+	OrgIdentifier     string `json:"orgIdentifier,omitempty"`
+	Description       string `json:"description,omitempty"`
+	Tags              struct {
+	} `json:"tags,omitempty"`
+	Yaml string `json:"yaml"`
+}
