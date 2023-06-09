@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
-	"os"
 )
 
 var Version = "development"
@@ -274,6 +275,7 @@ func main() {
 						Usage: "Delete a pipeline.",
 						Action: func(context *cli.Context) error {
 							return cliWrapper(deletePipeline, context)
+
 						},
 					},
 				},

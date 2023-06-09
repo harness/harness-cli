@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
-	"strings"
 )
 
 func applySecret(ctx *cli.Context) error {
