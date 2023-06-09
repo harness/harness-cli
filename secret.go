@@ -11,7 +11,7 @@ func applySecret(ctx *cli.Context) error {
 		println("Secret cannot be an empty string")
 		return nil
 	}
-	reqUrl := GetUrlWithQueryParams("", "", "v2/secrets", map[string]string{
+	reqUrl := GetUrlWithQueryParams("", NG_BASE_URL, "v2/secrets", map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 	printJson(cliCdRequestData)

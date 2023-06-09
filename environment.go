@@ -6,11 +6,11 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-// create update  Infra Definition
+// Create update  Environment
 func applyEnv(c *cli.Context) error {
 	fmt.Println("File path: ", c.String("file"))
 	fmt.Println("Trying to create / update an environment using the yaml.")
-	createOrUpdateEnvURL := GetUrlWithQueryParams("", "", ENVIRONMENT_ENDPOINT, map[string]string{
+	createOrUpdateEnvURL := GetUrlWithQueryParams("", NG_BASE_URL, ENVIRONMENT_ENDPOINT, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 	var content = readFromFile(c.String("file"))
