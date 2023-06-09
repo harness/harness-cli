@@ -87,7 +87,7 @@ func main() {
 			{
 				Name:    "secret",
 				Aliases: []string{"secret"},
-				Usage:   "Secrets apply (create or update), delete",
+				Usage:   "Secrets specific commands. eg: apply (create/update), delete",
 				Flags:   globalFlags,
 				Action: func(context *cli.Context) error {
 					fmt.Println("Secrets command.")
@@ -142,6 +142,37 @@ func main() {
 						Usage: "Delete a service.",
 						Action: func(context *cli.Context) error {
 							return cliWrapper(deleteConnector, context)
+						},
+					},
+				},
+			},
+			{
+				Name:    "environment",
+				Aliases: []string{"env"},
+				Usage:   "Environment specific commands, eg: apply (create/update), delete, list",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "file",
+						Usage: "`YAML` file path for the environment",
+					},
+				},
+				Before: func(ctx *cli.Context) error {
+					hydrateCredsFromPersistence(ctx)
+					return nil
+				},
+				Subcommands: []*cli.Command{
+					{
+						Name:  "apply",
+						Usage: "Create a new environment or Update  an existing one.",
+						Action: func(context *cli.Context) error {
+							return cliWrapper(applyEnv, context)
+						},
+					},
+					{
+						Name:  "delete",
+						Usage: "Delete an environment.",
+						Action: func(context *cli.Context) error {
+							return cliWrapper(deleteEnvironment, context)
 						},
 					},
 				},

@@ -229,3 +229,16 @@ type HarnessService struct {
 	} `json:"tags,omitempty"`
 	Yaml string `json:"yaml"`
 }
+
+type HarnessEnvironment struct {
+	Identifier        string `json:"identifier"`
+	Name              string `json:"name"`
+	ProjectIdentifier string `json:"projectIdentifier,omitempty"`
+	OrgIdentifier     string `json:"orgIdentifier,omitempty"`
+	Description       string `json:"description,omitempty"`
+	Tags              struct {
+	} `json:"tags,omitempty"`
+	Color string `json:"color,omitempty"`
+	Type  string `json:"type,omitempty"`
+	Yaml  string `json:"yaml"`
+}
