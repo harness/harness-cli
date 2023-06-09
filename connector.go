@@ -18,7 +18,7 @@ func applyConnector(c *cli.Context) error {
 	fmt.Println("Trying to create or update a connector using the provided connector yaml")
 
 	// Getting the account details
-	createConnectorURL := GetUrlWithQueryParams("", "", "connectors", map[string]string{
+	createConnectorURL := GetUrlWithQueryParams("", NG_BASE_URL, "connectors", map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 

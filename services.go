@@ -9,7 +9,7 @@ import (
 func applyService(c *cli.Context) error {
 	fmt.Println("File path: ", c.String("file"))
 	fmt.Println("Trying to create or update a service using the service yaml.")
-	createOrUpdateSvcURL := GetUrlWithQueryParams("", "", "servicesV2", map[string]string{
+	createOrUpdateSvcURL := GetUrlWithQueryParams("", NG_BASE_URL, "servicesV2", map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 	var content = readFromFile(c.String("file"))

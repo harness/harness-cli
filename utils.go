@@ -57,7 +57,7 @@ func GetUrlWithQueryParams(environment string, service string, endpoint string, 
 		params = strings.TrimSuffix(params, string('&'))
 	}
 
-	return fmt.Sprintf("%s/api/%s?%s", BASE_URL, endpoint, params)
+	return fmt.Sprintf("%s/api/%s?%s", service, endpoint, params)
 }
 
 func printJson(v any) {
@@ -203,7 +203,7 @@ func getEntity(reqURL string, projectIdentifier string, orgIdentifier string, ex
 		"orgIdentifier":     orgIdentifier,
 	}
 	queryParams = mergeMaps(queryParams, extraparams)
-	urlWithQueryParams := GetUrlWithQueryParams("", "", reqURL, queryParams)
+	urlWithQueryParams := GetUrlWithQueryParams("", NG_BASE_URL, reqURL, queryParams)
 	_, fetchEntityError := Get(urlWithQueryParams, cliCdRequestData.AuthToken)
 
 	fmt.Printf("urlWithQueryParams: ", urlWithQueryParams)
