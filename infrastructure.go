@@ -10,7 +10,7 @@ import (
 func applyInfraDefinition(c *cli.Context) error {
 	fmt.Println("File path: ", c.String("file"))
 	fmt.Println("Trying to create / update a Infrastructure Definition using the yaml.")
-	createoOrUpdateInfraURL := GetUrlWithQueryParams("", "", "infrastructures", map[string]string{
+	createoOrUpdateInfraURL := GetUrlWithQueryParams("", NG_BASE_URL, "infrastructures", map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 	var content = readFromFile(c.String("file"))

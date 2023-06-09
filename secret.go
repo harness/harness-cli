@@ -1,54 +1,27 @@
 package main
 
 import (
-	"fmt"
-	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 	"strings"
 )
 
 func applySecret(ctx *cli.Context) error {
-	gitPat := ctx.String("token")
-
-	if gitPat == "" {
-		gitPat = getGitSecret()
-	}
+	gitPat := getGitSecret()
 	if gitPat == "" {
 		println("Secret cannot be an empty string")
 		return nil
 	}
-	createSecretURL := GetUrlWithQueryParams("", "", "v2/secrets", map[string]string{
+	reqUrl := GetUrlWithQueryParams("", NG_BASE_URL, "v2/secrets", map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
-	updateSecretURL := GetUrlWithQueryParams("", "", fmt.Sprintf("v2/secrets/%s", GITHUB_SECRET_IDENTIFIER), map[string]string{
-		"accountIdentifier": cliCdRequestData.Account,
-	})
-	entityExists := getEntity(fmt.Sprintf("v2/secrets/%s", GITHUB_SECRET_IDENTIFIER), DEFAULT_PROJECT, DEFAULT_ORG, map[string]string{})
-
+	printJson(cliCdRequestData)
 	secretBody := createTextSecret("Harness Git Pat", GITHUB_SECRET_IDENTIFIER, gitPat)
-	var resp ResponseBody
-	var err error
-	if !entityExists {
-
-		println("Creating secret with id: ", getColoredText(GITHUB_SECRET_IDENTIFIER, color.FgGreen))
-		resp, err = Post(createSecretURL, cliCdRequestData.AuthToken, secretBody, JSON_CONTENT_TYPE)
-		if err == nil {
-			println(getColoredText("Secret created successfully!", color.FgGreen))
-			printJson(resp.Data)
-			return nil
-		}
-	} else {
-		println("Found secret with id: ", getColoredText(GITHUB_SECRET_IDENTIFIER, color.FgGreen))
-
-		println(getColoredText("Updating secret details....", color.FgGreen))
-		resp, err = Put(updateSecretURL, cliCdRequestData.AuthToken, secretBody, JSON_CONTENT_TYPE)
-		if err == nil {
-			println(getColoredText("Secret updated successfully!", color.FgGreen))
-			//printJson(resp.Data)
-			return nil
-		}
-
+	resp, err := Post(reqUrl, cliCdRequestData.AuthToken, secretBody, JSON_CONTENT_TYPE)
+	if err != nil {
+		println("Error creating secrets")
+		return nil
 	}
+	printJson(resp)
 	return nil
 }
 

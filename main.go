@@ -44,7 +44,7 @@ func main() {
 	globalFlags := []cli.Flag{
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:        "base-url",
-			Usage:       "provide the `BASE_URL` for self managed platforms",
+			Usage:       "provide the `NG_BASE_URL` for self managed platforms",
 			Destination: &cliCdRequestData.BaseUrl,
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
@@ -243,6 +243,37 @@ func main() {
 						Usage: "Delete a infrastructure.",
 						Action: func(context *cli.Context) error {
 							return cliWrapper(deleteInfraDefinition, context)
+						},
+					},
+				},
+			},
+			{
+				Name:    "pipeline",
+				Aliases: []string{"pipeline"},
+				Usage:   "Pipeline specific commands, eg: apply (create/update), delete, list",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "file",
+						Usage: "`YAML` file path for the pipeline",
+					},
+				},
+				Before: func(ctx *cli.Context) error {
+					hydrateCredsFromPersistence(ctx)
+					return nil
+				},
+				Subcommands: []*cli.Command{
+					{
+						Name:  "apply",
+						Usage: "Create a new pipeline or Update  an existing one.",
+						Action: func(context *cli.Context) error {
+							return nil
+						},
+					},
+					{
+						Name:  "delete",
+						Usage: "Delete a pipeline.",
+						Action: func(context *cli.Context) error {
+							return nil
 						},
 					},
 				},
