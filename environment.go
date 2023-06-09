@@ -32,7 +32,8 @@ func applyEnv(c *cli.Context) error {
 
 	//setup payload for Environment create / update
 	fmt.Printf("Before EnvPayload: ")
-	EnvPayload := HarnessEnvironment{Identifier: identifier, Name: name, Type: envType, Yaml: content}
+	EnvPayload := HarnessEnvironment{Identifier: identifier, Name: name, Type: envType,
+		ProjectIdentifier: projectIdentifier, OrgIdentifier: orgIdentifier, Yaml: content}
 	fmt.Printf("EnvPayload: ", EnvPayload)
 
 	entityExists := getEntity(fmt.Sprintf("environmentsV2/%s", identifier), projectIdentifier, orgIdentifier)
