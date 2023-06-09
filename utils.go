@@ -195,14 +195,14 @@ func getColoredText(text string, textColor color.Attribute) string {
 	return colored(text)
 }
 
-func getEntity(reqURL string, projectIdentifier string, orgIdentifier string) bool {
+func getEntity(reqURL string, projectIdentifier string, orgIdentifier string, extraparams map[string]string) bool {
 	queryParams := map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 		"routingId":         cliCdRequestData.Account,
 		"projectIdentifier": projectIdentifier,
 		"orgIdentifier":     orgIdentifier,
 	}
-
+	queryParams = mergeMaps(queryParams, extraparams)
 	urlWithQueryParams := GetUrlWithQueryParams("", "", reqURL, queryParams)
 	_, fetchEntityError := Get(urlWithQueryParams, cliCdRequestData.AuthToken)
 
