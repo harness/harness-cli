@@ -30,7 +30,7 @@ func applyService(c *cli.Context) error {
 		println("Creating service with id: ", getColoredText(identifier, color.FgGreen))
 		fmt.Println("createOrUpdateSvcURL: ", createOrUpdateSvcURL)
 		fmt.Println("requestBody: ", requestBody)
-		resp, err = Post(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, JSON_CONTENT_TYPE)
+		resp, err = Post(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, CONTENT_TYPE_JSON)
 		if err == nil {
 			println(getColoredText("Service created successfully!", color.FgGreen))
 			printJson(resp.Data)
@@ -39,7 +39,7 @@ func applyService(c *cli.Context) error {
 	} else {
 		println("Found service with id: ", getColoredText(identifier, color.FgGreen))
 		println(getColoredText("Updating service details....", color.FgGreen))
-		resp, err = Put(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, JSON_CONTENT_TYPE)
+		resp, err = Put(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, CONTENT_TYPE_JSON)
 		if err == nil {
 			println(getColoredText("Service updated successfully!", color.FgGreen))
 			//printJson(resp.Data)

@@ -16,7 +16,7 @@ func applySecret(ctx *cli.Context) error {
 	})
 	printJson(cliCdRequestData)
 	secretBody := createTextSecret("Harness Git Pat", GITHUB_SECRET_IDENTIFIER, gitPat)
-	resp, err := Post(reqUrl, cliCdRequestData.AuthToken, secretBody, JSON_CONTENT_TYPE)
+	resp, err := Post(reqUrl, cliCdRequestData.AuthToken, secretBody, CONTENT_TYPE_JSON)
 	if err != nil {
 		println("Error creating secrets")
 		return nil

@@ -57,7 +57,7 @@ func GetUrlWithQueryParams(environment string, service string, endpoint string, 
 		params = strings.TrimSuffix(params, string('&'))
 	}
 
-	return fmt.Sprintf("%s/api/%s?%s", service, endpoint, params)
+	return fmt.Sprintf("%s/%s?%s", service, endpoint, params)
 }
 
 func printJson(v any) {
