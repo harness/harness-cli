@@ -260,22 +260,3 @@ type HarnessInfra struct {
 	} `json:"tags,omitempty"`
 	Yaml string `json:"yaml"`
 }
-
-type HarnessPipeline struct {
-	Identifier        string `json:"identifier"`
-	Name              string `json:"name"`
-	ProjectIdentifier string `json:"projectIdentifier,omitempty"`
-	OrgIdentifier     string `json:"orgIdentifier,omitempty"`
-	Description       string `json:"description,omitempty"`
-	Tags              struct {
-	} `json:"tags,omitempty"`
-	//Branch         string    `json:"branch,omitempty"`
-	RepoIdentifier string    `json:"repoIdentifier,omitempty"`
-	RootFolder     string    `json:"rootFolder,omitempty"`
-	FilePath       string    `json:"filePath,omitempty"`
-	BaseBranch     string    `json:"baseBranch,omitempty"`
-	ConnectorRef   string    `json:"connectorRef,omitempty"`
-	RepoName       string    `json:"repoName,omitempty"`
-	StoreType      StoreType `json:"storeType"`
-	Yaml           string    `json:"yaml"`
-}
