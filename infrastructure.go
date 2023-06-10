@@ -34,7 +34,7 @@ func applyInfraDefinition(c *cli.Context) error {
 		println("Creating Infrastructure Definition with id: ", getColoredText(identifier, color.FgGreen))
 		fmt.Println("createoOrUpdateInfraURL: ", createoOrUpdateInfraURL)
 		fmt.Println("requestBody: ", requestBody)
-		resp, err = Post(createoOrUpdateInfraURL, cliCdRequestData.AuthToken, InfraPayload, JSON_CONTENT_TYPE)
+		resp, err = Post(createoOrUpdateInfraURL, cliCdRequestData.AuthToken, InfraPayload, CONTENT_TYPE_JSON)
 
 		if err == nil {
 			println(getColoredText("Infrastructure Definition created successfully!", color.FgGreen))
@@ -44,7 +44,7 @@ func applyInfraDefinition(c *cli.Context) error {
 	} else {
 		println("Found Infrastructure Definition with id: ", getColoredText(identifier, color.FgGreen))
 		println(getColoredText("Updating infrastructure definition details....", color.FgGreen))
-		resp, err = Put(createoOrUpdateInfraURL, cliCdRequestData.AuthToken, InfraPayload, JSON_CONTENT_TYPE)
+		resp, err = Put(createoOrUpdateInfraURL, cliCdRequestData.AuthToken, InfraPayload, CONTENT_TYPE_JSON)
 		if err == nil {
 			println(getColoredText("Infrastructure Definition updated successfully!", color.FgGreen))
 			//printJson(resp.Data)

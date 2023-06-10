@@ -6,7 +6,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-// Create update  Environment
+// Create update Environment
 func applyEnv(c *cli.Context) error {
 	fmt.Println("File path: ", c.String("file"))
 	fmt.Println("Trying to create / update an environment using the yaml.")
@@ -36,7 +36,7 @@ func applyEnv(c *cli.Context) error {
 		ProjectIdentifier: projectIdentifier, OrgIdentifier: orgIdentifier, Yaml: content}
 	fmt.Printf("EnvPayload: ", EnvPayload)
 
-	entityExists := getEntity(fmt.Sprintf("environmentsV2/%s", identifier), projectIdentifier, orgIdentifier, map[string]string{})
+	entityExists := getEntity(fmt.Sprintf("%s/%s", ENVIRONMENT_ENDPOINT, identifier), projectIdentifier, orgIdentifier, map[string]string{})
 
 	var resp ResponseBody
 	var err error
@@ -44,7 +44,7 @@ func applyEnv(c *cli.Context) error {
 		println("Creating environment with id: ", getColoredText(identifier, color.FgGreen))
 		fmt.Println("createOrUpdateEnvURL: ", createOrUpdateEnvURL)
 		fmt.Println("requestBody: ", requestBody)
-		resp, err = Post(createOrUpdateEnvURL, cliCdRequestData.AuthToken, EnvPayload, JSON_CONTENT_TYPE)
+		resp, err = Post(createOrUpdateEnvURL, cliCdRequestData.AuthToken, EnvPayload, CONTENT_TYPE_JSON)
 
 		if err == nil {
 			println(getColoredText("Environment created successfully!", color.FgGreen))
@@ -54,7 +54,7 @@ func applyEnv(c *cli.Context) error {
 	} else {
 		println("Found Environment with id: ", getColoredText(identifier, color.FgGreen))
 		println(getColoredText("Updating existing Environment Environment details....", color.FgGreen))
-		resp, err = Put(createOrUpdateEnvURL, cliCdRequestData.AuthToken, EnvPayload, JSON_CONTENT_TYPE)
+		resp, err = Put(createOrUpdateEnvURL, cliCdRequestData.AuthToken, EnvPayload, CONTENT_TYPE_JSON)
 		if err == nil {
 			println(getColoredText("Environment updated successfully!", color.FgGreen))
 			//printJson(resp.Data)
