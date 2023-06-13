@@ -269,7 +269,7 @@ type HarnessPipeline struct {
 	Description       string `json:"description,omitempty"`
 	Tags              struct {
 	} `json:"tags,omitempty"`
-	Branch         string    `json:"branch,omitempty"`
+	//Branch         string    `json:"branch,omitempty"`
 	RepoIdentifier string    `json:"repoIdentifier,omitempty"`
 	RootFolder     string    `json:"rootFolder,omitempty"`
 	FilePath       string    `json:"filePath,omitempty"`

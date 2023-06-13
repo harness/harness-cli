@@ -25,9 +25,10 @@ func applyInfraDefinition(c *cli.Context) error {
 	environmentRef := valueToString(GetNestedValue(requestBody, "infrastructureDefinition", "environmentRef").(string))
 	//setup payload for Infra create / update
 	InfraPayload := HarnessInfra{Identifier: identifier, Name: name, ProjectIdentifier: projectIdentifier, OrgIdentifier: orgIdentifier, Yaml: content}
-	entityExists := getEntity(fmt.Sprintf("infrastructures/%s", identifier), projectIdentifier, orgIdentifier, map[string]string{
-		"environmentIdentifier": environmentRef,
-	})
+	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("infrastructures/%s", identifier),
+		projectIdentifier, orgIdentifier, map[string]string{
+			"environmentIdentifier": environmentRef,
+		})
 	var resp ResponseBody
 	var err error
 	if !entityExists {
