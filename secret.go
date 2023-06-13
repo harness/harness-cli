@@ -1,27 +1,52 @@
 package main
 
 import (
+	"fmt"
+	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 	"strings"
 )
 
 func applySecret(ctx *cli.Context) error {
-	gitPat := getGitSecret()
+	gitPat := ctx.String("token")
+
+	if gitPat == "" {
+		gitPat = getGitSecret()
+	}
 	if gitPat == "" {
 		println("Secret cannot be an empty string")
 		return nil
 	}
-	reqUrl := GetUrlWithQueryParams("", NG_BASE_URL, "v2/secrets", map[string]string{
+	createSecretURL := GetUrlWithQueryParams("", NG_BASE_URL, "v2/secrets", map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
-	printJson(cliCdRequestData)
+	updateSecretURL := GetUrlWithQueryParams("", NG_BASE_URL, fmt.Sprintf("v2/secrets/%s", GITHUB_SECRET_IDENTIFIER), map[string]string{
+		"accountIdentifier": cliCdRequestData.Account,
+	})
+	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("v2/secrets/%s", GITHUB_SECRET_IDENTIFIER), DEFAULT_PROJECT, DEFAULT_ORG, map[string]string{})
+
 	secretBody := createTextSecret("Harness Git Pat", GITHUB_SECRET_IDENTIFIER, gitPat)
-	resp, err := Post(reqUrl, cliCdRequestData.AuthToken, secretBody, CONTENT_TYPE_JSON)
-	if err != nil {
-		println("Error creating secrets")
-		return nil
+	var resp ResponseBody
+	var err error
+	if !entityExists {
+		println("Creating secret with id: ", getColoredText(GITHUB_SECRET_IDENTIFIER, color.FgGreen))
+		resp, err = Post(createSecretURL, cliCdRequestData.AuthToken, secretBody, CONTENT_TYPE_JSON)
+		if err == nil {
+			println(getColoredText("Secret created successfully!", color.FgGreen))
+			printJson(resp.Data)
+			return nil
+		}
+	} else {
+		println("Found secret with id: ", getColoredText(GITHUB_SECRET_IDENTIFIER, color.FgGreen))
+
+		println(getColoredText("Updating secret details....", color.FgGreen))
+		resp, err = Put(updateSecretURL, cliCdRequestData.AuthToken, secretBody, CONTENT_TYPE_JSON)
+		if err == nil {
+			println(getColoredText("Secret updated successfully!", color.FgGreen))
+			//printJson(resp.Data)
+			return nil
+		}
 	}
-	printJson(resp)
 	return nil
 }
 
