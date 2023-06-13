@@ -149,7 +149,7 @@ func main() {
 						Name:  "delete",
 						Usage: "Delete a service.",
 						Action: func(context *cli.Context) error {
-							return cliWrapper(deleteConnector, context)
+							return cliWrapper(deleteService, context)
 						},
 					},
 				},
@@ -173,7 +173,7 @@ func main() {
 						Name:  "apply",
 						Usage: "Create a new environment or Update  an existing one.",
 						Action: func(context *cli.Context) error {
-							return cliWrapper(applyEnv, context)
+							return cliWrapper(applyEnvironment, context)
 						},
 					},
 					{
@@ -266,14 +266,14 @@ func main() {
 						Name:  "apply",
 						Usage: "Create a new pipeline or Update  an existing one.",
 						Action: func(context *cli.Context) error {
-							return nil
+							return cliWrapper(applyPipeline, context)
 						},
 					},
 					{
 						Name:  "delete",
 						Usage: "Delete a pipeline.",
 						Action: func(context *cli.Context) error {
-							return nil
+							return cliWrapper(deletePipeline, context)
 						},
 					},
 				},
