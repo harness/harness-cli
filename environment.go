@@ -36,7 +36,7 @@ func applyEnvironment(c *cli.Context) error {
 		ProjectIdentifier: projectIdentifier, OrgIdentifier: orgIdentifier, Yaml: content}
 	fmt.Printf("EnvPayload: ", EnvPayload)
 
-	entityExists := getEntity(fmt.Sprintf("%s/%s", ENVIRONMENT_ENDPOINT, identifier), projectIdentifier, orgIdentifier, map[string]string{})
+	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("%s/%s", ENVIRONMENT_ENDPOINT, identifier), projectIdentifier, orgIdentifier, map[string]string{})
 
 	var resp ResponseBody
 	var err error

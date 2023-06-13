@@ -23,7 +23,8 @@ func applyService(c *cli.Context) error {
 	orgIdentifier := "default"
 	//setup payload for svc create / update
 	svcPayload := HarnessService{Identifier: identifier, Name: name, ProjectIdentifier: projectIdentifier, OrgIdentifier: orgIdentifier, Yaml: content}
-	entityExists := getEntity(fmt.Sprintf("servicesV2/%s", identifier), projectIdentifier, orgIdentifier, map[string]string{})
+	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("servicesV2/%s", identifier),
+		projectIdentifier, orgIdentifier, map[string]string{})
 	var resp ResponseBody
 	var err error
 	if !entityExists {

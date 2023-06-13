@@ -10,15 +10,10 @@ import (
 func applyPipeline(c *cli.Context) error {
 	fmt.Println("File path: ", c.String("file"))
 	fmt.Println("Trying to create or update pipeline using the given yaml.")
-	createOrUpdateEnvURL := GetUrlWithQueryParams("", PIPELINES_BASE_URL, PIPELINES_ENDPOINT, map[string]string{
-		"accountIdentifier": cliCdRequestData.Account,
-	})
+
 	var content = readFromFile(c.String("file"))
 
 	requestBody := getJsonFromYaml(content)
-	//fmt.Printf(content)
-	//println("Request Body: ")
-	//printJson(requestBody)
 	if requestBody == nil {
 		println(getColoredText("Please enter valid pipeline yaml file", color.FgRed))
 	}
@@ -26,25 +21,28 @@ func applyPipeline(c *cli.Context) error {
 	name := valueToString(GetNestedValue(requestBody, "pipeline", "name").(string))
 	projectIdentifier := valueToString(GetNestedValue(requestBody, "pipeline", "projectIdentifier").(string))
 	orgIdentifier := valueToString(GetNestedValue(requestBody, "pipeline", "orgIdentifier").(string))
-	branch := valueToString(GetNestedValue(requestBody, "pipeline", "branch").(string))
-	fmt.Printf("identifier=%s, name=%s",
-		identifier, name)
-
+	//branch := valueToString(GetNestedValue(requestBody, "pipeline", "branch").(string))
+	//fmt.Printf("identifier=%s, name=%s", identifier, name)
+	createOrUpdatePipelineURL := GetUrlWithQueryParams("", PIPELINES_BASE_URL, PIPELINES_ENDPOINT, map[string]string{
+		"accountIdentifier": cliCdRequestData.Account,
+		"orgIdentifier":     orgIdentifier,
+		"projectIdentifier": projectIdentifier,
+	})
 	//setup payload for Pipelines create / update
-	fmt.Printf("Before PipelinePayload: ")
-	EnvPayload := HarnessPipeline{Identifier: identifier, Name: name, Branch: branch,
+	fmt.Println("PipelinePayload: ")
+	pipelinePayload := HarnessPipeline{Identifier: identifier, Name: name,
 		ProjectIdentifier: projectIdentifier, OrgIdentifier: orgIdentifier, Yaml: content}
-	fmt.Printf("Pipeline Payload: ", EnvPayload)
+	printJson(pipelinePayload)
 
-	entityExists := getEntity(fmt.Sprintf("%/%s", PIPELINES_ENDPOINT, identifier), projectIdentifier, orgIdentifier, map[string]string{})
-
+	entityExists := getEntity(PIPELINES_BASE_URL, fmt.Sprintf("%s/%s", PIPELINES_ENDPOINT, identifier),
+		projectIdentifier, orgIdentifier, map[string]string{})
 	var resp ResponseBody
 	var err error
 	if !entityExists {
 		println("Creating pipeline with id: ", getColoredText(identifier, color.FgGreen))
-		fmt.Println("createOrUpdateEnvURL: ", createOrUpdateEnvURL)
-		fmt.Println("requestBody: ", requestBody)
-		resp, err = Post(createOrUpdateEnvURL, cliCdRequestData.AuthToken, EnvPayload, CONTENT_TYPE_YAML)
+		//fmt.Println("createOrUpdatePipelineURL: ", createOrUpdatePipelineURL)
+		//fmt.Println("requestBody: ", requestBody)
+		resp, err = Post(createOrUpdatePipelineURL, cliCdRequestData.AuthToken, content, CONTENT_TYPE_YAML)
 
 		if err == nil {
 			println(getColoredText("Pipeline created successfully!", color.FgGreen))
@@ -54,7 +52,7 @@ func applyPipeline(c *cli.Context) error {
 	} else {
 		println("Found Pipeline with id: ", getColoredText(identifier, color.FgGreen))
 		println(getColoredText("Updating existing Pipeline details....", color.FgGreen))
-		resp, err = Put(createOrUpdateEnvURL, cliCdRequestData.AuthToken, EnvPayload, CONTENT_TYPE_JSON)
+		resp, err = Put(createOrUpdatePipelineURL, cliCdRequestData.AuthToken, pipelinePayload, CONTENT_TYPE_JSON)
 		if err == nil {
 			println(getColoredText("Pipeline updated successfully!", color.FgGreen))
 			//printJson(resp.Data)
