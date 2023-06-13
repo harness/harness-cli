@@ -1,6 +1,10 @@
 package main
 
-func PromptAccountDetails() bool {
+import "github.com/urfave/cli/v2"
+
+func PromptAccountDetails(ctx *cli.Context) bool {
+	apiKeyFlag := ctx.String("api-key")
+	println(apiKeyFlag)
 	promptConfirm := false
 
 	if len(cliCdRequestData.Account) == 0 {

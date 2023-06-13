@@ -53,9 +53,13 @@ func main() {
 			Destination: &cliCdRequestData.AuthToken,
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
-			Name:        "load",
-			Usage:       "`FILE` to load flags from.",
-			Destination: &cliCdRequestData.AuthToken,
+			Name:        "account-id",
+			Usage:       "`API_KEY` for the target account to authenticate & authorise the user.",
+			Destination: &cliCdRequestData.Account,
+		}),
+		altsrc.NewStringFlag(&cli.StringFlag{
+			Name:  "load",
+			Usage: "`FILE` to load flags from.",
 		}),
 
 		altsrc.NewBoolFlag(&cli.BoolFlag{
@@ -86,9 +90,13 @@ func main() {
 			},
 			{
 				Name:    "secret",
-				Aliases: []string{"secret"},
+				Aliases: []string{"secret-token"},
 				Usage:   "Secrets specific commands. eg: apply (create/update), delete",
-				Flags:   globalFlags,
+				Flags: append(globalFlags,
+					altsrc.NewStringFlag(&cli.StringFlag{
+						Name:  "token",
+						Usage: "Specify your PAT",
+					})),
 				Action: func(context *cli.Context) error {
 					fmt.Println("Secrets command.")
 					return nil
