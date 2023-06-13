@@ -7,7 +7,7 @@ import (
 )
 
 // Create update Environment
-func applyEnv(c *cli.Context) error {
+func applyEnvironment(c *cli.Context) error {
 	fmt.Println("File path: ", c.String("file"))
 	fmt.Println("Trying to create / update an environment using the yaml.")
 	createOrUpdateEnvURL := GetUrlWithQueryParams("", NG_BASE_URL, ENVIRONMENT_ENDPOINT, map[string]string{

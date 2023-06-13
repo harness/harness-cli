@@ -9,15 +9,16 @@ import (
 // create or update Pipeline
 func applyPipeline(c *cli.Context) error {
 	fmt.Println("File path: ", c.String("file"))
-	fmt.Println("Trying to create / update pipeline using the yaml.")
+	fmt.Println("Trying to create or update pipeline using the given yaml.")
 	createOrUpdateEnvURL := GetUrlWithQueryParams("", PIPELINES_BASE_URL, PIPELINES_ENDPOINT, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 	var content = readFromFile(c.String("file"))
 
 	requestBody := getJsonFromYaml(content)
-	println("Request Body")
-	printJson(requestBody)
+	//fmt.Printf(content)
+	//println("Request Body: ")
+	//printJson(requestBody)
 	if requestBody == nil {
 		println(getColoredText("Please enter valid pipeline yaml file", color.FgRed))
 	}
@@ -43,7 +44,7 @@ func applyPipeline(c *cli.Context) error {
 		println("Creating pipeline with id: ", getColoredText(identifier, color.FgGreen))
 		fmt.Println("createOrUpdateEnvURL: ", createOrUpdateEnvURL)
 		fmt.Println("requestBody: ", requestBody)
-		resp, err = Post(createOrUpdateEnvURL, cliCdRequestData.AuthToken, EnvPayload, CONTENT_TYPE_JSON)
+		resp, err = Post(createOrUpdateEnvURL, cliCdRequestData.AuthToken, EnvPayload, CONTENT_TYPE_YAML)
 
 		if err == nil {
 			println(getColoredText("Pipeline created successfully!", color.FgGreen))
