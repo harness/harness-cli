@@ -50,6 +50,7 @@ func applyService(c *cli.Context) error {
 	return nil
 }
 
-func deleteService() {
+func deleteService(*cli.Context) error {
 	fmt.Println(NOT_IMPLEMENTED)
+	return nil
 }

@@ -102,6 +102,8 @@ func readFromFile(filepath string) (s string) {
 		}
 		_fileContents = string(buffer[:reader])
 	}
+	println("File contents: ")
+	fmt.Printf(_fileContents)
 	return _fileContents
 }
 
