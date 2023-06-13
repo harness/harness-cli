@@ -13,5 +13,6 @@ const NG_BASE_URL = "https://app.harness.io/gateway/ng/api"
 >>>>>>> 3bc0f18 (feat: [PLG-2449] Added logic for pipeline apply and some refactoring)
 const NOT_IMPLEMENTED = "Command Not_Implemented. Check back later.."
 const PIPELINES_BASE_URL = "https://app.harness.io/pipeline/api"
-const PIPELINES_ENDPOINT = "pipelines/v2"
+const PIPELINES_ENDPOINT = "pipelines"
+const PIPELINES_ENDPOINT_V2 = "pipelines/v2"
 const SECRETS_STORE_PATH = ".secrets.json"

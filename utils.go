@@ -87,7 +87,7 @@ func writeToFile(text string, filepath string, overwrite bool) {
 
 func readFromFile(filepath string) (s string) {
 	var _fileContents = ""
-	buffer := make([]byte, 1024)
+	buffer := make([]byte, 2048)
 	file, fileError := os.OpenFile(filepath, os.O_RDONLY, 0644)
 	defer file.Close()
 	for {
@@ -102,8 +102,7 @@ func readFromFile(filepath string) (s string) {
 		}
 		_fileContents = string(buffer[:reader])
 	}
-	println("File contents: ")
-	fmt.Printf(_fileContents)
+
 	return _fileContents
 }
 
@@ -197,7 +196,7 @@ func getColoredText(text string, textColor color.Attribute) string {
 	return colored(text)
 }
 
-func getEntity(reqURL string, projectIdentifier string, orgIdentifier string, extraparams map[string]string) bool {
+func getEntity(baseUrl string, reqURL string, projectIdentifier string, orgIdentifier string, extraparams map[string]string) bool {
 	queryParams := map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 		"routingId":         cliCdRequestData.Account,
@@ -205,10 +204,11 @@ func getEntity(reqURL string, projectIdentifier string, orgIdentifier string, ex
 		"orgIdentifier":     orgIdentifier,
 	}
 	queryParams = mergeMaps(queryParams, extraparams)
-	urlWithQueryParams := GetUrlWithQueryParams("", NG_BASE_URL, reqURL, queryParams)
+	urlWithQueryParams := GetUrlWithQueryParams("", baseUrl, reqURL, queryParams)
 	_, fetchEntityError := Get(urlWithQueryParams, cliCdRequestData.AuthToken)
 
-	fmt.Printf("urlWithQueryParams: ", urlWithQueryParams)
+	fmt.Println("urlWithQueryParams: ")
+	fmt.Println(urlWithQueryParams)
 	if fetchEntityError != nil {
 		return false
 	} else {
