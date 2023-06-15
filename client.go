@@ -77,9 +77,6 @@ func Delete(reqUrl string, auth string) (respBodyObj ResponseBody, err error) {
 func handleResp(req *http.Request) (respBodyObj ResponseBody, err error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
-	if err != nil {
-		return
-	}
 
 	if err != nil {
 		log.Fatalln(err)
