@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 )
@@ -43,7 +44,6 @@ func applyService(c *cli.Context) error {
 		resp, err = Put(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, CONTENT_TYPE_JSON)
 		if err == nil {
 			println(getColoredText("Service updated successfully!", color.FgGreen))
-			//printJson(resp.Data)
 			return nil
 		}
 	}
