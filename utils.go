@@ -87,21 +87,14 @@ func writeToFile(text string, filepath string, overwrite bool) {
 
 func readFromFile(filepath string) (s string) {
 	var _fileContents = ""
-	buffer := make([]byte, 2048)
 	file, fileError := os.OpenFile(filepath, os.O_RDONLY, 0644)
 	defer file.Close()
-	for {
-		reader, readError := file.Read(buffer)
-		if readError != nil {
-			if readError == io.EOF {
-				break
-			} else {
-				log.Println("Error reading from file:", fileError)
-				break
-			}
-		}
-		_fileContents = string(buffer[:reader])
+
+	byteValue, readError := io.ReadAll(file)
+	if readError != nil {
+		log.Println("Error reading from file:", fileError)
 	}
+	_fileContents = string(byteValue)
 
 	return _fileContents
 }
