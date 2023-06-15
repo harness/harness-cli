@@ -28,17 +28,16 @@ func applyPipeline(c *cli.Context) error {
 	})
 	entityExists := getEntity(PIPELINES_BASE_URL, fmt.Sprintf("%s/%s", PIPELINES_ENDPOINT, identifier),
 		projectIdentifier, orgIdentifier, map[string]string{})
-	var resp ResponseBody
+	var _ ResponseBody
 	var err error
 	if !entityExists {
-		println("Creating pipeline with id: ", getColoredText(identifier, color.FgGreen))
+		println("Creating pipeline with id: ", getColoredText(identifier, color.FgCyan))
 		fmt.Println("createOrUpdatePipelineURL: ", createOrUpdatePipelineURL)
 		fmt.Println("requestBody: ", requestBody)
-		resp, err = Post(createOrUpdatePipelineURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_YAML)
+		_, err = Post(createOrUpdatePipelineURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_YAML)
 
 		if err == nil {
 			println(getColoredText("Pipeline created successfully!", color.FgGreen))
-			printJson(resp.Data)
 			return nil
 		}
 	} else {
@@ -49,9 +48,9 @@ func applyPipeline(c *cli.Context) error {
 				"orgIdentifier":      orgIdentifier,
 				"projectIdentifier":  projectIdentifier,
 			})
-		println("Found Pipeline with id: ", getColoredText(identifier, color.FgGreen))
+		println("Found Pipeline with id: ", getColoredText(identifier, color.FgBlue))
 		println(getColoredText("Updating existing Pipeline details....", color.FgGreen))
-		resp, err = Put(pipelinesPUTUrl, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_YAML)
+		_, err = Put(pipelinesPUTUrl, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_YAML)
 		if err == nil {
 			println(getColoredText("Pipeline updated successfully!", color.FgGreen))
 			return nil
