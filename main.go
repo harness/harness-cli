@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
-	"os"
 )
 
 var Version = "development"
@@ -39,7 +40,6 @@ func init() {
 }
 
 func main() {
-	fmt.Println("Welcome to Harness CLI!")
 	CheckGithubForReleases()
 	globalFlags := []cli.Flag{
 		altsrc.NewStringFlag(&cli.StringFlag{
@@ -110,7 +110,6 @@ func main() {
 						Name:  "apply",
 						Usage: "Create a new secret or Update  an existing one.",
 						Action: func(context *cli.Context) error {
-							println("secret calld")
 							return cliWrapper(applySecret, context)
 						},
 					},
@@ -217,9 +216,9 @@ func main() {
 				},
 			},
 			{
-				Name:    "infrastructure-definition",
+				Name:    "infrastructure",
 				Aliases: []string{"infra"},
-				Usage:   "Infrastructure Definition specific commands, eg: apply (create/update), delete, list",
+				Usage:   "Infrastructure specific commands, eg: apply (create/update), delete, list",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:  "file",

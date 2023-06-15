@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 )
@@ -57,7 +58,6 @@ func applyEnvironment(c *cli.Context) error {
 		resp, err = Put(createOrUpdateEnvURL, cliCdRequestData.AuthToken, EnvPayload, CONTENT_TYPE_JSON)
 		if err == nil {
 			println(getColoredText("Environment updated successfully!", color.FgGreen))
-			//printJson(resp.Data)
 			return nil
 		}
 	}

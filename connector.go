@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
@@ -52,7 +53,6 @@ func applyConnector(c *cli.Context) error {
 		resp, err = Put(createConnectorURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_JSON)
 		if err == nil {
 			println(getColoredText("Connector updated successfully!", color.FgGreen))
-			//printJson(resp.Data)
 			return nil
 		}
 

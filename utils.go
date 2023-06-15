@@ -111,6 +111,7 @@ func saveCredentials() (err error) {
 	}
 
 	writeToFile(string(jsonObj), SECRETS_STORE_PATH, true)
+	println(getColoredText("Login successfully done. Yay!", color.FgGreen))
 	return nil
 }
 func hydrateCredsFromPersistence(c *cli.Context) {
@@ -200,8 +201,6 @@ func getEntity(baseUrl string, reqURL string, projectIdentifier string, orgIdent
 	urlWithQueryParams := GetUrlWithQueryParams("", baseUrl, reqURL, queryParams)
 	_, fetchEntityError := Get(urlWithQueryParams, cliCdRequestData.AuthToken)
 
-	fmt.Println("urlWithQueryParams: ")
-	fmt.Println(urlWithQueryParams)
 	if fetchEntityError != nil {
 		return false
 	} else {

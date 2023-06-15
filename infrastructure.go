@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 )
@@ -48,7 +49,6 @@ func applyInfraDefinition(c *cli.Context) error {
 		resp, err = Put(createoOrUpdateInfraURL, cliCdRequestData.AuthToken, InfraPayload, CONTENT_TYPE_JSON)
 		if err == nil {
 			println(getColoredText("Infrastructure Definition updated successfully!", color.FgGreen))
-			//printJson(resp.Data)
 			return nil
 		}
 	}

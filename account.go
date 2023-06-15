@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/urfave/cli/v2"
 )
 
@@ -19,7 +20,6 @@ func getAccountDetails(ctx *cli.Context) error {
 		fmt.Printf("Response code: %s \n", resp.Code)
 		fmt.Printf("Response resource: %s \n", resp.Resource)
 		fmt.Printf("Response messages: %s \n", resp.Messages)
-		//printJson(resp.Data)
 		return nil
 	}
 
