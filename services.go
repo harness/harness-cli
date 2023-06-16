@@ -26,22 +26,22 @@ func applyService(c *cli.Context) error {
 	svcPayload := HarnessService{Identifier: identifier, Name: name, ProjectIdentifier: projectIdentifier, OrgIdentifier: orgIdentifier, Yaml: content}
 	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("servicesV2/%s", identifier),
 		projectIdentifier, orgIdentifier, map[string]string{})
-	var resp ResponseBody
+
 	var err error
 	if !entityExists {
 		println("Creating service with id: ", getColoredText(identifier, color.FgGreen))
 		fmt.Println("createOrUpdateSvcURL: ", createOrUpdateSvcURL)
 		fmt.Println("requestBody: ", requestBody)
-		resp, err = Post(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, CONTENT_TYPE_JSON)
+		_, err = Post(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, CONTENT_TYPE_JSON)
 		if err == nil {
 			println(getColoredText("Service created successfully!", color.FgGreen))
-			printJson(resp.Data)
+
 			return nil
 		}
 	} else {
 		println("Found service with id: ", getColoredText(identifier, color.FgGreen))
 		println(getColoredText("Updating service details....", color.FgGreen))
-		resp, err = Put(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, CONTENT_TYPE_JSON)
+		_, err = Put(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, CONTENT_TYPE_JSON)
 		if err == nil {
 			println(getColoredText("Service updated successfully!", color.FgGreen))
 			return nil

@@ -20,11 +20,15 @@ func applySecret(ctx *cli.Context) error {
 	}
 	createSecretURL := GetUrlWithQueryParams("", NG_BASE_URL, "v2/secrets", map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
+		"projectIdentifier": DEFAULT_PROJECT,
+		"orgIdentifier":     DEFAULT_ORG,
 	})
 	updateSecretURL := GetUrlWithQueryParams("", NG_BASE_URL, fmt.Sprintf("v2/secrets/%s", GITHUB_SECRET_IDENTIFIER), map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
+		"projectIdentifier": DEFAULT_PROJECT,
+		"orgIdentifier":     DEFAULT_ORG,
 	})
-	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("v2/secrets/%s", GITHUB_SECRET_IDENTIFIER), "", "", map[string]string{})
+	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("v2/secrets/%s", GITHUB_SECRET_IDENTIFIER), DEFAULT_PROJECT, DEFAULT_ORG, map[string]string{})
 
 	secretBody := createTextSecret("Harness Git Pat", GITHUB_SECRET_IDENTIFIER, gitPat)
 	var err error
@@ -64,6 +68,6 @@ func createTextSecret(secretName string, identifier string, secretValue string) 
 	if identifier == "" {
 		identifier = strings.ReplaceAll(secretName, " ", "_")
 	}
-	newSecret := HarnessSecret{Secret: Secret{Type: "SecretText", Name: secretName, Identifier: identifier, Spec: SecretSpec{Value: secretValue, SecretManagerIdentifier: "harnessSecretManager", ValueType: "Inline"}}}
+	newSecret := HarnessSecret{Secret: Secret{Type: "SecretText", Name: secretName, Identifier: identifier, OrgIdentifier: DEFAULT_ORG, ProjectIdentifier: DEFAULT_PROJECT, Spec: SecretSpec{Value: secretValue, SecretManagerIdentifier: "harnessSecretManager", ValueType: "Inline"}}}
 	return newSecret
 }

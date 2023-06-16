@@ -68,12 +68,18 @@ func printJson(v any) {
 	fmt.Println("Data: ", string(marsheld))
 }
 
-func writeToFile(text string, filepath string, overwrite bool) {
+func writeToFile(text string, filename string, overwrite bool) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Println("Failed to get user's home directory:", err)
+		return
+	}
+	exactFilePath := homeDir + "/" + filename
 	var permissions = os.O_APPEND | os.O_CREATE | os.O_WRONLY
 	if overwrite {
 		permissions = os.O_APPEND | os.O_CREATE | os.O_WRONLY | os.O_TRUNC
 	}
-	f, err := os.OpenFile(filepath, permissions, 0644)
+	f, err := os.OpenFile(exactFilePath, permissions, 0644)
 	if overwrite {
 		f.WriteString("")
 	}
@@ -87,6 +93,7 @@ func writeToFile(text string, filepath string, overwrite bool) {
 
 func readFromFile(filepath string) (s string) {
 	var _fileContents = ""
+
 	file, fileError := os.OpenFile(filepath, os.O_RDONLY, 0644)
 	defer file.Close()
 
@@ -118,7 +125,13 @@ func hydrateCredsFromPersistence(c *cli.Context) {
 	if cliCdRequestData.AuthToken != "" && cliCdRequestData.Account != "" {
 		return
 	}
-	credsJson, err := os.ReadFile(SECRETS_STORE_PATH)
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Println("Failed to get user's home directory:", err)
+		return
+	}
+	exactFilePath := homeDir + "/" + SECRETS_STORE_PATH
+	credsJson, err := os.ReadFile(exactFilePath)
 	if err != nil {
 		fmt.Println("Error reading creds file:", err)
 		return
