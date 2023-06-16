@@ -69,7 +69,7 @@ func printJson(v any) {
 }
 
 func writeToFile(text string, filename string, overwrite bool) {
-	 
+
 	exactFilePath := getUserHomePath() + "/" + filename
 	var permissions = os.O_APPEND | os.O_CREATE | os.O_WRONLY
 	if overwrite {
