@@ -69,12 +69,8 @@ func printJson(v any) {
 }
 
 func writeToFile(text string, filename string, overwrite bool) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Println("Failed to get user's home directory:", err)
-		return
-	}
-	exactFilePath := homeDir + "/" + filename
+	 
+	exactFilePath := getUserHomePath() + "/" + filename
 	var permissions = os.O_APPEND | os.O_CREATE | os.O_WRONLY
 	if overwrite {
 		permissions = os.O_APPEND | os.O_CREATE | os.O_WRONLY | os.O_TRUNC
@@ -125,12 +121,8 @@ func hydrateCredsFromPersistence(c *cli.Context) {
 	if cliCdRequestData.AuthToken != "" && cliCdRequestData.Account != "" {
 		return
 	}
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Println("Failed to get user's home directory:", err)
-		return
-	}
-	exactFilePath := homeDir + "/" + SECRETS_STORE_PATH
+
+	exactFilePath := getUserHomePath() + "/" + SECRETS_STORE_PATH
 	credsJson, err := os.ReadFile(exactFilePath)
 	if err != nil {
 		fmt.Println("Error reading creds file:", err)
@@ -180,7 +172,14 @@ func GetNestedValue(data map[string]interface{}, keys ...string) interface{} {
 
 	return value
 }
-
+func getUserHomePath() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Println("Failed to get user's home directory:", err)
+		return ""
+	}
+	return homeDir
+}
 func valueToString(value interface{}) string {
 	switch v := value.(type) {
 	case string:
