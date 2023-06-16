@@ -35,22 +35,22 @@ func applyConnector(c *cli.Context) error {
 	orgIdentifier := valueToString(GetNestedValue(requestBody, "connector", "orgIdentifier").(string))
 	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("connectors/%s", identifier),
 		projectIdentifier, orgIdentifier, map[string]string{})
-	var resp ResponseBody
+
 	var err error
 	if !entityExists {
 
 		println("Creating connector with id: ", getColoredText(identifier, color.FgGreen))
-		resp, err = Post(createConnectorURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_JSON)
+		_, err = Post(createConnectorURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_JSON)
 		if err == nil {
 			println(getColoredText("Connector created successfully!", color.FgGreen))
-			printJson(resp.Data)
 			return nil
 		}
+		println(err.Error())
 	} else {
 		println("Found connector with id: ", getColoredText(identifier, color.FgGreen))
 
 		println(getColoredText("Updating connector details....", color.FgGreen))
-		resp, err = Put(createConnectorURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_JSON)
+		_, err = Put(createConnectorURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_JSON)
 		if err == nil {
 			println(getColoredText("Connector updated successfully!", color.FgGreen))
 			return nil

@@ -39,23 +39,22 @@ func applyEnvironment(c *cli.Context) error {
 
 	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("%s/%s", ENVIRONMENT_ENDPOINT, identifier), projectIdentifier, orgIdentifier, map[string]string{})
 
-	var resp ResponseBody
 	var err error
 	if !entityExists {
 		println("Creating environment with id: ", getColoredText(identifier, color.FgGreen))
 		fmt.Println("createOrUpdateEnvURL: ", createOrUpdateEnvURL)
 		fmt.Println("requestBody: ", requestBody)
-		resp, err = Post(createOrUpdateEnvURL, cliCdRequestData.AuthToken, EnvPayload, CONTENT_TYPE_JSON)
+		_, err = Post(createOrUpdateEnvURL, cliCdRequestData.AuthToken, EnvPayload, CONTENT_TYPE_JSON)
 
 		if err == nil {
 			println(getColoredText("Environment created successfully!", color.FgGreen))
-			printJson(resp.Data)
+
 			return nil
 		}
 	} else {
 		println("Found Environment with id: ", getColoredText(identifier, color.FgGreen))
 		println(getColoredText("Updating existing Environment Environment details....", color.FgGreen))
-		resp, err = Put(createOrUpdateEnvURL, cliCdRequestData.AuthToken, EnvPayload, CONTENT_TYPE_JSON)
+		_, err = Put(createOrUpdateEnvURL, cliCdRequestData.AuthToken, EnvPayload, CONTENT_TYPE_JSON)
 		if err == nil {
 			println(getColoredText("Environment updated successfully!", color.FgGreen))
 			return nil
