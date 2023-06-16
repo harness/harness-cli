@@ -45,7 +45,7 @@ func applyConnector(c *cli.Context) error {
 			println(getColoredText("Connector created successfully!", color.FgGreen))
 			return nil
 		}
-		println(err.Error())
+		
 	} else {
 		println("Found connector with id: ", getColoredText(identifier, color.FgGreen))
 
