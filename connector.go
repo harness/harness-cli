@@ -15,7 +15,7 @@ func applyConnector(c *cli.Context) error {
 		fmt.Println("Please enter valid filename")
 		return nil
 	}
-	fmt.Println("Trying to create or update infrastructure using the yaml=",
+	fmt.Println("Trying to create or update connector using the yaml=",
 		getColoredText(filePath, color.FgCyan))
 
 	// Getting the account details

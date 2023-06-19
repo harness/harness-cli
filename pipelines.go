@@ -9,9 +9,13 @@ import (
 
 // create or update Pipeline
 func applyPipeline(c *cli.Context) error {
-	fmt.Println("File path: ", c.String("file"))
-	fmt.Println("Trying to create or update pipeline using the given yaml.")
-
+	filePath := c.String("file")
+	if filePath == "" {
+		fmt.Println("Please enter valid filename")
+		return nil
+	}
+	fmt.Println("Trying to create or update pipeline using the yaml=",
+		getColoredText(filePath, color.FgCyan))
 	var content = readFromFile(c.String("file"))
 	requestBody := getJsonFromYaml(content)
 	if requestBody == nil {
@@ -31,13 +35,11 @@ func applyPipeline(c *cli.Context) error {
 	var _ ResponseBody
 	var err error
 	if !entityExists {
-		println("Creating pipeline with id: ", getColoredText(identifier, color.FgCyan))
-		fmt.Println("createOrUpdatePipelineURL: ", createOrUpdatePipelineURL)
-		fmt.Println("requestBody: ", requestBody)
+		println("Creating pipeline with id: ", getColoredText(identifier, color.FgGreen))
 		_, err = Post(createOrUpdatePipelineURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_YAML)
-
 		if err == nil {
-			println(getColoredText("Pipeline created successfully!", color.FgGreen))
+			println(getColoredText("Successfully created pipeline with id= ", color.FgGreen) +
+				getColoredText(identifier, color.FgBlue))
 			return nil
 		}
 	} else {
@@ -48,11 +50,12 @@ func applyPipeline(c *cli.Context) error {
 				"orgIdentifier":      orgIdentifier,
 				"projectIdentifier":  projectIdentifier,
 			})
-		println("Found Pipeline with id: ", getColoredText(identifier, color.FgBlue))
-		println(getColoredText("Updating existing Pipeline details....", color.FgGreen))
+		println("Found pipeline with id=", getColoredText(identifier, color.FgCyan))
+		println("Updating details of pipeline with id=", getColoredText(identifier, color.FgBlue))
 		_, err = Put(pipelinesPUTUrl, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_YAML)
 		if err == nil {
-			println(getColoredText("Pipeline updated successfully!", color.FgGreen))
+			println(getColoredText("Successfully updated pipeline with id= ", color.FgGreen) +
+				getColoredText(identifier, color.FgBlue))
 			return nil
 		}
 	}
