@@ -15,8 +15,8 @@ func applyConnector(c *cli.Context) error {
 		fmt.Println("Please enter valid filename")
 		return nil
 	}
-	fmt.Println("File path: ", filePath)
-	fmt.Println("Trying to create or update a connector using the provided connector yaml")
+	fmt.Println("Trying to create or update infrastructure using the yaml=",
+		getColoredText(filePath, color.FgCyan))
 
 	// Getting the account details
 	createConnectorURL := GetUrlWithQueryParams("", NG_BASE_URL, "connectors", map[string]string{
@@ -46,7 +46,6 @@ func applyConnector(c *cli.Context) error {
 		}
 	} else {
 		println("Found connector with id=", getColoredText(identifier, color.FgCyan))
-
 		println("Updating details of connector with id=", getColoredText(identifier, color.FgBlue))
 		_, err = Put(createConnectorURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_JSON)
 		if err == nil {

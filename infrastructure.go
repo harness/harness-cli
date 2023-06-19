@@ -9,9 +9,14 @@ import (
 
 // create update  Infra Definition
 func applyInfraDefinition(c *cli.Context) error {
-	fmt.Println("File path: ", c.String("file"))
-	fmt.Println("Trying to create / update a Infrastructure Definition using the yaml.")
-	createoOrUpdateInfraURL := GetUrlWithQueryParams("", NG_BASE_URL, "infrastructures", map[string]string{
+	filePath := c.String("file")
+	if filePath == "" {
+		fmt.Println("Please enter valid filename")
+		return nil
+	}
+	fmt.Println("Trying to create or update infrastructure using the yaml=",
+		getColoredText(filePath, color.FgCyan))
+	createOrUpdateInfraURL := GetUrlWithQueryParams("", NG_BASE_URL, "infrastructures", map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 	var content = readFromFile(c.String("file"))
@@ -30,25 +35,21 @@ func applyInfraDefinition(c *cli.Context) error {
 		projectIdentifier, orgIdentifier, map[string]string{
 			"environmentIdentifier": environmentRef,
 		})
-	var resp ResponseBody
 	var err error
 	if !entityExists {
-		println("Creating Infrastructure Definition with id: ", getColoredText(identifier, color.FgGreen))
-		fmt.Println("createoOrUpdateInfraURL: ", createoOrUpdateInfraURL)
-		fmt.Println("requestBody: ", requestBody)
-		resp, err = Post(createoOrUpdateInfraURL, cliCdRequestData.AuthToken, InfraPayload, CONTENT_TYPE_JSON)
-
+		println("Creating infrastructure with id: ", getColoredText(identifier, color.FgGreen))
+		_, err = Post(createOrUpdateInfraURL, cliCdRequestData.AuthToken, InfraPayload, CONTENT_TYPE_JSON)
 		if err == nil {
 			println(getColoredText("Infrastructure Definition created successfully!", color.FgGreen))
-			printJson(resp.Data)
 			return nil
 		}
 	} else {
-		println("Found Infrastructure Definition with id: ", getColoredText(identifier, color.FgGreen))
-		println(getColoredText("Updating infrastructure definition details....", color.FgGreen))
-		resp, err = Put(createoOrUpdateInfraURL, cliCdRequestData.AuthToken, InfraPayload, CONTENT_TYPE_JSON)
+		println("Found infrastructure with id=", getColoredText(identifier, color.FgCyan))
+		println("Updating details of infrastructure with id=", getColoredText(identifier, color.FgBlue))
+		_, err = Put(createOrUpdateInfraURL, cliCdRequestData.AuthToken, InfraPayload, CONTENT_TYPE_JSON)
 		if err == nil {
-			println(getColoredText("Infrastructure Definition updated successfully!", color.FgGreen))
+			println(getColoredText("Successfully updated connector with id= ", color.FgGreen) +
+				getColoredText(identifier, color.FgBlue))
 			return nil
 		}
 	}

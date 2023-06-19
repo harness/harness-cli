@@ -8,7 +8,13 @@ import (
 )
 
 func applyService(c *cli.Context) error {
-	fmt.Println("Trying to create or update a service using the service yaml=", getColoredText(c.String("file"), color.FgCyan))
+	filePath := c.String("file")
+	if filePath == "" {
+		fmt.Println("Please enter valid filename")
+		return nil
+	}
+	fmt.Println("Trying to create or update service using the yaml=",
+		getColoredText(filePath, color.FgCyan))
 	createOrUpdateSvcURL := GetUrlWithQueryParams("", NG_BASE_URL, "servicesV2", map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
@@ -19,30 +25,27 @@ func applyService(c *cli.Context) error {
 	}
 	identifier := valueToString(GetNestedValue(requestBody, "service", "identifier").(string))
 	name := valueToString(GetNestedValue(requestBody, "service", "name").(string))
-	projectIdentifier := "default_project"
-	orgIdentifier := "default"
 	//setup payload for svc create / update
-	svcPayload := HarnessService{Identifier: identifier, Name: name, ProjectIdentifier: projectIdentifier, OrgIdentifier: orgIdentifier, Yaml: content}
+	svcPayload := HarnessService{Identifier: identifier, Name: name,
+		ProjectIdentifier: DEFAULT_PROJECT, OrgIdentifier: DEFAULT_ORG, Yaml: content}
 	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("servicesV2/%s", identifier),
-		projectIdentifier, orgIdentifier, map[string]string{})
-	var resp ResponseBody
+		DEFAULT_PROJECT, DEFAULT_ORG, map[string]string{})
 	var err error
 	if !entityExists {
 		println("Creating service with id: ", getColoredText(identifier, color.FgGreen))
-		fmt.Println("createOrUpdateSvcURL: ", createOrUpdateSvcURL)
-		fmt.Println("requestBody: ", requestBody)
-		resp, err = Post(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, CONTENT_TYPE_JSON)
+		_, err = Post(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, CONTENT_TYPE_JSON)
 		if err == nil {
-			println(getColoredText("Service created successfully!", color.FgGreen))
-			printJson(resp.Data)
+			println(getColoredText("Successfully created service with id= ", color.FgGreen) +
+				getColoredText(identifier, color.FgBlue))
 			return nil
 		}
 	} else {
-		println("Found service with id: ", getColoredText(identifier, color.FgGreen))
-		println(getColoredText("Updating service details....", color.FgGreen))
-		resp, err = Put(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, CONTENT_TYPE_JSON)
+		println("Found service with id=", getColoredText(identifier, color.FgCyan))
+		println("Updating details of service with id=", getColoredText(identifier, color.FgBlue))
+		_, err = Put(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, CONTENT_TYPE_JSON)
 		if err == nil {
-			println(getColoredText("Service updated successfully!", color.FgGreen))
+			println(getColoredText("Successfully updated connector with id= ", color.FgGreen) +
+				getColoredText(identifier, color.FgBlue))
 			return nil
 		}
 	}
