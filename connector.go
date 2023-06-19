@@ -38,21 +38,22 @@ func applyConnector(c *cli.Context) error {
 	var resp ResponseBody
 	var err error
 	if !entityExists {
-
 		println("Creating connector with id: ", getColoredText(identifier, color.FgGreen))
 		resp, err = Post(createConnectorURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_JSON)
 		if err == nil {
-			println(getColoredText("Connector created successfully!", color.FgGreen))
+			println(getColoredText(fmt.Sprintf("Connector with connectorId= %s created successfully!", identifier),
+				color.FgGreen))
 			printJson(resp.Data)
 			return nil
 		}
 	} else {
-		println("Found connector with id: ", getColoredText(identifier, color.FgGreen))
+		println("Found connector with id=", getColoredText(identifier, color.FgCyan))
 
-		println(getColoredText("Updating connector details....", color.FgGreen))
+		println("Updating details of connector with id=", getColoredText(identifier, color.FgBlue))
 		resp, err = Put(createConnectorURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_JSON)
 		if err == nil {
-			println(getColoredText("Connector updated successfully!", color.FgGreen))
+			println(getColoredText(fmt.Sprintf("Connector with id= %s updated successfully!", identifier),
+				color.FgGreen))
 			return nil
 		}
 
