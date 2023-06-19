@@ -15,8 +15,8 @@ func applyConnector(c *cli.Context) error {
 		fmt.Println("Please enter valid filename")
 		return nil
 	}
-	fmt.Println("File path: ", filePath)
-	fmt.Println("Trying to create or update a connector using the provided connector yaml")
+	fmt.Println("Trying to create or update connector using the yaml=",
+		getColoredText(filePath, color.FgCyan))
 
 	// Getting the account details
 	createConnectorURL := GetUrlWithQueryParams("", NG_BASE_URL, "connectors", map[string]string{
@@ -38,21 +38,23 @@ func applyConnector(c *cli.Context) error {
 
 	var err error
 	if !entityExists {
-
 		println("Creating connector with id: ", getColoredText(identifier, color.FgGreen))
 		_, err = Post(createConnectorURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_JSON)
 		if err == nil {
-			println(getColoredText("Connector created successfully!", color.FgGreen))
+			println(getColoredText("Successfully created connector with id= ", color.FgGreen) +
+				getColoredText(identifier, color.FgBlue))
+
 			return nil
 		}
 		
 	} else {
-		println("Found connector with id: ", getColoredText(identifier, color.FgGreen))
+		println("Found connector with id=", getColoredText(identifier, color.FgCyan))
+		println("Updating details of connector with id=", getColoredText(identifier, color.FgBlue))
 
-		println(getColoredText("Updating connector details....", color.FgGreen))
 		_, err = Put(createConnectorURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_JSON)
 		if err == nil {
-			println(getColoredText("Connector updated successfully!", color.FgGreen))
+			println(getColoredText("Successfully updated connector with id= ", color.FgGreen) +
+				getColoredText(identifier, color.FgBlue))
 			return nil
 		}
 

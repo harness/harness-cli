@@ -28,23 +28,26 @@ func applySecret(ctx *cli.Context) error {
 		"projectIdentifier": DEFAULT_PROJECT,
 		"orgIdentifier":     DEFAULT_ORG,
 	})
-	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("v2/secrets/%s", GITHUB_SECRET_IDENTIFIER), DEFAULT_PROJECT, DEFAULT_ORG, map[string]string{})
+	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("v2/secrets/%s", GITHUB_SECRET_IDENTIFIER), "",
+		"", map[string]string{})
 
 	secretBody := createTextSecret("Harness Git Pat", GITHUB_SECRET_IDENTIFIER, gitPat)
 	var err error
 	if !entityExists {
-		println("Creating secret with id: ", getColoredText(GITHUB_SECRET_IDENTIFIER, color.FgGreen))
+		println("Creating secret with default id: ", getColoredText(GITHUB_SECRET_IDENTIFIER, color.FgCyan))
 		_, err = Post(createSecretURL, cliCdRequestData.AuthToken, secretBody, CONTENT_TYPE_JSON)
 		if err == nil {
-			println(getColoredText("Secret created successfully!", color.FgGreen))
+			println(getColoredText("Successfully created secret with id= ", color.FgGreen) +
+				getColoredText(GITHUB_SECRET_IDENTIFIER, color.FgBlue))
 			return nil
 		}
 	} else {
 		println("Found secret with id: ", getColoredText(GITHUB_SECRET_IDENTIFIER, color.FgCyan))
-		println(getColoredText("Updating secret details....", color.FgBlue))
+		println("Updating secret details....")
 		_, err = Put(updateSecretURL, cliCdRequestData.AuthToken, secretBody, CONTENT_TYPE_JSON)
 		if err == nil {
-			println(getColoredText("Secret updated successfully!", color.FgGreen))
+			println(getColoredText("Successfully updated secretId= ", color.FgGreen) +
+				getColoredText(GITHUB_SECRET_IDENTIFIER, color.FgBlue))
 			return nil
 		}
 	}
@@ -68,6 +71,7 @@ func createTextSecret(secretName string, identifier string, secretValue string) 
 	if identifier == "" {
 		identifier = strings.ReplaceAll(secretName, " ", "_")
 	}
-	newSecret := HarnessSecret{Secret: Secret{Type: "SecretText", Name: secretName, Identifier: identifier, OrgIdentifier: DEFAULT_ORG, ProjectIdentifier: DEFAULT_PROJECT, Spec: SecretSpec{Value: secretValue, SecretManagerIdentifier: "harnessSecretManager", ValueType: "Inline"}}}
+	newSecret := HarnessSecret{Secret: Secret{Type: "SecretText", Name: secretName, Identifier: identifier, ProjectIdentifier: DEFAULT_PROJECT,
+		OrgIdentifier: DEFAULT_ORG, Spec: SecretSpec{Value: secretValue, SecretManagerIdentifier: "harnessSecretManager", ValueType: "Inline"}}}
 	return newSecret
 }
