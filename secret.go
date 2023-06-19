@@ -71,6 +71,7 @@ func createTextSecret(secretName string, identifier string, secretValue string) 
 	if identifier == "" {
 		identifier = strings.ReplaceAll(secretName, " ", "_")
 	}
-	newSecret := HarnessSecret{Secret: Secret{Type: "SecretText", Name: secretName, Identifier: identifier, OrgIdentifier: DEFAULT_ORG, ProjectIdentifier: DEFAULT_PROJECT, Spec: SecretSpec{Value: secretValue, SecretManagerIdentifier: "harnessSecretManager", ValueType: "Inline"}}}
+	newSecret := HarnessSecret{Secret: Secret{Type: "SecretText", Name: secretName, Identifier: identifier, ProjectIdentifier: DEFAULT_PROJECT,
+		OrgIdentifier: DEFAULT_ORG, Spec: SecretSpec{Value: secretValue, SecretManagerIdentifier: "harnessSecretManager", ValueType: "Inline"}}}
 	return newSecret
 }
