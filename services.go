@@ -8,8 +8,7 @@ import (
 )
 
 func applyService(c *cli.Context) error {
-	fmt.Println("File path: ", c.String("file"))
-	fmt.Println("Trying to create or update a service using the service yaml.")
+	fmt.Println("Trying to create or update a service using the service yaml=", getColoredText(c.String("file"), color.FgCyan))
 	createOrUpdateSvcURL := GetUrlWithQueryParams("", NG_BASE_URL, "servicesV2", map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})

@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
-	"net/http/httputil"
 	"strconv"
 	"strings"
 
@@ -27,12 +25,11 @@ func Post(reqUrl string, auth string, body interface{}, contentType string) (res
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set(AuthHeaderKey(auth), auth)
 
-	b, err := httputil.DumpRequest(req, true)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	fmt.Printf("Request = %s\n", string(b))
+	//fmt.Printf("Request = %s\n", string(b))
 
 	return handleResp(req)
 }
