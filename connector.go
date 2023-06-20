@@ -46,7 +46,6 @@ func applyConnector(c *cli.Context) error {
 	if err := yaml.Unmarshal([]byte(content), requestBody); err != nil {
 		return err
 	}
-	printJson(requestBody)
 	identifier := valueToString(GetNestedValue(requestBody, "connector", "identifier").(string))
 	projectIdentifier := valueToString(GetNestedValue(requestBody, "connector", "projectIdentifier").(string))
 	orgIdentifier := valueToString(GetNestedValue(requestBody, "connector", "orgIdentifier").(string))
