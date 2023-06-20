@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
@@ -11,6 +13,9 @@ import (
 // apply(create or update) connector
 func applyConnector(c *cli.Context) error {
 	filePath := c.String("file")
+	githubUsername := c.String("git-user")
+	delegateName := c.String("delegate-name")
+
 	if filePath == "" {
 		fmt.Println("Please enter valid filename")
 		return nil
@@ -24,12 +29,24 @@ func applyConnector(c *cli.Context) error {
 	})
 
 	var content = readFromFile(filePath)
+	if isGithubConnectorYAML(content) {
+		if githubUsername == "" || githubUsername == GITHUB_USERNAME_PLACEHOLDER {
+			githubUsername = TextInput("Enter valid github username:")
 
+		}
+		content = replacePlaceholderValues(content, GITHUB_USERNAME_PLACEHOLDER, githubUsername)
+	}
+	if isK8sConnectorYAML(content) {
+		if delegateName == "" || delegateName == DELEGATE_NAME_PLACEHOLDER {
+			delegateName = TextInput("Enter valid delegate name:")
+		}
+		content = replacePlaceholderValues(content, DELEGATE_NAME_PLACEHOLDER, delegateName)
+	}
 	requestBody := make(map[string]interface{})
 	if err := yaml.Unmarshal([]byte(content), requestBody); err != nil {
 		return err
 	}
-
+	printJson(requestBody)
 	identifier := valueToString(GetNestedValue(requestBody, "connector", "identifier").(string))
 	projectIdentifier := valueToString(GetNestedValue(requestBody, "connector", "projectIdentifier").(string))
 	orgIdentifier := valueToString(GetNestedValue(requestBody, "connector", "orgIdentifier").(string))
@@ -60,6 +77,22 @@ func applyConnector(c *cli.Context) error {
 
 	}
 	return nil
+}
+
+func replacePlaceholderValues(haystack string, needle string, value string) string {
+	return strings.ReplaceAll(haystack, needle, value)
+}
+
+func isGithubConnectorYAML(str string) bool {
+	regexPattern := `type:\s+Github`
+	match, _ := regexp.MatchString(regexPattern, str)
+	return match
+}
+
+func isK8sConnectorYAML(str string) bool {
+	regexPattern := `type:\s+K8sCluster`
+	match, _ := regexp.MatchString(regexPattern, str)
+	return match
 }
 
 // Delete an existing connector
