@@ -4,14 +4,15 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"fmt"
-	"github.com/fatih/color"
-	"github.com/urfave/cli/v2"
 	"io"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
+
+	"github.com/fatih/color"
+	"github.com/urfave/cli/v2"
 )
 
 func Update(*cli.Context) (err error) {
@@ -34,7 +35,7 @@ func Update(*cli.Context) (err error) {
 	if GOOS == "windows" {
 		extension = "zip"
 	}
-	url := fmt.Sprintf("https://github.com/harness/migrator/releases/download/%s/harness-upgrade-%s-%s-%s.%s", newVersion, newVersion, GOOS, GOARCH, extension)
+	url := fmt.Sprintf("https://github.com/harness/harness-cli/releases/download/%s/harness-cli-%s-%s-%s.%s", newVersion, newVersion, GOOS, GOARCH, extension)
 
 	if GOOS == "windows" {
 		fmt.Printf("%s\n", yellow("Auto update support is not available for windows"))
@@ -86,10 +87,10 @@ func readTar(body io.ReadCloser, dest string) error {
 		if err != nil {
 			return err
 		}
-		if header.Typeflag == tar.TypeReg && header.Name == "harness-upgrade" {
+		if header.Typeflag == tar.TypeReg && header.Name == "harness-cli" {
 			execFile := path.Join(dest, header.Name)
 			green := color.New(color.FgGreen).SprintFunc()
-			fmt.Printf("Extracting harness-upgrade to - %s\n", green(execFile))
+			fmt.Printf("Extracting harness-cli to - %s\n", green(execFile))
 			outFile, err := os.Create(execFile)
 			if err != nil {
 				return err

@@ -15,7 +15,7 @@ func applyService(c *cli.Context) error {
 	}
 	fmt.Println("Trying to create or update service using the yaml=",
 		getColoredText(filePath, color.FgCyan))
-	createOrUpdateSvcURL := GetUrlWithQueryParams("", NG_BASE_URL, "servicesV2", map[string]string{
+	createOrUpdateSvcURL := GetUrlWithQueryParams("", NG_BASE_URL, SERVICES_ENDPOINT, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 	var content = readFromFile(c.String("file"))

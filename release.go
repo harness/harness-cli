@@ -3,10 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/fatih/color"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/fatih/color"
 )
 
 type GithubRelease struct {
@@ -15,7 +16,7 @@ type GithubRelease struct {
 }
 
 func GetNewRelease() (newVersion string) {
-	resp, err := http.Get("https://api.github.com/repos/harness/migrator/releases")
+	resp, err := http.Get("https://api.github.com/repos/harness/harness-cli/releases")
 	if err != nil {
 		return
 	}
@@ -86,7 +87,7 @@ func printUpgradeMessage(from string, to string) {
 	green := color.New(color.FgGreen).SprintFunc()
 	red := color.New(color.FgHiRed).SprintFunc()
 	yellow := color.New(color.FgYellow).SprintFunc()
-	fmt.Printf("[%s] A new release of harness-upgrade is available: %s → %s\n", blue("notice"), red(from), green(to))
-	fmt.Printf("%s\n", yellow("https://github.com/harness/migrator/releases/tag/"+to))
-	fmt.Printf("To update, run: %s\n", green("harness-upgrade update"))
+	fmt.Printf("[%s] A new release of harness-cli is available: %s → %s\n", blue("notice"), red(from), green(to))
+	fmt.Printf("%s\n", yellow("https://github.com/harness/harness-cli/releases/tag/"+to))
+	fmt.Printf("To update, run: %s\n", green("harness-cli update"))
 }

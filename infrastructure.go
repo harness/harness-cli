@@ -16,7 +16,8 @@ func applyInfraDefinition(c *cli.Context) error {
 	}
 	fmt.Println("Trying to create or update infrastructure using the yaml=",
 		getColoredText(filePath, color.FgCyan))
-	createOrUpdateInfraURL := GetUrlWithQueryParams("", NG_BASE_URL, "infrastructures", map[string]string{
+
+	createOrUpdateInfraURL := GetUrlWithQueryParams("", NG_BASE_URL, INFRA_ENDPOINT, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 	var content = readFromFile(c.String("file"))

@@ -19,7 +19,7 @@ func applyConnector(c *cli.Context) error {
 		getColoredText(filePath, color.FgCyan))
 
 	// Getting the account details
-	createConnectorURL := GetUrlWithQueryParams("", NG_BASE_URL, "connectors", map[string]string{
+	createConnectorURL := GetUrlWithQueryParams("", NG_BASE_URL, CONNECTOR_ENDPOINT, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 
@@ -46,7 +46,7 @@ func applyConnector(c *cli.Context) error {
 
 			return nil
 		}
-		
+
 	} else {
 		println("Found connector with id=", getColoredText(identifier, color.FgCyan))
 		println("Updating details of connector with id=", getColoredText(identifier, color.FgBlue))
