@@ -29,5 +29,5 @@ jobs:
           goarch: ${{ matrix.goarch }}
           goversion: 1.19
           project_path: "."
-          binary_name: "harness-cli"
+          binary_name: "harness"
           ldflags: ${{ format('-X "main.Version={0}"', github.ref_name) }}

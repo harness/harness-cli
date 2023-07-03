@@ -1,4 +1,4 @@
-module harness-cli
+module harness
 
 go 1.19
 

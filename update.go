@@ -87,10 +87,10 @@ func readTar(body io.ReadCloser, dest string) error {
 		if err != nil {
 			return err
 		}
-		if header.Typeflag == tar.TypeReg && header.Name == "harness-cli" {
+		if header.Typeflag == tar.TypeReg && header.Name == "harness" {
 			execFile := path.Join(dest, header.Name)
 			green := color.New(color.FgGreen).SprintFunc()
-			fmt.Printf("Extracting harness-cli to - %s\n", green(execFile))
+			fmt.Printf("Extracting harness cli to - %s\n", green(execFile))
 			outFile, err := os.Create(execFile)
 			if err != nil {
 				return err
