@@ -74,7 +74,7 @@ func main() {
 		}),
 	}
 	app := &cli.App{
-		Name:                 "harness-cli",
+		Name:                 "harness",
 		Version:              Version,
 		Usage:                "Setup Harness CD & GitOps in a few commands.",
 		EnableBashCompletion: true,
