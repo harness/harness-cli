@@ -1,7 +1,10 @@
 on:
   release:
     types: [created]
-
+  push:
+    branches: [ "feat/install-cli" ]
+  pull_request:
+    branches: [ "feat/install-cli" ]
 permissions:
   contents: write
   packages: write
