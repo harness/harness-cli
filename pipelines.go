@@ -17,7 +17,9 @@ func applyPipeline(c *cli.Context) error {
 	fmt.Println("Trying to create or update pipeline using the yaml=",
 		getColoredText(filePath, color.FgCyan))
 	var content = readFromFile(c.String("file"))
+
 	requestBody := getJsonFromYaml(content)
+
 	if requestBody == nil {
 		println(getColoredText("Please enter valid pipeline yaml file", color.FgRed))
 	}

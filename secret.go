@@ -10,10 +10,8 @@ import (
 
 func applySecret(ctx *cli.Context) error {
 	gitPat := ctx.String("token")
+	gitPat = getGitSecret(gitPat)
 
-	if gitPat == "" {
-		gitPat = getGitSecret()
-	}
 	if gitPat == "" {
 		println("Secret cannot be an empty string")
 		return nil
@@ -28,8 +26,8 @@ func applySecret(ctx *cli.Context) error {
 		"projectIdentifier": DEFAULT_PROJECT,
 		"orgIdentifier":     DEFAULT_ORG,
 	})
-	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("v2/secrets/%s", GITHUB_SECRET_IDENTIFIER), "",
-		"", map[string]string{})
+	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("v2/secrets/%s", GITHUB_SECRET_IDENTIFIER), DEFAULT_PROJECT,
+		DEFAULT_ORG, map[string]string{})
 
 	secretBody := createTextSecret("Harness Git Pat", GITHUB_SECRET_IDENTIFIER, gitPat)
 	var err error
@@ -54,10 +52,11 @@ func applySecret(ctx *cli.Context) error {
 	return nil
 }
 
-func getGitSecret() string {
-
+func getGitSecret(userVal string) string {
 	gitPat := ""
-
+	if userVal != GITHUB_PAT_PLACEHOLDER {
+		return userVal
+	}
 	gitPat = TextInput("Enter your git pat: ")
 
 	if gitPat == "" {

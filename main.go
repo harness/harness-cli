@@ -202,6 +202,17 @@ func main() {
 					{
 						Name:  "apply",
 						Usage: "Create a new connector or Update  an existing one.",
+						Flags: []cli.Flag{
+
+							&cli.StringFlag{
+								Name:  "delegate-name",
+								Usage: "delegate name for the k8s connector",
+							},
+							&cli.StringFlag{
+								Name:  "git-user",
+								Usage: "git username for the github connector",
+							},
+						},
 						Action: func(context *cli.Context) error {
 							return cliWrapper(applyConnector, context)
 						},
