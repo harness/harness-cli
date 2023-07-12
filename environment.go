@@ -10,13 +10,14 @@ import (
 // Create update Environment
 func applyEnvironment(c *cli.Context) error {
 	filePath := c.String("file")
+	baseURL := getNGBaseURL(c)
 	if filePath == "" {
 		fmt.Println("Please enter valid filename")
 		return nil
 	}
 	fmt.Println("Trying to create or update a environment using the yaml=",
 		getColoredText(filePath, color.FgCyan))
-	createOrUpdateEnvURL := GetUrlWithQueryParams("", NG_BASE_URL, ENVIRONMENT_ENDPOINT, map[string]string{
+	createOrUpdateEnvURL := GetUrlWithQueryParams("", baseURL, ENVIRONMENT_ENDPOINT, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 	var content = readFromFile(c.String("file"))
@@ -34,7 +35,7 @@ func applyEnvironment(c *cli.Context) error {
 	//setup payload for Environment create / update
 	EnvPayload := HarnessEnvironment{Identifier: identifier, Name: name, Type: envType,
 		ProjectIdentifier: projectIdentifier, OrgIdentifier: orgIdentifier, Yaml: content}
-	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("%s/%s", ENVIRONMENT_ENDPOINT, identifier), projectIdentifier, orgIdentifier, map[string]string{})
+	entityExists := getEntity(baseURL, fmt.Sprintf("%s/%s", ENVIRONMENT_ENDPOINT, identifier), projectIdentifier, orgIdentifier, map[string]string{})
 
 	var err error
 	if !entityExists {

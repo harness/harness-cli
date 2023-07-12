@@ -10,6 +10,7 @@ import (
 // create update  Infra Definition
 func applyInfraDefinition(c *cli.Context) error {
 	filePath := c.String("file")
+	baseURL := getNGBaseURL(c)
 	if filePath == "" {
 		fmt.Println("Please enter valid filename")
 		return nil
@@ -17,7 +18,7 @@ func applyInfraDefinition(c *cli.Context) error {
 	fmt.Println("Trying to create or update infrastructure using the yaml=",
 		getColoredText(filePath, color.FgCyan))
 
-	createOrUpdateInfraURL := GetUrlWithQueryParams("", NG_BASE_URL, INFRA_ENDPOINT, map[string]string{
+	createOrUpdateInfraURL := GetUrlWithQueryParams("", baseURL, INFRA_ENDPOINT, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 	var content = readFromFile(c.String("file"))
@@ -32,7 +33,7 @@ func applyInfraDefinition(c *cli.Context) error {
 	environmentRef := valueToString(GetNestedValue(requestBody, "infrastructureDefinition", "environmentRef").(string))
 	//setup payload for Infra create / update
 	InfraPayload := HarnessInfra{Identifier: identifier, Name: name, ProjectIdentifier: projectIdentifier, OrgIdentifier: orgIdentifier, Yaml: content}
-	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("infrastructures/%s", identifier),
+	entityExists := getEntity(baseURL, fmt.Sprintf("infrastructures/%s", identifier),
 		projectIdentifier, orgIdentifier, map[string]string{
 			"environmentIdentifier": environmentRef,
 		})

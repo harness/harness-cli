@@ -10,6 +10,7 @@ import (
 // create or update Pipeline
 func applyPipeline(c *cli.Context) error {
 	filePath := c.String("file")
+	baseURL := getPipelineSVCBaseURL(c)
 	if filePath == "" {
 		fmt.Println("Please enter valid filename")
 		return nil
@@ -27,12 +28,12 @@ func applyPipeline(c *cli.Context) error {
 	identifier := valueToString(GetNestedValue(requestBody, "pipeline", "identifier").(string))
 	projectIdentifier := valueToString(GetNestedValue(requestBody, "pipeline", "projectIdentifier").(string))
 	orgIdentifier := valueToString(GetNestedValue(requestBody, "pipeline", "orgIdentifier").(string))
-	createOrUpdatePipelineURL := GetUrlWithQueryParams("", PIPELINES_BASE_URL, PIPELINES_ENDPOINT_V2, map[string]string{
+	createOrUpdatePipelineURL := GetUrlWithQueryParams("", baseURL, PIPELINES_ENDPOINT_V2, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 		"orgIdentifier":     orgIdentifier,
 		"projectIdentifier": projectIdentifier,
 	})
-	entityExists := getEntity(PIPELINES_BASE_URL, fmt.Sprintf("%s/%s", PIPELINES_ENDPOINT, identifier),
+	entityExists := getEntity(baseURL, fmt.Sprintf("%s/%s", PIPELINES_ENDPOINT, identifier),
 		projectIdentifier, orgIdentifier, map[string]string{})
 	var _ ResponseBody
 	var err error
@@ -45,7 +46,7 @@ func applyPipeline(c *cli.Context) error {
 			return nil
 		}
 	} else {
-		var pipelinesPUTUrl = GetUrlWithQueryParams("", PIPELINES_BASE_URL,
+		var pipelinesPUTUrl = GetUrlWithQueryParams("", baseURL,
 			fmt.Sprintf("%s/%s", PIPELINES_ENDPOINT_V2, identifier), map[string]string{
 				"pipelineIdentifier": identifier,
 				"accountIdentifier":  cliCdRequestData.Account,

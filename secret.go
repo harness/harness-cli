@@ -9,6 +9,7 @@ import (
 )
 
 func applySecret(ctx *cli.Context) error {
+	baseURL := ctx.String("base-url")
 	gitPat := ctx.String("token")
 	gitPat = getGitSecret(gitPat)
 
@@ -16,17 +17,17 @@ func applySecret(ctx *cli.Context) error {
 		println("Secret cannot be an empty string")
 		return nil
 	}
-	createSecretURL := GetUrlWithQueryParams("", NG_BASE_URL, "v2/secrets", map[string]string{
+	createSecretURL := GetUrlWithQueryParams("", baseURL, "v2/secrets", map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 		"projectIdentifier": DEFAULT_PROJECT,
 		"orgIdentifier":     DEFAULT_ORG,
 	})
-	updateSecretURL := GetUrlWithQueryParams("", NG_BASE_URL, fmt.Sprintf("v2/secrets/%s", GITHUB_SECRET_IDENTIFIER), map[string]string{
+	updateSecretURL := GetUrlWithQueryParams("", baseURL, fmt.Sprintf("v2/secrets/%s", GITHUB_SECRET_IDENTIFIER), map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 		"projectIdentifier": DEFAULT_PROJECT,
 		"orgIdentifier":     DEFAULT_ORG,
 	})
-	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("v2/secrets/%s", GITHUB_SECRET_IDENTIFIER), DEFAULT_PROJECT,
+	entityExists := getEntity(baseURL, fmt.Sprintf("v2/secrets/%s", GITHUB_SECRET_IDENTIFIER), DEFAULT_PROJECT,
 		DEFAULT_ORG, map[string]string{})
 
 	secretBody := createTextSecret("Harness Git Pat", GITHUB_SECRET_IDENTIFIER, gitPat)

@@ -38,7 +38,6 @@ func TextInput(question string) string {
 
 func GetUrlWithQueryParams(environment string, service string, endpoint string, queryParams map[string]string) string {
 	params := ""
-
 	totalItems := len(queryParams)
 	currentIndex := 0
 	for k, v := range queryParams {
@@ -69,7 +68,6 @@ func printJson(v any) {
 }
 
 func writeToFile(text string, filename string, overwrite bool) {
-
 	exactFilePath := getUserHomePath() + "/" + filename
 	var permissions = os.O_APPEND | os.O_CREATE | os.O_WRONLY
 	if overwrite {
@@ -102,10 +100,19 @@ func readFromFile(filepath string) (s string) {
 	return _fileContents
 }
 
-func saveCredentials() (err error) {
+func saveCredentials(c *cli.Context) (err error) {
+	baseURL := c.String("base-url")
+
+	if baseURL == "" {
+		baseURL = cliCdRequestData.BaseUrl
+	}
+	if cliCdRequestData.BaseUrl == "" {
+		baseURL = HARNESS_PROD_URL
+	}
 	authCredentials := SecretStore{
 		ApiKey:    cliCdRequestData.AuthToken,
 		AccountId: cliCdRequestData.Account,
+		BaseURL:   cliCdRequestData.BaseUrl,
 	}
 	jsonObj, err := json.MarshalIndent(authCredentials, "", "  ")
 	if err != nil {
@@ -117,8 +124,17 @@ func saveCredentials() (err error) {
 	println(getColoredText("Login successfully done. Yay!", color.FgGreen))
 	return nil
 }
-func hydrateCredsFromPersistence(c *cli.Context) {
-	if cliCdRequestData.AuthToken != "" && cliCdRequestData.Account != "" {
+
+func hydrateCredsFromPersistence(params ...interface{}) {
+	c := params[0].(*cli.Context)
+	var hydrateOnlyURL = false
+
+	if len(params) > 1 {
+		if value, ok := params[1].(bool); ok {
+			hydrateOnlyURL = value
+		}
+	}
+	if cliCdRequestData.AuthToken != "" && cliCdRequestData.Account != "" && !hydrateOnlyURL {
 		return
 	}
 
@@ -135,10 +151,47 @@ func hydrateCredsFromPersistence(c *cli.Context) {
 		Login(c)
 		return
 	}
-	cliCdRequestData.AuthToken = secretstore.ApiKey
-	cliCdRequestData.Account = secretstore.AccountId
+	if hydrateOnlyURL {
 
+		cliCdRequestData.BaseUrl = secretstore.BaseURL
+	} else {
+		cliCdRequestData.AuthToken = secretstore.ApiKey
+		cliCdRequestData.Account = secretstore.AccountId
+		cliCdRequestData.BaseUrl = secretstore.BaseURL
+
+	}
 	return
+}
+
+func getNGBaseURL(c *cli.Context) string {
+	baseURL := c.String("base-url")
+	if baseURL == "" {
+		if cliCdRequestData.BaseUrl == "" {
+			baseURL = HARNESS_PROD_URL
+		} else {
+			baseURL = cliCdRequestData.BaseUrl
+		}
+	}
+
+	baseURL = strings.TrimRight(baseURL, "/") //remove trailing slash
+	baseURL = baseURL + NG_BASE_URL
+	return baseURL
+}
+
+func getPipelineSVCBaseURL(c *cli.Context) string {
+	baseURL := c.String("base-url")
+
+	if baseURL == "" {
+		if cliCdRequestData.BaseUrl == "" {
+			baseURL = HARNESS_PROD_URL
+		} else {
+			baseURL = cliCdRequestData.BaseUrl
+		}
+	}
+
+	baseURL = strings.TrimRight(baseURL, "/") //remove trailing slash
+	baseURL = baseURL + PIPELINES_BASE_URL
+	return baseURL
 }
 
 func getJsonFromYaml(content string) map[string]interface{} {

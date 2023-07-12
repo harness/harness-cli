@@ -10,6 +10,6 @@ func Login(ctx *cli.Context) (err error) {
 	fmt.Println("Welcome to Harness CLI!")
 	PromptAccountDetails(ctx)
 	getAccountDetails(ctx)
-	saveCredentials()
+	saveCredentials(ctx)
 	return nil
 }
