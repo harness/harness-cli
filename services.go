@@ -9,13 +9,14 @@ import (
 
 func applyService(c *cli.Context) error {
 	filePath := c.String("file")
+	baseURL := getNGBaseURL(c)
 	if filePath == "" {
 		fmt.Println("Please enter valid filename")
 		return nil
 	}
 	fmt.Println("Trying to create or update service using the yaml=",
 		getColoredText(filePath, color.FgCyan))
-	createOrUpdateSvcURL := GetUrlWithQueryParams("", NG_BASE_URL, SERVICES_ENDPOINT, map[string]string{
+	createOrUpdateSvcURL := GetUrlWithQueryParams("", baseURL, SERVICES_ENDPOINT, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 	var content = readFromFile(c.String("file"))
@@ -28,7 +29,7 @@ func applyService(c *cli.Context) error {
 	//setup payload for svc create / update
 	svcPayload := HarnessService{Identifier: identifier, Name: name,
 		ProjectIdentifier: DEFAULT_PROJECT, OrgIdentifier: DEFAULT_ORG, Yaml: content}
-	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("servicesV2/%s", identifier),
+	entityExists := getEntity(baseURL, fmt.Sprintf("servicesV2/%s", identifier),
 		DEFAULT_PROJECT, DEFAULT_ORG, map[string]string{})
 	var err error
 	if !entityExists {

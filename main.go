@@ -21,7 +21,7 @@ var cliCdRequestData = struct {
 	ProjectName string `survey:"default"`
 	Debug       bool   `survey:"debug"`
 	Json        bool   `survey:"json"`
-	BaseUrl     string `survey:"https://app.harness.io/gateway/ng"` //TODO : make it environment specific in utils
+	BaseUrl     string `survey:"https://app.harness.io/"` //TODO : make it environment specific in utils
 }{}
 
 func init() {
@@ -296,6 +296,10 @@ func main() {
 				Action: func(context *cli.Context) error {
 
 					return cliWrapper(Login, context)
+				},
+				Before: func(ctx *cli.Context) error {
+					hydrateCredsFromPersistence(ctx, true)
+					return nil
 				},
 			},
 			{

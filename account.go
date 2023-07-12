@@ -8,11 +8,12 @@ import (
 
 func getAccountDetails(ctx *cli.Context) error {
 	// Getting the account details
+	var baseURL = getNGBaseURL(ctx)
 	accountsEndpoint := "accounts/" + cliCdRequestData.Account
-	url := GetUrlWithQueryParams("", NG_BASE_URL, accountsEndpoint, map[string]string{
+	url := GetUrlWithQueryParams("", baseURL, accountsEndpoint, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
-
+	print(url)
 	resp, err := Get(url, cliCdRequestData.AuthToken)
 
 	if err != nil {

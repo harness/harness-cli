@@ -15,6 +15,7 @@ func applyConnector(c *cli.Context) error {
 	filePath := c.String("file")
 	githubUsername := c.String("git-user")
 	delegateName := c.String("delegate-name")
+	baseURL := getNGBaseURL(c)
 
 	if filePath == "" {
 		fmt.Println("Please enter valid filename")
@@ -24,7 +25,7 @@ func applyConnector(c *cli.Context) error {
 		getColoredText(filePath, color.FgCyan))
 
 	// Getting the account details
-	createConnectorURL := GetUrlWithQueryParams("", NG_BASE_URL, CONNECTOR_ENDPOINT, map[string]string{
+	createConnectorURL := GetUrlWithQueryParams("", baseURL, CONNECTOR_ENDPOINT, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 
@@ -49,7 +50,7 @@ func applyConnector(c *cli.Context) error {
 	identifier := valueToString(GetNestedValue(requestBody, "connector", "identifier").(string))
 	projectIdentifier := valueToString(GetNestedValue(requestBody, "connector", "projectIdentifier").(string))
 	orgIdentifier := valueToString(GetNestedValue(requestBody, "connector", "orgIdentifier").(string))
-	entityExists := getEntity(NG_BASE_URL, fmt.Sprintf("connectors/%s", identifier),
+	entityExists := getEntity(baseURL, fmt.Sprintf("connectors/%s", identifier),
 		projectIdentifier, orgIdentifier, map[string]string{})
 
 	var err error
