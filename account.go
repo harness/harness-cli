@@ -13,7 +13,6 @@ func getAccountDetails(ctx *cli.Context) error {
 	url := GetUrlWithQueryParams("", baseURL, accountsEndpoint, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
-	print(url)
 	resp, err := Get(url, cliCdRequestData.AuthToken)
 
 	if err != nil {

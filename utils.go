@@ -166,9 +166,7 @@ func hydrateCredsFromPersistence(params ...interface{}) {
 func getNGBaseURL(c *cli.Context) string {
 	baseURL := c.String("base-url")
 	if baseURL == "" {
-
 		if cliCdRequestData.BaseUrl == "" {
-
 			baseURL = HARNESS_PROD_URL
 		} else {
 			baseURL = cliCdRequestData.BaseUrl

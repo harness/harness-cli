@@ -204,7 +204,7 @@ type ProjectCSV struct {
 type SecretStore struct {
 	ApiKey    string `json:"apiKey"`
 	AccountId string `json:"accountId"`
-	BaseURL   string `json:"baseurl"`
+	BaseURL   string `json:"baseUrl"`
 }
 type SecretSpec struct {
 	Value                   string `json:"value"`
