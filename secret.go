@@ -9,7 +9,7 @@ import (
 )
 
 func applySecret(ctx *cli.Context) error {
-	baseURL := ctx.String("base-url")
+	baseURL := getNGBaseURL(ctx)
 	gitPat := ctx.String("token")
 	gitPat = getGitSecret(gitPat)
 
