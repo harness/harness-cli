@@ -1,7 +1,10 @@
 on:
   release:
     types: [created]
-
+  push:
+    branches: [ "feat/install-cli" ]
+  pull_request:
+    branches: [ "feat/install-cli" ]
 permissions:
   contents: write
   packages: write
@@ -31,3 +34,21 @@ jobs:
           project_path: "."
           binary_name: "harness"
           ldflags: ${{ format('-X "main.Version={0}"', github.ref_name) }}
+
+      - name: Move binary to the release directory
+        run: |
+          mkdir release
+          mv harness release/
+          cp ./install_scripts/${{ matrix.goos }}/* release/
+        working-directory: ${{ github.workspace }}
+
+      - name: Bundle everything inside release directory
+        run: |
+          tar czvf release.tar.gz release/
+        working-directory: ${{ github.workspace }}
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: release-artifacts
+          path: release.tar.gz
