@@ -92,10 +92,14 @@ func handleResp(req *http.Request) (respBodyObj ResponseBody, err error) {
 		log.Fatalln("There was error while parsing the response from server. Exiting...", err)
 	}
 	if resp.StatusCode != 200 {
-		if len(respBodyObj.Message) > 0 {
-			log.Error(respBodyObj.Message)
-		} else if len(respBodyObj.Messages) > 0 && len(respBodyObj.Messages[0].Message) > 0 {
-			log.Error(respBodyObj.Messages[0].Message)
+		if resp.StatusCode >= 400 || resp.StatusCode < 500 {
+			println(respBodyObj.Message)
+		} else {
+			if len(respBodyObj.Message) > 0 {
+				log.Error(respBodyObj.Message)
+			} else if len(respBodyObj.Messages) > 0 && len(respBodyObj.Messages[0].Message) > 0 {
+				log.Error(respBodyObj.Messages[0].Message)
+			}
 		}
 		return respBodyObj, errors.New("received non 200 response code. The response code was " + strconv.Itoa(resp.StatusCode))
 	}
