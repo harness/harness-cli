@@ -16,7 +16,7 @@ To install the Harness CLI tool manually, follow these steps:
 3. Run the `harness help` command to verify that the installation was successful.
 If you are using macOS, you can move the `harness` file to the /usr/local/bin/ directory by running the following command:
   `mv harness /usr/local/bin/`
-   Then, run the harness help command to verify that the installation was successful.
+   Then, run the `harness help` command to verify that the installation was successful.
 
 4. To update the CLI to a newer version, run the following command:
    `harness update`
