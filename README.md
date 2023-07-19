@@ -6,7 +6,7 @@ Current focus is on the entities needed for the CD & GitOps module. Other module
 - Requires a [Harness API Key](https://developer.harness.io/docs/platform/user-management/add-and-manage-api-keys/) for authenticating with your Harness account. 
 
 # Instructions
-Manual install
+## Manual install
 To install the Harness CLI tool manually, follow these steps:
 
 1. Download the latest release from the GitHub releases page: https://github.com/harness/harness-cli/releases .
