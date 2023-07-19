@@ -92,7 +92,7 @@ func handleResp(req *http.Request) (respBodyObj ResponseBody, err error) {
 		log.Fatalln("There was error while parsing the response from server. Exiting...", err)
 	}
 	if resp.StatusCode != 200 {
-		if resp.StatusCode == 400 {
+		if resp.StatusCode >= 400 || resp.StatusCode < 500 {
 			println(respBodyObj.Message)
 		} else {
 			if len(respBodyObj.Message) > 0 {
