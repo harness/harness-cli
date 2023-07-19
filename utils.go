@@ -88,12 +88,12 @@ func writeToFile(text string, filename string, overwrite bool) {
 func readFromFile(filepath string) (s string) {
 	var _fileContents = ""
 
-	file, fileError := os.OpenFile(filepath, os.O_RDONLY, 0644)
+	file, _ := os.OpenFile(filepath, os.O_RDONLY, 0644)
 	defer file.Close()
 
 	byteValue, readError := io.ReadAll(file)
 	if readError != nil {
-		log.Println("Error reading from file:", fileError)
+		//log.Println("Error reading from file:", fileError)
 	}
 	_fileContents = string(byteValue)
 
@@ -102,7 +102,6 @@ func readFromFile(filepath string) (s string) {
 
 func saveCredentials(c *cli.Context) (err error) {
 	baseURL := c.String("base-url")
-
 	if baseURL == "" {
 		baseURL = cliCdRequestData.BaseUrl
 	}
@@ -112,7 +111,7 @@ func saveCredentials(c *cli.Context) (err error) {
 	authCredentials := SecretStore{
 		ApiKey:    cliCdRequestData.AuthToken,
 		AccountId: cliCdRequestData.Account,
-		BaseURL:   cliCdRequestData.BaseUrl,
+		BaseURL:   baseURL,
 	}
 	jsonObj, err := json.MarshalIndent(authCredentials, "", "  ")
 	if err != nil {
@@ -152,8 +151,12 @@ func hydrateCredsFromPersistence(params ...interface{}) {
 		return
 	}
 	if hydrateOnlyURL {
-
-		cliCdRequestData.BaseUrl = secretstore.BaseURL
+		baseURL := c.String("base-url")
+		if baseURL == "" {
+			cliCdRequestData.BaseUrl = secretstore.BaseURL
+		} else {
+			cliCdRequestData.BaseUrl = baseURL
+		}
 	} else {
 		cliCdRequestData.AuthToken = secretstore.ApiKey
 		cliCdRequestData.Account = secretstore.AccountId

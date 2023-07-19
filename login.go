@@ -9,7 +9,7 @@ import (
 func Login(ctx *cli.Context) (err error) {
 	fmt.Println("Welcome to Harness CLI!")
 	PromptAccountDetails(ctx)
-	getAccountDetails(ctx)
 	saveCredentials(ctx)
+	getAccountDetails(ctx)
 	return nil
 }
