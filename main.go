@@ -294,7 +294,6 @@ func main() {
 				Usage:   "Login with account identifier and api key.",
 				Flags:   globalFlags,
 				Action: func(context *cli.Context) error {
-
 					return cliWrapper(Login, context)
 				},
 				Before: func(ctx *cli.Context) error {
