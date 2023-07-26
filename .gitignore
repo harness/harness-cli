@@ -3,3 +3,4 @@ harness-upgrade
 .temp.data
 .secrets.json
 harness
+harnesscd-example-apps

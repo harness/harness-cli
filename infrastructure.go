@@ -2,12 +2,18 @@ package main
 
 import (
 	"fmt"
+	"regexp"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 )
 
-// create update  Infra Definition
+var gcpProjectName = ""
+var gcpRegionName = ""
+
+// create or update  Infra Definition
 func applyInfraDefinition(c *cli.Context) error {
 	filePath := c.String("file")
 	baseURL := getNGBaseURL(c)
@@ -15,16 +21,20 @@ func applyInfraDefinition(c *cli.Context) error {
 		fmt.Println("Please enter valid filename")
 		return nil
 	}
-	fmt.Println("Trying to create or update infrastructure using the yaml=",
+	gcpProjectName = c.String("gcp-project")
+	gcpRegionName = c.String("region")
+	fmt.Println("Trying to create or update infrastructure using the given yaml=",
 		getColoredText(filePath, color.FgCyan))
 
 	createOrUpdateInfraURL := GetUrlWithQueryParams("", baseURL, INFRA_ENDPOINT, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 	var content = readFromFile(c.String("file"))
+	content = updateYamlContent(content)
+
 	requestBody := getJsonFromYaml(content)
 	if requestBody == nil {
-		println(getColoredText("Please enter valid yaml", color.FgRed))
+		println(getColoredText("Please enter a valid yaml and try again...", color.FgRed))
 	}
 	identifier := valueToString(GetNestedValue(requestBody, "infrastructureDefinition", "identifier").(string))
 	name := valueToString(GetNestedValue(requestBody, "infrastructureDefinition", "name").(string))
@@ -50,13 +60,38 @@ func applyInfraDefinition(c *cli.Context) error {
 		println("Updating details of infrastructure with id=", getColoredText(identifier, color.FgBlue))
 		_, err = Put(createOrUpdateInfraURL, cliCdRequestData.AuthToken, InfraPayload, CONTENT_TYPE_JSON)
 		if err == nil {
-			println(getColoredText("Successfully updated connector with id= ", color.FgGreen) +
+			println(getColoredText("Successfully updated infrastructure definition with id= ", color.FgGreen) +
 				getColoredText(identifier, color.FgBlue))
 			return nil
 		}
 	}
 
 	return nil
+}
+
+func updateYamlContent(content string) string {
+	var infraType = fetchInfraType(content)
+	switch {
+	case infraType == GCP:
+		log.Info("Looks like you are creating an infrastructure definition for GCP," +
+			" validating GCP project and region now...")
+		if gcpProjectName == "" || gcpProjectName == GCP_PROJECT_NAME_PLACEHOLDER {
+			gcpProjectName = TextInput("Enter a valid GCP project name:")
+		}
+
+		if gcpRegionName == "" || gcpRegionName == GCP_REGION_NAME_PLACEHOLDER {
+			gcpRegionName = TextInput("Enter a valid GCP region name:")
+		}
+		log.Info("Got your gcp project and region info, let's create the infra now...")
+		content = replacePlaceholderValues(content, GCP_PROJECT_NAME_PLACEHOLDER, gcpProjectName)
+		content = replacePlaceholderValues(content, GCP_REGION_NAME_PLACEHOLDER, gcpRegionName)
+	case infraType == AWS:
+		log.Info("Looks like you are creating an infrastructure definition for AWS, validating yaml now...")
+	default:
+		fmt.Println("Nothing to update in the yaml.")
+	}
+
+	return content
 }
 
 // Delete an existing  Infra Definition
@@ -69,4 +104,20 @@ func deleteInfraDefinition(*cli.Context) error {
 func listInfraDefinition(*cli.Context) error {
 	fmt.Println(NOT_IMPLEMENTED)
 	return nil
+}
+
+func fetchInfraType(str string) string {
+	fmt.Println("Checking infra type in the yaml..")
+	gcpRegexPattern := `type:\s+GoogleCloudFunctions`
+	isGcpMatch, _ := regexp.MatchString(gcpRegexPattern, str)
+	awsRegexPattern := `type:\s+AwsLambda`
+	isAwsMatch, _ := regexp.MatchString(awsRegexPattern, str)
+
+	if isGcpMatch {
+		return GCP
+	} else if isAwsMatch {
+		return AWS
+	}
+
+	return ""
 }

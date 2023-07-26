@@ -233,7 +233,7 @@ func main() {
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:  "file",
-						Usage: "`YAML` file path for the connector",
+						Usage: "`YAML` file path for the infrastructure",
 					},
 				},
 				Before: func(ctx *cli.Context) error {
@@ -244,6 +244,16 @@ func main() {
 					{
 						Name:  "apply",
 						Usage: "Create a new infrastructure or Update  an existing one.",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "gcp-project",
+								Usage: "provide the Google Cloud Platform project name. ",
+							},
+							&cli.StringFlag{
+								Name:  "region",
+								Usage: "provide the Cloud Platform region name. For eg; 1.Creating GCP pipeline then provide gcp-region name, 2.Creating AWS based pipeline then provide aws-region name",
+							},
+						},
 						Action: func(context *cli.Context) error {
 							return cliWrapper(applyInfraDefinition, context)
 						},
