@@ -289,3 +289,8 @@ func mergeMaps(map1 map[string]string, map2 map[string]string) map[string]string
 	}()
 	return mergedMap
 }
+
+// replaces placeholder values in the given yaml content
+func replacePlaceholderValues(haystack string, needle string, value string) string {
+	return strings.ReplaceAll(haystack, needle, value)
+}
