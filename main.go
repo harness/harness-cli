@@ -225,7 +225,7 @@ func main() {
 								Usage: "access secret for the aws connector",
 							},
 							&cli.StringFlag{
-								Name:  "aws-region",
+								Name:  "region",
 								Usage: "region for the aws connector",
 							},
 						},
