@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
@@ -99,10 +98,6 @@ func applyConnector(c *cli.Context) error {
 
 	}
 	return nil
-}
-
-func replacePlaceholderValues(haystack string, needle string, value string) string {
-	return strings.ReplaceAll(haystack, needle, value)
 }
 
 func isGithubConnectorYAML(str string) bool {

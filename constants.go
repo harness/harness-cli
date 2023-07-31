@@ -4,11 +4,20 @@ const CONNECTOR_ENDPOINT = "connectors"
 const CONTENT_TYPE_JSON = "application/json"
 const CONTENT_TYPE_YAML = "application/yaml"
 const ENVIRONMENT_ENDPOINT = "environmentsV2"
+const GCP_PROJECT_NAME_PLACEHOLDER = "GCP_PROJECT_NAME"
+const GCP_REGION_NAME_PLACEHOLDER = "GCP_REGION_NAME"
 const GITHUB_SECRET_IDENTIFIER = "harness_gitpat"
 const NG_BASE_URL = "/gateway/ng/api"
 const DEFAULT_PROJECT = "default_project"
 const DEFAULT_ORG = "default"
 const INFRA_ENDPOINT = "infrastructures"
+
+// Enum for multiple platforms
+const (
+	GCP string = "GCP"
+	AWS        = "AWS"
+)
+
 const NOT_IMPLEMENTED = "Command Not_Implemented. Check back later.."
 const PIPELINES_BASE_URL = "/gateway/pipeline/api"
 const PIPELINES_ENDPOINT = "pipelines"
