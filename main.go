@@ -212,6 +212,22 @@ func main() {
 								Name:  "git-user",
 								Usage: "git username for the github connector",
 							},
+							&cli.StringFlag{
+								Name:  "aws-cross-account-role-arn",
+								Usage: "cross account role arn for the aws connector",
+							},
+							&cli.StringFlag{
+								Name:  "aws-access-key",
+								Usage: "access key for the aws connector",
+							},
+							&cli.StringFlag{
+								Name:  "aws-secret-Key",
+								Usage: "access secret for the aws connector",
+							},
+							&cli.StringFlag{
+								Name:  "region",
+								Usage: "region for the aws connector",
+							},
 						},
 						Action: func(context *cli.Context) error {
 							return cliWrapper(applyConnector, context)

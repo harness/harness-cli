@@ -14,6 +14,10 @@ func applyConnector(c *cli.Context) error {
 	filePath := c.String("file")
 	githubUsername := c.String("git-user")
 	delegateName := c.String("delegate-name")
+	awsCrossAccountRoleArn := c.String("aws-cross-account-role-arn")
+	awsAccessKey := c.String("aws-access-key")
+	awsSecretKey := c.String("aws-secret-Key")
+	awsRegion := c.String("region")
 	baseURL := getNGBaseURL(c)
 
 	if filePath == "" {
@@ -32,7 +36,6 @@ func applyConnector(c *cli.Context) error {
 	if isGithubConnectorYAML(content) {
 		if githubUsername == "" || githubUsername == GITHUB_USERNAME_PLACEHOLDER {
 			githubUsername = TextInput("Enter valid github username:")
-
 		}
 		content = replacePlaceholderValues(content, GITHUB_USERNAME_PLACEHOLDER, githubUsername)
 	}
@@ -41,6 +44,25 @@ func applyConnector(c *cli.Context) error {
 			delegateName = TextInput("Enter valid delegate name:")
 		}
 		content = replacePlaceholderValues(content, DELEGATE_NAME_PLACEHOLDER, delegateName)
+	}
+	if isAwsConnectorYAML(content) {
+		if awsCrossAccountRoleArn == "" || awsCrossAccountRoleArn == AWS_CROSS_ACCOUNT_ROLE_ARN {
+			awsCrossAccountRoleArn = TextInput("Enter valid aws cross account role arn:")
+		}
+		if awsAccessKey == "" || awsAccessKey == AWS_ACCESS_KEY {
+			awsAccessKey = TextInput("Enter valid aws access key:")
+		}
+		if awsSecretKey == "" || awsSecretKey == AWS_SECRET_KEY {
+			awsSecretKey = TextInput("Enter valid aws secret key:")
+		}
+		if awsRegion == "" || awsRegion == AWS_REGION {
+			awsSecretKey = TextInput("Enter valid aws region:")
+		}
+		//TODO: find a better way to resolve placeholders, dont depend on fixed placeholders
+		content = replacePlaceholderValues(content, AWS_CROSS_ACCOUNT_ROLE_ARN, awsCrossAccountRoleArn)
+		content = replacePlaceholderValues(content, AWS_ACCESS_KEY, awsAccessKey)
+		content = replacePlaceholderValues(content, AWS_SECRET_KEY, awsSecretKey)
+		content = replacePlaceholderValues(content, AWS_REGION, awsRegion)
 	}
 	requestBody := make(map[string]interface{})
 	if err := yaml.Unmarshal([]byte(content), requestBody); err != nil {
@@ -86,6 +108,12 @@ func isGithubConnectorYAML(str string) bool {
 
 func isK8sConnectorYAML(str string) bool {
 	regexPattern := `type:\s+K8sCluster`
+	match, _ := regexp.MatchString(regexPattern, str)
+	return match
+}
+
+func isAwsConnectorYAML(str string) bool {
+	regexPattern := `type:\s+Aws`
 	match, _ := regexp.MatchString(regexPattern, str)
 	return match
 }
