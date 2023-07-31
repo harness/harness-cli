@@ -17,7 +17,7 @@ func applyConnector(c *cli.Context) error {
 	awsCrossAccountRoleArn := c.String("aws-cross-account-role-arn")
 	awsAccessKey := c.String("aws-access-key")
 	awsSecretKey := c.String("aws-secret-Key")
-	awsRegion := c.String("aws-region")
+	awsRegion := c.String("region")
 	baseURL := getNGBaseURL(c)
 
 	if filePath == "" {
