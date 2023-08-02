@@ -1,23 +1,50 @@
-# harness-cli
-Harness CLI for managing Harness entities, from the command line with YAML as input. This CLI is currently in BETA stage.
-Current focus is on the entities needed for the CD & GitOps module. Other modules will be covered in the future.
+# Harness CLI 
+
+The `harness` CLI utility allows users to manage Harness entities through the use of resource YAML files for creating, deleting, and modifying them. Currently, it is primarily focused on the entities required for the CD & GitOps module, with future plans to expand its support to other modules.
 
 - Uses public [Harness REST APIs](https://apidocs.harness.io/)
-- Requires a [Harness API Key](https://developer.harness.io/docs/platform/user-management/add-and-manage-api-keys/) for authenticating with your Harness account. 
+- Requires a [Harness API Key](https://developer.harness.io/docs/platform/user-management/add-and-manage-api-keys/) for authenticating with your Harness account.
 
-# Instructions
-## Manual install
-To install the Harness CLI tool manually, follow these steps:
+<!-- Regenerate this table of contents using https://github.com/ekalinin/github-markdown-toc -->
+<!-- gh-md-toc --insert README.md -->
+<!--ts-->
 
-1. Download the latest release from the GitHub releases page: https://github.com/harness/harness-cli/releases .
-   The tool supports MacOS (darwin + (amd64/arm64)), Linux (linux + (amd64/arm64)), and Windows (windows+amd64) platforms, so make sure to download the correct asset for your 
-   platform.
-2. Extract the downloaded file to a directory of your choice. It is recommended that you move the extracted file to a folder specified in your system's path for ease of use.
-3. Run the `harness help` command to verify that the installation was successful.
-If you are using macOS, you can move the `harness` file to the /usr/local/bin/ directory by running the following command:
-  `mv harness /usr/local/bin/`
-   Then, run the `harness help` command to verify that the installation was successful.
+## Table of Contents
 
-4. To update the CLI to a newer version, run the following command:
-   `harness update`
-   This will update the tool to the latest version.
+* [Harness CLI](#harness-cli)
+   * [Install Harness CLI](#install-harness-cli)
+   * [Use Harness CLI](#use-harness-cli)
+   * [Branch Info](#branch-info)
+   * [Code of Conduct](#code-of-conduct)
+   * [Get Involved](#get-involved)
+   * [License](#license)
+
+<!-- Created by https://github.com/ekalinin/github-markdown-toc -->
+
+<!--te-->
+
+## Install Harness CLI
+
+The Harness CLI is designed to work seamlessly across Linux, Windows, and MacOS operating systems. For installation instructions on your preferred OS, please refer the [Install Guide](./INSTALL.md).
+
+## Use Harness CLI
+
+[TODO] Add steps to apply resource yamls or link to CLI-based tutorial.
+
+## Branch Info
+
+* The `develop` branch corresponds to the release actively under development.
+* The `vX.X.X` branches correspond to stable releases.
+* Create a branch based on `develop` and set up a dev environment if you want to open a PR.
+
+## Code of Conduct
+
+We ask all of our users and contributors to adhere to the [Harness Code of Conduct](https://github.com/harness/community/blob/main/CODE_OF_CONDUCT.md). If you have questions or need assistance, please reach out to our team at [community-engineering@harness.io](mailto:community-engineering@harness.io)
+
+## Get Involved
+
+We welcome your feedback and ideas. Here's how to reach us with feedback and questions: Join [Harness Community](https://join.slack.com/t/harnesscommunity/shared_invite/zt-1h2cy1up2-Bf3MQQvKTf~YkVcsnkJ5pw) Slack space. Refer to [Harness Community Communications Guide](https://github.com/harness-community/overview/blob/main/community_communication_guide.rst) to interact with the wider community users/contributors.
+
+## License
+
+MIT License. See [COPYING](LICENSE) for more information.
