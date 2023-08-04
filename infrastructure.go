@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"regexp"
 
 	log "github.com/sirupsen/logrus"
 
@@ -30,7 +29,7 @@ func applyInfraDefinition(c *cli.Context) error {
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 	var content = readFromFile(c.String("file"))
-	content = updateYamlContent(content)
+	content = updateInfraYamlContent(content)
 
 	requestBody := getJsonFromYaml(content)
 	if requestBody == nil {
@@ -69,8 +68,8 @@ func applyInfraDefinition(c *cli.Context) error {
 	return nil
 }
 
-func updateYamlContent(content string) string {
-	var infraType = fetchInfraType(content)
+func updateInfraYamlContent(content string) string {
+	var infraType = fetchCloudType(content)
 	switch {
 	case infraType == GCP:
 		log.Info("Looks like you are creating an infrastructure definition for GCP," +
@@ -104,20 +103,4 @@ func deleteInfraDefinition(*cli.Context) error {
 func listInfraDefinition(*cli.Context) error {
 	fmt.Println(NOT_IMPLEMENTED)
 	return nil
-}
-
-func fetchInfraType(str string) string {
-	fmt.Println("Checking infra type in the yaml..")
-	gcpRegexPattern := `type:\s+GoogleCloudFunctions`
-	isGcpMatch, _ := regexp.MatchString(gcpRegexPattern, str)
-	awsRegexPattern := `type:\s+AwsLambda`
-	isAwsMatch, _ := regexp.MatchString(awsRegexPattern, str)
-
-	if isGcpMatch {
-		return GCP
-	} else if isAwsMatch {
-		return AWS
-	}
-
-	return ""
 }

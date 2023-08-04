@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -293,4 +294,18 @@ func mergeMaps(map1 map[string]string, map2 map[string]string) map[string]string
 // replaces placeholder values in the given yaml content
 func replacePlaceholderValues(haystack string, needle string, value string) string {
 	return strings.ReplaceAll(haystack, needle, value)
+}
+
+func fetchCloudType(str string) string {
+	fmt.Println("Checking cloud type in the yaml..")
+	gcpRegexPattern := `type:\s+GoogleCloudFunctions`
+	awsRegexPattern := `type:\s+AwsLambda`
+
+	if isGcpMatch, err1 := regexp.MatchString(gcpRegexPattern, str); err1 == nil && isGcpMatch {
+		return GCP
+	} else if isAwsMatch, err2 := regexp.MatchString(awsRegexPattern, str); err2 == nil && isAwsMatch {
+		return AWS
+	}
+
+	return ""
 }

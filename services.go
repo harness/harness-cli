@@ -3,9 +3,13 @@ package main
 import (
 	"fmt"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 )
+
+var gcpBucketName = ""
 
 func applyService(c *cli.Context) error {
 	filePath := c.String("file")
@@ -14,12 +18,16 @@ func applyService(c *cli.Context) error {
 		fmt.Println("Please enter valid filename")
 		return nil
 	}
+	gcpProjectName = c.String("gcp-project")
+	gcpBucketName = c.String("gcp-bucket")
 	fmt.Println("Trying to create or update service using the yaml=",
 		getColoredText(filePath, color.FgCyan))
 	createOrUpdateSvcURL := GetUrlWithQueryParams("", baseURL, SERVICES_ENDPOINT, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 	var content = readFromFile(c.String("file"))
+	content = updateServiceYamlContent(content)
+
 	requestBody := getJsonFromYaml(content)
 	if requestBody == nil {
 		println(getColoredText("Please enter valid yaml", color.FgRed))
@@ -52,6 +60,32 @@ func applyService(c *cli.Context) error {
 	}
 
 	return nil
+}
+
+func updateServiceYamlContent(content string) string {
+	var serviceType = fetchCloudType(content)
+	switch {
+	case serviceType == GCP:
+		log.Info("Looks like you are creating a service for GCP," +
+			" validating GCP project and bucket now...")
+		if gcpProjectName == "" || gcpProjectName == GCP_PROJECT_NAME_PLACEHOLDER {
+			gcpProjectName = TextInput("Enter a valid GCP project name:")
+		}
+
+		if gcpBucketName == "" || gcpBucketName == GCP_BUCKET_NAME_PLACEHOLDER {
+			gcpBucketName = TextInput("Enter a valid GCP bucket name:")
+		}
+		log.Info("Got your gcp project and bucket info, let's create the service now...")
+		content = replacePlaceholderValues(content, GCP_PROJECT_NAME_PLACEHOLDER, gcpProjectName)
+		content = replacePlaceholderValues(content, GCP_BUCKET_NAME_PLACEHOLDER, gcpBucketName)
+	case serviceType == AWS:
+		log.Info("Looks like you are creating a service for AWS, validating yaml now...")
+	default:
+		fmt.Println("Nothing to update in the yaml.")
+		panic("The supported Cloud types are GCP and AWS. Input should be one of these.")
+	}
+
+	return content
 }
 
 func deleteService(*cli.Context) error {

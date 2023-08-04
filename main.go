@@ -140,6 +140,16 @@ func main() {
 					{
 						Name:  "apply",
 						Usage: "Create a new service or Update  an existing one.",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "gcp-project",
+								Usage: "provide the Google Cloud Platform project name.",
+							},
+							&cli.StringFlag{
+								Name:  "gcp-bucket",
+								Usage: "provide the Google Cloud Platform bucket name.",
+							},
+						},
 						Action: func(context *cli.Context) error {
 							return cliWrapper(applyService, context)
 						},
