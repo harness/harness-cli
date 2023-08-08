@@ -81,8 +81,7 @@ func updateServiceYamlContent(content string) string {
 	case serviceType == AWS:
 		log.Info("Looks like you are creating a service for AWS, validating yaml now...")
 	default:
-		fmt.Println("Nothing to update in the yaml.")
-		panic("The supported Cloud types are GCP and AWS. Input should be one of these.")
+		return content
 	}
 
 	return content
