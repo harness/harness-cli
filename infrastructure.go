@@ -87,7 +87,7 @@ func updateInfraYamlContent(content string) string {
 	case infraType == AWS:
 		log.Info("Looks like you are creating an infrastructure definition for AWS, validating yaml now...")
 	default:
-		fmt.Println("Nothing to update in the yaml.")
+		return content
 	}
 
 	return content

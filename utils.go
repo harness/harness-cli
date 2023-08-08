@@ -297,7 +297,6 @@ func replacePlaceholderValues(haystack string, needle string, value string) stri
 }
 
 func fetchCloudType(str string) string {
-	fmt.Println("Checking cloud type in the yaml..")
 	gcpRegexPattern := `type:\s+GoogleCloudFunctions`
 	awsRegexPattern := `type:\s+AwsLambda`
 
