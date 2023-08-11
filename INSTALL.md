@@ -2,20 +2,11 @@
 
 You can install the Harness CLI (`harness`) in order to interact with Harness Platform from a command-line interface. You can install `harness` on Linux, Windows, or macOS.
 
-<!-- Regenerate this table of contents using https://github.com/ekalinin/github-markdown-toc -->
-<!-- gh-md-toc --insert README.md -->
-<!--ts-->
-
 ## Table of Contents
 
    * [Installing the CLI on Linux](#installing-the-cli-on-linux)
    * [Installing the CLI on Windows](#installing-the-cli-on-windows)
    * [Installing the CLI on macOS](#installing-the-cli-on-macos)
-
-
-<!-- Created by https://github.com/ekalinin/github-markdown-toc -->
-
-<!--te-->
 
 ## Installing the CLI on Linux
 
