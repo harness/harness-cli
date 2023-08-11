@@ -21,21 +21,18 @@ curl -LOJ https://github.com/harness/harness-cli/releases/download/<VERSION>/har
 3. Unpack the archive:
 ```bash
 tar xvzf harness-<VERSION>-linux-<ARCH>.tar.gz
+ls -l | grep -i harness
 ```
 
-4. Move the `harness` binary in a directory that is on your `PATH`.
-    - To check your `PATH`, execute the following command:
-        ```bash
-        echo $PATH
-        ```
-    - To move the `harness` binary
-        ```bash
-        mv ./harness /PATH/TO/DEST
-        ```
+4. Add the binary path to the system `$PATH` variable
+```bash
+echo 'export PATH="$(pwd):$PATH"' >> ~/.bash_profile
+source ~/.bash_profile
+```
 
 5. After you install the CLI, it is available using the `harness` command:
 ```bash
-harness harness --version
+harness --version
 ```
 
 ## Installing the CLI on Windows
