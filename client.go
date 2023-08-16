@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
-	"net/http/httputil"
 	"strconv"
 	"strings"
 
@@ -45,9 +43,9 @@ func Post(reqUrl string, auth string, body interface{}, contentType string, buff
 
 	}
 
-	b, err := httputil.DumpRequest(req, true)
-
-	fmt.Printf("Request = %s\n", string(b))
+	//b, err := httputil.DumpRequest(req, true)
+	//
+	//fmt.Printf("Request = %s\n", string(b))
 
 	return handleResp(req)
 }
@@ -76,8 +74,8 @@ func Put(reqUrl string, auth string, body interface{}, contentType string, buffe
 	}
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set(AuthHeaderKey(auth), auth)
-	b, err := httputil.DumpRequest(req, true)
-	fmt.Printf("Request = %s\n", string(b))
+	//b, err := httputil.DumpRequest(req, true)
+	//fmt.Printf("Request = %s\n", string(b))
 	return handleResp(req)
 }
 
