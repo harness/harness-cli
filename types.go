@@ -1,5 +1,9 @@
 package main
 
+import (
+	"os"
+)
+
 type EntityType string
 type ImportType string
 type StoreType int64
@@ -207,7 +211,7 @@ type SecretStore struct {
 	BaseURL   string `json:"baseUrl"`
 }
 type SecretSpec struct {
-	Value                   string `json:"value"`
+	Value                   string `json:"value,omitempty"`
 	SecretManagerIdentifier string `json:"secretManagerIdentifier"`
 	ValueType               string `json:"valueType"`
 }
@@ -279,4 +283,14 @@ type HarnessPipeline struct {
 	RepoName       string    `json:"repoName,omitempty"`
 	StoreType      StoreType `json:"storeType"`
 	Yaml           string    `json:"yaml"`
+}
+
+const (
+	SecretText string = "SecretText"
+	SecretFile        = "SecretFile"
+)
+
+type HarnessFileSecretPayload struct {
+	Spec HarnessSecret
+	File *os.File
 }

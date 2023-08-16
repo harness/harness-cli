@@ -16,7 +16,6 @@ func applyConnector(c *cli.Context) error {
 	delegateName := c.String("delegate-name")
 	awsCrossAccountRoleArn := c.String("aws-cross-account-role-arn")
 	awsAccessKey := c.String("aws-access-key")
-	awsSecretKey := c.String("aws-secret-Key")
 	awsRegion := c.String("region")
 	baseURL := getNGBaseURL(c)
 
@@ -32,7 +31,7 @@ func applyConnector(c *cli.Context) error {
 		"accountIdentifier": cliCdRequestData.Account,
 	})
 
-	var content = readFromFile(filePath)
+	var content, _ = readFromFile(filePath)
 	if isGithubConnectorYAML(content) {
 		if githubUsername == "" || githubUsername == GITHUB_USERNAME_PLACEHOLDER {
 			githubUsername = TextInput("Enter valid github username:")
@@ -52,17 +51,18 @@ func applyConnector(c *cli.Context) error {
 		if awsAccessKey == "" || awsAccessKey == AWS_ACCESS_KEY {
 			awsAccessKey = TextInput("Enter valid aws access key:")
 		}
-		if awsSecretKey == "" || awsSecretKey == AWS_SECRET_KEY {
-			awsSecretKey = TextInput("Enter valid aws secret key:")
-		}
 		if awsRegion == "" || awsRegion == AWS_REGION {
-			awsSecretKey = TextInput("Enter valid aws region:")
+			awsRegion = TextInput("Enter valid aws region:")
 		}
+		if delegateName == "" || delegateName == DELEGATE_NAME_PLACEHOLDER {
+			delegateName = TextInput("Enter valid delegate name:")
+		}
+
 		//TODO: find a better way to resolve placeholders, dont depend on fixed placeholders
 		content = replacePlaceholderValues(content, AWS_CROSS_ACCOUNT_ROLE_ARN, awsCrossAccountRoleArn)
 		content = replacePlaceholderValues(content, AWS_ACCESS_KEY, awsAccessKey)
-		content = replacePlaceholderValues(content, AWS_SECRET_KEY, awsSecretKey)
 		content = replacePlaceholderValues(content, AWS_REGION, awsRegion)
+		content = replacePlaceholderValues(content, DELEGATE_NAME_PLACEHOLDER, delegateName)
 	}
 	requestBody := make(map[string]interface{})
 	if err := yaml.Unmarshal([]byte(content), requestBody); err != nil {
@@ -77,7 +77,7 @@ func applyConnector(c *cli.Context) error {
 	var err error
 	if !entityExists {
 		println("Creating connector with id: ", getColoredText(identifier, color.FgGreen))
-		_, err = Post(createConnectorURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_JSON)
+		_, err = Post(createConnectorURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_JSON, nil)
 		if err == nil {
 			println(getColoredText("Successfully created connector with id= ", color.FgGreen) +
 				getColoredText(identifier, color.FgBlue))
@@ -89,7 +89,7 @@ func applyConnector(c *cli.Context) error {
 		println("Found connector with id=", getColoredText(identifier, color.FgCyan))
 		println("Updating details of connector with id=", getColoredText(identifier, color.FgBlue))
 
-		_, err = Put(createConnectorURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_JSON)
+		_, err = Put(createConnectorURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_JSON, nil)
 		if err == nil {
 			println(getColoredText("Successfully updated connector with id= ", color.FgGreen) +
 				getColoredText(identifier, color.FgBlue))

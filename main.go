@@ -96,7 +96,12 @@ func main() {
 					altsrc.NewStringFlag(&cli.StringFlag{
 						Name:  "token",
 						Usage: "Specify your PAT",
-					})),
+					}),
+					&cli.StringFlag{
+						Name:  "file",
+						Usage: "`File path for the secret",
+					},
+				),
 				Action: func(context *cli.Context) error {
 					fmt.Println("Secrets command.")
 					return nil
@@ -109,6 +114,12 @@ func main() {
 					{
 						Name:  "apply",
 						Usage: "Create a new secret or Update  an existing one.",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "secret-type",
+								Usage: "provide the secret type.",
+							},
+						},
 						Action: func(context *cli.Context) error {
 							return cliWrapper(applySecret, context)
 						},

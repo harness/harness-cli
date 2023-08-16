@@ -25,7 +25,7 @@ func applyService(c *cli.Context) error {
 	createOrUpdateSvcURL := GetUrlWithQueryParams("", baseURL, SERVICES_ENDPOINT, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
-	var content = readFromFile(c.String("file"))
+	var content, _ = readFromFile(c.String("file"))
 	content = updateServiceYamlContent(content)
 
 	requestBody := getJsonFromYaml(content)
@@ -42,7 +42,7 @@ func applyService(c *cli.Context) error {
 	var err error
 	if !entityExists {
 		println("Creating service with id: ", getColoredText(identifier, color.FgGreen))
-		_, err = Post(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, CONTENT_TYPE_JSON)
+		_, err = Post(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, CONTENT_TYPE_JSON, nil)
 		if err == nil {
 			println(getColoredText("Successfully created service with id= ", color.FgGreen) +
 				getColoredText(identifier, color.FgBlue))
@@ -51,7 +51,7 @@ func applyService(c *cli.Context) error {
 	} else {
 		println("Found service with id=", getColoredText(identifier, color.FgCyan))
 		println("Updating details of service with id=", getColoredText(identifier, color.FgBlue))
-		_, err = Put(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, CONTENT_TYPE_JSON)
+		_, err = Put(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, CONTENT_TYPE_JSON, nil)
 		if err == nil {
 			println(getColoredText("Successfully updated connector with id= ", color.FgGreen) +
 				getColoredText(identifier, color.FgBlue))

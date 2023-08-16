@@ -86,7 +86,7 @@ func writeToFile(text string, filename string, overwrite bool) {
 	f.Close()
 }
 
-func readFromFile(filepath string) (s string) {
+func readFromFile(filepath string) (s string, r []byte) {
 	var _fileContents = ""
 
 	file, _ := os.OpenFile(filepath, os.O_RDONLY, 0644)
@@ -98,7 +98,7 @@ func readFromFile(filepath string) (s string) {
 	}
 	_fileContents = string(byteValue)
 
-	return _fileContents
+	return _fileContents, byteValue
 }
 
 func saveCredentials(c *cli.Context) (err error) {

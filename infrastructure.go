@@ -28,7 +28,7 @@ func applyInfraDefinition(c *cli.Context) error {
 	createOrUpdateInfraURL := GetUrlWithQueryParams("", baseURL, INFRA_ENDPOINT, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
-	var content = readFromFile(c.String("file"))
+	var content, _ = readFromFile(c.String("file"))
 	content = updateInfraYamlContent(content)
 
 	requestBody := getJsonFromYaml(content)
@@ -49,7 +49,7 @@ func applyInfraDefinition(c *cli.Context) error {
 	var err error
 	if !entityExists {
 		println("Creating infrastructure with id: ", getColoredText(identifier, color.FgGreen))
-		_, err = Post(createOrUpdateInfraURL, cliCdRequestData.AuthToken, InfraPayload, CONTENT_TYPE_JSON)
+		_, err = Post(createOrUpdateInfraURL, cliCdRequestData.AuthToken, InfraPayload, CONTENT_TYPE_JSON, nil)
 		if err == nil {
 			println(getColoredText("Infrastructure Definition created successfully!", color.FgGreen))
 			return nil
@@ -57,7 +57,7 @@ func applyInfraDefinition(c *cli.Context) error {
 	} else {
 		println("Found infrastructure with id=", getColoredText(identifier, color.FgCyan))
 		println("Updating details of infrastructure with id=", getColoredText(identifier, color.FgBlue))
-		_, err = Put(createOrUpdateInfraURL, cliCdRequestData.AuthToken, InfraPayload, CONTENT_TYPE_JSON)
+		_, err = Put(createOrUpdateInfraURL, cliCdRequestData.AuthToken, InfraPayload, CONTENT_TYPE_JSON, nil)
 		if err == nil {
 			println(getColoredText("Successfully updated infrastructure definition with id= ", color.FgGreen) +
 				getColoredText(identifier, color.FgBlue))
