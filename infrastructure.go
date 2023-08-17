@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 
@@ -9,8 +10,8 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var gcpProjectName = ""
-var gcpRegionName = ""
+var cloudProjectName = ""
+var cloudRegionName = ""
 
 // create or update  Infra Definition
 func applyInfraDefinition(c *cli.Context) error {
@@ -20,8 +21,8 @@ func applyInfraDefinition(c *cli.Context) error {
 		fmt.Println("Please enter valid filename")
 		return nil
 	}
-	gcpProjectName = c.String("gcp-project")
-	gcpRegionName = c.String("region")
+	cloudProjectName = c.String("cloud-project")
+	cloudRegionName = c.String("cloud-region")
 	fmt.Println("Trying to create or update infrastructure using the given yaml=",
 		getColoredText(filePath, color.FgCyan))
 
@@ -69,26 +70,20 @@ func applyInfraDefinition(c *cli.Context) error {
 }
 
 func updateInfraYamlContent(content string) string {
-	var infraType = fetchCloudType(content)
-	switch {
-	case infraType == GCP:
-		log.Info("Looks like you are creating an infrastructure definition for GCP," +
-			" validating GCP project and region now...")
-		if gcpProjectName == "" || gcpProjectName == GCP_PROJECT_NAME_PLACEHOLDER {
-			gcpProjectName = TextInput("Enter a valid GCP project name:")
-		}
+	hasRegionName := strings.Contains(content, REGION_NAME_PLACEHOLDER)
+	hasProjectName := strings.Contains(content, PROJECT_NAME_PLACEHOLDER)
 
-		if gcpRegionName == "" || gcpRegionName == GCP_REGION_NAME_PLACEHOLDER {
-			gcpRegionName = TextInput("Enter a valid GCP region name:")
-		}
-		log.Info("Got your gcp project and region info, let's create the infra now...")
-		content = replacePlaceholderValues(content, GCP_PROJECT_NAME_PLACEHOLDER, gcpProjectName)
-		content = replacePlaceholderValues(content, GCP_REGION_NAME_PLACEHOLDER, gcpRegionName)
-	case infraType == AWS:
-		log.Info("Looks like you are creating an infrastructure definition for AWS, validating yaml now...")
-	default:
-		return content
+	if hasProjectName && (cloudProjectName == "" || cloudProjectName == PROJECT_NAME_PLACEHOLDER) {
+		cloudProjectName = TextInput("Enter a valid project name:")
 	}
+
+	if hasRegionName && (cloudRegionName == "" || cloudRegionName == REGION_NAME_PLACEHOLDER) {
+		cloudRegionName = TextInput("Enter a valid region name:")
+	}
+
+	log.Info("Got your gcp project and region info, let's create the infra now...")
+	content = replacePlaceholderValues(content, PROJECT_NAME_PLACEHOLDER, cloudProjectName)
+	content = replacePlaceholderValues(content, REGION_NAME_PLACEHOLDER, cloudRegionName)
 
 	return content
 }

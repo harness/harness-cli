@@ -16,7 +16,7 @@ func applyConnector(c *cli.Context) error {
 	delegateName := c.String("delegate-name")
 	awsCrossAccountRoleArn := c.String("aws-cross-account-role-arn")
 	awsAccessKey := c.String("aws-access-key")
-	awsRegion := c.String("region")
+	awsRegion := c.String("cloud-region")
 	baseURL := getNGBaseURL(c)
 
 	if filePath == "" {
@@ -61,7 +61,7 @@ func applyConnector(c *cli.Context) error {
 		//TODO: find a better way to resolve placeholders, dont depend on fixed placeholders
 		content = replacePlaceholderValues(content, AWS_CROSS_ACCOUNT_ROLE_ARN, awsCrossAccountRoleArn)
 		content = replacePlaceholderValues(content, AWS_ACCESS_KEY, awsAccessKey)
-		content = replacePlaceholderValues(content, AWS_REGION, awsRegion)
+		content = replacePlaceholderValues(content, REGION_NAME_PLACEHOLDER, awsRegion)
 		content = replacePlaceholderValues(content, DELEGATE_NAME_PLACEHOLDER, delegateName)
 	}
 	requestBody := make(map[string]interface{})

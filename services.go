@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 
@@ -9,7 +10,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var gcpBucketName = ""
+var cloudBucketName = ""
 
 func applyService(c *cli.Context) error {
 	filePath := c.String("file")
@@ -18,8 +19,9 @@ func applyService(c *cli.Context) error {
 		fmt.Println("Please enter valid filename")
 		return nil
 	}
-	gcpProjectName = c.String("gcp-project")
-	gcpBucketName = c.String("gcp-bucket")
+	cloudProjectName = c.String("cloud-project")
+	cloudBucketName = c.String("cloud-bucket")
+	cloudRegionName = c.String("cloud-region")
 	fmt.Println("Trying to create or update service using the yaml=",
 		getColoredText(filePath, color.FgCyan))
 	createOrUpdateSvcURL := GetUrlWithQueryParams("", baseURL, SERVICES_ENDPOINT, map[string]string{
@@ -63,23 +65,40 @@ func applyService(c *cli.Context) error {
 }
 
 func updateServiceYamlContent(content string) string {
-	var serviceType = fetchCloudType(content)
+	var serviceType = strings.ToLower(fetchCloudType(content))
+	println(strings.EqualFold(serviceType, AWS))
 	switch {
-	case serviceType == GCP:
+	case strings.EqualFold(serviceType, GCP):
+		println("reached gcp")
 		log.Info("Looks like you are creating a service for GCP," +
 			" validating GCP project and bucket now...")
-		if gcpProjectName == "" || gcpProjectName == GCP_PROJECT_NAME_PLACEHOLDER {
-			gcpProjectName = TextInput("Enter a valid GCP project name:")
+		if cloudProjectName == "" || cloudProjectName == PROJECT_NAME_PLACEHOLDER {
+			cloudProjectName = TextInput("Enter a valid GCP project name:")
 		}
 
-		if gcpBucketName == "" || gcpBucketName == GCP_BUCKET_NAME_PLACEHOLDER {
-			gcpBucketName = TextInput("Enter a valid GCP bucket name:")
+		if cloudBucketName == "" || cloudBucketName == BUCKET_NAME_PLACEHOLDER {
+			cloudBucketName = TextInput("Enter a valid GCP bucket name:")
 		}
 		log.Info("Got your gcp project and bucket info, let's create the service now...")
-		content = replacePlaceholderValues(content, GCP_PROJECT_NAME_PLACEHOLDER, gcpProjectName)
-		content = replacePlaceholderValues(content, GCP_BUCKET_NAME_PLACEHOLDER, gcpBucketName)
-	case serviceType == AWS:
+		content = replacePlaceholderValues(content, PROJECT_NAME_PLACEHOLDER, cloudProjectName)
+		content = replacePlaceholderValues(content, BUCKET_NAME_PLACEHOLDER, cloudBucketName)
+		return content
+	case strings.EqualFold(serviceType, AWS):
+		println("reached aws")
 		log.Info("Looks like you are creating a service for AWS, validating yaml now...")
+		hasRegionName := strings.Contains(content, REGION_NAME_PLACEHOLDER)
+		hasBucketName := strings.Contains(content, BUCKET_NAME_PLACEHOLDER)
+		if hasRegionName && (cloudRegionName == "" || cloudRegionName == REGION_NAME_PLACEHOLDER) {
+			cloudRegionName = TextInput("Enter a valid AWS region name:")
+		}
+
+		if hasBucketName && (cloudBucketName == "" || cloudBucketName == BUCKET_NAME_PLACEHOLDER) {
+			cloudBucketName = TextInput("Enter a valid AWS bucket name:")
+		}
+		log.Info("Got your aws project and bucket info, let's create the service now...")
+		content = replacePlaceholderValues(content, REGION_NAME_PLACEHOLDER, cloudRegionName)
+		content = replacePlaceholderValues(content, BUCKET_NAME_PLACEHOLDER, cloudBucketName)
+		return content
 	default:
 		return content
 	}

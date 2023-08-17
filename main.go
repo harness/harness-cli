@@ -153,11 +153,15 @@ func main() {
 						Usage: "Create a new service or Update  an existing one.",
 						Flags: []cli.Flag{
 							&cli.StringFlag{
-								Name:  "gcp-project",
+								Name:  "cloud-project",
 								Usage: "provide the Google Cloud Platform project name.",
 							},
 							&cli.StringFlag{
-								Name:  "gcp-bucket",
+								Name:  "cloud-bucket",
+								Usage: "provide the Google Cloud Platform bucket name.",
+							},
+							&cli.StringFlag{
+								Name:  "cloud-region",
 								Usage: "provide the Google Cloud Platform bucket name.",
 							},
 						},
@@ -246,8 +250,8 @@ func main() {
 								Usage: "access secret for the aws connector",
 							},
 							&cli.StringFlag{
-								Name:  "region",
-								Usage: "region for the aws connector",
+								Name:  "cloud-region",
+								Usage: "region for the cloud connector",
 							},
 						},
 						Action: func(context *cli.Context) error {
@@ -283,11 +287,11 @@ func main() {
 						Usage: "Create a new infrastructure or Update  an existing one.",
 						Flags: []cli.Flag{
 							&cli.StringFlag{
-								Name:  "gcp-project",
+								Name:  "cloud-project",
 								Usage: "provide the Google Cloud Platform project name. ",
 							},
 							&cli.StringFlag{
-								Name:  "region",
+								Name:  "cloud-region",
 								Usage: "provide the Cloud Platform region name. For eg; 1.Creating GCP pipeline then provide gcp-region name, 2.Creating AWS based pipeline then provide aws-region name",
 							},
 						},

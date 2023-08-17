@@ -161,13 +161,13 @@ func getSecretIdentifier(secType string) string {
 	return secretIdentifier
 }
 
-func getSecretName(secType string) string {
+func getSecretName(secretType string) string {
 	secretName := ""
-	switch secType {
-	case "aws":
+	switch {
+	case strings.EqualFold(secretType, AWS):
 		secretName = "Harness AWS Secret"
 		break
-	case "gcp":
+	case strings.EqualFold(secretType, GCP):
 		secretName = "Harness GCP Secret"
 		break
 	default:
