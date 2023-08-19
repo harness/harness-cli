@@ -51,7 +51,7 @@ func applyConnector(c *cli.Context) error {
 		if awsAccessKey == "" || awsAccessKey == AWS_ACCESS_KEY {
 			awsAccessKey = TextInput("Enter valid aws access key:")
 		}
-		if awsRegion == "" || awsRegion == AWS_REGION {
+		if awsRegion == "" || awsRegion == REGION_NAME_PLACEHOLDER {
 			awsRegion = TextInput("Enter valid aws region:")
 		}
 		if delegateName == "" || delegateName == DELEGATE_NAME_PLACEHOLDER {
