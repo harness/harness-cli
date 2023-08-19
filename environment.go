@@ -20,7 +20,7 @@ func applyEnvironment(c *cli.Context) error {
 	createOrUpdateEnvURL := GetUrlWithQueryParams("", baseURL, ENVIRONMENT_ENDPOINT, map[string]string{
 		"accountIdentifier": cliCdRequestData.Account,
 	})
-	var content = readFromFile(c.String("file"))
+	var content, _ = readFromFile(c.String("file"))
 
 	requestBody := getJsonFromYaml(content)
 	if requestBody == nil {
@@ -40,7 +40,7 @@ func applyEnvironment(c *cli.Context) error {
 	var err error
 	if !entityExists {
 		println("Creating environment with id: ", getColoredText(identifier, color.FgGreen))
-		_, err = Post(createOrUpdateEnvURL, cliCdRequestData.AuthToken, EnvPayload, CONTENT_TYPE_JSON)
+		_, err = Post(createOrUpdateEnvURL, cliCdRequestData.AuthToken, EnvPayload, CONTENT_TYPE_JSON, nil)
 		if err == nil {
 			println(getColoredText("Successfully created environment with id= ", color.FgGreen) +
 				getColoredText(identifier, color.FgBlue))
@@ -49,7 +49,7 @@ func applyEnvironment(c *cli.Context) error {
 	} else {
 		println("Found environment with id: ", getColoredText(identifier, color.FgCyan))
 		println("Updating environment details....")
-		_, err = Put(createOrUpdateEnvURL, cliCdRequestData.AuthToken, EnvPayload, CONTENT_TYPE_JSON)
+		_, err = Put(createOrUpdateEnvURL, cliCdRequestData.AuthToken, EnvPayload, CONTENT_TYPE_JSON, nil)
 		if err == nil {
 			println(getColoredText("Successfully updated environment with id= ", color.FgGreen) +
 				getColoredText(identifier, color.FgBlue))

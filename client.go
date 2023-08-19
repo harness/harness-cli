@@ -12,13 +12,21 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func Post(reqUrl string, auth string, body interface{}, contentType string) (respBodyObj ResponseBody, err error) {
+func Post(reqUrl string, auth string, body interface{}, contentType string, requestBodyWithFile *bytes.Buffer) (respBodyObj ResponseBody, err error) {
 	postBody, _ := json.Marshal(body)
 	requestBody := bytes.NewBuffer(postBody)
+	var req *http.Request
+
 	log.WithFields(log.Fields{
 		"body": string(postBody),
 	}).Debug("The request body")
-	req, err := http.NewRequest("POST", reqUrl, requestBody)
+
+	if requestBodyWithFile != nil {
+		requestBody = requestBodyWithFile
+	}
+
+	req, err = http.NewRequest("POST", reqUrl, requestBody)
+
 	if err != nil {
 		return
 	}
@@ -27,26 +35,30 @@ func Post(reqUrl string, auth string, body interface{}, contentType string) (res
 
 	if err != nil {
 		log.Fatalln(err)
-	}
 
-	//fmt.Printf("Request = %s\n", string(b))
+	}
 
 	return handleResp(req)
 }
 
-func Put(reqUrl string, auth string, body interface{}, contentType string) (respBodyObj ResponseBody, err error) {
+func Put(reqUrl string, auth string, body interface{}, contentType string, requestBodyWithFile *bytes.Buffer) (respBodyObj ResponseBody, err error) {
 	postBody, _ := json.Marshal(body)
 	requestBody := bytes.NewBuffer(postBody)
+	var req *http.Request
 	log.WithFields(log.Fields{
 		"body": string(postBody),
 	}).Debug("The request body")
-	req, err := http.NewRequest("PUT", reqUrl, requestBody)
+	if requestBodyWithFile != nil {
+		requestBody = requestBodyWithFile
+	}
+
+	req, err = http.NewRequest("PUT", reqUrl, requestBody)
+
 	if err != nil {
 		return
 	}
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set(AuthHeaderKey(auth), auth)
-
 	return handleResp(req)
 }
 

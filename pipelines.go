@@ -17,7 +17,7 @@ func applyPipeline(c *cli.Context) error {
 	}
 	fmt.Println("Trying to create or update pipeline using the yaml=",
 		getColoredText(filePath, color.FgCyan))
-	var content = readFromFile(c.String("file"))
+	var content, _ = readFromFile(c.String("file"))
 
 	requestBody := getJsonFromYaml(content)
 
@@ -39,7 +39,7 @@ func applyPipeline(c *cli.Context) error {
 	var err error
 	if !entityExists {
 		println("Creating pipeline with id: ", getColoredText(identifier, color.FgGreen))
-		_, err = Post(createOrUpdatePipelineURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_YAML)
+		_, err = Post(createOrUpdatePipelineURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_YAML, nil)
 		if err == nil {
 			println(getColoredText("Successfully created pipeline with id= ", color.FgGreen) +
 				getColoredText(identifier, color.FgBlue))
@@ -55,7 +55,7 @@ func applyPipeline(c *cli.Context) error {
 			})
 		println("Found pipeline with id=", getColoredText(identifier, color.FgCyan))
 		println("Updating details of pipeline with id=", getColoredText(identifier, color.FgBlue))
-		_, err = Put(pipelinesPUTUrl, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_YAML)
+		_, err = Put(pipelinesPUTUrl, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_YAML, nil)
 		if err == nil {
 			println(getColoredText("Successfully updated pipeline with id= ", color.FgGreen) +
 				getColoredText(identifier, color.FgBlue))
