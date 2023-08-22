@@ -13,7 +13,6 @@ The `harness` CLI utility allows users to manage Harness entities through the us
 
 * [Harness CLI](#harness-cli)
    * [Install Harness CLI](#install-harness-cli)
-   * [Use Harness CLI](#use-harness-cli)
    * [Branch Info](#branch-info)
    * [Code of Conduct](#code-of-conduct)
    * [Get Involved](#get-involved)
@@ -26,10 +25,6 @@ The `harness` CLI utility allows users to manage Harness entities through the us
 ## Install Harness CLI
 
 The Harness CLI is designed to work seamlessly across Linux, Windows, and MacOS operating systems. For installation instructions on your preferred OS, please refer the [Install Guide](./INSTALL.md).
-
-## Use Harness CLI
-
-[TODO] Add steps to apply resource yamls or link to CLI-based tutorial.
 
 ## Branch Info
 
