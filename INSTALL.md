@@ -54,4 +54,4 @@ tar -xvf harness-v0.0.13-alpha-darwin-amd64.tar.gz
 export PATH="$(pwd):$PATH" 
 echo 'export PATH="'$(pwd)':$PATH"' >> ~/.bash_profile   
 ```
-(If you are using different variation of terminal feel free to change `bash_profile` to your bash profile file)
+(If you are using different variation of terminal , replace `~/.bash_profile` with your bash profile file path)
