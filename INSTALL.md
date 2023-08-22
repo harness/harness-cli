@@ -36,7 +36,22 @@ harness --version
 ```
 
 ## Installing the CLI on Windows
-[TODO]
+1. Run the commands below in Windows Powershell:
+```
+Invoke-WebRequest -Uri https://github.com/harness/harness-cli/releases/download/v0.0.13-alpha/harness-v0.0.13-alpha-windows-amd64.zip -OutFile ./harness.zip
+```
+2. Extract the downloaded zip file and change directory to extracted file location
+3. Run following command in powershell to setup environment variables:
+```$currentPath = Get-Location 
+[Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$currentPath", [EnvironmentVariableTarget]::Machine)
+```
+ 4. Restart terminal
 
 ## Installing the CLI on macOS
-[TODO]
+1. Run commands below on terminal
+```curl -LO https://github.com/harness/harness-cli/releases/download/v0.0.13-alpha/harness-v0.0.13-alpha-darwin-amd64.tar.gz 
+tar -xvf harness-v0.0.13-alpha-darwin-amd64.tar.gz 
+export PATH="$(pwd):$PATH" 
+echo 'export PATH="'$(pwd)':$PATH"' >> ~/.bash_profile   
+```
+(If you are using different variation of terminal feel free to change `bash_profile` to your bash profile file)
