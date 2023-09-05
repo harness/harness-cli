@@ -54,7 +54,7 @@ func main() {
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:        "account-id",
-			Usage:       "provide the auto-generated identifier for target account",
+			Usage:       "provide an Account Identifier of the user",
 			Destination: &cliCdRequestData.Account,
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
