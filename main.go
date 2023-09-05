@@ -54,7 +54,7 @@ func main() {
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:        "account-id",
-			Usage:       "`API_KEY` for the target account to authenticate & authorise the user.",
+			Usage:       "provide an Account Identifier of the user",
 			Destination: &cliCdRequestData.Account,
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
