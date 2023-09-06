@@ -182,7 +182,7 @@ func getNGBaseURL(c *cli.Context) string {
 	return baseURL
 }
 
-func getPipelineSVCBaseURL(c *cli.Context) string {
+func getBaseUrl(c *cli.Context, serviceUrl string) string {
 	baseURL := c.String("base-url")
 
 	if baseURL == "" {
@@ -194,7 +194,7 @@ func getPipelineSVCBaseURL(c *cli.Context) string {
 	}
 
 	baseURL = strings.TrimRight(baseURL, "/") //remove trailing slash
-	baseURL = baseURL + PIPELINES_BASE_URL
+	baseURL = baseURL + serviceUrl
 	return baseURL
 }
 

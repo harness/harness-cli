@@ -137,7 +137,7 @@ type Resource struct {
 }
 
 type ResponseBody struct {
-	Code     string             `json:"code"`
+	Code     interface{}        `json:"code"`
 	Message  string             `json:"message"`
 	Status   string             `json:"status"`
 	Data     interface{}        `json:"data"`
@@ -242,6 +242,29 @@ type HarnessService struct {
 	Yaml string `json:"yaml"`
 }
 
+type Repo struct {
+	Repo           string `json:"repo"`
+	Type           string `json:"type"`
+	Name           string `json:"name"`
+	Project        string `json:"project,omitempty"`
+	ConnectionType string `json:"connectionType"`
+	GithubType     string `json:"githubType,omitempty"`
+	InheritedCreds bool   `json:"inheritedCreds,omitempty"`
+}
+type HarnessRepository struct {
+	Repo `json:"repo"`
+}
+
+type UpdateMask struct {
+	Paths []string `json:"Paths"`
+}
+
+type RepoWithUpdateMask struct {
+	Repo       `json:"repo"`
+	UpdateMask struct {
+		Paths []string `json:"paths"`
+	} `json:"updateMask"`
+}
 type HarnessEnvironment struct {
 	Identifier        string `json:"identifier"`
 	Name              string `json:"name"`
