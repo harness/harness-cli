@@ -10,7 +10,7 @@ import (
 // create or update Pipeline
 func applyPipeline(c *cli.Context) error {
 	filePath := c.String("file")
-	baseURL := getPipelineSVCBaseURL(c)
+	baseURL := getBaseUrl(c, PIPELINES_BASE_URL)
 	if filePath == "" {
 		fmt.Println("Please enter valid filename")
 		return nil
