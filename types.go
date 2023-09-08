@@ -242,6 +242,25 @@ type HarnessService struct {
 	Yaml string `json:"yaml"`
 }
 
+type GitOpsCluster struct {
+	Identifier        string `json:"identifier"`
+	ProjectIdentifier string `json:"projectIdentifier"`
+	OrgIdentifier     string `json:"orgIdentifier"`
+	Description       string `json:"description"`
+	Type              string `json:"type,omitempty"`
+	Cluster           `json:"cluster"`
+}
+
+type Cluster struct {
+	Name   string `json:"name"`
+	Server string `json:"server"`
+	Config `json:"config"`
+}
+
+type Config struct {
+	ClusterConnectionType string `json:"clusterConnectionType"`
+}
+
 type Repo struct {
 	Repo           string `json:"repo"`
 	Type           string `json:"type"`
