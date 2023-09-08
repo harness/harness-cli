@@ -78,8 +78,8 @@ func applyRepository(c *cli.Context) error {
 	return nil
 }
 
-func createRepoPayload(requestBody map[string]interface{}) HarnessRepository {
-	newRepo := HarnessRepository{Repo: Repo{
+func createRepoPayload(requestBody map[string]interface{}) GitOpsRepository {
+	newRepo := GitOpsRepository{Repo: Repo{
 		Name:           valueToString(GetNestedValue(requestBody, "gitops", "name").(string)),
 		ConnectionType: valueToString(GetNestedValue(requestBody, "gitops", "repo", "connectionType").(string)),
 		Repo:           valueToString(GetNestedValue(requestBody, "gitops", "repo", "repo").(string)),

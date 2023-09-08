@@ -242,6 +242,10 @@ type HarnessService struct {
 	Yaml string `json:"yaml"`
 }
 
+// GitOpsRepository structs
+type GitOpsRepository struct {
+	Repo `json:"repo"`
+}
 type Repo struct {
 	Repo           string `json:"repo"`
 	Type           string `json:"type"`
@@ -251,20 +255,43 @@ type Repo struct {
 	GithubType     string `json:"githubType,omitempty"`
 	InheritedCreds bool   `json:"inheritedCreds,omitempty"`
 }
-type HarnessRepository struct {
-	Repo `json:"repo"`
-}
-
-type UpdateMask struct {
-	Paths []string `json:"Paths"`
-}
-
 type RepoWithUpdateMask struct {
 	Repo       `json:"repo"`
 	UpdateMask struct {
 		Paths []string `json:"paths"`
 	} `json:"updateMask"`
 }
+type UpdateMask struct {
+	Paths []string `json:"Paths"`
+}
+
+// GitOpsApplication structs
+type GitOpsApplication struct {
+	Application `json:"application"`
+}
+type Application struct {
+	Metadata `json:"metadata"`
+	Spec     `json:"spec"`
+}
+type Spec struct {
+	Source      `json:"source"`
+	Destination `json:"destination"`
+}
+type Metadata struct {
+	Name        string `json:"name"`
+	Namespace   string `json:"namespace"`
+	ClusterName string `json:"clusterName"`
+}
+type Source struct {
+	RepoURL        string `json:"repoURL"`
+	Path           string `json:"path"`
+	TargetRevision string `json:"targetRevision"`
+}
+type Destination struct {
+	Server    string `json:"server"`
+	Namespace string `json:"namespace"`
+}
+
 type HarnessEnvironment struct {
 	Identifier        string `json:"identifier"`
 	Name              string `json:"name"`

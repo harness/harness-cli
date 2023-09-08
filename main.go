@@ -268,6 +268,36 @@ func main() {
 				},
 			},
 			{
+				Name:    "gitops-application",
+				Aliases: []string{"gitops-app"},
+				Usage:   "Gitops application specific commands, eg: apply (create/update), delete, list",
+				Flags: append(globalFlags,
+					altsrc.NewStringFlag(&cli.StringFlag{
+						Name:  "file",
+						Usage: "`File` path for the repo",
+					}),
+				),
+				Before: func(ctx *cli.Context) error {
+					hydrateCredsFromPersistence(ctx)
+					return nil
+				},
+				Subcommands: []*cli.Command{
+					{
+						Name:  "apply",
+						Usage: "Create a new gitops-application or Update  an existing one.",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "agent-identifier",
+								Usage: "provide GitOps Agent Identifier.",
+							},
+						},
+						Action: func(context *cli.Context) error {
+							return cliWrapper(applyGitopsApplications, context)
+						},
+					},
+				},
+			},
+			{
 				Name:    "gitops-repository",
 				Aliases: []string{"gitops-repo"},
 				Usage:   "Gitops repository specific commands, eg: apply (create/update), delete, list",
