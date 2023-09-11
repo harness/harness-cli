@@ -251,6 +251,11 @@ type GitOpsCluster struct {
 	Cluster           `json:"cluster"`
 }
 
+type GitOpsClusterWithUpdatedFields struct {
+	Cluster       `json:"cluster"`
+	UpdatedFields []string `json:"updatedFields"`
+}
+
 type Cluster struct {
 	Name   string `json:"name"`
 	Server string `json:"server"`

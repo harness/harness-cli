@@ -56,6 +56,21 @@ func applyCluster(c *cli.Context) error {
 		}
 	} else {
 		println("Found GitOps Cluster with id=", getColoredText(identifier, color.FgCyan))
+		println("Updating details of GitOps Cluster with id=", getColoredText(identifier, color.FgBlue))
+		var clusterPUTUrl = GetUrlWithQueryParams("", baseURL,
+			fmt.Sprintf("%s/%s", GITOPS_CLUSTER_ENDPOINT, identifier), map[string]string{
+				"accountIdentifier": cliCdRequestData.Account,
+				"orgIdentifier":     orgIdentifier,
+				"projectIdentifier": projectIdentifier,
+			})
+		newClusterPayload := createClusterPUTPayload(requestBody)
+		_, err = Put(clusterPUTUrl, cliCdRequestData.AuthToken, newClusterPayload, CONTENT_TYPE_JSON, nil)
+
+		if err == nil {
+			println(getColoredText("Successfully updated GitOps Cluster with id= ", color.FgGreen) +
+				getColoredText(identifier, color.FgBlue))
+			return nil
+		}
 	}
 
 	return nil
@@ -72,4 +87,18 @@ func createClusterPayload(requestBody map[string]interface{}) GitOpsCluster {
 		},
 	}
 	return newCluster
+}
+
+func createClusterPUTPayload(requestBody map[string]interface{}) GitOpsClusterWithUpdatedFields {
+	clusterWithUpdateMask := GitOpsClusterWithUpdatedFields{
+		Cluster: Cluster{
+			Name:   valueToString(GetNestedValue(requestBody, "gitops", "name").(string)),
+			Server: valueToString(GetNestedValue(requestBody, "gitops", "cluster", "server").(string)),
+			Config: Config{
+				ClusterConnectionType: valueToString(GetNestedValue(requestBody, "gitops", "cluster", "config", "clusterConnectionType").(string)),
+			},
+		},
+		UpdatedFields: []string{"name", "tags", "authType", "credsType"},
+	}
+	return clusterWithUpdateMask
 }
