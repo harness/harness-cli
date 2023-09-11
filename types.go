@@ -281,6 +281,12 @@ type Metadata struct {
 	Name        string `json:"name"`
 	Namespace   string `json:"namespace"`
 	ClusterName string `json:"clusterName"`
+	Labels      `json:"labels"`
+	Annotations interface{}
+}
+type Labels struct {
+	Envref     string `json:"harness.io/envRef"`
+	Serviceref string `json:"harness.io/serviceRef"`
 }
 type Source struct {
 	RepoURL        string `json:"repoURL"`

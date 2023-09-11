@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 )
@@ -95,6 +94,10 @@ func createGitOpsApplicationPayload(requestBody map[string]interface{}) GitOpsAp
 	newApplication := GitOpsApplication{
 		Application: Application{
 			Metadata: Metadata{
+				Labels: Labels{
+					Envref:     valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/envRef").(string)),
+					Serviceref: valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/serviceRef").(string)),
+				},
 				Name:        valueToString(GetNestedValue(requestBody, "gitops", "name").(string)),
 				Namespace:   valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "namespace").(string)),
 				ClusterName: valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "clusterName").(string)),
@@ -117,5 +120,26 @@ func createGitOpsApplicationPayload(requestBody map[string]interface{}) GitOpsAp
 
 // TODO: @Deba
 func createGitOpsApplicationPUTPayload(requestBody map[string]interface{}) Application {
-	return Application{}
+	Application := Application{
+		Metadata: Metadata{
+			Labels: Labels{
+				Envref:     valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/envRef").(string)),
+				Serviceref: valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/serviceRef").(string)),
+			},
+			Namespace:   valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "namespace").(string)),
+			Annotations: valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "annotations").(interface{})),
+		},
+		Spec: Spec{
+			Source: Source{
+				RepoURL:        valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "repoURL").(string)),
+				Path:           valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "path").(string)),
+				TargetRevision: valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "targetRevision").(string)),
+			},
+			Destination: Destination{
+				Server:    valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "destination", "server").(string)),
+				Namespace: valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "destination", "namespace").(string)),
+			},
+		},
+	}
+	return Application
 }
