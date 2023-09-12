@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
@@ -17,6 +18,9 @@ func applyConnector(c *cli.Context) error {
 	awsCrossAccountRoleArn := c.String("aws-cross-account-role-arn")
 	awsAccessKey := c.String("aws-access-key")
 	awsRegion := c.String("cloud-region")
+	hostIpOrFqdn := c.String("host-ip")
+	hostPort := c.String("port")
+
 	baseURL := getNGBaseURL(c)
 
 	if filePath == "" {
@@ -63,6 +67,21 @@ func applyConnector(c *cli.Context) error {
 		content = replacePlaceholderValues(content, AWS_ACCESS_KEY, awsAccessKey)
 		content = replacePlaceholderValues(content, REGION_NAME_PLACEHOLDER, awsRegion)
 		content = replacePlaceholderValues(content, DELEGATE_NAME_PLACEHOLDER, delegateName)
+	}
+	if isPdcConnectorYAML(content) {
+		hasPortNumber := strings.Contains(content, HOST_PORT_PLACEHOLDER)
+		if hostIpOrFqdn == "" || hostIpOrFqdn == HOST_IP_PLACEHOLDER {
+			hostIpOrFqdn = TextInput("Enter valid host ip / fqdn:")
+		}
+		if hasPortNumber && (hostPort == "" || hostPort == HOST_PORT_PLACEHOLDER) {
+			hostPort = TextInput("Enter valid host port:")
+		}
+		if delegateName == "" || delegateName == DELEGATE_NAME_PLACEHOLDER {
+			delegateName = TextInput("Enter valid delegate name:")
+		}
+		content = replacePlaceholderValues(content, HOST_IP_PLACEHOLDER, hostIpOrFqdn)
+		content = replacePlaceholderValues(content, DELEGATE_NAME_PLACEHOLDER, delegateName)
+		content = replacePlaceholderValues(content, HOST_PORT_PLACEHOLDER, hostPort)
 	}
 	requestBody := make(map[string]interface{})
 	if err := yaml.Unmarshal([]byte(content), requestBody); err != nil {
@@ -114,6 +133,12 @@ func isK8sConnectorYAML(str string) bool {
 
 func isAwsConnectorYAML(str string) bool {
 	regexPattern := `type:\s+Aws`
+	match, _ := regexp.MatchString(regexPattern, str)
+	return match
+}
+
+func isPdcConnectorYAML(str string) bool {
+	regexPattern := `type:\s+Pdc`
 	match, _ := regexp.MatchString(regexPattern, str)
 	return match
 }
