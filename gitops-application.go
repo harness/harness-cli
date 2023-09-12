@@ -9,7 +9,6 @@ import (
 func applyGitopsApplications(c *cli.Context) error {
 	filePath := c.String("file")
 	baseURL := getBaseUrl(c, GITOPS_BASE_URL)
-	// entityURL := strings.TrimSuffix(baseURL, "/agents/")
 	if filePath == "" {
 		fmt.Println("Please enter valid filename")
 		return nil
@@ -40,7 +39,6 @@ func applyGitopsApplications(c *cli.Context) error {
 		"repoIdentifier":    repoIdentifier,
 	})
 	extraParams := map[string]string{
-
 		"agentIdentifier": agentIdentifier,
 	}
 	applicationName := valueToString(GetNestedValue(requestBody, "gitops", "name").(string))
@@ -65,7 +63,6 @@ func applyGitopsApplications(c *cli.Context) error {
 		println("Updating details of GitOps-Application with id=", getColoredText(applicationName, color.FgBlue))
 
 		var appPUTUrl = GetUrlWithQueryParams("", baseURL,
-			//fmt.Sprintf("%s/%s/spec", GITOPS_APPLICATION_ENDPOINT, applicationName), map[string]string{
 			fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName), map[string]string{
 				"routingId":         cliCdRequestData.Account,
 				"accountIdentifier": cliCdRequestData.Account,

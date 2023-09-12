@@ -37,9 +37,7 @@ func Post(reqUrl string, auth string, body interface{}, contentType string, requ
 
 	if err != nil {
 		log.Fatalln(err)
-
 	}
-
 	return handleResp(req)
 }
 
@@ -71,7 +69,6 @@ func Get(reqUrl string, auth string) (respBodyObj ResponseBody, err error) {
 	}
 	req.Header.Set("Content-Type", CONTENT_TYPE_JSON)
 	req.Header.Set(AuthHeaderKey(auth), cliCdRequestData.AuthToken)
-
 	return handleResp(req)
 }
 
@@ -117,7 +114,6 @@ func handleResp(req *http.Request) (respBodyObj ResponseBody, err error) {
 		}
 		return respBodyObj, errors.New("received non 200 response code. The response code was " + strconv.Itoa(resp.StatusCode))
 	}
-
 	return respBodyObj, nil
 }
 
