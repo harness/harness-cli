@@ -25,7 +25,7 @@ The `harness` CLI utility allows users to manage Harness entities through the us
 
 ## Install Harness CLI
 
-The Harness CLI is designed to work seamlessly across Linux, Windows, and MacOS operating systems. For installation instructions on your preferred OS, please refer the [Install Guide](./INSTALL.md).
+The Harness CLI is designed to work seamlessly across Linux, Windows, and MacOS operating systems. For installation instructions on your preferred OS, please refer to the documentation [here](https://developer.harness.io/docs/platform/automation/cli/install).
 
 ## Use Harness CLI
 
