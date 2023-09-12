@@ -47,7 +47,6 @@ func applyGitopsApplications(c *cli.Context) error {
 
 	entityExists := getEntity(baseURL, fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s"+"/exists", applicationName),
 		projectIdentifier, orgIdentifier, extraParams)
-	fmt.Println("test: ", entityExists)
 	var _ ResponseBody
 	var err error
 	if !entityExists {
