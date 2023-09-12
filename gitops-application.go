@@ -14,11 +14,12 @@ import (
 func applyGitopsApplications(c *cli.Context) error {
 	filePath := c.String("file")
 	baseURL := getBaseUrl(c, GITOPS_BASE_URL)
+	// entityURL := strings.TrimSuffix(baseURL, "/agents/")
 	if filePath == "" {
 		fmt.Println("Please enter valid filename")
 		return nil
 	}
-	fmt.Println("Trying to create or update gitops-repository using the yaml=",
+	fmt.Println("Trying to create or update gitops-application using the yaml=",
 		getColoredText(filePath, color.FgCyan))
 	var content, _ = readFromFile(c.String("file"))
 	agentIdentifier = c.String("agent-identifier")
@@ -44,16 +45,16 @@ func applyGitopsApplications(c *cli.Context) error {
 		"repoIdentifier":    repoIdentifier,
 	})
 	extraParams := map[string]string{
-		//"query.repo": valueToString(GetNestedValue(requestBody, "gitops", "repo", "repo").(string)),
-		"query.refresh": "true",
+
+		"agentIdentifier": agentIdentifier,
 	}
 	applicationName := valueToString(GetNestedValue(requestBody, "gitops", "name").(string))
 
-	entityExists := getEntity(baseURL, fmt.Sprintf(GITOPS_REPOSITORY_ENDPOINT+"/%s", applicationName),
+	entityExists := getEntity(baseURL, fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s"+"/exists", applicationName),
 		projectIdentifier, orgIdentifier, extraParams)
+	fmt.Println("test: ", entityExists)
 	var _ ResponseBody
 	var err error
-
 	if !entityExists {
 		println("Creating GitOps-Application with id: ", getColoredText(applicationName, color.FgGreen))
 		applicationPayload := createGitOpsApplicationPayload(requestBody)
@@ -67,19 +68,22 @@ func applyGitopsApplications(c *cli.Context) error {
 			return nil
 		}
 	} else {
-		// 'https://app.harness.io/gitops/api/v1/agents/defaultgitopsagent/applications/{request.name}/
-		//spec?accountIdentifier=YxQTDwg5Rwuj7m0AznWGZA&orgIdentifier=default&projectIdentifier=default_project' \
 		println("Found GitOps-Application with id=", getColoredText(applicationName, color.FgCyan))
 		println("Updating details of GitOps-Application with id=", getColoredText(applicationName, color.FgBlue))
+
 		var appPUTUrl = GetUrlWithQueryParams("", baseURL,
-			fmt.Sprintf("%s/%s/spec", GITOPS_APPLICATION_ENDPOINT, applicationName), map[string]string{
+			//fmt.Sprintf("%s/%s/spec", GITOPS_APPLICATION_ENDPOINT, applicationName), map[string]string{
+			fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName), map[string]string{
+				"routingId":         cliCdRequestData.Account,
 				"accountIdentifier": cliCdRequestData.Account,
 				"orgIdentifier":     orgIdentifier,
 				"projectIdentifier": projectIdentifier,
+				"repoIdentifier":    repoIdentifier,
+				"clusterIdentifier": clusterIdentifier,
 			})
-		newRepoPayload := createGitOpsApplicationPUTPayload(requestBody)
-		_, err = Put(appPUTUrl, cliCdRequestData.AuthToken, newRepoPayload, CONTENT_TYPE_JSON, nil)
-
+		newAppPayload := createGitOpsApplicationPUTPayload(requestBody)
+		_, err = Put(appPUTUrl, cliCdRequestData.AuthToken, newAppPayload, CONTENT_TYPE_JSON, nil)
+		fmt.Printf("appPUTurl", appPUTUrl)
 		if err == nil {
 			println(getColoredText("Successfully updated repository with id= ", color.FgGreen) +
 				getColoredText(applicationName, color.FgBlue))
@@ -118,7 +122,6 @@ func createGitOpsApplicationPayload(requestBody map[string]interface{}) GitOpsAp
 	return newApplication
 }
 
-// TODO: @Deba
 func createGitOpsApplicationPUTPayload(requestBody map[string]interface{}) Application {
 	Application := Application{
 		Metadata: Metadata{
@@ -126,8 +129,7 @@ func createGitOpsApplicationPUTPayload(requestBody map[string]interface{}) Appli
 				Envref:     valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/envRef").(string)),
 				Serviceref: valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/serviceRef").(string)),
 			},
-			Namespace:   valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "namespace").(string)),
-			Annotations: valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "annotations").(interface{})),
+			Namespace: valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "namespace").(string)),
 		},
 		Spec: Spec{
 			Source: Source{
