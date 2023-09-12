@@ -54,7 +54,6 @@ func applyGitopsApplications(c *cli.Context) error {
 		applicationPayload := createGitOpsApplicationPayload(requestBody)
 
 		printJson(applicationPayload)
-		fmt.Printf("createOrUpdateApplicationURL: ", createOrUpdateApplicationURL)
 		_, err = Post(createOrUpdateApplicationURL, cliCdRequestData.AuthToken, applicationPayload, CONTENT_TYPE_JSON, nil)
 		if err == nil {
 			println(getColoredText("Successfully created GitOps-Application with id= ", color.FgGreen) +
@@ -77,7 +76,6 @@ func applyGitopsApplications(c *cli.Context) error {
 			})
 		newAppPayload := createGitOpsApplicationPUTPayload(requestBody)
 		_, err = Put(appPUTUrl, cliCdRequestData.AuthToken, newAppPayload, CONTENT_TYPE_JSON, nil)
-		fmt.Printf("appPUTurl", appPUTUrl)
 		if err == nil {
 			println(getColoredText("Successfully updated repository with id= ", color.FgGreen) +
 				getColoredText(applicationName, color.FgBlue))
