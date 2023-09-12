@@ -29,7 +29,7 @@ The Harness CLI is designed to work seamlessly across Linux, Windows, and MacOS 
 
 ## Use Harness CLI
 
-To learn how to begin and familiarize yourself with the harness CLI utility, please consult this [documentation](https://developer.harness.io/docs/platform/automation/cli/examples) for comprehensive instructions.
+To learn how to begin and familiarize yourself with the harness CLI utility, please consult this [documentation](https://developer.harness.io/docs/platform/automation/cli/examples) for comprehensive instructions. Additionally, here is the [reference documentation](https://developer.harness.io/docs/platform/automation/cli/reference) for the CLI.
 
 ## Branch Info
 
