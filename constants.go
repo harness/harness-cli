@@ -11,15 +11,15 @@ const DEFAULT_PROJECT = "default_project"
 const DEFAULT_ORG = "default"
 const ENVIRONMENT_ENDPOINT = "environmentsV2"
 const GITHUB_SECRET_IDENTIFIER = "harness_gitpat"
+const GITOPS_APPLICATION_ENDPOINT = "applications"
 const GITOPS_AGENT_IDENTIFIER_PLACEHOLDER = "AGENT_NAME"
 const GITOPS_BASE_URL = "/gateway/gitops/api/v1/agents/"
 const GITOPS_REPOSITORY_ENDPOINT = "repositories"
-const GITOPS_APPLICATION_ENDPOINT = "applications"
 const GCP_SECRET_IDENTIFIER = "gcpsecret"
+const INFRA_ENDPOINT = "infrastructures"
 const NG_BASE_URL = "/gateway/ng/api"
 const PROJECT_NAME_PLACEHOLDER = "CLOUD_PROJECT_NAME"
 const REGION_NAME_PLACEHOLDER = "CLOUD_REGION_NAME"
-const INFRA_ENDPOINT = "infrastructures"
 
 // Enum for multiple platforms
 const (
