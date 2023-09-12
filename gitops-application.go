@@ -6,11 +6,6 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-//'https://app.harness.io/gitops/api/v1/agents/defaultgitopsagent/
-//applications?accountIdentifier=YxQTDwg5Rwuj7m0AznWGZA
-//&orgIdentifier=default&projectIdentifier=default_project
-//&clusterIdentifier=string&repoIdentifier=string' \
-
 func applyGitopsApplications(c *cli.Context) error {
 	filePath := c.String("file")
 	baseURL := getBaseUrl(c, GITOPS_BASE_URL)
