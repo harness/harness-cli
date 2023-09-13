@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -17,8 +16,6 @@ func Post(reqUrl string, auth string, body interface{}, contentType string, requ
 	postBody, _ := json.Marshal(body)
 	requestBody := bytes.NewBuffer(postBody)
 	var req *http.Request
-	fmt.Println("requestBody")
-	printJson(requestBody)
 	log.WithFields(log.Fields{
 		"body": string(postBody),
 	}).Debug("The request body")
