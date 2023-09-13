@@ -12,6 +12,7 @@ import (
 
 var cloudProjectName = ""
 var cloudRegionName = ""
+var cloudInstanceName = ""
 
 // create or update  Infra Definition
 func applyInfraDefinition(c *cli.Context) error {
@@ -23,6 +24,8 @@ func applyInfraDefinition(c *cli.Context) error {
 	}
 	cloudProjectName = c.String("cloud-project")
 	cloudRegionName = c.String("cloud-region")
+	cloudInstanceName = c.String("instance-name")
+
 	fmt.Println("Trying to create or update infrastructure using the given yaml=",
 		getColoredText(filePath, color.FgCyan))
 
@@ -72,18 +75,24 @@ func applyInfraDefinition(c *cli.Context) error {
 func updateInfraYamlContent(content string) string {
 	hasRegionName := strings.Contains(content, REGION_NAME_PLACEHOLDER)
 	hasProjectName := strings.Contains(content, PROJECT_NAME_PLACEHOLDER)
+	hasInstanceName := strings.Contains(content, INSTANCE_NAME_PLACEHOLDER)
 
 	if hasProjectName && (cloudProjectName == "" || cloudProjectName == PROJECT_NAME_PLACEHOLDER) {
 		cloudProjectName = TextInput("Enter a valid project name:")
+	}
+
+	if hasInstanceName && (cloudInstanceName == "" || cloudInstanceName == INSTANCE_NAME_PLACEHOLDER) {
+		cloudInstanceName = TextInput("Enter a valid instance name:")
 	}
 
 	if hasRegionName && (cloudRegionName == "" || cloudRegionName == REGION_NAME_PLACEHOLDER) {
 		cloudRegionName = TextInput("Enter a valid region name:")
 	}
 
-	log.Info("Got your gcp project and region info, let's create the infra now...")
+	log.Info("Got your project and region info, let's create the infra now...")
 	content = replacePlaceholderValues(content, PROJECT_NAME_PLACEHOLDER, cloudProjectName)
 	content = replacePlaceholderValues(content, REGION_NAME_PLACEHOLDER, cloudRegionName)
+	content = replacePlaceholderValues(content, INSTANCE_NAME_PLACEHOLDER, cloudInstanceName)
 
 	return content
 }

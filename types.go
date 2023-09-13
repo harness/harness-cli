@@ -1,9 +1,5 @@
 package main
 
-import (
-	"os"
-)
-
 type EntityType string
 type ImportType string
 type StoreType int64
@@ -222,9 +218,9 @@ type Secret struct {
 	Description string `json:"description,omitempty"`
 	Tags        struct {
 	} `json:"tags,omitempty"`
-	OrgIdentifier     string     `json:"orgIdentifier,omitempty"`
-	ProjectIdentifier string     `json:"projectIdentifier,omitempty"`
-	Spec              SecretSpec `json:"spec"`
+	OrgIdentifier     string      `json:"orgIdentifier,omitempty"`
+	ProjectIdentifier string      `json:"projectIdentifier,omitempty"`
+	Spec              interface{} `json:"spec"`
 }
 
 type HarnessSecret struct {
@@ -246,6 +242,31 @@ type HarnessService struct {
 type GitOpsRepository struct {
 	Repo `json:"repo"`
 }
+
+type GitOpsCluster struct {
+	Identifier        string `json:"identifier"`
+	ProjectIdentifier string `json:"projectIdentifier"`
+	OrgIdentifier     string `json:"orgIdentifier"`
+	Description       string `json:"description"`
+	Type              string `json:"type,omitempty"`
+	Cluster           `json:"cluster"`
+}
+
+type GitOpsClusterWithUpdatedFields struct {
+	Cluster       `json:"cluster"`
+	UpdatedFields []string `json:"updatedFields"`
+}
+
+type Cluster struct {
+	Name   string `json:"name"`
+	Server string `json:"server"`
+	Config `json:"config"`
+}
+
+type Config struct {
+	ClusterConnectionType string `json:"clusterConnectionType"`
+}
+
 type Repo struct {
 	Repo           string `json:"repo"`
 	Type           string `json:"type"`
@@ -344,9 +365,63 @@ type HarnessPipeline struct {
 const (
 	SecretText string = "SecretText"
 	SecretFile        = "SecretFile"
+	SSHKey            = "SSHKey"
+	WinRM             = "WinRmCredentials"
 )
 
-type HarnessFileSecretPayload struct {
-	Spec HarnessSecret
-	File *os.File
+const (
+	SShSecretType string = "SSH"
+)
+
+const (
+	NTLM string = "NTLM"
+)
+
+type SSHSecretType struct {
+	Auth SecretAuth `json:"auth"`
+	Port int        `json:"port"`
+}
+
+type WinRMSecretType struct {
+	Auth       WinRMSecretAuth `json:"auth"`
+	Port       int             `json:"port"`
+	Parameters []string        `json:"parameters,omitempty"`
+}
+
+type SecretAuth struct {
+	Type string        `json:"type"`
+	Spec SSHSecretSpec `json:"spec"`
+}
+
+type WinRMSecretAuth struct {
+	Type string          `json:"type"`
+	Spec WinRMSecretSpec `json:"spec"`
+}
+
+type WinRMSecretSpec struct {
+	Username       string `json:"username"`
+	Password       string `json:"password"`
+	Domain         string `json:"domain"`
+	UseNoProfile   bool   `json:"useNoProfile"`
+	UseSSL         bool   `json:"useSSL"`
+	SkipCertChecks bool   `json:"skipCertChecks"`
+}
+
+type SSHSecretSpec struct {
+	CredentialType string           `json:"credentialType"`
+	Spec           SShSecretSubSpec `json:"spec"`
+}
+
+type SShSecretSubSpec struct {
+	UserName string `json:"userName"`
+	Key      string `json:"key"`
+}
+
+type SSHWINRMSecretData struct {
+	Username string
+	Key      string
+	Port     int
+	Password string
+	Domain   string
+	AuthType string
 }
