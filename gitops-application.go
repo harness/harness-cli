@@ -50,8 +50,6 @@ func applyGitopsApplications(c *cli.Context) error {
 	if !entityExists {
 		println("Creating GitOps-Application with id: ", getColoredText(applicationName, color.FgGreen))
 		applicationPayload := createGitOpsApplicationPayload(requestBody)
-
-		printJson(applicationPayload)
 		_, err = Post(createOrUpdateApplicationURL, cliCdRequestData.AuthToken, applicationPayload, CONTENT_TYPE_JSON, nil)
 		if err == nil {
 			println(getColoredText("Successfully created GitOps-Application with id= ", color.FgGreen) +
