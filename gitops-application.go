@@ -42,9 +42,20 @@ func applyGitopsApplications(c *cli.Context) error {
 		"agentIdentifier": agentIdentifier,
 	}
 	applicationName := valueToString(GetNestedValue(requestBody, "gitops", "name").(string))
-
+	// https://app.harness.io/gateway/gitops/api/v1/agents/debacligitops/applications/gitops-application-6/sync?
+	//routingId=vpCkHKsDSxK9_KYfjCTMKA&accountIdentifier=vpCkHKsDSxK9_KYfjCTMKA&projectIdentifier=communityeng&orgIdentifier=default
 	entityExists := getEntity(baseURL, fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s"+"/exists", applicationName),
 		projectIdentifier, orgIdentifier, extraParams)
+
+	syncApplicationURL := GetUrlWithQueryParams("", baseURL,
+		fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName+"/sync?"), map[string]string{
+			"routingId":         cliCdRequestData.Account,
+			"accountIdentifier": cliCdRequestData.Account,
+			"orgIdentifier":     orgIdentifier,
+			"projectIdentifier": projectIdentifier,
+		})
+	fmt.Printf("syncApplicationURL:", syncApplicationURL)
+
 	var _ ResponseBody
 	var err error
 	if !entityExists {
@@ -54,6 +65,13 @@ func applyGitopsApplications(c *cli.Context) error {
 		if err == nil {
 			println(getColoredText("Successfully created GitOps-Application with id= ", color.FgGreen) +
 				getColoredText(applicationName, color.FgBlue))
+			println("Syncing the Gitops-Application:", getColoredText(applicationName, color.FgGreen))
+			_, err = Post(syncApplicationURL, cliCdRequestData.AuthToken, applicationPayload, CONTENT_TYPE_JSON, nil)
+			if err == nil {
+				println(getColoredText("Successfully synced GitOps-Application with id= ", color.FgGreen) +
+					getColoredText(applicationName, color.FgBlue))
+				return nil
+			}
 			return nil
 		}
 	} else {
