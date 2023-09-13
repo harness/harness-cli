@@ -66,10 +66,8 @@ func applyService(c *cli.Context) error {
 
 func updateServiceYamlContent(content string) string {
 	var serviceType = strings.ToLower(fetchCloudType(content))
-	println(strings.EqualFold(serviceType, AWS))
 	switch {
 	case strings.EqualFold(serviceType, GCP):
-		println("reached gcp")
 		log.Info("Looks like you are creating a service for GCP," +
 			" validating GCP project and bucket now...")
 		if cloudProjectName == "" || cloudProjectName == PROJECT_NAME_PLACEHOLDER {
@@ -84,7 +82,7 @@ func updateServiceYamlContent(content string) string {
 		content = replacePlaceholderValues(content, BUCKET_NAME_PLACEHOLDER, cloudBucketName)
 		return content
 	case strings.EqualFold(serviceType, AWS):
-		println("reached aws")
+
 		log.Info("Looks like you are creating a service for AWS, validating yaml now...")
 		hasRegionName := strings.Contains(content, REGION_NAME_PLACEHOLDER)
 		hasBucketName := strings.Contains(content, BUCKET_NAME_PLACEHOLDER)

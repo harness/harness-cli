@@ -269,7 +269,6 @@ func getEntity(baseUrl string, reqURL string, projectIdentifier string, orgIdent
 	queryParams = mergeMaps(queryParams, extraParams)
 	urlWithQueryParams := GetUrlWithQueryParams("", baseUrl, reqURL, queryParams)
 	_, fetchEntityError := Get(urlWithQueryParams, cliCdRequestData.AuthToken)
-
 	if fetchEntityError != nil {
 		return false
 	} else {

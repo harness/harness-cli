@@ -1,9 +1,5 @@
 package main
 
-import (
-	"os"
-)
-
 type EntityType string
 type ImportType string
 type StoreType int64
@@ -222,9 +218,9 @@ type Secret struct {
 	Description string `json:"description,omitempty"`
 	Tags        struct {
 	} `json:"tags,omitempty"`
-	OrgIdentifier     string     `json:"orgIdentifier,omitempty"`
-	ProjectIdentifier string     `json:"projectIdentifier,omitempty"`
-	Spec              SecretSpec `json:"spec"`
+	OrgIdentifier     string      `json:"orgIdentifier,omitempty"`
+	ProjectIdentifier string      `json:"projectIdentifier,omitempty"`
+	Spec              interface{} `json:"spec"`
 }
 
 type HarnessSecret struct {
@@ -240,6 +236,11 @@ type HarnessService struct {
 	Tags              struct {
 	} `json:"tags,omitempty"`
 	Yaml string `json:"yaml"`
+}
+
+// GitOpsRepository structs
+type GitOpsRepository struct {
+	Repo `json:"repo"`
 }
 
 type GitOpsCluster struct {
@@ -275,20 +276,49 @@ type Repo struct {
 	GithubType     string `json:"githubType,omitempty"`
 	InheritedCreds bool   `json:"inheritedCreds,omitempty"`
 }
-type HarnessRepository struct {
-	Repo `json:"repo"`
-}
-
-type UpdateMask struct {
-	Paths []string `json:"Paths"`
-}
-
 type RepoWithUpdateMask struct {
 	Repo       `json:"repo"`
 	UpdateMask struct {
 		Paths []string `json:"paths"`
 	} `json:"updateMask"`
 }
+type UpdateMask struct {
+	Paths []string `json:"Paths"`
+}
+
+// GitOpsApplication structs
+type GitOpsApplication struct {
+	Application `json:"application"`
+}
+type Application struct {
+	Metadata `json:"metadata"`
+	Spec     `json:"spec"`
+}
+type Spec struct {
+	Source      `json:"source"`
+	Destination `json:"destination"`
+}
+type Metadata struct {
+	Name        string `json:"name"`
+	Namespace   string `json:"namespace"`
+	ClusterName string `json:"clusterName"`
+	Labels      `json:"labels"`
+	Annotations interface{}
+}
+type Labels struct {
+	Envref     string `json:"harness.io/envRef"`
+	Serviceref string `json:"harness.io/serviceRef"`
+}
+type Source struct {
+	RepoURL        string `json:"repoURL"`
+	Path           string `json:"path"`
+	TargetRevision string `json:"targetRevision"`
+}
+type Destination struct {
+	Server    string `json:"server"`
+	Namespace string `json:"namespace"`
+}
+
 type HarnessEnvironment struct {
 	Identifier        string `json:"identifier"`
 	Name              string `json:"name"`
@@ -335,9 +365,63 @@ type HarnessPipeline struct {
 const (
 	SecretText string = "SecretText"
 	SecretFile        = "SecretFile"
+	SSHKey            = "SSHKey"
+	WinRM             = "WinRmCredentials"
 )
 
-type HarnessFileSecretPayload struct {
-	Spec HarnessSecret
-	File *os.File
+const (
+	SShSecretType string = "SSH"
+)
+
+const (
+	NTLM string = "NTLM"
+)
+
+type SSHSecretType struct {
+	Auth SecretAuth `json:"auth"`
+	Port int        `json:"port"`
+}
+
+type WinRMSecretType struct {
+	Auth       WinRMSecretAuth `json:"auth"`
+	Port       int             `json:"port"`
+	Parameters []string        `json:"parameters,omitempty"`
+}
+
+type SecretAuth struct {
+	Type string        `json:"type"`
+	Spec SSHSecretSpec `json:"spec"`
+}
+
+type WinRMSecretAuth struct {
+	Type string          `json:"type"`
+	Spec WinRMSecretSpec `json:"spec"`
+}
+
+type WinRMSecretSpec struct {
+	Username       string `json:"username"`
+	Password       string `json:"password"`
+	Domain         string `json:"domain"`
+	UseNoProfile   bool   `json:"useNoProfile"`
+	UseSSL         bool   `json:"useSSL"`
+	SkipCertChecks bool   `json:"skipCertChecks"`
+}
+
+type SSHSecretSpec struct {
+	CredentialType string           `json:"credentialType"`
+	Spec           SShSecretSubSpec `json:"spec"`
+}
+
+type SShSecretSubSpec struct {
+	UserName string `json:"userName"`
+	Key      string `json:"key"`
+}
+
+type SSHWINRMSecretData struct {
+	Username string
+	Key      string
+	Port     int
+	Password string
+	Domain   string
+	AuthType string
 }
