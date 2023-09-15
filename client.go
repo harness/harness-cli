@@ -61,7 +61,6 @@ func Put(reqUrl string, auth string, body interface{}, contentType string, reque
 
 func Get(reqUrl string, auth string) (respBodyObj ResponseBody, err error) {
 	req, err := http.NewRequest("GET", reqUrl, nil)
-	//fmt.Println("req:", req)
 	if err != nil {
 		return
 	}
