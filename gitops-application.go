@@ -51,7 +51,7 @@ func applyGitopsApplications(c *cli.Context) error {
 	extraParams := map[string]string{
 		"agentIdentifier": agentIdentifier,
 	}
-	entityExists := getEntity(baseURL, fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName),
+	entityExists := getEntity(baseURL, fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT + "/%s", applicationName),
 		projectIdentifier, orgIdentifier, extraParams)
 	var _ ResponseBody
 	var err error
