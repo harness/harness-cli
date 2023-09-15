@@ -88,7 +88,7 @@ func applyGitopsApplications(c *cli.Context) error {
 				getColoredText(applicationName, color.FgBlue))
 			_, err = Put(appPUTUrl, cliCdRequestData.AuthToken, newAppPayload, CONTENT_TYPE_JSON, nil)
 			if err == nil {
-				println(getColoredText("Successfully updated repository with id= ", color.FgGreen) +
+				println(getColoredText("Successfully updated GitOps app with id= ", color.FgGreen) +
 					getColoredText(applicationName, color.FgBlue))
 				return nil
 			}
