@@ -65,7 +65,6 @@ func applyGitopsApplications(c *cli.Context) error {
 				getColoredText(applicationName, color.FgBlue))
 			return nil
 		}
-
 	} else {
 		println("Found GitOps Application with id=", getColoredText(applicationName, color.FgCyan))
 		println("Updating details of GitOps Application with id=", getColoredText(applicationName, color.FgBlue))
