@@ -1,5 +1,5 @@
 gitops:
-  name: gitops-application-demo-20
+  name: gitops-application-demo-4
   projectIdentifier: communityeng
   orgIdentifier: default
   type: application
@@ -8,12 +8,12 @@ gitops:
       namespace: default
       clusterName: demoasd
       labels:
-        harness.io/serviceRef: service
-        harness.io/envRef: env
+        harness.io/serviceRef: d
+        harness.io/envRef: de
     spec:
       source:
         repoURL: https://github.com/harness-community/harnesscd-example-apps
-        path: guestbook
+        path: kustomize-guestbook
         targetRevision: master
       destination:
         server: https://kubernetes.default.svc
