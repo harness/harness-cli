@@ -4,4 +4,3 @@ harness-upgrade
 .secrets.json
 harness
 harnesscd-example-apps
-.application.yml
