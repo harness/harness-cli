@@ -41,7 +41,7 @@ func applyGitopsApplications(c *cli.Context) error {
 
 	applicationName := valueToString(GetNestedValue(requestBody, "gitops", "name").(string))
 	syncApplicationURL := GetUrlWithQueryParams("", baseURL,
-		fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName+"/sync"), map[string]string{
+		fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT + "/%s", applicationName + "/sync"), map[string]string{
 			"routingId":         cliCdRequestData.Account,
 			"accountIdentifier": cliCdRequestData.Account,
 			"orgIdentifier":     orgIdentifier,
