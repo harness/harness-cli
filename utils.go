@@ -276,50 +276,6 @@ func getEntity(baseUrl string, reqURL string, projectIdentifier string, orgIdent
 	}
 }
 
-func getStatusCode(baseUrl string, reqURL string, projectIdentifier string, orgIdentifier string, extraParams map[string]string) bool {
-	queryParams := map[string]string{
-		"accountIdentifier": cliCdRequestData.Account,
-		"routingId":         cliCdRequestData.Account,
-		"projectIdentifier": projectIdentifier,
-		"orgIdentifier":     orgIdentifier,
-	}
-	queryParams = mergeMaps(queryParams, extraParams)
-	urlWithQueryParams := GetUrlWithQueryParams("", baseUrl, reqURL, queryParams)
-	_, fetchEntityError := Get(urlWithQueryParams, cliCdRequestData.AuthToken)
-	if fetchEntityError != nil {
-		return false
-	} else {
-		return true
-	}
-}
-
-func getApp(baseUrl string, reqURL string, projectIdentifier string, orgIdentifier string, extraParams map[string]string) bool {
-	queryParams := map[string]string{
-		"accountIdentifier": cliCdRequestData.Account,
-		"routingId":         cliCdRequestData.Account,
-		"projectIdentifier": projectIdentifier,
-		"orgIdentifier":     orgIdentifier,
-	}
-	queryParams = mergeMaps(queryParams, extraParams)
-	urlWithQueryParams := GetUrlWithQueryParams("", baseUrl, reqURL, queryParams)
-	_, fetchEntityError := Get(urlWithQueryParams, cliCdRequestData.AuthToken)
-	if fetchEntityError != nil {
-		return false
-	} else {
-		return true
-	}
-}
-
-//func getEntitystatus(agentIdentifier string, applicationName string) bool {
-//	reqUrl := "https://app.harness.io/gitops/api/v1/agents/" + agentIdentifier + "/applications/" + applicationName
-//	_, fetchEntityError := Get(reqUrl, cliCdRequestData.AuthToken)
-//	if fetchEntityError != nil {
-//		return true
-//	} else {
-//		return false
-//	}
-//}
-
 func mergeMaps(map1 map[string]string, map2 map[string]string) map[string]string {
 	mergedMap := func() map[string]string {
 		result := make(map[string]string)
