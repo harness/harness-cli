@@ -84,7 +84,7 @@ func applyGitopsApplications(c *cli.Context) error {
 		println("Syncing the GitOps app before updating the spec:", getColoredText(applicationName, color.FgGreen))
 		_, err = Post(syncApplicationURL, cliCdRequestData.AuthToken, syncPayload, CONTENT_TYPE_JSON, nil)
 		if err == nil {
-			println(getColoredText("Successfully synced GitOps-Application with id= ", color.FgGreen) +
+			println(getColoredText("Successfully synced GitOps app with id= ", color.FgGreen) +
 				getColoredText(applicationName, color.FgBlue))
 			_, err = Put(appPUTUrl, cliCdRequestData.AuthToken, newAppPayload, CONTENT_TYPE_JSON, nil)
 			if err == nil {
