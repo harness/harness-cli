@@ -43,6 +43,9 @@ func applyGitopsApplications(c *cli.Context) error {
 		"agentIdentifier": agentIdentifier,
 	}
 	applicationName := valueToString(GetNestedValue(requestBody, "gitops", "name").(string))
+	entityExists := getEntity(newbaseURL, fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName),
+		projectIdentifier, orgIdentifier, extraParams)
+	//fmt.Printf("entitt:", entityExists)
 	syncApplicationURL := GetUrlWithQueryParams("", baseURL,
 		fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName+"/sync"), map[string]string{
 			"routingId":         cliCdRequestData.Account,
@@ -51,11 +54,13 @@ func applyGitopsApplications(c *cli.Context) error {
 			"projectIdentifier": projectIdentifier,
 		})
 
-	entityExists := getEntity(newbaseURL, fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s"+"/exists", applicationName),
+	entityExistfalse := getEntity(newbaseURL, fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s"+"/exists", applicationName),
 		projectIdentifier, orgIdentifier, extraParams)
-	fmt.Printf("entittyurl:", entityExists)
+	//fmt.Printf("entittyurl:", entityExistfalse)
+
 	var _ ResponseBody
 	var err error
+
 	if !entityExists {
 		println("Creating GitOps-Application with id: ", getColoredText(applicationName, color.FgGreen))
 		applicationPayload := createGitOpsApplicationPayload(requestBody)
@@ -65,7 +70,8 @@ func applyGitopsApplications(c *cli.Context) error {
 				getColoredText(applicationName, color.FgBlue))
 			return nil
 		}
-	} else {
+	}
+	if entityExistfalse {
 		println("Found GitOps-Application with id=", getColoredText(applicationName, color.FgCyan))
 		println("Updating details of GitOps-Application with id=", getColoredText(applicationName, color.FgBlue))
 
@@ -95,6 +101,36 @@ func applyGitopsApplications(c *cli.Context) error {
 			return nil
 		}
 	}
+	//} else {
+	//	println("Found GitOps-Application with id=", getColoredText(applicationName, color.FgCyan))
+	//	println("Updating details of GitOps-Application with id=", getColoredText(applicationName, color.FgBlue))
+	//
+	//	var appPUTUrl = GetUrlWithQueryParams("", baseURL,
+	//		fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName), map[string]string{
+	//			"routingId":         cliCdRequestData.Account,
+	//			"accountIdentifier": cliCdRequestData.Account,
+	//			"orgIdentifier":     orgIdentifier,
+	//			"projectIdentifier": projectIdentifier,
+	//			"repoIdentifier":    repoIdentifier,
+	//			"clusterIdentifier": clusterIdentifier,
+	//		})
+	//	newAppPayload := createGitOpsApplicationPUTPayload(requestBody)
+	//	fmt.Printf("newapppayload", newAppPayload)
+	//	syncPayload := createGitOpsApplicationPayload(requestBody)
+	//	println("Syncing the Gitops-Application:", getColoredText(applicationName, color.FgGreen))
+	//	_, err = Post(syncApplicationURL, cliCdRequestData.AuthToken, syncPayload, CONTENT_TYPE_JSON, nil)
+	//	if err == nil {
+	//		println(getColoredText("Successfully synced GitOps-Application with id= ", color.FgGreen) +
+	//			getColoredText(applicationName, color.FgBlue))
+	//		_, err = Put(appPUTUrl, cliCdRequestData.AuthToken, newAppPayload, CONTENT_TYPE_JSON, nil)
+	//		if err == nil {
+	//			println(getColoredText("Successfully updated repository with id= ", color.FgGreen) +
+	//				getColoredText(applicationName, color.FgBlue))
+	//			return nil
+	//		}
+	//		return nil
+	//	}
+	//}
 
 	return nil
 }

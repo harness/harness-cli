@@ -61,6 +61,7 @@ func Put(reqUrl string, auth string, body interface{}, contentType string, reque
 
 func Get(reqUrl string, auth string) (respBodyObj ResponseBody, err error) {
 	req, err := http.NewRequest("GET", reqUrl, nil)
+	//fmt.Println("req:", req)
 	if err != nil {
 		return
 	}
@@ -111,6 +112,7 @@ func handleResp(req *http.Request) (respBodyObj ResponseBody, err error) {
 		}
 		return respBodyObj, errors.New("received non 200 response code. The response code was " + strconv.Itoa(resp.StatusCode))
 	}
+	//fmt.Println("\nresp", resp.StatusCode)
 	return respBodyObj, nil
 }
 

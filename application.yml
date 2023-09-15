@@ -1,5 +1,5 @@
 gitops:
-  name: gitops-application-demo-5
+  name: gitops-application-demo-20
   projectIdentifier: communityeng
   orgIdentifier: default
   type: application
@@ -8,8 +8,8 @@ gitops:
       namespace: default
       clusterName: demoasd
       labels:
-        harness.io/serviceRef: dee
-        harness.io/envRef: de
+        harness.io/serviceRef: service
+        harness.io/envRef: env
     spec:
       source:
         repoURL: https://github.com/harness-community/harnesscd-example-apps
