@@ -38,15 +38,24 @@ func applyGitopsApplications(c *cli.Context) error {
 		"clusterIdentifier": clusterIdentifier,
 		"repoIdentifier":    repoIdentifier,
 	})
+
+	applicationName := valueToString(GetNestedValue(requestBody, "gitops", "name").(string))
+	syncApplicationURL := GetUrlWithQueryParams("", baseURL,
+		fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName+"/sync"), map[string]string{
+			"routingId":         cliCdRequestData.Account,
+			"accountIdentifier": cliCdRequestData.Account,
+			"orgIdentifier":     orgIdentifier,
+			"projectIdentifier": projectIdentifier,
+		})
+
 	extraParams := map[string]string{
 		"agentIdentifier": agentIdentifier,
 	}
-	applicationName := valueToString(GetNestedValue(requestBody, "gitops", "name").(string))
-
-	entityExists := getEntity(baseURL, fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s"+"/exists", applicationName),
+	entityExists := getEntity(baseURL, fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName),
 		projectIdentifier, orgIdentifier, extraParams)
 	var _ ResponseBody
 	var err error
+
 	if !entityExists {
 		println("Creating GitOps-Application with id: ", getColoredText(applicationName, color.FgGreen))
 		applicationPayload := createGitOpsApplicationPayload(requestBody)
@@ -57,8 +66,8 @@ func applyGitopsApplications(c *cli.Context) error {
 			return nil
 		}
 	} else {
-		println("Found GitOps-Application with id=", getColoredText(applicationName, color.FgCyan))
-		println("Updating details of GitOps-Application with id=", getColoredText(applicationName, color.FgBlue))
+		println("Found GitOps Application with id=", getColoredText(applicationName, color.FgCyan))
+		println("Updating details of GitOps Application with id=", getColoredText(applicationName, color.FgBlue))
 
 		var appPUTUrl = GetUrlWithQueryParams("", baseURL,
 			fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName), map[string]string{
@@ -70,10 +79,18 @@ func applyGitopsApplications(c *cli.Context) error {
 				"clusterIdentifier": clusterIdentifier,
 			})
 		newAppPayload := createGitOpsApplicationPUTPayload(requestBody)
-		_, err = Put(appPUTUrl, cliCdRequestData.AuthToken, newAppPayload, CONTENT_TYPE_JSON, nil)
+		syncPayload := createGitOpsApplicationPayload(requestBody)
+		println("Syncing the GitOps Application before updating the spec:", getColoredText(applicationName, color.FgGreen))
+		_, err = Post(syncApplicationURL, cliCdRequestData.AuthToken, syncPayload, CONTENT_TYPE_JSON, nil)
 		if err == nil {
-			println(getColoredText("Successfully updated repository with id= ", color.FgGreen) +
+			println(getColoredText("Successfully synced GitOps app with id= ", color.FgGreen) +
 				getColoredText(applicationName, color.FgBlue))
+			_, err = Put(appPUTUrl, cliCdRequestData.AuthToken, newAppPayload, CONTENT_TYPE_JSON, nil)
+			if err == nil {
+				println(getColoredText("Successfully updated GitOps app with id= ", color.FgGreen) +
+					getColoredText(applicationName, color.FgBlue))
+				return nil
+			}
 			return nil
 		}
 	}
@@ -109,26 +126,28 @@ func createGitOpsApplicationPayload(requestBody map[string]interface{}) GitOpsAp
 	return newApplication
 }
 
-func createGitOpsApplicationPUTPayload(requestBody map[string]interface{}) Application {
-	Application := Application{
-		Metadata: Metadata{
-			Labels: Labels{
-				Envref:     valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/envRef").(string)),
-				Serviceref: valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/serviceRef").(string)),
+func createGitOpsApplicationPUTPayload(requestBody map[string]interface{}) GitOpsApplication {
+	putApp := GitOpsApplication{
+		Application{
+			Metadata: Metadata{
+				Namespace: valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "namespace").(string)),
+				Labels: Labels{
+					Serviceref: valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/serviceRef").(string)),
+					Envref:     valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/envRef").(string)),
+				},
 			},
-			Namespace: valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "namespace").(string)),
-		},
-		Spec: Spec{
-			Source: Source{
-				RepoURL:        valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "repoURL").(string)),
-				Path:           valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "path").(string)),
-				TargetRevision: valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "targetRevision").(string)),
-			},
-			Destination: Destination{
-				Server:    valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "destination", "server").(string)),
-				Namespace: valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "destination", "namespace").(string)),
+			Spec: Spec{
+				Source: Source{
+					RepoURL:        valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "repoURL").(string)),
+					Path:           valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "path").(string)),
+					TargetRevision: valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "targetRevision").(string)),
+				},
+				Destination: Destination{
+					Server:    valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "destination", "server").(string)),
+					Namespace: valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "destination", "namespace").(string)),
+				},
 			},
 		},
 	}
-	return Application
+	return putApp
 }
