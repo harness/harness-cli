@@ -41,7 +41,7 @@ func applyGitopsApplications(c *cli.Context) error {
 
 	applicationName := valueToString(GetNestedValue(requestBody, "gitops", "name").(string))
 	syncApplicationURL := GetUrlWithQueryParams("", baseURL,
-		fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT + "/%s", applicationName + "/sync"), map[string]string{
+		fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName+"/sync"), map[string]string{
 			"routingId":         cliCdRequestData.Account,
 			"accountIdentifier": cliCdRequestData.Account,
 			"orgIdentifier":     orgIdentifier,
@@ -51,7 +51,7 @@ func applyGitopsApplications(c *cli.Context) error {
 	extraParams := map[string]string{
 		"agentIdentifier": agentIdentifier,
 	}
-	entityExists := getEntity(baseURL, fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT + "/%s", applicationName),
+	entityExists := getEntity(baseURL, fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName),
 		projectIdentifier, orgIdentifier, extraParams)
 	var _ ResponseBody
 	var err error
@@ -80,7 +80,7 @@ func applyGitopsApplications(c *cli.Context) error {
 			})
 		newAppPayload := createGitOpsApplicationPUTPayload(requestBody)
 		syncPayload := createGitOpsApplicationPayload(requestBody)
-		println("Syncing the GitOps app before updating the spec:", getColoredText(applicationName, color.FgGreen))
+		println("Syncing the GitOps Application before updating the spec of:", getColoredText(applicationName, color.FgGreen))
 		_, err = Post(syncApplicationURL, cliCdRequestData.AuthToken, syncPayload, CONTENT_TYPE_JSON, nil)
 		if err == nil {
 			println(getColoredText("Successfully synced GitOps app with id= ", color.FgGreen) +
