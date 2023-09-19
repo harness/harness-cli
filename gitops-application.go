@@ -80,7 +80,7 @@ func applyGitopsApplications(c *cli.Context) error {
 			})
 		newAppPayload := createGitOpsApplicationPUTPayload(requestBody)
 		syncPayload := createGitOpsApplicationPayload(requestBody)
-		println("Syncing the GitOps Application before updating the spec of:", getColoredText(applicationName, color.FgGreen))
+		println("Syncing the GitOps Application before updating the spec:", getColoredText(applicationName, color.FgGreen))
 		_, err = Post(syncApplicationURL, cliCdRequestData.AuthToken, syncPayload, CONTENT_TYPE_JSON, nil)
 		if err == nil {
 			println(getColoredText("Successfully synced GitOps app with id= ", color.FgGreen) +
