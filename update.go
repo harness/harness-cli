@@ -35,7 +35,7 @@ func Update(*cli.Context) (err error) {
 	if GOOS == "windows" {
 		extension = "zip"
 	}
-	url := fmt.Sprintf("https://github.com/harness/harness-cli/releases/download/%s/harness-cli-%s-%s-%s.%s", newVersion, newVersion, GOOS, GOARCH, extension)
+	url := fmt.Sprintf("https://github.com/harness/harness-cli/releases/download/%s/harness-%s-%s-%s.%s", newVersion, newVersion, GOOS, GOARCH, extension)
 
 	if GOOS == "windows" {
 		fmt.Printf("%s\n", yellow("Auto update support is not available for windows"))
