@@ -2,12 +2,16 @@ package main
 
 import (
 	"fmt"
-	"regexp"
-	"strings"
-
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
+	"harness/client"
+	"harness/defaults"
+	. "harness/shared"
+	"harness/telemetry"
+	. "harness/utils"
+	"regexp"
+	"strings"
 )
 
 // apply(create or update) connector
@@ -21,97 +25,105 @@ func applyConnector(c *cli.Context) error {
 	hostIpOrFqdn := c.String("host-ip")
 	hostPort := c.String("port")
 
-	baseURL := getNGBaseURL(c)
+	baseURL := GetNGBaseURL(c)
 
 	if filePath == "" {
 		fmt.Println("Please enter valid filename")
 		return nil
 	}
 	fmt.Println("Trying to create or update connector using the yaml=",
-		getColoredText(filePath, color.FgCyan))
+		GetColoredText(filePath, color.FgCyan))
 
 	// Getting the account details
-	createConnectorURL := GetUrlWithQueryParams("", baseURL, CONNECTOR_ENDPOINT, map[string]string{
-		"accountIdentifier": cliCdRequestData.Account,
+	createConnectorURL := GetUrlWithQueryParams("", baseURL, defaults.CONNECTOR_ENDPOINT, map[string]string{
+		"accountIdentifier": CliCdRequestData.Account,
 	})
 
-	var content, _ = readFromFile(filePath)
+	var content, _ = ReadFromFile(filePath)
 	if isGithubConnectorYAML(content) {
-		if githubUsername == "" || githubUsername == GITHUB_USERNAME_PLACEHOLDER {
+		if githubUsername == "" || githubUsername == defaults.GITHUB_USERNAME_PLACEHOLDER {
 			githubUsername = TextInput("Enter valid github username:")
 		}
-		content = replacePlaceholderValues(content, GITHUB_USERNAME_PLACEHOLDER, githubUsername)
+		content = ReplacePlaceholderValues(content, defaults.GITHUB_USERNAME_PLACEHOLDER, githubUsername)
 	}
 	if isK8sConnectorYAML(content) {
-		if delegateName == "" || delegateName == DELEGATE_NAME_PLACEHOLDER {
+		if delegateName == "" || delegateName == defaults.DELEGATE_NAME_PLACEHOLDER {
 			delegateName = TextInput("Enter valid delegate name:")
 		}
-		content = replacePlaceholderValues(content, DELEGATE_NAME_PLACEHOLDER, delegateName)
+		content = ReplacePlaceholderValues(content, defaults.DELEGATE_NAME_PLACEHOLDER, delegateName)
 	}
 	if isAwsConnectorYAML(content) {
-		if awsCrossAccountRoleArn == "" || awsCrossAccountRoleArn == AWS_CROSS_ACCOUNT_ROLE_ARN {
+		if awsCrossAccountRoleArn == "" || awsCrossAccountRoleArn == defaults.AWS_CROSS_ACCOUNT_ROLE_ARN {
 			awsCrossAccountRoleArn = TextInput("Enter valid aws cross account role arn:")
 		}
-		if awsAccessKey == "" || awsAccessKey == AWS_ACCESS_KEY {
+		if awsAccessKey == "" || awsAccessKey == defaults.AWS_ACCESS_KEY {
 			awsAccessKey = TextInput("Enter valid aws access key:")
 		}
-		if awsRegion == "" || awsRegion == REGION_NAME_PLACEHOLDER {
+		if awsRegion == "" || awsRegion == defaults.REGION_NAME_PLACEHOLDER {
 			awsRegion = TextInput("Enter valid aws region:")
 		}
-		if delegateName == "" || delegateName == DELEGATE_NAME_PLACEHOLDER {
+		if delegateName == "" || delegateName == defaults.DELEGATE_NAME_PLACEHOLDER {
 			delegateName = TextInput("Enter valid delegate name:")
 		}
 
 		//TODO: find a better way to resolve placeholders, dont depend on fixed placeholders
-		content = replacePlaceholderValues(content, AWS_CROSS_ACCOUNT_ROLE_ARN, awsCrossAccountRoleArn)
-		content = replacePlaceholderValues(content, AWS_ACCESS_KEY, awsAccessKey)
-		content = replacePlaceholderValues(content, REGION_NAME_PLACEHOLDER, awsRegion)
-		content = replacePlaceholderValues(content, DELEGATE_NAME_PLACEHOLDER, delegateName)
+		content = ReplacePlaceholderValues(content, defaults.AWS_CROSS_ACCOUNT_ROLE_ARN, awsCrossAccountRoleArn)
+		content = ReplacePlaceholderValues(content, defaults.AWS_ACCESS_KEY, awsAccessKey)
+		content = ReplacePlaceholderValues(content, defaults.REGION_NAME_PLACEHOLDER, awsRegion)
+		content = ReplacePlaceholderValues(content, defaults.DELEGATE_NAME_PLACEHOLDER, delegateName)
 	}
 	if isPdcConnectorYAML(content) {
-		hasPortNumber := strings.Contains(content, HOST_PORT_PLACEHOLDER)
-		if hostIpOrFqdn == "" || hostIpOrFqdn == HOST_IP_PLACEHOLDER {
+		hasPortNumber := strings.Contains(content, defaults.HOST_PORT_PLACEHOLDER)
+		if hostIpOrFqdn == "" || hostIpOrFqdn == defaults.HOST_IP_PLACEHOLDER {
 			hostIpOrFqdn = TextInput("Enter valid host ip / fqdn:")
 		}
-		if hasPortNumber && (hostPort == "" || hostPort == HOST_PORT_PLACEHOLDER) {
+		if hasPortNumber && (hostPort == "" || hostPort == defaults.HOST_PORT_PLACEHOLDER) {
 			hostPort = TextInput("Enter valid host port:")
 		}
-		if delegateName == "" || delegateName == DELEGATE_NAME_PLACEHOLDER {
+		if delegateName == "" || delegateName == defaults.DELEGATE_NAME_PLACEHOLDER {
 			delegateName = TextInput("Enter valid delegate name:")
 		}
-		content = replacePlaceholderValues(content, HOST_IP_PLACEHOLDER, hostIpOrFqdn)
-		content = replacePlaceholderValues(content, DELEGATE_NAME_PLACEHOLDER, delegateName)
-		content = replacePlaceholderValues(content, HOST_PORT_PLACEHOLDER, hostPort)
+		content = ReplacePlaceholderValues(content, defaults.HOST_IP_PLACEHOLDER, hostIpOrFqdn)
+		content = ReplacePlaceholderValues(content, defaults.DELEGATE_NAME_PLACEHOLDER, delegateName)
+		content = ReplacePlaceholderValues(content, defaults.HOST_PORT_PLACEHOLDER, hostPort)
 	}
 	requestBody := make(map[string]interface{})
 	if err := yaml.Unmarshal([]byte(content), requestBody); err != nil {
 		return err
 	}
-	identifier := valueToString(GetNestedValue(requestBody, "connector", "identifier").(string))
-	projectIdentifier := valueToString(GetNestedValue(requestBody, "connector", "projectIdentifier").(string))
-	orgIdentifier := valueToString(GetNestedValue(requestBody, "connector", "orgIdentifier").(string))
-	entityExists := getEntity(baseURL, fmt.Sprintf("connectors/%s", identifier),
+	identifier := ValueToString(GetNestedValue(requestBody, "connector", "identifier").(string))
+	projectIdentifier := ValueToString(GetNestedValue(requestBody, "connector", "projectIdentifier").(string))
+	orgIdentifier := ValueToString(GetNestedValue(requestBody, "connector", "orgIdentifier").(string))
+	entityExists := GetEntity(baseURL, fmt.Sprintf("connectors/%s", identifier),
 		projectIdentifier, orgIdentifier, map[string]string{})
 
 	var err error
 	if !entityExists {
-		println("Creating connector with id: ", getColoredText(identifier, color.FgGreen))
-		_, err = Post(createConnectorURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_JSON, nil)
+		println("Creating connector with id: ", GetColoredText(identifier, color.FgGreen))
+		_, err = client.Post(createConnectorURL, CliCdRequestData.AuthToken, requestBody, defaults.CONTENT_TYPE_JSON, nil)
 		if err == nil {
-			println(getColoredText("Successfully created connector with id= ", color.FgGreen) +
-				getColoredText(identifier, color.FgBlue))
-
+			println(GetColoredText("Successfully created connector with id= ", color.FgGreen) +
+				GetColoredText(identifier, color.FgBlue))
+			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.CONNECTOR_CREATED, UserId: CliCdRequestData.UserId}, map[string]interface{}{
+				"accountId":     CliCdRequestData.Account,
+				"connectorType": GetTypeFromYAML(content),
+			})
 			return nil
 		}
 
 	} else {
-		println("Found connector with id=", getColoredText(identifier, color.FgCyan))
-		println("Updating details of connector with id=", getColoredText(identifier, color.FgBlue))
+		println("Found connector with id=", GetColoredText(identifier, color.FgCyan))
+		println("Updating details of connector with id=", GetColoredText(identifier, color.FgBlue))
 
-		_, err = Put(createConnectorURL, cliCdRequestData.AuthToken, requestBody, CONTENT_TYPE_JSON, nil)
+		_, err = client.Put(createConnectorURL, CliCdRequestData.AuthToken, requestBody, defaults.CONTENT_TYPE_JSON, nil)
 		if err == nil {
-			println(getColoredText("Successfully updated connector with id= ", color.FgGreen) +
-				getColoredText(identifier, color.FgBlue))
+			println(GetColoredText("Successfully updated connector with id= ", color.FgGreen) +
+				GetColoredText(identifier, color.FgBlue))
+			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.CONNECTOR_CREATED, UserId: CliCdRequestData.UserId}, map[string]interface{}{
+				"accountId":     CliCdRequestData.Account,
+				"connectorType": GetTypeFromYAML(content),
+				"userId":        CliCdRequestData.UserId,
+			})
 			return nil
 		}
 
@@ -145,12 +157,12 @@ func isPdcConnectorYAML(str string) bool {
 
 // Delete an existing connector
 func deleteConnector(*cli.Context) error {
-	fmt.Println(NOT_IMPLEMENTED)
+	fmt.Println(defaults.NOT_IMPLEMENTED)
 	return nil
 }
 
 // Delete an existing connector
 func listConnector(*cli.Context) error {
-	fmt.Println(NOT_IMPLEMENTED)
+	fmt.Println(defaults.NOT_IMPLEMENTED)
 	return nil
 }

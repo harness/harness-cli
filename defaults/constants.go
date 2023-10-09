@@ -1,4 +1,4 @@
-package main
+package defaults
 
 const AWS_CROSS_ACCOUNT_ROLE_ARN = "ROLE_ARN"
 const AWS_ACCESS_KEY = "AWS_ACCESS_KEY"
@@ -44,6 +44,7 @@ const SERVICES_ENDPOINT = "servicesV2"
 const SECRETS_ENDPOINT = "v2/secrets"
 const SECRETS_ENDPOINT_WITH_IDENTIFIER = "v2/secrets/%s"
 const FILE_SECRETS_ENDPOINT = "v2/secrets/files/%s"
+const USER_INFO_ENDPOINT = "user/currentUser"
 const GITHUB_USERNAME_PLACEHOLDER = "GITHUB_USERNAME"
 const DELEGATE_NAME_PLACEHOLDER = "DELEGATE_NAME"
 const GITHUB_PAT_PLACEHOLDER = "GITHUB-PAT"

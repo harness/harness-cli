@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"fmt"
+	"harness/utils"
 	"io"
 	"net/http"
 	"os"
@@ -25,7 +26,7 @@ func Update(*cli.Context) (err error) {
 	yellow := color.New(color.FgYellow).SprintFunc()
 	green := color.New(color.FgGreen).SprintFunc()
 	fmt.Printf("New version %s is available.\n", green(newVersion))
-	confirm := ConfirmInput("Do you want to update?")
+	confirm := utils.ConfirmInput("Do you want to update?")
 	if !confirm {
 		return nil
 	}

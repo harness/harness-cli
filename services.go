@@ -2,6 +2,12 @@ package main
 
 import (
 	"fmt"
+	"harness/client"
+	"harness/defaults"
+	. "harness/shared"
+	"harness/telemetry"
+	. "harness/types"
+	. "harness/utils"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -14,7 +20,7 @@ var cloudBucketName = ""
 
 func applyService(c *cli.Context) error {
 	filePath := c.String("file")
-	baseURL := getNGBaseURL(c)
+	baseURL := GetNGBaseURL(c)
 	if filePath == "" {
 		fmt.Println("Please enter valid filename")
 		return nil
@@ -23,40 +29,50 @@ func applyService(c *cli.Context) error {
 	cloudBucketName = c.String("cloud-bucket")
 	cloudRegionName = c.String("cloud-region")
 	fmt.Println("Trying to create or update service using the yaml=",
-		getColoredText(filePath, color.FgCyan))
-	createOrUpdateSvcURL := GetUrlWithQueryParams("", baseURL, SERVICES_ENDPOINT, map[string]string{
-		"accountIdentifier": cliCdRequestData.Account,
+		GetColoredText(filePath, color.FgCyan))
+	createOrUpdateSvcURL := GetUrlWithQueryParams("", baseURL, defaults.SERVICES_ENDPOINT, map[string]string{
+		"accountIdentifier": CliCdRequestData.Account,
 	})
-	var content, _ = readFromFile(c.String("file"))
+	var content, _ = ReadFromFile(c.String("file"))
 	content = updateServiceYamlContent(content)
 
-	requestBody := getJsonFromYaml(content)
+	requestBody := GetJsonFromYaml(content)
 	if requestBody == nil {
-		println(getColoredText("Please enter valid yaml", color.FgRed))
+		println(GetColoredText("Please enter valid yaml", color.FgRed))
 	}
-	identifier := valueToString(GetNestedValue(requestBody, "service", "identifier").(string))
-	name := valueToString(GetNestedValue(requestBody, "service", "name").(string))
+	identifier := ValueToString(GetNestedValue(requestBody, "service", "identifier").(string))
+	name := ValueToString(GetNestedValue(requestBody, "service", "name").(string))
 	//setup payload for svc create / update
 	svcPayload := HarnessService{Identifier: identifier, Name: name,
-		ProjectIdentifier: DEFAULT_PROJECT, OrgIdentifier: DEFAULT_ORG, Yaml: content}
-	entityExists := getEntity(baseURL, fmt.Sprintf("servicesV2/%s", identifier),
-		DEFAULT_PROJECT, DEFAULT_ORG, map[string]string{})
+		ProjectIdentifier: defaults.DEFAULT_PROJECT, OrgIdentifier: defaults.DEFAULT_ORG, Yaml: content}
+	entityExists := GetEntity(baseURL, fmt.Sprintf("servicesV2/%s", identifier),
+		defaults.DEFAULT_PROJECT, defaults.DEFAULT_ORG, map[string]string{})
 	var err error
 	if !entityExists {
-		println("Creating service with id: ", getColoredText(identifier, color.FgGreen))
-		_, err = Post(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, CONTENT_TYPE_JSON, nil)
+		println("Creating service with id: ", GetColoredText(identifier, color.FgGreen))
+		_, err = client.Post(createOrUpdateSvcURL, CliCdRequestData.AuthToken, svcPayload, defaults.CONTENT_TYPE_JSON, nil)
 		if err == nil {
-			println(getColoredText("Successfully created service with id= ", color.FgGreen) +
-				getColoredText(identifier, color.FgBlue))
+			println(GetColoredText("Successfully created service with id= ", color.FgGreen) +
+				GetColoredText(identifier, color.FgBlue))
+			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.SVC_CREATED, UserId: CliCdRequestData.UserId}, map[string]interface{}{
+				"accountId":     CliCdRequestData.Account,
+				"connectorType": GetTypeFromYAML(content),
+				"userId":        CliCdRequestData.UserId,
+			})
 			return nil
 		}
 	} else {
-		println("Found service with id=", getColoredText(identifier, color.FgCyan))
-		println("Updating details of service with id=", getColoredText(identifier, color.FgBlue))
-		_, err = Put(createOrUpdateSvcURL, cliCdRequestData.AuthToken, svcPayload, CONTENT_TYPE_JSON, nil)
+		println("Found service with id=", GetColoredText(identifier, color.FgCyan))
+		println("Updating details of service with id=", GetColoredText(identifier, color.FgBlue))
+		_, err = client.Put(createOrUpdateSvcURL, CliCdRequestData.AuthToken, svcPayload, defaults.CONTENT_TYPE_JSON, nil)
 		if err == nil {
-			println(getColoredText("Successfully updated connector with id= ", color.FgGreen) +
-				getColoredText(identifier, color.FgBlue))
+			println(GetColoredText("Successfully updated connector with id= ", color.FgGreen) +
+				GetColoredText(identifier, color.FgBlue))
+			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.SVC_CREATED, UserId: CliCdRequestData.UserId}, map[string]interface{}{
+				"accountId": CliCdRequestData.Account,
+				"type":      GetTypeFromYAML(content),
+				"userId":    CliCdRequestData.UserId,
+			})
 			return nil
 		}
 	}
@@ -65,37 +81,37 @@ func applyService(c *cli.Context) error {
 }
 
 func updateServiceYamlContent(content string) string {
-	var serviceType = strings.ToLower(fetchCloudType(content))
+	var serviceType = strings.ToLower(FetchCloudType(content))
 	switch {
-	case strings.EqualFold(serviceType, GCP):
+	case strings.EqualFold(serviceType, defaults.GCP):
 		log.Info("Looks like you are creating a service for GCP," +
 			" validating GCP project and bucket now...")
-		if cloudProjectName == "" || cloudProjectName == PROJECT_NAME_PLACEHOLDER {
+		if cloudProjectName == "" || cloudProjectName == defaults.PROJECT_NAME_PLACEHOLDER {
 			cloudProjectName = TextInput("Enter a valid GCP project name:")
 		}
 
-		if cloudBucketName == "" || cloudBucketName == BUCKET_NAME_PLACEHOLDER {
+		if cloudBucketName == "" || cloudBucketName == defaults.BUCKET_NAME_PLACEHOLDER {
 			cloudBucketName = TextInput("Enter a valid GCP bucket name:")
 		}
 		log.Info("Got your gcp project and bucket info, let's create the service now...")
-		content = replacePlaceholderValues(content, PROJECT_NAME_PLACEHOLDER, cloudProjectName)
-		content = replacePlaceholderValues(content, BUCKET_NAME_PLACEHOLDER, cloudBucketName)
+		content = ReplacePlaceholderValues(content, defaults.PROJECT_NAME_PLACEHOLDER, cloudProjectName)
+		content = ReplacePlaceholderValues(content, defaults.BUCKET_NAME_PLACEHOLDER, cloudBucketName)
 		return content
-	case strings.EqualFold(serviceType, AWS):
+	case strings.EqualFold(serviceType, defaults.AWS):
 
 		log.Info("Looks like you are creating a service for AWS, validating yaml now...")
-		hasRegionName := strings.Contains(content, REGION_NAME_PLACEHOLDER)
-		hasBucketName := strings.Contains(content, BUCKET_NAME_PLACEHOLDER)
-		if hasRegionName && (cloudRegionName == "" || cloudRegionName == REGION_NAME_PLACEHOLDER) {
+		hasRegionName := strings.Contains(content, defaults.REGION_NAME_PLACEHOLDER)
+		hasBucketName := strings.Contains(content, defaults.BUCKET_NAME_PLACEHOLDER)
+		if hasRegionName && (cloudRegionName == "" || cloudRegionName == defaults.REGION_NAME_PLACEHOLDER) {
 			cloudRegionName = TextInput("Enter a valid AWS region name:")
 		}
 
-		if hasBucketName && (cloudBucketName == "" || cloudBucketName == BUCKET_NAME_PLACEHOLDER) {
+		if hasBucketName && (cloudBucketName == "" || cloudBucketName == defaults.BUCKET_NAME_PLACEHOLDER) {
 			cloudBucketName = TextInput("Enter a valid AWS bucket name:")
 		}
 		log.Info("Got your aws project and bucket info, let's create the service now...")
-		content = replacePlaceholderValues(content, REGION_NAME_PLACEHOLDER, cloudRegionName)
-		content = replacePlaceholderValues(content, BUCKET_NAME_PLACEHOLDER, cloudBucketName)
+		content = ReplacePlaceholderValues(content, defaults.REGION_NAME_PLACEHOLDER, cloudRegionName)
+		content = ReplacePlaceholderValues(content, defaults.BUCKET_NAME_PLACEHOLDER, cloudBucketName)
 		return content
 	default:
 		return content
@@ -105,6 +121,6 @@ func updateServiceYamlContent(content string) string {
 }
 
 func deleteService(*cli.Context) error {
-	fmt.Println(NOT_IMPLEMENTED)
+	fmt.Println(defaults.NOT_IMPLEMENTED)
 	return nil
 }

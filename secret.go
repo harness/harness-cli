@@ -4,6 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"harness/client"
+	"harness/defaults"
+	"harness/shared"
+	. "harness/types"
+	"harness/utils"
 	"io"
 	"mime/multipart"
 	"os"
@@ -16,7 +21,7 @@ import (
 )
 
 func applySecret(ctx *cli.Context) error {
-	baseURL := getNGBaseURL(ctx)
+	baseURL := utils.GetNGBaseURL(ctx)
 	token := ctx.String("token")
 	password := ctx.String("password")
 	filePath := ctx.String("file")
@@ -43,31 +48,31 @@ func applySecret(ctx *cli.Context) error {
 	if authType == "" {
 		authType = NTLM
 	}
-	createUrl := SECRETS_ENDPOINT
+	createUrl := defaults.SECRETS_ENDPOINT
 	if requiresFile {
-		createUrl = fmt.Sprintf(SECRETS_ENDPOINT_WITH_IDENTIFIER, "files")
+		createUrl = fmt.Sprintf(defaults.SECRETS_ENDPOINT_WITH_IDENTIFIER, "files")
 	}
-	createSecretURL := GetUrlWithQueryParams("", baseURL, createUrl, map[string]string{
-		"accountIdentifier": cliCdRequestData.Account,
-		"projectIdentifier": DEFAULT_PROJECT,
-		"orgIdentifier":     DEFAULT_ORG,
+	createSecretURL := utils.GetUrlWithQueryParams("", baseURL, createUrl, map[string]string{
+		"accountIdentifier": shared.CliCdRequestData.Account,
+		"projectIdentifier": defaults.DEFAULT_PROJECT,
+		"orgIdentifier":     defaults.DEFAULT_ORG,
 	})
 
-	updateUrl := fmt.Sprintf(SECRETS_ENDPOINT_WITH_IDENTIFIER, secretIdentifier)
+	updateUrl := fmt.Sprintf(defaults.SECRETS_ENDPOINT_WITH_IDENTIFIER, secretIdentifier)
 	if requiresFile {
-		updateUrl = fmt.Sprintf(FILE_SECRETS_ENDPOINT, secretIdentifier)
+		updateUrl = fmt.Sprintf(defaults.FILE_SECRETS_ENDPOINT, secretIdentifier)
 	}
-	updateSecretURL := GetUrlWithQueryParams("", baseURL, updateUrl, map[string]string{
-		"accountIdentifier": cliCdRequestData.Account,
-		"projectIdentifier": DEFAULT_PROJECT,
-		"orgIdentifier":     DEFAULT_ORG,
+	updateSecretURL := utils.GetUrlWithQueryParams("", baseURL, updateUrl, map[string]string{
+		"accountIdentifier": shared.CliCdRequestData.Account,
+		"projectIdentifier": defaults.DEFAULT_PROJECT,
+		"orgIdentifier":     defaults.DEFAULT_ORG,
 	})
 
-	entityExists := getEntity(baseURL, fmt.Sprintf(SECRETS_ENDPOINT_WITH_IDENTIFIER, secretIdentifier), DEFAULT_PROJECT,
-		DEFAULT_ORG, map[string]string{})
+	entityExists := utils.GetEntity(baseURL, fmt.Sprintf(defaults.SECRETS_ENDPOINT_WITH_IDENTIFIER, secretIdentifier), defaults.DEFAULT_PROJECT,
+		defaults.DEFAULT_ORG, map[string]string{})
 	if strings.EqualFold(secretType, SSHKey) {
 		if username == "" {
-			username = TextInput("Enter valid username:")
+			username = utils.TextInput("Enter valid username:")
 		}
 
 		portNumber, portErr := strconv.Atoi(port)
@@ -80,13 +85,13 @@ func applySecret(ctx *cli.Context) error {
 	}
 	if strings.EqualFold(secretType, WinRM) {
 		if username == "" {
-			username = TextInput("Enter valid username:")
+			username = utils.TextInput("Enter valid username:")
 		}
 		if password == "" {
-			password = TextInput("Enter valid password:")
+			password = utils.TextInput("Enter valid password:")
 		}
 		if domain == "" {
-			domain = TextInput("Enter valid domain:")
+			domain = utils.TextInput("Enter valid domain:")
 		}
 
 		portNumber, portErr := strconv.Atoi(port)
@@ -103,41 +108,41 @@ func applySecret(ctx *cli.Context) error {
 		secretBody = createSecret(secretName, secretIdentifier, gitPat, SecretText, SSHWINRMSecretData{})
 	}
 	if !entityExists {
-		println("Creating secret with default id: ", getColoredText(secretIdentifier, color.FgCyan))
+		println("Creating secret with default id: ", utils.GetColoredText(secretIdentifier, color.FgCyan))
 		if requiresFile {
 			payload, header, _ := readSecretFromPath(filePath, secretBody)
 
-			_, err = Post(createSecretURL,
-				cliCdRequestData.AuthToken,
+			_, err = client.Post(createSecretURL,
+				shared.CliCdRequestData.AuthToken,
 				nil,
 				header,
 				payload,
 			)
 
 		} else {
-			_, err = Post(createSecretURL, cliCdRequestData.AuthToken, secretBody, CONTENT_TYPE_JSON, nil)
+			_, err = client.Post(createSecretURL, shared.CliCdRequestData.AuthToken, secretBody, defaults.CONTENT_TYPE_JSON, nil)
 		}
 		if err == nil {
-			println(getColoredText("Successfully created secret with id= ", color.FgGreen) +
-				getColoredText(secretIdentifier, color.FgBlue))
+			println(utils.GetColoredText("Successfully created secret with id= ", color.FgGreen) +
+				utils.GetColoredText(secretIdentifier, color.FgBlue))
 			return nil
 		}
 	} else {
-		println("Found secret with id: ", getColoredText(secretIdentifier, color.FgCyan))
+		println("Found secret with id: ", utils.GetColoredText(secretIdentifier, color.FgCyan))
 		println("Updating secret details....")
 		if requiresFile {
 			payload, header, _ := readSecretFromPath(filePath, secretBody)
-			_, err = Put(updateSecretURL, cliCdRequestData.AuthToken,
+			_, err = client.Put(updateSecretURL, shared.CliCdRequestData.AuthToken,
 				nil,
 				header, payload,
 			)
 
 		} else {
-			_, err = Put(updateSecretURL, cliCdRequestData.AuthToken, secretBody, CONTENT_TYPE_JSON, nil)
+			_, err = client.Put(updateSecretURL, shared.CliCdRequestData.AuthToken, secretBody, defaults.CONTENT_TYPE_JSON, nil)
 		}
 		if err == nil {
-			println(getColoredText("Successfully updated secretId= ", color.FgGreen) +
-				getColoredText(secretIdentifier, color.FgBlue))
+			println(utils.GetColoredText("Successfully updated secretId= ", color.FgGreen) +
+				utils.GetColoredText(secretIdentifier, color.FgBlue))
 			return nil
 		}
 	}
@@ -146,10 +151,10 @@ func applySecret(ctx *cli.Context) error {
 
 func getGitSecret(userVal string) string {
 	gitPat := ""
-	if userVal != GITHUB_PAT_PLACEHOLDER {
+	if userVal != defaults.GITHUB_PAT_PLACEHOLDER {
 		return userVal
 	}
-	gitPat = TextInput("Enter your git pat: ")
+	gitPat = utils.TextInput("Enter your git pat: ")
 
 	if gitPat == "" {
 		println("Please enter valid git pat: ")
@@ -159,7 +164,7 @@ func getGitSecret(userVal string) string {
 }
 func isFileTypeSecret(secretType string) bool {
 	switch {
-	case strings.EqualFold(secretType, GCP):
+	case strings.EqualFold(secretType, defaults.GCP):
 		return true
 	case strings.EqualFold(secretType, SSHKey):
 		return true
@@ -194,8 +199,8 @@ func createSecret(secretName string, identifier string, secretValue string, secr
 			},
 			Port: 22,
 		}
-		newSecret = HarnessSecret{Secret: Secret{Type: typeOfSecret, Name: secretName, Identifier: identifier, ProjectIdentifier: DEFAULT_PROJECT,
-			OrgIdentifier: DEFAULT_ORG, Spec: secretTypeData,
+		newSecret = HarnessSecret{Secret: Secret{Type: typeOfSecret, Name: secretName, Identifier: identifier, ProjectIdentifier: defaults.DEFAULT_PROJECT,
+			OrgIdentifier: defaults.DEFAULT_ORG, Spec: secretTypeData,
 		}}
 
 		if sshspec, ok := newSecret.Spec.(SSHSecretType); ok {
@@ -219,8 +224,8 @@ func createSecret(secretName string, identifier string, secretValue string, secr
 			Port:       5985,
 			Parameters: []string{},
 		}
-		newSecret = HarnessSecret{Secret: Secret{Type: typeOfSecret, Name: secretName, Identifier: identifier, ProjectIdentifier: DEFAULT_PROJECT,
-			OrgIdentifier: DEFAULT_ORG, Spec: secretTypeData,
+		newSecret = HarnessSecret{Secret: Secret{Type: typeOfSecret, Name: secretName, Identifier: identifier, ProjectIdentifier: defaults.DEFAULT_PROJECT,
+			OrgIdentifier: defaults.DEFAULT_ORG, Spec: secretTypeData,
 		}}
 
 		if winrmSpec, ok := newSecret.Spec.(WinRMSecretType); ok {
@@ -233,8 +238,8 @@ func createSecret(secretName string, identifier string, secretValue string, secr
 			newSecret.Spec = winrmSpec
 		}
 	} else {
-		newSecret = HarnessSecret{Secret: Secret{Type: typeOfSecret, Name: secretName, Identifier: identifier, ProjectIdentifier: DEFAULT_PROJECT,
-			OrgIdentifier: DEFAULT_ORG, Spec: SecretSpec{SecretManagerIdentifier: "harnessSecretManager", ValueType: "Inline"}}}
+		newSecret = HarnessSecret{Secret: Secret{Type: typeOfSecret, Name: secretName, Identifier: identifier, ProjectIdentifier: defaults.DEFAULT_PROJECT,
+			OrgIdentifier: defaults.DEFAULT_ORG, Spec: SecretSpec{SecretManagerIdentifier: "harnessSecretManager", ValueType: "Inline"}}}
 	}
 
 	if spec, ok := newSecret.Spec.(SecretSpec); ok {
@@ -248,13 +253,13 @@ func getSecretIdentifier(secType string) string {
 	secretIdentifier := ""
 	switch secType {
 	case "aws":
-		secretIdentifier = AWS_SECRET_IDENTIFIER
+		secretIdentifier = defaults.AWS_SECRET_IDENTIFIER
 		break
 	case "gcp":
-		secretIdentifier = GCP_SECRET_IDENTIFIER
+		secretIdentifier = defaults.GCP_SECRET_IDENTIFIER
 		break
 	default:
-		secretIdentifier = GITHUB_SECRET_IDENTIFIER
+		secretIdentifier = defaults.GITHUB_SECRET_IDENTIFIER
 		break
 	}
 	return secretIdentifier
@@ -263,10 +268,10 @@ func getSecretIdentifier(secType string) string {
 func getSecretName(secretType string) string {
 	secretName := ""
 	switch {
-	case strings.EqualFold(secretType, AWS):
+	case strings.EqualFold(secretType, defaults.AWS):
 		secretName = "Harness AWS Secret"
 		break
-	case strings.EqualFold(secretType, GCP):
+	case strings.EqualFold(secretType, defaults.GCP):
 		secretName = "Harness GCP Secret"
 		break
 	default:
@@ -313,46 +318,46 @@ func createSSHSecret(filepath string, secretIdentifier string, baseURL string, p
 
 	isSSHFileSecret := secretIdentifier == ""
 	if isSSHFileSecret {
-		secretIdentifier = SSH_KEY_FILE_SECRET_IDENTIFIER
+		secretIdentifier = defaults.SSH_KEY_FILE_SECRET_IDENTIFIER
 	}
-	createUrl := SECRETS_ENDPOINT
+	createUrl := defaults.SECRETS_ENDPOINT
 	if requiresFile {
-		createUrl = fmt.Sprintf(SECRETS_ENDPOINT_WITH_IDENTIFIER, "files")
+		createUrl = fmt.Sprintf(defaults.SECRETS_ENDPOINT_WITH_IDENTIFIER, "files")
 	}
-	createSecretURL := GetUrlWithQueryParams("", baseURL, createUrl, map[string]string{
-		"accountIdentifier": cliCdRequestData.Account,
-		"projectIdentifier": DEFAULT_PROJECT,
-		"orgIdentifier":     DEFAULT_ORG,
+	createSecretURL := utils.GetUrlWithQueryParams("", baseURL, createUrl, map[string]string{
+		"accountIdentifier": shared.CliCdRequestData.Account,
+		"projectIdentifier": defaults.DEFAULT_PROJECT,
+		"orgIdentifier":     defaults.DEFAULT_ORG,
 	})
 
-	updateUrl := fmt.Sprintf(FILE_SECRETS_ENDPOINT, secretIdentifier)
-	updateSSHSecretURL := fmt.Sprintf(SECRETS_ENDPOINT_WITH_IDENTIFIER, secretIdentifier)
-	updateSecretURL := GetUrlWithQueryParams("", baseURL, updateUrl, map[string]string{
-		"accountIdentifier": cliCdRequestData.Account,
-		"projectIdentifier": DEFAULT_PROJECT,
-		"orgIdentifier":     DEFAULT_ORG,
+	updateUrl := fmt.Sprintf(defaults.FILE_SECRETS_ENDPOINT, secretIdentifier)
+	updateSSHSecretURL := fmt.Sprintf(defaults.SECRETS_ENDPOINT_WITH_IDENTIFIER, secretIdentifier)
+	updateSecretURL := utils.GetUrlWithQueryParams("", baseURL, updateUrl, map[string]string{
+		"accountIdentifier": shared.CliCdRequestData.Account,
+		"projectIdentifier": defaults.DEFAULT_PROJECT,
+		"orgIdentifier":     defaults.DEFAULT_ORG,
 	})
 
-	updatedSSHSecretURL := GetUrlWithQueryParams("", baseURL, updateSSHSecretURL, map[string]string{
-		"accountIdentifier": cliCdRequestData.Account,
-		"projectIdentifier": DEFAULT_PROJECT,
-		"orgIdentifier":     DEFAULT_ORG,
+	updatedSSHSecretURL := utils.GetUrlWithQueryParams("", baseURL, updateSSHSecretURL, map[string]string{
+		"accountIdentifier": shared.CliCdRequestData.Account,
+		"projectIdentifier": defaults.DEFAULT_PROJECT,
+		"orgIdentifier":     defaults.DEFAULT_ORG,
 	})
 
-	fileSecretExists := getEntity(baseURL, fmt.Sprintf(SECRETS_ENDPOINT_WITH_IDENTIFIER, secretIdentifier), DEFAULT_PROJECT,
-		DEFAULT_ORG, map[string]string{})
+	fileSecretExists := utils.GetEntity(baseURL, fmt.Sprintf(defaults.SECRETS_ENDPOINT_WITH_IDENTIFIER, secretIdentifier), defaults.DEFAULT_PROJECT,
+		defaults.DEFAULT_ORG, map[string]string{})
 	if isSSHFileSecret {
 		secretBody = createSecret(secretIdentifier, secretIdentifier, "", SecretFile, SSHWINRMSecretData{})
 	} else {
-		secretBody = createSecret(secretIdentifier, secretIdentifier, "", SSHKey, SSHWINRMSecretData{Port: port, Username: username, Key: SSH_KEY_FILE_SECRET_IDENTIFIER})
+		secretBody = createSecret(secretIdentifier, secretIdentifier, "", SSHKey, SSHWINRMSecretData{Port: port, Username: username, Key: defaults.SSH_KEY_FILE_SECRET_IDENTIFIER})
 	}
 	if !fileSecretExists {
-		println("Creating secret with default id: ", getColoredText(secretIdentifier, color.FgCyan))
+		println("Creating secret with default id: ", utils.GetColoredText(secretIdentifier, color.FgCyan))
 		if isSSHFileSecret {
 			payload, header, _ := readSecretFromPath(filepath, secretBody)
 
-			_, err = Post(createSecretURL,
-				cliCdRequestData.AuthToken,
+			_, err = client.Post(createSecretURL,
+				shared.CliCdRequestData.AuthToken,
 				nil,
 				header,
 				payload,
@@ -360,39 +365,39 @@ func createSSHSecret(filepath string, secretIdentifier string, baseURL string, p
 
 		} else {
 
-			_, err = Post(createSecretURL, cliCdRequestData.AuthToken, secretBody, CONTENT_TYPE_JSON, nil)
+			_, err = client.Post(createSecretURL, shared.CliCdRequestData.AuthToken, secretBody, defaults.CONTENT_TYPE_JSON, nil)
 		}
 		if err == nil {
-			println(getColoredText("Successfully created secret with id= ", color.FgGreen) +
-				getColoredText(secretIdentifier, color.FgBlue))
+			println(utils.GetColoredText("Successfully created secret with id= ", color.FgGreen) +
+				utils.GetColoredText(secretIdentifier, color.FgBlue))
 
 		}
 	} else {
-		println("Found secret with id: ", getColoredText(secretIdentifier, color.FgCyan))
+		println("Found secret with id: ", utils.GetColoredText(secretIdentifier, color.FgCyan))
 		println("Updating secret details....")
 		if isSSHFileSecret {
 
 			payload, header, _ := readSecretFromPath(filepath, secretBody)
-			_, err = Put(updateSecretURL, cliCdRequestData.AuthToken,
+			_, err = client.Put(updateSecretURL, shared.CliCdRequestData.AuthToken,
 				nil,
 				header, payload,
 			)
 
 		} else {
 
-			_, err = Put(updatedSSHSecretURL, cliCdRequestData.AuthToken, secretBody, CONTENT_TYPE_JSON, nil)
+			_, err = client.Put(updatedSSHSecretURL, shared.CliCdRequestData.AuthToken, secretBody, defaults.CONTENT_TYPE_JSON, nil)
 
 		}
 		if err == nil {
-			println(getColoredText("Successfully updated secretId= ", color.FgGreen) +
-				getColoredText(secretIdentifier, color.FgBlue))
+			println(utils.GetColoredText("Successfully updated secretId= ", color.FgGreen) +
+				utils.GetColoredText(secretIdentifier, color.FgBlue))
 
 		}
 	}
-	if secretIdentifier == SSH_PRIVATE_KEY_SECRET_IDENTIFIER {
+	if secretIdentifier == defaults.SSH_PRIVATE_KEY_SECRET_IDENTIFIER {
 		return nil
 	}
-	return createSSHSecret("", SSH_PRIVATE_KEY_SECRET_IDENTIFIER, baseURL, port, username, false)
+	return createSSHSecret("", defaults.SSH_PRIVATE_KEY_SECRET_IDENTIFIER, baseURL, port, username, false)
 }
 
 func createWinRMSecret(secretIdentifier string, baseURL string, port int, username string, password string, domain string, authType string) error {
@@ -401,55 +406,55 @@ func createWinRMSecret(secretIdentifier string, baseURL string, port int, userna
 
 	isWinRMPasswordSecret := secretIdentifier == ""
 	if isWinRMPasswordSecret {
-		secretIdentifier = WINRM_PASSWORD_SECRET_IDENTIFIER
+		secretIdentifier = defaults.WINRM_PASSWORD_SECRET_IDENTIFIER
 	}
-	createUrl := SECRETS_ENDPOINT
+	createUrl := defaults.SECRETS_ENDPOINT
 
-	createSecretURL := GetUrlWithQueryParams("", baseURL, createUrl, map[string]string{
-		"accountIdentifier": cliCdRequestData.Account,
-		"projectIdentifier": DEFAULT_PROJECT,
-		"orgIdentifier":     DEFAULT_ORG,
+	createSecretURL := utils.GetUrlWithQueryParams("", baseURL, createUrl, map[string]string{
+		"accountIdentifier": shared.CliCdRequestData.Account,
+		"projectIdentifier": defaults.DEFAULT_PROJECT,
+		"orgIdentifier":     defaults.DEFAULT_ORG,
 	})
 
-	updateUrl := fmt.Sprintf(SECRETS_ENDPOINT_WITH_IDENTIFIER, secretIdentifier)
+	updateUrl := fmt.Sprintf(defaults.SECRETS_ENDPOINT_WITH_IDENTIFIER, secretIdentifier)
 
-	updateSecretURL := GetUrlWithQueryParams("", baseURL, updateUrl, map[string]string{
-		"accountIdentifier": cliCdRequestData.Account,
-		"projectIdentifier": DEFAULT_PROJECT,
-		"orgIdentifier":     DEFAULT_ORG,
+	updateSecretURL := utils.GetUrlWithQueryParams("", baseURL, updateUrl, map[string]string{
+		"accountIdentifier": shared.CliCdRequestData.Account,
+		"projectIdentifier": defaults.DEFAULT_PROJECT,
+		"orgIdentifier":     defaults.DEFAULT_ORG,
 	})
 
-	secretExists := getEntity(baseURL, fmt.Sprintf(SECRETS_ENDPOINT_WITH_IDENTIFIER, secretIdentifier), DEFAULT_PROJECT,
-		DEFAULT_ORG, map[string]string{})
+	secretExists := utils.GetEntity(baseURL, fmt.Sprintf(defaults.SECRETS_ENDPOINT_WITH_IDENTIFIER, secretIdentifier), defaults.DEFAULT_PROJECT,
+		defaults.DEFAULT_ORG, map[string]string{})
 	if isWinRMPasswordSecret {
 		secretBody = createSecret(secretIdentifier, secretIdentifier, password, SecretText, SSHWINRMSecretData{})
 	} else {
-		secretBody = createSecret(secretIdentifier, secretIdentifier, "", WinRM, SSHWINRMSecretData{Port: port, Username: username, Password: WINRM_PASSWORD_SECRET_IDENTIFIER, Domain: domain, AuthType: authType})
+		secretBody = createSecret(secretIdentifier, secretIdentifier, "", WinRM, SSHWINRMSecretData{Port: port, Username: username, Password: defaults.WINRM_PASSWORD_SECRET_IDENTIFIER, Domain: domain, AuthType: authType})
 	}
 	if !secretExists {
-		println("Creating secret with default id: ", getColoredText(secretIdentifier, color.FgCyan))
+		println("Creating secret with default id: ", utils.GetColoredText(secretIdentifier, color.FgCyan))
 
-		_, err = Post(createSecretURL, cliCdRequestData.AuthToken, secretBody, CONTENT_TYPE_JSON, nil)
+		_, err = client.Post(createSecretURL, shared.CliCdRequestData.AuthToken, secretBody, defaults.CONTENT_TYPE_JSON, nil)
 
 		if err == nil {
-			println(getColoredText("Successfully created secret with id= ", color.FgGreen) +
-				getColoredText(secretIdentifier, color.FgBlue))
+			println(utils.GetColoredText("Successfully created secret with id= ", color.FgGreen) +
+				utils.GetColoredText(secretIdentifier, color.FgBlue))
 
 		}
 	} else {
-		println("Found secret with id: ", getColoredText(secretIdentifier, color.FgCyan))
+		println("Found secret with id: ", utils.GetColoredText(secretIdentifier, color.FgCyan))
 		println("Updating secret details....")
 
-		_, err = Put(updateSecretURL, cliCdRequestData.AuthToken, secretBody, CONTENT_TYPE_JSON, nil)
+		_, err = client.Put(updateSecretURL, shared.CliCdRequestData.AuthToken, secretBody, defaults.CONTENT_TYPE_JSON, nil)
 
 		if err == nil {
-			println(getColoredText("Successfully updated secretId= ", color.FgGreen) +
-				getColoredText(secretIdentifier, color.FgBlue))
+			println(utils.GetColoredText("Successfully updated secretId= ", color.FgGreen) +
+				utils.GetColoredText(secretIdentifier, color.FgBlue))
 
 		}
 	}
-	if secretIdentifier == WINRM_SECRET_IDENTIFIER {
+	if secretIdentifier == defaults.WINRM_SECRET_IDENTIFIER {
 		return nil
 	}
-	return createWinRMSecret(WINRM_SECRET_IDENTIFIER, baseURL, port, username, password, domain, authType)
+	return createWinRMSecret(defaults.WINRM_SECRET_IDENTIFIER, baseURL, port, username, password, domain, authType)
 }

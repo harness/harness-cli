@@ -1,4 +1,4 @@
-package main
+package types
 
 type EntityType string
 type ImportType string
@@ -205,6 +205,7 @@ type SecretStore struct {
 	ApiKey    string `json:"apiKey"`
 	AccountId string `json:"accountId"`
 	BaseURL   string `json:"baseUrl"`
+	UserId    string `json:"userId"`
 }
 type SecretSpec struct {
 	Value                   string `json:"value,omitempty"`
@@ -424,4 +425,54 @@ type SSHWINRMSecretData struct {
 	Password string
 	Domain   string
 	AuthType string
+}
+
+type CliCDRequest struct {
+	AuthToken   string `survey:"authToken"`
+	AuthType    string `survey:"authType"`
+	Account     string `survey:"account"`
+	OrgName     string `survey:"default"`
+	ProjectName string `survey:"default"`
+	Debug       bool   `survey:"debug"`
+	Json        bool   `survey:"json"`
+	BaseUrl     string `survey:"https://app.harness.io/"` //TODO : make it environment specific in utils
+	UserId      string `survey:"userId"`
+}
+
+type UserInfo struct {
+	Accounts []struct {
+		AccountName       string `json:"accountName"`
+		CompanyName       string `json:"companyName"`
+		CreatedFromNG     bool   `json:"createdFromNG"`
+		DefaultExperience string `json:"defaultExperience"`
+		NextGenEnabled    bool   `json:"nextGenEnabled"`
+		Uuid              string `json:"uuid"`
+	} `json:"accounts"`
+	Admin                          bool        `json:"admin"`
+	BillingFrequency               interface{} `json:"billingFrequency"`
+	CreatedAt                      int64       `json:"createdAt"`
+	DefaultAccountId               string      `json:"defaultAccountId"`
+	Disabled                       bool        `json:"disabled"`
+	Edition                        interface{} `json:"edition"`
+	Email                          string      `json:"email"`
+	EmailVerified                  bool        `json:"emailVerified"`
+	ExternalId                     interface{} `json:"externalId"`
+	ExternallyManaged              bool        `json:"externallyManaged"`
+	FamilyName                     interface{} `json:"familyName"`
+	GivenName                      interface{} `json:"givenName"`
+	Intent                         interface{} `json:"intent"`
+	LastUpdatedAt                  int64       `json:"lastUpdatedAt"`
+	Locked                         bool        `json:"locked"`
+	Name                           string      `json:"name"`
+	SignupAction                   interface{} `json:"signupAction"`
+	Token                          interface{} `json:"token"`
+	TwoFactorAuthenticationEnabled bool        `json:"twoFactorAuthenticationEnabled"`
+	UtmInfo                        struct {
+		UtmCampaign string `json:"utmCampaign"`
+		UtmContent  string `json:"utmContent"`
+		UtmMedium   string `json:"utmMedium"`
+		UtmSource   string `json:"utmSource"`
+		UtmTerm     string `json:"utmTerm"`
+	} `json:"utmInfo"`
+	Uuid string `json:"uuid"`
 }

@@ -1,9 +1,12 @@
-package main
+package client
 
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"harness/defaults"
+	"harness/shared"
+	. "harness/types"
 	"io"
 	"net/http"
 	"strconv"
@@ -64,8 +67,8 @@ func Get(reqUrl string, auth string) (respBodyObj ResponseBody, err error) {
 	if err != nil {
 		return
 	}
-	req.Header.Set("Content-Type", CONTENT_TYPE_JSON)
-	req.Header.Set(AuthHeaderKey(auth), cliCdRequestData.AuthToken)
+	req.Header.Set("Content-Type", defaults.CONTENT_TYPE_JSON)
+	req.Header.Set(AuthHeaderKey(auth), shared.CliCdRequestData.AuthToken)
 	return handleResp(req)
 }
 
@@ -74,7 +77,7 @@ func Delete(reqUrl string, auth string) (respBodyObj ResponseBody, err error) {
 	if err != nil {
 		return
 	}
-	req.Header.Set("Content-Type", CONTENT_TYPE_JSON)
+	req.Header.Set("Content-Type", defaults.CONTENT_TYPE_JSON)
 	req.Header.Set(AuthHeaderKey(auth), auth)
 	return handleResp(req)
 }
@@ -91,14 +94,16 @@ func handleResp(req *http.Request) (respBodyObj ResponseBody, err error) {
 		_ = Body.Close()
 	}(resp.Body)
 	respBody, err := io.ReadAll(resp.Body)
+
+	log.WithFields(log.Fields{
+		"body": string(respBody),
+	}).Debug("The response body")
+
 	if err != nil {
 		return
 	}
+	_ = json.Unmarshal(respBody, &respBodyObj)
 
-	err = json.Unmarshal(respBody, &respBodyObj)
-	if err != nil {
-		log.Fatalln("There was error while parsing the response from server. Exiting...", err)
-	}
 	if resp.StatusCode != 200 {
 		if resp.StatusCode >= 400 || resp.StatusCode < 500 {
 			println(respBodyObj.Message)
