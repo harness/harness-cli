@@ -95,6 +95,11 @@ func handleResp(req *http.Request) (respBodyObj ResponseBody, err error) {
 		return
 	}
 
+	if resp.StatusCode >= 400 && resp.StatusCode <= 500 {
+		log.Error("Server returned 'Unauthorized access' code ", resp.StatusCode)
+		return
+	}
+
 	err = json.Unmarshal(respBody, &respBodyObj)
 	if err != nil {
 		log.Fatalln("There was error while parsing the response from server. Exiting...", err)
