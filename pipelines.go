@@ -70,7 +70,7 @@ func applyPipeline(c *cli.Context) error {
 		if err == nil {
 			println(GetColoredText("Successfully updated pipeline with id= ", color.FgGreen) +
 				GetColoredText(identifier, color.FgBlue))
-			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.PIPELINE_CREATED, UserId: CliCdRequestData.UserId}, map[string]interface{}{
+			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.PIPELINE_UPDATED, UserId: CliCdRequestData.UserId}, map[string]interface{}{
 				"accountId":          CliCdRequestData.Account,
 				"type":               GetTypeFromYAML(content),
 				"userId":             CliCdRequestData.UserId,

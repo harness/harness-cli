@@ -13,16 +13,27 @@ import (
 )
 
 func Login(ctx *cli.Context) (err error) {
+
 	fmt.Println("Welcome to Harness CLI!")
 	PromptAccountDetails(ctx)
 	SaveCredentials(ctx, true)
-	GetAccountDetails(ctx)
+	loginError := GetAccountDetails(ctx)
+
+	if loginError != nil {
+		println("here")
+		telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.LOGIN_FAILED, UserId: CliCdRequestData.UserId}, map[string]interface{}{
+			"accountId": CliCdRequestData.Account,
+			"userId":    CliCdRequestData.UserId,
+		})
+		return nil
+	}
 	GetUserDetails(ctx)
 	SaveCredentials(ctx, false)
 	telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.LOGIN_SUCCESS, UserId: CliCdRequestData.UserId}, map[string]interface{}{
 		"accountId": CliCdRequestData.Account,
 		"userId":    CliCdRequestData.UserId,
 	})
+
 	return nil
 }
 

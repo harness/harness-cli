@@ -119,7 +119,7 @@ func applyConnector(c *cli.Context) error {
 		if err == nil {
 			println(GetColoredText("Successfully updated connector with id= ", color.FgGreen) +
 				GetColoredText(identifier, color.FgBlue))
-			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.CONNECTOR_CREATED, UserId: CliCdRequestData.UserId}, map[string]interface{}{
+			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.CONNECTOR_UPDATED, UserId: CliCdRequestData.UserId}, map[string]interface{}{
 				"accountId":     CliCdRequestData.Account,
 				"connectorType": GetTypeFromYAML(content),
 				"userId":        CliCdRequestData.UserId,

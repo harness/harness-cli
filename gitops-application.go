@@ -101,7 +101,7 @@ func applyGitopsApplications(c *cli.Context) error {
 			if err == nil {
 				println(GetColoredText("Successfully updated GitOps app with id= ", color.FgGreen) +
 					GetColoredText(applicationName, color.FgBlue))
-				telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.APP_CREATED, UserId: shared.CliCdRequestData.UserId}, map[string]interface{}{
+				telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.APP_UPDATED, UserId: shared.CliCdRequestData.UserId}, map[string]interface{}{
 					"accountId":       shared.CliCdRequestData.Account,
 					"type":            GetTypeFromYAML(content),
 					"userId":          shared.CliCdRequestData.UserId,

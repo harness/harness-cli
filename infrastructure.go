@@ -78,7 +78,7 @@ func applyInfraDefinition(c *cli.Context) error {
 			println(GetColoredText("Successfully updated infrastructure definition with id= ", color.FgGreen) +
 				GetColoredText(identifier, color.FgBlue))
 
-			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.INFRA_CREATED, UserId: shared.CliCdRequestData.UserId}, map[string]interface{}{
+			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.INFRA_UPDATED, UserId: shared.CliCdRequestData.UserId}, map[string]interface{}{
 				"accountId": shared.CliCdRequestData.Account,
 				"type":      GetTypeFromYAML(content),
 				"userId":    shared.CliCdRequestData.UserId,

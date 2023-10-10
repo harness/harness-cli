@@ -339,11 +339,8 @@ func GetAccountDetails(ctx *cli.Context) error {
 	})
 	resp, err := client.Get(url, CliCdRequestData.AuthToken)
 	if err != nil {
-		fmt.Printf("Response status: %s \n", resp.Status)
 		fmt.Printf("Response code: %s \n", resp.Code)
-		fmt.Printf("Response resource: %s \n", resp.Resource)
-		fmt.Printf("Response messages: %s \n", resp.Messages)
-		return nil
+		return err
 	}
 	return nil
 }
@@ -355,11 +352,8 @@ func GetUserDetails(ctx *cli.Context) error {
 	})
 	resp, err := client.Get(url, CliCdRequestData.AuthToken)
 	if err != nil {
-		fmt.Printf("Response status: %s \n", resp.Status)
 		fmt.Printf("Response code: %s \n", resp.Code)
-		fmt.Printf("Response resource: %s \n", resp.Resource)
-		fmt.Printf("Response messages: %s \n", resp.Messages)
-		return nil
+		return err
 	}
 	dataJSON, err := json.Marshal(resp.Data)
 	if err != nil {

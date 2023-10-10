@@ -7,6 +7,7 @@ import (
 	"harness/client"
 	"harness/defaults"
 	"harness/shared"
+	"harness/telemetry"
 	. "harness/types"
 	"harness/utils"
 	"io"
@@ -125,7 +126,14 @@ func applySecret(ctx *cli.Context) error {
 		if err == nil {
 			println(utils.GetColoredText("Successfully created secret with id= ", color.FgGreen) +
 				utils.GetColoredText(secretIdentifier, color.FgBlue))
+			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.SECRET_CREATED, UserId: shared.CliCdRequestData.UserId}, map[string]interface{}{
+				"accountId":       shared.CliCdRequestData.Account,
+				"type":            SecretText,
+				"userId":          shared.CliCdRequestData.UserId,
+				"agentIdentifier": agentIdentifier,
+			})
 			return nil
+
 		}
 	} else {
 		println("Found secret with id: ", utils.GetColoredText(secretIdentifier, color.FgCyan))
@@ -143,6 +151,12 @@ func applySecret(ctx *cli.Context) error {
 		if err == nil {
 			println(utils.GetColoredText("Successfully updated secretId= ", color.FgGreen) +
 				utils.GetColoredText(secretIdentifier, color.FgBlue))
+			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.SECRET_UPDATED, UserId: shared.CliCdRequestData.UserId}, map[string]interface{}{
+				"accountId":       shared.CliCdRequestData.Account,
+				"type":            SecretText,
+				"userId":          shared.CliCdRequestData.UserId,
+				"agentIdentifier": agentIdentifier,
+			})
 			return nil
 		}
 	}
@@ -315,10 +329,11 @@ func readSecretFromPath(filePath string, secretSpec HarnessSecret) (*bytes.Buffe
 func createSSHSecret(filepath string, secretIdentifier string, baseURL string, port int, username string, requiresFile bool) error {
 	var err error
 	var secretBody HarnessSecret
-
+	secretTypeName := SecretText
 	isSSHFileSecret := secretIdentifier == ""
 	if isSSHFileSecret {
 		secretIdentifier = defaults.SSH_KEY_FILE_SECRET_IDENTIFIER
+		secretTypeName = SecretFile
 	}
 	createUrl := defaults.SECRETS_ENDPOINT
 	if requiresFile {
@@ -370,8 +385,14 @@ func createSSHSecret(filepath string, secretIdentifier string, baseURL string, p
 		if err == nil {
 			println(utils.GetColoredText("Successfully created secret with id= ", color.FgGreen) +
 				utils.GetColoredText(secretIdentifier, color.FgBlue))
-
+			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.SECRET_CREATED, UserId: shared.CliCdRequestData.UserId}, map[string]interface{}{
+				"accountId":       shared.CliCdRequestData.Account,
+				"type":            secretTypeName,
+				"userId":          shared.CliCdRequestData.UserId,
+				"agentIdentifier": agentIdentifier,
+			})
 		}
+
 	} else {
 		println("Found secret with id: ", utils.GetColoredText(secretIdentifier, color.FgCyan))
 		println("Updating secret details....")
@@ -391,7 +412,12 @@ func createSSHSecret(filepath string, secretIdentifier string, baseURL string, p
 		if err == nil {
 			println(utils.GetColoredText("Successfully updated secretId= ", color.FgGreen) +
 				utils.GetColoredText(secretIdentifier, color.FgBlue))
-
+			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.SECRET_UPDATED, UserId: shared.CliCdRequestData.UserId}, map[string]interface{}{
+				"accountId":       shared.CliCdRequestData.Account,
+				"type":            secretTypeName,
+				"userId":          shared.CliCdRequestData.UserId,
+				"agentIdentifier": agentIdentifier,
+			})
 		}
 	}
 	if secretIdentifier == defaults.SSH_PRIVATE_KEY_SECRET_IDENTIFIER {
@@ -439,6 +465,12 @@ func createWinRMSecret(secretIdentifier string, baseURL string, port int, userna
 		if err == nil {
 			println(utils.GetColoredText("Successfully created secret with id= ", color.FgGreen) +
 				utils.GetColoredText(secretIdentifier, color.FgBlue))
+			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.SECRET_CREATED, UserId: shared.CliCdRequestData.UserId}, map[string]interface{}{
+				"accountId":       shared.CliCdRequestData.Account,
+				"type":            WinRM,
+				"userId":          shared.CliCdRequestData.UserId,
+				"agentIdentifier": agentIdentifier,
+			})
 
 		}
 	} else {
@@ -450,6 +482,12 @@ func createWinRMSecret(secretIdentifier string, baseURL string, port int, userna
 		if err == nil {
 			println(utils.GetColoredText("Successfully updated secretId= ", color.FgGreen) +
 				utils.GetColoredText(secretIdentifier, color.FgBlue))
+			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.SECRET_UPDATED, UserId: shared.CliCdRequestData.UserId}, map[string]interface{}{
+				"accountId":       shared.CliCdRequestData.Account,
+				"type":            WinRM,
+				"userId":          shared.CliCdRequestData.UserId,
+				"agentIdentifier": agentIdentifier,
+			})
 
 		}
 	}

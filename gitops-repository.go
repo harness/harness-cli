@@ -88,7 +88,7 @@ func applyRepository(c *cli.Context) error {
 		if err == nil {
 			println(GetColoredText("Successfully updated repository with id= ", color.FgGreen) +
 				GetColoredText(identifier, color.FgBlue))
-			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.REPO_CREATED, UserId: shared.CliCdRequestData.UserId}, map[string]interface{}{
+			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.REPO_UPDATED, UserId: shared.CliCdRequestData.UserId}, map[string]interface{}{
 				"accountId":       shared.CliCdRequestData.Account,
 				"type":            GetTypeFromYAML(content),
 				"userId":          shared.CliCdRequestData.UserId,
