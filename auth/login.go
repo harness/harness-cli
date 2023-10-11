@@ -20,7 +20,6 @@ func Login(ctx *cli.Context) (err error) {
 	loginError := GetAccountDetails(ctx)
 
 	if loginError != nil {
-		println("here")
 		telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.LOGIN_FAILED, UserId: CliCdRequestData.UserId}, map[string]interface{}{
 			"accountId": CliCdRequestData.Account,
 			"userId":    CliCdRequestData.UserId,
