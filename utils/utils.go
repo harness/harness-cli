@@ -132,48 +132,6 @@ func SaveCredentials(c *cli.Context, showWelcome bool) (err error) {
 	return nil
 }
 
-//func auth.HydrateCredsFromPersistence(params ...interface{}) {
-//	c := params[0].(*cli.Context)
-//	var hydrateOnlyURL = false
-//
-//	if len(params) > 1 {
-//		if value, ok := params[1].(bool); ok {
-//			hydrateOnlyURL = value
-//		}
-//	}
-//	if CliCdRequestData.AuthToken != "" && CliCdRequestData.Account != "" && !hydrateOnlyURL {
-//		return
-//	}
-//
-//	exactFilePath := getUserHomePath() + "/" + defaults.SECRETS_STORE_PATH
-//	credsJson, err := os.ReadFile(exactFilePath)
-//	if err != nil {
-//		fmt.Println("Error reading creds file:", err)
-//		return
-//	}
-//	var secretstore SecretStore
-//	err = json.Unmarshal(credsJson, &secretstore)
-//	if err != nil {
-//		fmt.Println("Error:", err)
-//		auth.Login(c)
-//		return
-//	}
-//	if hydrateOnlyURL {
-//		baseURL := c.String("base-url")
-//		if baseURL == "" {
-//			CliCdRequestData.BaseUrl = secretstore.BaseURL
-//		} else {
-//			CliCdRequestData.BaseUrl = baseURL
-//		}
-//	} else {
-//		CliCdRequestData.AuthToken = secretstore.ApiKey
-//		CliCdRequestData.Account = secretstore.AccountId
-//		CliCdRequestData.BaseUrl = secretstore.BaseURL
-//
-//	}
-//	return
-//}
-
 func GetNGBaseURL(c *cli.Context) string {
 	baseURL := c.String("base-url")
 	if baseURL == "" {
@@ -333,7 +291,7 @@ func PromptAccountDetails(ctx *cli.Context) bool {
 func GetAccountDetails(ctx *cli.Context) error {
 	// Getting the account details
 	var baseURL = GetNGBaseURL(ctx)
-	accountsEndpoint := "accounts/" + CliCdRequestData.Account
+	accountsEndpoint := defaults.ACCOUNTS_ENDPOINT + CliCdRequestData.Account
 	url := GetUrlWithQueryParams("", baseURL, accountsEndpoint, map[string]string{
 		"accountIdentifier": CliCdRequestData.Account,
 	})

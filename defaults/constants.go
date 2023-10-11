@@ -3,6 +3,7 @@ package defaults
 const AWS_CROSS_ACCOUNT_ROLE_ARN = "ROLE_ARN"
 const AWS_ACCESS_KEY = "AWS_ACCESS_KEY"
 const AWS_SECRET_IDENTIFIER = "awssecret"
+const ACCOUNTS_ENDPOINT = "accounts/"
 const BUCKET_NAME_PLACEHOLDER = "CLOUD_BUCKET_NAME"
 const CONNECTOR_ENDPOINT = "connectors"
 const CONTENT_TYPE_JSON = "application/json"

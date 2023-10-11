@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"harness/client"
+	"harness/defaults"
 	. "harness/shared"
 	"harness/utils"
 )
@@ -11,7 +12,7 @@ import (
 func GetAccountDetails(ctx *cli.Context) error {
 	// Getting the account details
 	var baseURL = utils.GetNGBaseURL(ctx)
-	accountsEndpoint := "accounts/" + CliCdRequestData.Account
+	accountsEndpoint := defaults.ACCOUNTS_ENDPOINT + CliCdRequestData.Account
 	url := utils.GetUrlWithQueryParams("", baseURL, accountsEndpoint, map[string]string{
 		"accountIdentifier": CliCdRequestData.Account,
 	})
