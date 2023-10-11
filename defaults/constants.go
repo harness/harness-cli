@@ -1,8 +1,9 @@
-package main
+package defaults
 
 const AWS_CROSS_ACCOUNT_ROLE_ARN = "ROLE_ARN"
 const AWS_ACCESS_KEY = "AWS_ACCESS_KEY"
 const AWS_SECRET_IDENTIFIER = "awssecret"
+const ACCOUNTS_ENDPOINT = "accounts/"
 const BUCKET_NAME_PLACEHOLDER = "CLOUD_BUCKET_NAME"
 const CONNECTOR_ENDPOINT = "connectors"
 const CONTENT_TYPE_JSON = "application/json"
@@ -44,6 +45,7 @@ const SERVICES_ENDPOINT = "servicesV2"
 const SECRETS_ENDPOINT = "v2/secrets"
 const SECRETS_ENDPOINT_WITH_IDENTIFIER = "v2/secrets/%s"
 const FILE_SECRETS_ENDPOINT = "v2/secrets/files/%s"
+const USER_INFO_ENDPOINT = "user/currentUser"
 const GITHUB_USERNAME_PLACEHOLDER = "GITHUB_USERNAME"
 const DELEGATE_NAME_PLACEHOLDER = "DELEGATE_NAME"
 const GITHUB_PAT_PLACEHOLDER = "GITHUB-PAT"

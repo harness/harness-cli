@@ -2,27 +2,19 @@ package main
 
 import (
 	"fmt"
+	"harness/account"
+	"harness/auth"
 	"os"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
+	. "harness/shared"
 )
 
 var Version = "development"
 
 type cliFnWrapper func(ctx *cli.Context) error
-
-var cliCdRequestData = struct {
-	AuthToken   string `survey:"authToken"`
-	AuthType    string `survey:"authType"`
-	Account     string `survey:"account"`
-	OrgName     string `survey:"default"`
-	ProjectName string `survey:"default"`
-	Debug       bool   `survey:"debug"`
-	Json        bool   `survey:"json"`
-	BaseUrl     string `survey:"https://app.harness.io/"` //TODO : make it environment specific in utils
-}{}
 
 func init() {
 	// Log as JSON instead of the default ASCII formatter.
@@ -45,17 +37,17 @@ func main() {
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:        "base-url",
 			Usage:       "provide the `NG_BASE_URL` for self managed platforms",
-			Destination: &cliCdRequestData.BaseUrl,
+			Destination: &CliCdRequestData.BaseUrl,
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:        "api-key",
 			Usage:       "`API_KEY` for the target account to authenticate & authorise the user.",
-			Destination: &cliCdRequestData.AuthToken,
+			Destination: &CliCdRequestData.AuthToken,
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:        "account-id",
 			Usage:       "provide an Account Identifier of the user",
-			Destination: &cliCdRequestData.Account,
+			Destination: &CliCdRequestData.Account,
 		}),
 		altsrc.NewStringFlag(&cli.StringFlag{
 			Name:  "load",
@@ -65,12 +57,12 @@ func main() {
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:        "debug",
 			Usage:       "prints debug level logs",
-			Destination: &cliCdRequestData.Debug,
+			Destination: &CliCdRequestData.Debug,
 		}),
 		altsrc.NewBoolFlag(&cli.BoolFlag{
 			Name:        "json",
 			Usage:       "log as JSON instead of standard ASCII formatter",
-			Destination: &cliCdRequestData.Json,
+			Destination: &CliCdRequestData.Json,
 		}),
 	}
 	app := &cli.App{
@@ -111,7 +103,7 @@ func main() {
 					return nil
 				},
 				Before: func(ctx *cli.Context) error {
-					hydrateCredsFromPersistence(ctx)
+					auth.HydrateCredsFromPersistence(ctx)
 					return nil
 				},
 				Subcommands: []*cli.Command{
@@ -164,7 +156,7 @@ func main() {
 					},
 				},
 				Before: func(ctx *cli.Context) error {
-					hydrateCredsFromPersistence(ctx)
+					auth.HydrateCredsFromPersistence(ctx)
 					return nil
 				},
 				Subcommands: []*cli.Command{
@@ -209,7 +201,7 @@ func main() {
 					},
 				},
 				Before: func(ctx *cli.Context) error {
-					hydrateCredsFromPersistence(ctx)
+					auth.HydrateCredsFromPersistence(ctx)
 					return nil
 				},
 				Subcommands: []*cli.Command{
@@ -240,7 +232,7 @@ func main() {
 					},
 				},
 				Before: func(ctx *cli.Context) error {
-					hydrateCredsFromPersistence(ctx)
+					auth.HydrateCredsFromPersistence(ctx)
 					return nil
 				},
 				Subcommands: []*cli.Command{
@@ -306,7 +298,7 @@ func main() {
 					}),
 				),
 				Before: func(ctx *cli.Context) error {
-					hydrateCredsFromPersistence(ctx)
+					auth.HydrateCredsFromPersistence(ctx)
 					return nil
 				},
 				Subcommands: []*cli.Command{
@@ -336,7 +328,7 @@ func main() {
 					}),
 				),
 				Before: func(ctx *cli.Context) error {
-					hydrateCredsFromPersistence(ctx)
+					auth.HydrateCredsFromPersistence(ctx)
 					return nil
 				},
 				Subcommands: []*cli.Command{
@@ -366,7 +358,7 @@ func main() {
 					}),
 				),
 				Before: func(ctx *cli.Context) error {
-					hydrateCredsFromPersistence(ctx)
+					auth.HydrateCredsFromPersistence(ctx)
 					return nil
 				},
 				Subcommands: []*cli.Command{
@@ -396,7 +388,7 @@ func main() {
 					},
 				},
 				Before: func(ctx *cli.Context) error {
-					hydrateCredsFromPersistence(ctx)
+					auth.HydrateCredsFromPersistence(ctx)
 					return nil
 				},
 				Subcommands: []*cli.Command{
@@ -441,7 +433,7 @@ func main() {
 					},
 				},
 				Before: func(ctx *cli.Context) error {
-					hydrateCredsFromPersistence(ctx)
+					auth.HydrateCredsFromPersistence(ctx)
 					return nil
 				},
 				Subcommands: []*cli.Command{
@@ -467,10 +459,13 @@ func main() {
 				Usage:   "Login with account identifier and api key.",
 				Flags:   globalFlags,
 				Action: func(context *cli.Context) error {
-					return cliWrapper(Login, context)
+					return cliWrapper(func(context *cli.Context) error {
+						// Call auth.Login with the provided context
+						return auth.Login(context)
+					}, context)
 				},
 				Before: func(ctx *cli.Context) error {
-					hydrateCredsFromPersistence(ctx, true)
+					auth.HydrateCredsFromPersistence(ctx, true)
 					return nil
 				},
 			},
@@ -480,7 +475,7 @@ func main() {
 				Usage:   "Fetch Account details",
 				Flags:   globalFlags,
 				Action: func(context *cli.Context) error {
-					return cliWrapper(getAccountDetails, context)
+					return cliWrapper(account.GetAccountDetails, context)
 				},
 			},
 		},
@@ -495,10 +490,10 @@ func main() {
 }
 
 func cliWrapper(fn cliFnWrapper, ctx *cli.Context) error {
-	if cliCdRequestData.Debug {
+	if CliCdRequestData.Debug {
 		log.SetLevel(log.DebugLevel)
 	}
-	if cliCdRequestData.Json {
+	if CliCdRequestData.Json {
 		log.SetFormatter(&log.JSONFormatter{})
 	}
 	return fn(ctx)

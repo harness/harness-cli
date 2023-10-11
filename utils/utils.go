@@ -1,8 +1,12 @@
-package main
+package utils
 
 import (
 	"encoding/json"
 	"fmt"
+	"harness/client"
+	"harness/defaults"
+	. "harness/shared"
+	. "harness/types"
 	"io"
 	"os"
 	"regexp"
@@ -60,7 +64,7 @@ func GetUrlWithQueryParams(environment string, service string, endpoint string, 
 	return fmt.Sprintf("%s/%s?%s", service, endpoint, params)
 }
 
-func printJson(v any) {
+func PrintJson(v any) {
 	marsheld, err := json.MarshalIndent(v, "", " ")
 	if err != nil {
 		log.Fatalf("Marshaling error: %s", err)
@@ -68,8 +72,8 @@ func printJson(v any) {
 	fmt.Println("Data: ", string(marsheld))
 }
 
-func writeToFile(text string, filename string, overwrite bool) {
-	exactFilePath := getUserHomePath() + "/" + filename
+func WriteToFile(text string, filename string, overwrite bool) {
+	exactFilePath := GetUserHomePath() + "/" + filename
 	var permissions = os.O_APPEND | os.O_CREATE | os.O_WRONLY
 	if overwrite {
 		permissions = os.O_APPEND | os.O_CREATE | os.O_WRONLY | os.O_TRUNC
@@ -86,7 +90,7 @@ func writeToFile(text string, filename string, overwrite bool) {
 	f.Close()
 }
 
-func readFromFile(filepath string) (s string, r []byte) {
+func ReadFromFile(filepath string) (s string, r []byte) {
 	var _fileContents = ""
 
 	file, _ := os.OpenFile(filepath, os.O_RDONLY, 0644)
@@ -101,18 +105,19 @@ func readFromFile(filepath string) (s string, r []byte) {
 	return _fileContents, byteValue
 }
 
-func saveCredentials(c *cli.Context) (err error) {
+func SaveCredentials(c *cli.Context, showWelcome bool) (err error) {
 	baseURL := c.String("base-url")
 	if baseURL == "" {
-		baseURL = cliCdRequestData.BaseUrl
+		baseURL = CliCdRequestData.BaseUrl
 	}
-	if cliCdRequestData.BaseUrl == "" {
-		baseURL = HARNESS_PROD_URL
+	if CliCdRequestData.BaseUrl == "" {
+		baseURL = defaults.HARNESS_PROD_URL
 	}
 	authCredentials := SecretStore{
-		ApiKey:    cliCdRequestData.AuthToken,
-		AccountId: cliCdRequestData.Account,
+		ApiKey:    CliCdRequestData.AuthToken,
+		AccountId: CliCdRequestData.Account,
 		BaseURL:   baseURL,
+		UserId:    CliCdRequestData.UserId,
 	}
 	jsonObj, err := json.MarshalIndent(authCredentials, "", "  ")
 	if err != nil {
@@ -120,76 +125,36 @@ func saveCredentials(c *cli.Context) (err error) {
 		return
 	}
 
-	writeToFile(string(jsonObj), SECRETS_STORE_PATH, true)
-	println(getColoredText("Login successfully done. Yay!", color.FgGreen))
+	WriteToFile(string(jsonObj), defaults.SECRETS_STORE_PATH, true)
+	if showWelcome {
+		println(GetColoredText("Login successfully done. Yay!", color.FgGreen))
+	}
 	return nil
 }
 
-func hydrateCredsFromPersistence(params ...interface{}) {
-	c := params[0].(*cli.Context)
-	var hydrateOnlyURL = false
-
-	if len(params) > 1 {
-		if value, ok := params[1].(bool); ok {
-			hydrateOnlyURL = value
-		}
-	}
-	if cliCdRequestData.AuthToken != "" && cliCdRequestData.Account != "" && !hydrateOnlyURL {
-		return
-	}
-
-	exactFilePath := getUserHomePath() + "/" + SECRETS_STORE_PATH
-	credsJson, err := os.ReadFile(exactFilePath)
-	if err != nil {
-		fmt.Println("Error reading creds file:", err)
-		return
-	}
-	var secretstore SecretStore
-	err = json.Unmarshal(credsJson, &secretstore)
-	if err != nil {
-		fmt.Println("Error:", err)
-		Login(c)
-		return
-	}
-	if hydrateOnlyURL {
-		baseURL := c.String("base-url")
-		if baseURL == "" {
-			cliCdRequestData.BaseUrl = secretstore.BaseURL
-		} else {
-			cliCdRequestData.BaseUrl = baseURL
-		}
-	} else {
-		cliCdRequestData.AuthToken = secretstore.ApiKey
-		cliCdRequestData.Account = secretstore.AccountId
-		cliCdRequestData.BaseUrl = secretstore.BaseURL
-
-	}
-	return
-}
-
-func getNGBaseURL(c *cli.Context) string {
+func GetNGBaseURL(c *cli.Context) string {
 	baseURL := c.String("base-url")
 	if baseURL == "" {
-		if cliCdRequestData.BaseUrl == "" {
-			baseURL = HARNESS_PROD_URL
+		if CliCdRequestData.BaseUrl == "" {
+			baseURL = defaults.HARNESS_PROD_URL
 		} else {
-			baseURL = cliCdRequestData.BaseUrl
+			baseURL = CliCdRequestData.BaseUrl
 		}
 	}
 
 	baseURL = strings.TrimRight(baseURL, "/") //remove trailing slash
-	baseURL = baseURL + NG_BASE_URL
+	baseURL = baseURL + defaults.NG_BASE_URL
 	return baseURL
 }
 
-func getBaseUrl(c *cli.Context, serviceUrl string) string {
+func GetBaseUrl(c *cli.Context, serviceUrl string) string {
 	baseURL := c.String("base-url")
 
 	if baseURL == "" {
-		if cliCdRequestData.BaseUrl == "" {
-			baseURL = HARNESS_PROD_URL
+		if CliCdRequestData.BaseUrl == "" {
+			baseURL = defaults.HARNESS_PROD_URL
 		} else {
-			baseURL = cliCdRequestData.BaseUrl
+			baseURL = CliCdRequestData.BaseUrl
 		}
 	}
 
@@ -198,7 +163,7 @@ func getBaseUrl(c *cli.Context, serviceUrl string) string {
 	return baseURL
 }
 
-func getJsonFromYaml(content string) map[string]interface{} {
+func GetJsonFromYaml(content string) map[string]interface{} {
 	requestBody := make(map[string]interface{})
 	err := yaml.Unmarshal([]byte(content), requestBody)
 	if err != nil {
@@ -229,7 +194,7 @@ func GetNestedValue(data map[string]interface{}, keys ...string) interface{} {
 
 	return value
 }
-func getUserHomePath() string {
+func GetUserHomePath() string {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Println("Failed to get user's home directory:", err)
@@ -237,7 +202,7 @@ func getUserHomePath() string {
 	}
 	return homeDir
 }
-func valueToString(value interface{}) string {
+func ValueToString(value interface{}) string {
 	switch v := value.(type) {
 	case string:
 		return v
@@ -254,21 +219,21 @@ func valueToString(value interface{}) string {
 	}
 }
 
-func getColoredText(text string, textColor color.Attribute) string {
+func GetColoredText(text string, textColor color.Attribute) string {
 	colored := color.New(textColor).SprintFunc()
 	return colored(text)
 }
 
-func getEntity(baseUrl string, reqURL string, projectIdentifier string, orgIdentifier string, extraParams map[string]string) bool {
+func GetEntity(baseUrl string, reqURL string, projectIdentifier string, orgIdentifier string, extraParams map[string]string) bool {
 	queryParams := map[string]string{
-		"accountIdentifier": cliCdRequestData.Account,
-		"routingId":         cliCdRequestData.Account,
+		"accountIdentifier": CliCdRequestData.Account,
+		"routingId":         CliCdRequestData.Account,
 		"projectIdentifier": projectIdentifier,
 		"orgIdentifier":     orgIdentifier,
 	}
-	queryParams = mergeMaps(queryParams, extraParams)
+	queryParams = MergeMaps(queryParams, extraParams)
 	urlWithQueryParams := GetUrlWithQueryParams("", baseUrl, reqURL, queryParams)
-	_, fetchEntityError := Get(urlWithQueryParams, cliCdRequestData.AuthToken)
+	_, fetchEntityError := client.Get(urlWithQueryParams, CliCdRequestData.AuthToken)
 	if fetchEntityError != nil {
 		return false
 	} else {
@@ -276,7 +241,7 @@ func getEntity(baseUrl string, reqURL string, projectIdentifier string, orgIdent
 	}
 }
 
-func mergeMaps(map1 map[string]string, map2 map[string]string) map[string]string {
+func MergeMaps(map1 map[string]string, map2 map[string]string) map[string]string {
 	mergedMap := func() map[string]string {
 		result := make(map[string]string)
 		for k, v := range map1 {
@@ -291,19 +256,90 @@ func mergeMaps(map1 map[string]string, map2 map[string]string) map[string]string
 }
 
 // replaces placeholder values in the given yaml content
-func replacePlaceholderValues(haystack string, needle string, value string) string {
+func ReplacePlaceholderValues(haystack string, needle string, value string) string {
 	return strings.ReplaceAll(haystack, needle, value)
 }
 
-func fetchCloudType(str string) string {
+func FetchCloudType(str string) string {
 	gcpRegexPattern := `type:\s+GoogleCloudFunctions`
 	awsRegexPattern := `type:\s+AwsLambda`
 
 	if isGcpMatch, err1 := regexp.MatchString(gcpRegexPattern, str); err1 == nil && isGcpMatch {
-		return GCP
+		return defaults.GCP
 	} else if isAwsMatch, err2 := regexp.MatchString(awsRegexPattern, str); err2 == nil && isAwsMatch {
-		return AWS
+		return defaults.AWS
 	}
 
 	return ""
+}
+
+func PromptAccountDetails(ctx *cli.Context) bool {
+	promptConfirm := false
+
+	if len(CliCdRequestData.Account) == 0 {
+		promptConfirm = true
+		CliCdRequestData.Account = TextInput("Account that you wish to login to:")
+	}
+
+	if len(CliCdRequestData.AuthToken) == 0 {
+		promptConfirm = true
+		CliCdRequestData.AuthToken = TextInput("Provide your api-key:")
+	}
+	return promptConfirm
+}
+
+func GetAccountDetails(ctx *cli.Context) error {
+	// Getting the account details
+	var baseURL = GetNGBaseURL(ctx)
+	accountsEndpoint := defaults.ACCOUNTS_ENDPOINT + CliCdRequestData.Account
+	url := GetUrlWithQueryParams("", baseURL, accountsEndpoint, map[string]string{
+		"accountIdentifier": CliCdRequestData.Account,
+	})
+	resp, err := client.Get(url, CliCdRequestData.AuthToken)
+	if err != nil {
+		fmt.Printf("Response code: %s \n", resp.Code)
+		return err
+	}
+	return nil
+}
+
+func GetUserDetails(ctx *cli.Context) error {
+	var baseURL = GetNGBaseURL(ctx)
+	url := GetUrlWithQueryParams("", baseURL, defaults.USER_INFO_ENDPOINT, map[string]string{
+		"accountIdentifier": CliCdRequestData.Account,
+	})
+	resp, err := client.Get(url, CliCdRequestData.AuthToken)
+	if err != nil {
+		fmt.Printf("Response code: %s \n", resp.Code)
+		return err
+	}
+	dataJSON, err := json.Marshal(resp.Data)
+	if err != nil {
+		fmt.Println("Error marshalling data:", err)
+		return err
+	}
+	var currentUserInfo UserInfo
+	err = json.Unmarshal(dataJSON, &currentUserInfo)
+	if err != nil {
+		fmt.Println("Error unmarshalling JSON:", err)
+		return err
+	}
+	CliCdRequestData.UserId = currentUserInfo.Email
+	return nil
+}
+
+func GetTypeFromYAML(str string) (connectorType string) {
+	pattern := `type:\s+(\w+)`
+	expression := regexp.MustCompile(pattern)
+	if expression.MatchString(str) {
+		// Find the first match in the YAML content
+		match := expression.FindStringSubmatch(str)
+
+		// Extract the value (abc) from the match
+		if len(match) >= 2 {
+			value := match[1]
+			connectorType = value
+		}
+	}
+	return
 }

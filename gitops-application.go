@@ -4,46 +4,52 @@ import (
 	"fmt"
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
+	"harness/client"
+	"harness/defaults"
+	"harness/shared"
+	"harness/telemetry"
+	. "harness/types"
+	. "harness/utils"
 )
 
 func applyGitopsApplications(c *cli.Context) error {
 	filePath := c.String("file")
-	baseURL := getBaseUrl(c, GITOPS_BASE_URL)
+	baseURL := GetBaseUrl(c, defaults.GITOPS_BASE_URL)
 	if filePath == "" {
 		fmt.Println("Please enter valid filename")
 		return nil
 	}
 	fmt.Println("Trying to create or update gitops-application using the yaml=",
-		getColoredText(filePath, color.FgCyan))
-	var content, _ = readFromFile(c.String("file"))
+		GetColoredText(filePath, color.FgCyan))
+	var content, _ = ReadFromFile(c.String("file"))
 	agentIdentifier = c.String("agent-identifier")
-	if agentIdentifier == "" || agentIdentifier == GITOPS_AGENT_IDENTIFIER_PLACEHOLDER {
+	if agentIdentifier == "" || agentIdentifier == defaults.GITOPS_AGENT_IDENTIFIER_PLACEHOLDER {
 		agentIdentifier = TextInput("Enter a valid AgentIdentifier:")
 	}
-	content = replacePlaceholderValues(content, GITOPS_AGENT_IDENTIFIER_PLACEHOLDER, agentIdentifier)
+	content = ReplacePlaceholderValues(content, defaults.GITOPS_AGENT_IDENTIFIER_PLACEHOLDER, agentIdentifier)
 	baseURL = baseURL + agentIdentifier
-	requestBody := getJsonFromYaml(content)
+	requestBody := GetJsonFromYaml(content)
 	if requestBody == nil {
-		println(getColoredText("Please enter valid repository yaml file", color.FgRed))
+		println(GetColoredText("Please enter valid repository yaml file", color.FgRed))
 	}
-	orgIdentifier := valueToString(GetNestedValue(requestBody, "gitops", "orgIdentifier").(string))
-	projectIdentifier := valueToString(GetNestedValue(requestBody, "gitops", "projectIdentifier").(string))
-	clusterIdentifier := valueToString(GetNestedValue(requestBody, "gitops", "clusterIdentifier").(string))
-	repoIdentifier := valueToString(GetNestedValue(requestBody, "gitops", "repoIdentifier").(string))
+	orgIdentifier := ValueToString(GetNestedValue(requestBody, "gitops", "orgIdentifier").(string))
+	projectIdentifier := ValueToString(GetNestedValue(requestBody, "gitops", "projectIdentifier").(string))
+	clusterIdentifier := ValueToString(GetNestedValue(requestBody, "gitops", "clusterIdentifier").(string))
+	repoIdentifier := ValueToString(GetNestedValue(requestBody, "gitops", "repoIdentifier").(string))
 
-	createOrUpdateApplicationURL := GetUrlWithQueryParams("", baseURL, GITOPS_APPLICATION_ENDPOINT, map[string]string{
-		"accountIdentifier": cliCdRequestData.Account,
+	createOrUpdateApplicationURL := GetUrlWithQueryParams("", baseURL, defaults.GITOPS_APPLICATION_ENDPOINT, map[string]string{
+		"accountIdentifier": shared.CliCdRequestData.Account,
 		"orgIdentifier":     orgIdentifier,
 		"projectIdentifier": projectIdentifier,
 		"clusterIdentifier": clusterIdentifier,
 		"repoIdentifier":    repoIdentifier,
 	})
 
-	applicationName := valueToString(GetNestedValue(requestBody, "gitops", "name").(string))
+	applicationName := ValueToString(GetNestedValue(requestBody, "gitops", "name").(string))
 	syncApplicationURL := GetUrlWithQueryParams("", baseURL,
-		fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName+"/sync"), map[string]string{
-			"routingId":         cliCdRequestData.Account,
-			"accountIdentifier": cliCdRequestData.Account,
+		fmt.Sprintf(defaults.GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName+"/sync"), map[string]string{
+			"routingId":         shared.CliCdRequestData.Account,
+			"accountIdentifier": shared.CliCdRequestData.Account,
 			"orgIdentifier":     orgIdentifier,
 			"projectIdentifier": projectIdentifier,
 		})
@@ -51,28 +57,34 @@ func applyGitopsApplications(c *cli.Context) error {
 	extraParams := map[string]string{
 		"agentIdentifier": agentIdentifier,
 	}
-	entityExists := getEntity(baseURL, fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName),
+	entityExists := GetEntity(baseURL, fmt.Sprintf(defaults.GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName),
 		projectIdentifier, orgIdentifier, extraParams)
 	var _ ResponseBody
 	var err error
 
 	if !entityExists {
-		println("Creating GitOps-Application with id: ", getColoredText(applicationName, color.FgGreen))
+		println("Creating GitOps-Application with id: ", GetColoredText(applicationName, color.FgGreen))
 		applicationPayload := createGitOpsApplicationPayload(requestBody)
-		_, err = Post(createOrUpdateApplicationURL, cliCdRequestData.AuthToken, applicationPayload, CONTENT_TYPE_JSON, nil)
+		_, err = client.Post(createOrUpdateApplicationURL, shared.CliCdRequestData.AuthToken, applicationPayload, defaults.CONTENT_TYPE_JSON, nil)
 		if err == nil {
-			println(getColoredText("Successfully created GitOps-Application with id= ", color.FgGreen) +
-				getColoredText(applicationName, color.FgBlue))
+			println(GetColoredText("Successfully created GitOps-Application with id= ", color.FgGreen) +
+				GetColoredText(applicationName, color.FgBlue))
+			telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.APP_CREATED, UserId: shared.CliCdRequestData.UserId}, map[string]interface{}{
+				"accountId":       shared.CliCdRequestData.Account,
+				"type":            GetTypeFromYAML(content),
+				"userId":          shared.CliCdRequestData.UserId,
+				"agentIdentifier": agentIdentifier,
+			})
 			return nil
 		}
 	} else {
-		println("Found GitOps Application with id=", getColoredText(applicationName, color.FgCyan))
-		println("Updating details of GitOps Application with id=", getColoredText(applicationName, color.FgBlue))
+		println("Found GitOps Application with id=", GetColoredText(applicationName, color.FgCyan))
+		println("Updating details of GitOps Application with id=", GetColoredText(applicationName, color.FgBlue))
 
 		var appPUTUrl = GetUrlWithQueryParams("", baseURL,
-			fmt.Sprintf(GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName), map[string]string{
-				"routingId":         cliCdRequestData.Account,
-				"accountIdentifier": cliCdRequestData.Account,
+			fmt.Sprintf(defaults.GITOPS_APPLICATION_ENDPOINT+"/%s", applicationName), map[string]string{
+				"routingId":         shared.CliCdRequestData.Account,
+				"accountIdentifier": shared.CliCdRequestData.Account,
 				"orgIdentifier":     orgIdentifier,
 				"projectIdentifier": projectIdentifier,
 				"repoIdentifier":    repoIdentifier,
@@ -80,16 +92,23 @@ func applyGitopsApplications(c *cli.Context) error {
 			})
 		newAppPayload := createGitOpsApplicationPUTPayload(requestBody)
 		syncPayload := createGitOpsApplicationPayload(requestBody)
-		println("Syncing the GitOps Application before updating the spec:", getColoredText(applicationName, color.FgGreen))
-		_, err = Post(syncApplicationURL, cliCdRequestData.AuthToken, syncPayload, CONTENT_TYPE_JSON, nil)
+		println("Syncing the GitOps Application before updating the spec:", GetColoredText(applicationName, color.FgGreen))
+		_, err = client.Post(syncApplicationURL, shared.CliCdRequestData.AuthToken, syncPayload, defaults.CONTENT_TYPE_JSON, nil)
 		if err == nil {
-			println(getColoredText("Successfully synced GitOps app with id= ", color.FgGreen) +
-				getColoredText(applicationName, color.FgBlue))
-			_, err = Put(appPUTUrl, cliCdRequestData.AuthToken, newAppPayload, CONTENT_TYPE_JSON, nil)
+			println(GetColoredText("Successfully synced GitOps app with id= ", color.FgGreen) +
+				GetColoredText(applicationName, color.FgBlue))
+			_, err = client.Put(appPUTUrl, shared.CliCdRequestData.AuthToken, newAppPayload, defaults.CONTENT_TYPE_JSON, nil)
 			if err == nil {
-				println(getColoredText("Successfully updated GitOps app with id= ", color.FgGreen) +
-					getColoredText(applicationName, color.FgBlue))
+				println(GetColoredText("Successfully updated GitOps app with id= ", color.FgGreen) +
+					GetColoredText(applicationName, color.FgBlue))
+				telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.APP_UPDATED, UserId: shared.CliCdRequestData.UserId}, map[string]interface{}{
+					"accountId":       shared.CliCdRequestData.Account,
+					"type":            GetTypeFromYAML(content),
+					"userId":          shared.CliCdRequestData.UserId,
+					"agentIdentifier": agentIdentifier,
+				})
 				return nil
+
 			}
 			return nil
 		}
@@ -103,22 +122,22 @@ func createGitOpsApplicationPayload(requestBody map[string]interface{}) GitOpsAp
 		Application: Application{
 			Metadata: Metadata{
 				Labels: Labels{
-					Envref:     valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/envRef").(string)),
-					Serviceref: valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/serviceRef").(string)),
+					Envref:     ValueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/envRef").(string)),
+					Serviceref: ValueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/serviceRef").(string)),
 				},
-				Name:        valueToString(GetNestedValue(requestBody, "gitops", "name").(string)),
-				Namespace:   valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "namespace").(string)),
-				ClusterName: valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "clusterName").(string)),
+				Name:        ValueToString(GetNestedValue(requestBody, "gitops", "name").(string)),
+				Namespace:   ValueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "namespace").(string)),
+				ClusterName: ValueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "clusterName").(string)),
 			},
 			Spec: Spec{
 				Source: Source{
-					RepoURL:        valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "repoURL").(string)),
-					Path:           valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "path").(string)),
-					TargetRevision: valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "targetRevision").(string)),
+					RepoURL:        ValueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "repoURL").(string)),
+					Path:           ValueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "path").(string)),
+					TargetRevision: ValueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "targetRevision").(string)),
 				},
 				Destination: Destination{
-					Server:    valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "destination", "server").(string)),
-					Namespace: valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "destination", "namespace").(string)),
+					Server:    ValueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "destination", "server").(string)),
+					Namespace: ValueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "destination", "namespace").(string)),
 				},
 			},
 		},
@@ -130,21 +149,21 @@ func createGitOpsApplicationPUTPayload(requestBody map[string]interface{}) GitOp
 	putApp := GitOpsApplication{
 		Application{
 			Metadata: Metadata{
-				Namespace: valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "namespace").(string)),
+				Namespace: ValueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "namespace").(string)),
 				Labels: Labels{
-					Serviceref: valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/serviceRef").(string)),
-					Envref:     valueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/envRef").(string)),
+					Serviceref: ValueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/serviceRef").(string)),
+					Envref:     ValueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/envRef").(string)),
 				},
 			},
 			Spec: Spec{
 				Source: Source{
-					RepoURL:        valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "repoURL").(string)),
-					Path:           valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "path").(string)),
-					TargetRevision: valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "targetRevision").(string)),
+					RepoURL:        ValueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "repoURL").(string)),
+					Path:           ValueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "path").(string)),
+					TargetRevision: ValueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "source", "targetRevision").(string)),
 				},
 				Destination: Destination{
-					Server:    valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "destination", "server").(string)),
-					Namespace: valueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "destination", "namespace").(string)),
+					Server:    ValueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "destination", "server").(string)),
+					Namespace: ValueToString(GetNestedValue(requestBody, "gitops", "application", "spec", "destination", "namespace").(string)),
 				},
 			},
 		},
