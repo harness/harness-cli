@@ -1,3 +1,3 @@
 package telemetry
 
-const HARNESS_DIAGNOSTIC_ENDPOINT = "http://localhost:8084/api/v1/harnesscli"
+const HARNESS_DIAGNOSTIC_ENDPOINT = "https://stats.drone.ci/api/v1/harnesscli"
