@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/fatih/color"
-	"github.com/urfave/cli/v2"
 	"harness/client"
 	"harness/defaults"
 	"harness/shared"
 	"harness/telemetry"
 	. "harness/types"
 	. "harness/utils"
+
+	"github.com/fatih/color"
+	"github.com/urfave/cli/v2"
 )
 
 func applyGitopsApplications(c *cli.Context) error {
@@ -126,7 +127,6 @@ func createGitOpsApplicationPayload(requestBody map[string]interface{}) GitOpsAp
 					Serviceref: ValueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/serviceRef").(string)),
 				},
 				Name:        ValueToString(GetNestedValue(requestBody, "gitops", "name").(string)),
-				Namespace:   ValueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "namespace").(string)),
 				ClusterName: ValueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "clusterName").(string)),
 			},
 			Spec: Spec{
@@ -149,7 +149,6 @@ func createGitOpsApplicationPUTPayload(requestBody map[string]interface{}) GitOp
 	putApp := GitOpsApplication{
 		Application{
 			Metadata: Metadata{
-				Namespace: ValueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "namespace").(string)),
 				Labels: Labels{
 					Serviceref: ValueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/serviceRef").(string)),
 					Envref:     ValueToString(GetNestedValue(requestBody, "gitops", "application", "metadata", "labels", "harness.io/envRef").(string)),
