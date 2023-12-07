@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/fatih/color"
-	"github.com/urfave/cli/v2"
 	"harness/client"
 	"harness/defaults"
 	"harness/shared"
 	"harness/telemetry"
 	. "harness/types"
 	. "harness/utils"
+
+	"github.com/fatih/color"
+	"github.com/urfave/cli/v2"
 )
 
 // create or update a Gitops Cluster
@@ -34,7 +35,10 @@ func applyCluster(c *cli.Context) error {
 		println(GetColoredText("Please enter valid cluster yaml file", color.FgRed))
 	}
 	identifier := ValueToString(GetNestedValue(requestBody, "gitops", "identifier").(string))
-	projectIdentifier := ValueToString(GetNestedValue(requestBody, "gitops", "projectIdentifier").(string))
+	projectIdentifier := c.String("project")
+	if projectIdentifier == "" {
+		projectIdentifier = ValueToString(GetNestedValue(requestBody, "gitops", "projectIdentifier").(string))
+	}
 	orgIdentifier := ValueToString(GetNestedValue(requestBody, "gitops", "orgIdentifier").(string))
 	createOrUpdateClusterURL := GetUrlWithQueryParams("", baseURL, defaults.GITOPS_CLUSTER_ENDPOINT, map[string]string{
 		"identifier":        identifier,

@@ -28,6 +28,8 @@ func applyService(c *cli.Context) error {
 	cloudProjectName = c.String("cloud-project")
 	cloudBucketName = c.String("cloud-bucket")
 	cloudRegionName = c.String("cloud-region")
+	orgIdentifier := c.String("org-id")
+	projectIdentifier := c.String("project-id")
 	fmt.Println("Trying to create or update service using the yaml=",
 		GetColoredText(filePath, color.FgCyan))
 	createOrUpdateSvcURL := GetUrlWithQueryParams("", baseURL, defaults.SERVICES_ENDPOINT, map[string]string{
@@ -42,11 +44,18 @@ func applyService(c *cli.Context) error {
 	}
 	identifier := ValueToString(GetNestedValue(requestBody, "service", "identifier").(string))
 	name := ValueToString(GetNestedValue(requestBody, "service", "name").(string))
+
+	if orgIdentifier == "" {
+		orgIdentifier = defaults.DEFAULT_ORG
+	}
+	if projectIdentifier == "" {
+		projectIdentifier = defaults.DEFAULT_PROJECT
+	}
 	//setup payload for svc create / update
 	svcPayload := HarnessService{Identifier: identifier, Name: name,
-		ProjectIdentifier: defaults.DEFAULT_PROJECT, OrgIdentifier: defaults.DEFAULT_ORG, Yaml: content}
+		ProjectIdentifier: projectIdentifier, OrgIdentifier: orgIdentifier, Yaml: content}
 	entityExists := GetEntity(baseURL, fmt.Sprintf("servicesV2/%s", identifier),
-		defaults.DEFAULT_PROJECT, defaults.DEFAULT_ORG, map[string]string{})
+		projectIdentifier, orgIdentifier, map[string]string{})
 	var err error
 	if !entityExists {
 		println("Creating service with id: ", GetColoredText(identifier, color.FgGreen))
