@@ -2,30 +2,40 @@ package main
 
 import (
 	"fmt"
-	"github.com/fatih/color"
-	"github.com/urfave/cli/v2"
 	"harness/client"
 	"harness/defaults"
 	. "harness/shared"
 	"harness/telemetry"
 	. "harness/types"
 	. "harness/utils"
+
+	"github.com/fatih/color"
+	"github.com/urfave/cli/v2"
 )
 
 // Create update Environment
 func applyEnvironment(c *cli.Context) error {
 	filePath := c.String("file")
+	orgIdentifier := c.String("org-id")
+	projectIdentifier := c.String("project-id")
 	baseURL := GetNGBaseURL(c)
 	if filePath == "" {
 		fmt.Println("Please enter valid filename")
 		return nil
 	}
+
 	fmt.Println("Trying to create or update a environment using the yaml=",
 		GetColoredText(filePath, color.FgCyan))
 	createOrUpdateEnvURL := GetUrlWithQueryParams("", baseURL, defaults.ENVIRONMENT_ENDPOINT, map[string]string{
 		"accountIdentifier": CliCdRequestData.Account,
 	})
 	var content, _ = ReadFromFile(c.String("file"))
+	if projectIdentifier != "" {
+		content = ReplacePlaceholderValues(content, defaults.DEFAULT_PROJECT, projectIdentifier)
+	}
+	if orgIdentifier != "" {
+		content = ReplacePlaceholderValues(content, defaults.DEFAULT_ORG, orgIdentifier)
+	}
 
 	requestBody := GetJsonFromYaml(content)
 	if requestBody == nil {
@@ -33,8 +43,14 @@ func applyEnvironment(c *cli.Context) error {
 	}
 	identifier := ValueToString(GetNestedValue(requestBody, "environment", "identifier").(string))
 	name := ValueToString(GetNestedValue(requestBody, "environment", "name").(string))
-	projectIdentifier := ValueToString(GetNestedValue(requestBody, "environment", "projectIdentifier").(string))
-	orgIdentifier := ValueToString(GetNestedValue(requestBody, "environment", "orgIdentifier").(string))
+
+	// Check if the project and org values are provided by the user otherwise default them
+	if projectIdentifier == "" {
+		projectIdentifier = ValueToString(GetNestedValue(requestBody, "environment", "projectIdentifier").(string))
+	}
+	if orgIdentifier == "" {
+		orgIdentifier = ValueToString(GetNestedValue(requestBody, "environment", "orgIdentifier").(string))
+	}
 	envType := ValueToString(GetNestedValue(requestBody, "environment", "type").(string))
 
 	//setup payload for Environment create / update
