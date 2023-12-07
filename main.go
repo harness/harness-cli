@@ -6,10 +6,11 @@ import (
 	"harness/auth"
 	"os"
 
+	. "harness/shared"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
-	. "harness/shared"
 )
 
 var Version = "development"
@@ -131,6 +132,14 @@ func main() {
 								Name:  "domain",
 								Usage: "domain for cloud data center",
 							},
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "org-id",
+								Usage: "provide an Organization Identifier",
+							}),
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "project-id",
+								Usage: "provide a Project Identifier",
+							}),
 						},
 						Action: func(context *cli.Context) error {
 							return cliWrapper(applySecret, context)
@@ -154,6 +163,16 @@ func main() {
 						Name:  "file",
 						Usage: "`YAML` file path for the service",
 					},
+					altsrc.NewStringFlag(&cli.StringFlag{
+						Name:        "org-id",
+						Usage:       "provide an Organization Identifier",
+						Destination: &CliCdRequestData.OrgName,
+					}),
+					altsrc.NewStringFlag(&cli.StringFlag{
+						Name:        "project-id",
+						Usage:       "provide an Project Identifier",
+						Destination: &CliCdRequestData.ProjectName,
+					}),
 				},
 				Before: func(ctx *cli.Context) error {
 					auth.HydrateCredsFromPersistence(ctx)
@@ -176,6 +195,14 @@ func main() {
 								Name:  "cloud-region",
 								Usage: "provide the Google Cloud Platform bucket name.",
 							},
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "org-id",
+								Usage: "provide an Organization Identifier",
+							}),
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "project-id",
+								Usage: "provide a Project Identifier",
+							}),
 						},
 						Action: func(context *cli.Context) error {
 							return cliWrapper(applyService, context)
@@ -208,6 +235,16 @@ func main() {
 					{
 						Name:  "apply",
 						Usage: "Create a new environment or Update  an existing one.",
+						Flags: []cli.Flag{
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "org-id",
+								Usage: "provide an Organization Identifier",
+							}),
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "project-id",
+								Usage: "provide a Project Identifier",
+							}),
+						},
 						Action: func(context *cli.Context) error {
 							return cliWrapper(applyEnvironment, context)
 						},
@@ -273,6 +310,14 @@ func main() {
 								Name:  "port",
 								Usage: "port for the physical data center connector",
 							},
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "org-id",
+								Usage: "provide an Organization Identifier",
+							}),
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "project-id",
+								Usage: "provide a Project Identifier",
+							}),
 						},
 						Action: func(context *cli.Context) error {
 							return cliWrapper(applyConnector, context)
@@ -408,6 +453,14 @@ func main() {
 								Name:  "instance-name",
 								Usage: "instance name for the cloud provider for PDC Infrastructure",
 							},
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "org-id",
+								Usage: "provide an Organization Identifier",
+							}),
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "project-id",
+								Usage: "provide a Project Identifier",
+							}),
 						},
 						Action: func(context *cli.Context) error {
 							return cliWrapper(applyInfraDefinition, context)
@@ -431,6 +484,16 @@ func main() {
 						Name:  "file",
 						Usage: "`YAML` file path for the pipeline",
 					},
+					altsrc.NewStringFlag(&cli.StringFlag{
+						Name:        "org-id",
+						Usage:       "provide an Organization Identifier",
+						Destination: &CliCdRequestData.OrgName,
+					}),
+					altsrc.NewStringFlag(&cli.StringFlag{
+						Name:        "project-id",
+						Usage:       "provide a Project Identifier",
+						Destination: &CliCdRequestData.ProjectName,
+					}),
 				},
 				Before: func(ctx *cli.Context) error {
 					auth.HydrateCredsFromPersistence(ctx)
