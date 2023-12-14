@@ -2,9 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/fatih/color"
-	"github.com/urfave/cli/v2"
-	"gopkg.in/yaml.v3"
 	"harness/client"
 	"harness/defaults"
 	. "harness/shared"
@@ -12,6 +9,11 @@ import (
 	. "harness/utils"
 	"regexp"
 	"strings"
+
+	"github.com/urfave/cli/v2"
+	"gopkg.in/yaml.v3"
+
+	"github.com/fatih/color"
 )
 
 // apply(create or update) connector
@@ -24,6 +26,8 @@ func applyConnector(c *cli.Context) error {
 	awsRegion := c.String("cloud-region")
 	hostIpOrFqdn := c.String("host-ip")
 	hostPort := c.String("port")
+	orgIdentifier := c.String("org-id")
+	projectIdentifier := c.String("project-id")
 
 	baseURL := GetNGBaseURL(c)
 
@@ -87,13 +91,27 @@ func applyConnector(c *cli.Context) error {
 		content = ReplacePlaceholderValues(content, defaults.DELEGATE_NAME_PLACEHOLDER, delegateName)
 		content = ReplacePlaceholderValues(content, defaults.HOST_PORT_PLACEHOLDER, hostPort)
 	}
+	if projectIdentifier != "" {
+		content = ReplacePlaceholderValues(content, defaults.DEFAULT_PROJECT, projectIdentifier)
+	}
+	if orgIdentifier != "" {
+		content = ReplacePlaceholderValues(content, defaults.DEFAULT_ORG, orgIdentifier)
+	}
 	requestBody := make(map[string]interface{})
 	if err := yaml.Unmarshal([]byte(content), requestBody); err != nil {
 		return err
 	}
 	identifier := ValueToString(GetNestedValue(requestBody, "connector", "identifier").(string))
-	projectIdentifier := ValueToString(GetNestedValue(requestBody, "connector", "projectIdentifier").(string))
-	orgIdentifier := ValueToString(GetNestedValue(requestBody, "connector", "orgIdentifier").(string))
+
+	// Check if the project and org values are provided by the user otherwise default them
+	if projectIdentifier == "" {
+		projectIdentifier = ValueToString(GetNestedValue(requestBody, "connector", "projectIdentifier").(string))
+	}
+
+	if orgIdentifier == "" {
+		orgIdentifier = ValueToString(GetNestedValue(requestBody, "connector", "orgIdentifier").(string))
+	}
+
 	entityExists := GetEntity(baseURL, fmt.Sprintf("connectors/%s", identifier),
 		projectIdentifier, orgIdentifier, map[string]string{})
 

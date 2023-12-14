@@ -31,6 +31,8 @@ func applyInfraDefinition(c *cli.Context) error {
 	cloudProjectName = c.String("cloud-project")
 	cloudRegionName = c.String("cloud-region")
 	cloudInstanceName = c.String("instance-name")
+	orgIdentifier := c.String("org-id")
+	projectIdentifier := c.String("project-id")
 
 	fmt.Println("Trying to create or update infrastructure using the given yaml=",
 		GetColoredText(filePath, color.FgCyan))
@@ -41,14 +43,25 @@ func applyInfraDefinition(c *cli.Context) error {
 	var content, _ = ReadFromFile(c.String("file"))
 	content = updateInfraYamlContent(content)
 
+	if projectIdentifier != "" {
+		content = ReplacePlaceholderValues(content, defaults.DEFAULT_PROJECT, projectIdentifier)
+	}
+	if orgIdentifier != "" {
+		content = ReplacePlaceholderValues(content, defaults.DEFAULT_ORG, orgIdentifier)
+	}
 	requestBody := GetJsonFromYaml(content)
 	if requestBody == nil {
 		println(GetColoredText("Please enter a valid yaml and try again...", color.FgRed))
 	}
 	identifier := ValueToString(GetNestedValue(requestBody, "infrastructureDefinition", "identifier").(string))
 	name := ValueToString(GetNestedValue(requestBody, "infrastructureDefinition", "name").(string))
-	projectIdentifier := ValueToString(GetNestedValue(requestBody, "infrastructureDefinition", "projectIdentifier").(string))
-	orgIdentifier := ValueToString(GetNestedValue(requestBody, "infrastructureDefinition", "orgIdentifier").(string))
+	// Check if the project and org values are provided by the user otherwise default them
+	if projectIdentifier == "" {
+		projectIdentifier = ValueToString(GetNestedValue(requestBody, "infrastructureDefinition", "projectIdentifier").(string))
+	}
+	if orgIdentifier == "" {
+		orgIdentifier = ValueToString(GetNestedValue(requestBody, "infrastructureDefinition", "orgIdentifier").(string))
+	}
 	environmentRef := ValueToString(GetNestedValue(requestBody, "infrastructureDefinition", "environmentRef").(string))
 	//setup payload for Infra create / update
 	InfraPayload := HarnessInfra{Identifier: identifier, Name: name, ProjectIdentifier: projectIdentifier, OrgIdentifier: orgIdentifier, Yaml: content}
