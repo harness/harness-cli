@@ -355,6 +355,14 @@ func main() {
 								Name:  "agent-identifier",
 								Usage: "provide GitOps Agent Identifier.",
 							},
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "org-id",
+								Usage: "provide an Organization Identifier",
+							}),
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "project-id",
+								Usage: "provide a Project Identifier",
+							}),
 						},
 						Action: func(context *cli.Context) error {
 							return cliWrapper(applyGitopsApplications, context)
@@ -385,6 +393,14 @@ func main() {
 								Name:  "agent-identifier",
 								Usage: "provide GitOps Agent Identifier.",
 							},
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "org-id",
+								Usage: "provide an Organization Identifier",
+							}),
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "project-id",
+								Usage: "provide a Project Identifier",
+							}),
 						},
 						Action: func(context *cli.Context) error {
 							return cliWrapper(applyCluster, context)
@@ -415,6 +431,14 @@ func main() {
 								Name:  "agent-identifier",
 								Usage: "provide GitOps Agent Identifier.",
 							},
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "org-id",
+								Usage: "provide an Organization Identifier",
+							}),
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "project-id",
+								Usage: "provide a Project Identifier",
+							}),
 						},
 						Action: func(context *cli.Context) error {
 							return cliWrapper(applyRepository, context)
