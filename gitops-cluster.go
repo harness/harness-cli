@@ -16,6 +16,9 @@ import (
 // create or update a Gitops Cluster
 func applyCluster(c *cli.Context) error {
 	filePath := c.String("file")
+	orgIdentifier := c.String("org-id")
+	projectIdentifier := c.String("project-id")
+
 	baseURL := GetBaseUrl(c, defaults.GITOPS_BASE_URL)
 	if filePath == "" {
 		fmt.Println("Please enter valid filename")
@@ -35,11 +38,15 @@ func applyCluster(c *cli.Context) error {
 		println(GetColoredText("Please enter valid cluster yaml file", color.FgRed))
 	}
 	identifier := ValueToString(GetNestedValue(requestBody, "gitops", "identifier").(string))
-	projectIdentifier := c.String("project")
+
 	if projectIdentifier == "" {
 		projectIdentifier = ValueToString(GetNestedValue(requestBody, "gitops", "projectIdentifier").(string))
 	}
-	orgIdentifier := ValueToString(GetNestedValue(requestBody, "gitops", "orgIdentifier").(string))
+
+	if orgIdentifier == "" {
+		orgIdentifier = ValueToString(GetNestedValue(requestBody, "gitops", "orgIdentifier").(string))
+	}
+
 	createOrUpdateClusterURL := GetUrlWithQueryParams("", baseURL, defaults.GITOPS_CLUSTER_ENDPOINT, map[string]string{
 		"identifier":        identifier,
 		"accountIdentifier": shared.CliCdRequestData.Account,

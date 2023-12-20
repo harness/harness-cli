@@ -15,6 +15,9 @@ import (
 
 func applyGitopsApplications(c *cli.Context) error {
 	filePath := c.String("file")
+	orgIdentifier := c.String("org-id")
+	projectIdentifier := c.String("project-id")
+
 	baseURL := GetBaseUrl(c, defaults.GITOPS_BASE_URL)
 	if filePath == "" {
 		fmt.Println("Please enter valid filename")
@@ -33,8 +36,12 @@ func applyGitopsApplications(c *cli.Context) error {
 	if requestBody == nil {
 		println(GetColoredText("Please enter valid repository yaml file", color.FgRed))
 	}
-	orgIdentifier := ValueToString(GetNestedValue(requestBody, "gitops", "orgIdentifier").(string))
-	projectIdentifier := ValueToString(GetNestedValue(requestBody, "gitops", "projectIdentifier").(string))
+	if orgIdentifier == "" {
+		orgIdentifier = ValueToString(GetNestedValue(requestBody, "gitops", "orgIdentifier").(string))
+	}
+	if projectIdentifier == "" {
+		projectIdentifier = ValueToString(GetNestedValue(requestBody, "gitops", "projectIdentifier").(string))
+	}
 	clusterIdentifier := ValueToString(GetNestedValue(requestBody, "gitops", "clusterIdentifier").(string))
 	repoIdentifier := ValueToString(GetNestedValue(requestBody, "gitops", "repoIdentifier").(string))
 
