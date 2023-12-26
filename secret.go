@@ -14,6 +14,7 @@ import (
 	"mime/multipart"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -36,8 +37,8 @@ func applySecret(ctx *cli.Context) error {
 	orgIdentifier := ctx.String("org-id")
 	projectIdentifier := ctx.String("project-id")
 	requiresFile := isFileTypeSecret(secretType)
-	secretIdentifier := getSecretIdentifier(secretType)
-	secretName := getSecretName(secretType)
+	secretName := ctx.String("secret-name")
+	secretIdentifier := getSecretIdentifier(secretName)
 	var secretBody HarnessSecret
 	var err error
 
@@ -49,6 +50,10 @@ func applySecret(ctx *cli.Context) error {
 	}
 	if requiresFile && filePath == "" {
 		println(fmt.Sprintf("Secret type %s requires file path to create a valid filetype secret", secretType))
+		return nil
+	}
+	if secretName == "" {
+		println("Secret name cannot be empty")
 		return nil
 	}
 	if !requiresFile && password == "" && gitPat == "" {
@@ -281,37 +286,13 @@ func createSecret(orgIdentifier string, projectIdentifier string,
 	return newSecret
 }
 
-func getSecretIdentifier(secType string) string {
+func getSecretIdentifier(secName string) string {
 	secretIdentifier := ""
-	switch secType {
-	case "aws":
-		secretIdentifier = defaults.AWS_SECRET_IDENTIFIER
-		break
-	case "gcp":
-		secretIdentifier = defaults.GCP_SECRET_IDENTIFIER
-		break
-	default:
-		secretIdentifier = defaults.GITHUB_SECRET_IDENTIFIER
-		break
-	}
+        reCleaner := regexp.MustCompile(`[^a-zA-Z0-9_]`)
+	secretIdentifier = reCleaner.ReplaceAllString(secName, "")
 	return secretIdentifier
 }
 
-func getSecretName(secretType string) string {
-	secretName := ""
-	switch {
-	case strings.EqualFold(secretType, defaults.AWS):
-		secretName = "Harness AWS Secret"
-		break
-	case strings.EqualFold(secretType, defaults.GCP):
-		secretName = "Harness GCP Secret"
-		break
-	default:
-		secretName = "Harness Git Pat"
-		break
-	}
-	return secretName
-}
 func readSecretFromPath(filePath string, secretSpec HarnessSecret) (*bytes.Buffer, string, error) {
 
 	secretJSONSpec, err := json.Marshal(secretSpec)

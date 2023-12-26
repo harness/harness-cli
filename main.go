@@ -86,10 +86,6 @@ func main() {
 				Aliases: []string{"secret-token"},
 				Usage:   "Secrets specific commands. eg: apply (create/update), delete",
 				Flags: append(globalFlags,
-					altsrc.NewStringFlag(&cli.StringFlag{
-						Name:  "token",
-						Usage: "Specify your Secret Token",
-					}),
 					&cli.StringFlag{
 						Name:  "file",
 						Usage: "File path for the secret",
@@ -112,6 +108,14 @@ func main() {
 						Name:  "apply",
 						Usage: "Create a new secret or Update  an existing one.",
 						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name: "token",
+								Usage: "Specify your Secret Token",
+							},
+							&cli.StringFlag{
+								Name: "secret-name",
+								Usage: "provide the secret name",
+							},
 							&cli.StringFlag{
 								Name:  "secret-type",
 								Usage: "provide the secret type.",
