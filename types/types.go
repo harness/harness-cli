@@ -264,6 +264,15 @@ type Cluster struct {
 	Config `json:"config"`
 }
 
+type ClusterEnvLink struct {
+	Identifier        string `json:"identifier"`
+	OrgIdentifier     string `json:"orgIdentifier"`
+	AgentIdentifier   string `json:"agentIdentifier"`
+	ProjectIdentifier string `json:"projectIdentifier"`
+	EnvRef            string `json:"envRef"`
+	Scope             string `json:"scope"`
+}
+
 type Config struct {
 	ClusterConnectionType string `json:"clusterConnectionType"`
 }

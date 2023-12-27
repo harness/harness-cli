@@ -117,6 +117,17 @@ func createClusterPayload(requestBody map[string]interface{}) GitOpsCluster {
 	return newCluster
 }
 
+func createClusterEnvPayload(clusterId string, orgId string,
+	projId string, envId string) ClusterEnvLink {
+	return ClusterEnvLink{Identifier: clusterId,
+		AgentIdentifier:   agentIdentifier,
+		OrgIdentifier:     orgId,
+		ProjectIdentifier: projId,
+		EnvRef:            envId,
+		Scope:             "ACCOUNT",
+	}
+}
+
 func createClusterPUTPayload(requestBody map[string]interface{}) GitOpsClusterWithUpdatedFields {
 	clusterWithUpdateMask := GitOpsClusterWithUpdatedFields{
 		Cluster: Cluster{
@@ -129,4 +140,50 @@ func createClusterPUTPayload(requestBody map[string]interface{}) GitOpsClusterWi
 		UpdatedFields: []string{"name", "tags", "authType", "credsType"},
 	}
 	return clusterWithUpdateMask
+}
+
+func linkClusterEnv(c *cli.Context) error {
+	agentIdentifier = c.String("agent-identifier")
+	clusterIdentifier := c.String("cluster-id")
+	envRef := c.String("environment-id")
+	orgIdentifier := c.String("org-id")
+	projectIdentifier := c.String("project-id")
+
+	fmt.Println("Trying to link a clusterId =", GetColoredText(clusterIdentifier, color.FgBlue),
+		"with an environmentId =", GetColoredText(envRef, color.FgBlue))
+
+	if agentIdentifier == "" {
+		agentIdentifier = TextInput("Enter a valid AgentIdentifier:")
+	}
+	if clusterIdentifier == "" {
+		clusterIdentifier = TextInput("Enter a valid ClusterIdentifier:")
+	}
+	if envRef == "" {
+		envRef = TextInput("Enter a valid environmentIdentifier:")
+	}
+	if projectIdentifier == "" {
+		projectIdentifier = defaults.DEFAULT_PROJECT
+	}
+	if orgIdentifier == "" {
+		orgIdentifier = defaults.DEFAULT_ORG
+	}
+
+	baseURL := GetNGBaseURL(c) + defaults.GITOPS_ENDPOINT
+	createOrUpdateClusterURL := GetUrlWithQueryParams("", baseURL, defaults.GITOPS_CLUSTER_ENDPOINT, map[string]string{
+		"accountIdentifier": shared.CliCdRequestData.Account,
+	})
+	var _ ResponseBody
+	var err error
+	clusterEnvPayload := createClusterEnvPayload(clusterIdentifier, orgIdentifier, projectIdentifier, envRef)
+	_, err = client.Post(createOrUpdateClusterURL, shared.CliCdRequestData.AuthToken, clusterEnvPayload, defaults.CONTENT_TYPE_JSON, nil)
+	if err == nil {
+		println(GetColoredText("Successfully linked clusterId = ", color.FgGreen)+GetColoredText(clusterIdentifier, color.FgBlue),
+			GetColoredText("with environmentId = ", color.FgGreen)+GetColoredText(envRef, color.FgBlue))
+		return nil
+	} else {
+		println(GetColoredText("Encountered an issue while trying to link the clusterId = ", color.FgRed)+GetColoredText(clusterIdentifier, color.FgBlue),
+			GetColoredText("with environmentId = ", color.FgRed)+GetColoredText(envRef, color.FgBlue))
+		println(GetColoredText("Try again with correct parameters...", color.FgGreen))
+	}
+	return nil
 }
