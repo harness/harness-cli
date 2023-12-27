@@ -406,6 +406,35 @@ func main() {
 							return cliWrapper(applyCluster, context)
 						},
 					},
+					{
+						Name:  "link",
+						Usage: "Links a GitOps-cluster with an environment.",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "agent-identifier",
+								Usage: "provide GitOps Agent Identifier.",
+							},
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "cluster-id",
+								Usage: "provide a Cluster Identifier.",
+							}),
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "environment-id",
+								Usage: "provide an Environment Identifier.",
+							}),
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "org-id",
+								Usage: "provide an Organization Identifier.",
+							}),
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "project-id",
+								Usage: "provide a Project Identifier.",
+							}),
+						},
+						Action: func(context *cli.Context) error {
+							return cliWrapper(linkClusterEnv, context)
+						},
+					},
 				},
 			},
 			{
