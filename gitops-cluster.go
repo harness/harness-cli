@@ -124,7 +124,7 @@ func createClusterEnvPayload(clusterId string, orgId string,
 		OrgIdentifier:     orgId,
 		ProjectIdentifier: projId,
 		EnvRef:            envId,
-		Scope:             "ACCOUNT",
+		Scope:             "PROJECT",
 	}
 }
 
