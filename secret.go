@@ -123,7 +123,7 @@ func applySecret(ctx *cli.Context) error {
 		secretBody = createSecret(orgIdentifier, projectIdentifier, secretName, secretIdentifier, gitPat, SecretText, SSHWINRMSecretData{})
 	}
 	if !entityExists {
-		println("Creating secret with default id: ", utils.GetColoredText(secretIdentifier, color.FgCyan))
+		println("Creating secret with id: ", utils.GetColoredText(secretIdentifier, color.FgCyan))
 		if requiresFile {
 			payload, header, _ := readSecretFromPath(filePath, secretBody)
 
@@ -365,7 +365,7 @@ func createSSHSecret(orgIdentifier string, projIdentifier string, filepath strin
 		secretBody = createSecret(orgIdentifier, projIdentifier, secretIdentifier, secretIdentifier, "", SSHKey, SSHWINRMSecretData{Port: port, Username: username, Key: defaults.SSH_KEY_FILE_SECRET_IDENTIFIER})
 	}
 	if !fileSecretExists {
-		println("Creating secret with default id: ", utils.GetColoredText(secretIdentifier, color.FgCyan))
+		println("Creating secret with id: ", utils.GetColoredText(secretIdentifier, color.FgCyan))
 		if isSSHFileSecret {
 			payload, header, _ := readSecretFromPath(filepath, secretBody)
 
@@ -456,7 +456,7 @@ func createWinRMSecret(orgIdentifier string, projIdentifier string, secretIdenti
 		secretBody = createSecret(orgIdentifier, projIdentifier, secretIdentifier, secretIdentifier, "", WinRM, SSHWINRMSecretData{Port: port, Username: username, Password: defaults.WINRM_PASSWORD_SECRET_IDENTIFIER, Domain: domain, AuthType: authType})
 	}
 	if !secretExists {
-		println("Creating secret with default id: ", utils.GetColoredText(secretIdentifier, color.FgCyan))
+		println("Creating secret with id: ", utils.GetColoredText(secretIdentifier, color.FgCyan))
 
 		_, err = client.Post(createSecretURL, shared.CliCdRequestData.AuthToken, secretBody, defaults.CONTENT_TYPE_JSON, nil)
 
