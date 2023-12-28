@@ -53,7 +53,7 @@ func applySecret(ctx *cli.Context) error {
 		return nil
 	}
 	if secretName == "" {
-		println("Secret name cannot be empty")
+		println("Secret name cannot be empty. Please provide --secret-name.")
 		return nil
 	}
 	if !requiresFile && password == "" && gitPat == "" {
@@ -136,8 +136,6 @@ func applySecret(ctx *cli.Context) error {
 
 		} else {
 			fmt.Println("createSecretURL: " + createSecretURL)
-			fmt.Println("Printing SecretBody: ")
-			fmt.Println(secretBody)
 			_, err = client.Post(createSecretURL, shared.CliCdRequestData.AuthToken, secretBody, defaults.CONTENT_TYPE_JSON, nil)
 		}
 		if err == nil {
