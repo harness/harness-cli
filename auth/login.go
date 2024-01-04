@@ -16,7 +16,7 @@ func Login(ctx *cli.Context) (err error) {
 
 	fmt.Println("Welcome to Harness CLI!")
 	PromptAccountDetails(ctx)
-	SaveCredentials(ctx, false)
+	SaveCredentials(ctx, false) // Suppress child showWelcome funcn while login in progress
 	loginError := GetAccountDetails(ctx)
 
 	if loginError != nil {
@@ -27,7 +27,7 @@ func Login(ctx *cli.Context) (err error) {
 		return nil
 	}
 	GetUserDetails(ctx)
-	SaveCredentials(ctx, true)
+	SaveCredentials(ctx, true) // Call child showWelcome funcn if login succeeds
 	telemetry.Track(telemetry.TrackEventInfoPayload{EventName: telemetry.LOGIN_SUCCESS, UserId: CliCdRequestData.UserId}, map[string]interface{}{
 		"accountId": CliCdRequestData.Account,
 		"userId":    CliCdRequestData.UserId,
