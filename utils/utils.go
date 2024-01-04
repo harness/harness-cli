@@ -297,6 +297,7 @@ func GetAccountDetails(ctx *cli.Context) error {
 	})
 	resp, err := client.Get(url, CliCdRequestData.AuthToken)
 	if err != nil {
+		println(GetColoredText("Could not log in: Did you provide correct credentials?", color.FgRed))
 		fmt.Printf("Response code: %s \n", resp.Code)
 		return err
 	}
@@ -310,6 +311,7 @@ func GetUserDetails(ctx *cli.Context) error {
 	})
 	resp, err := client.Get(url, CliCdRequestData.AuthToken)
 	if err != nil {
+		println(GetColoredText("Could not log in: Did you provide correct credentials?", color.FgRed))
 		fmt.Printf("Response code: %s \n", resp.Code)
 		return err
 	}
