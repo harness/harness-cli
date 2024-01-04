@@ -8,6 +8,7 @@ import (
 	"harness/telemetry"
 	. "harness/types"
 	. "harness/utils"
+	"regexp"
 
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
@@ -15,6 +16,7 @@ import (
 
 func applyGitopsApplications(c *cli.Context) error {
 	filePath := c.String("file")
+	githubUsername := c.String("git-user")
 	orgIdentifier := c.String("org-id")
 	projectIdentifier := c.String("project-id")
 
@@ -26,6 +28,13 @@ func applyGitopsApplications(c *cli.Context) error {
 	fmt.Println("Trying to create or update gitops-application using the yaml=",
 		GetColoredText(filePath, color.FgCyan))
 	var content, _ = ReadFromFile(c.String("file"))
+	if isGithubRepoUrl(content) {
+		if githubUsername == "" || githubUsername == defaults.GITHUB_USERNAME_PLACEHOLDER {
+			githubUsername = TextInput("Enter valid github username:")
+		}
+		content = ReplacePlaceholderValues(content, defaults.GITHUB_USERNAME_PLACEHOLDER, githubUsername)
+	}
+
 	agentIdentifier = c.String("agent-identifier")
 	if agentIdentifier == "" || agentIdentifier == defaults.GITOPS_AGENT_IDENTIFIER_PLACEHOLDER {
 		agentIdentifier = TextInput("Enter a valid AgentIdentifier:")
@@ -175,4 +184,10 @@ func createGitOpsApplicationPUTPayload(requestBody map[string]interface{}) GitOp
 		},
 	}
 	return putApp
+}
+
+func isGithubRepoUrl(str string) bool {
+	regexPattern := `repoURL:\s+https:\/\/github.com\/GITHUB_USERNAME`
+	match, _ := regexp.MatchString(regexPattern, str)
+	return match
 }

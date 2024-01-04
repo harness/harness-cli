@@ -109,11 +109,11 @@ func main() {
 						Usage: "Create a new secret or Update  an existing one.",
 						Flags: []cli.Flag{
 							&cli.StringFlag{
-								Name: "token",
+								Name:  "token",
 								Usage: "Specify your Secret Token",
 							},
 							&cli.StringFlag{
-								Name: "secret-name",
+								Name:  "secret-name",
 								Usage: "provide the secret name",
 							},
 							&cli.StringFlag{
@@ -358,6 +358,10 @@ func main() {
 							&cli.StringFlag{
 								Name:  "agent-identifier",
 								Usage: "provide GitOps Agent Identifier.",
+							},
+							&cli.StringFlag{
+								Name:  "git-user",
+								Usage: "provide your Github username",
 							},
 							altsrc.NewStringFlag(&cli.StringFlag{
 								Name:  "org-id",
