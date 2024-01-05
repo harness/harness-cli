@@ -287,6 +287,10 @@ func main() {
 								Usage: "delegate name for the k8s connector",
 							},
 							&cli.StringFlag{
+								Name:  "docker-user",
+								Usage: "docker username for the docker connector",
+							},
+							&cli.StringFlag{
 								Name:  "git-user",
 								Usage: "git username for the github connector",
 							},

@@ -21,6 +21,7 @@ func applyConnector(c *cli.Context) error {
 	filePath := c.String("file")
 	githubUsername := c.String("git-user")
 	delegateName := c.String("delegate-name")
+	dockerUsername := c.String("docker-user")
 	awsCrossAccountRoleArn := c.String("aws-cross-account-role-arn")
 	awsAccessKey := c.String("aws-access-key")
 	awsRegion := c.String("cloud-region")
@@ -55,6 +56,13 @@ func applyConnector(c *cli.Context) error {
 			delegateName = TextInput("Enter valid delegate name:")
 		}
 		content = ReplacePlaceholderValues(content, defaults.DELEGATE_NAME_PLACEHOLDER, delegateName)
+	}
+	if isDockerConnectorYAML(content) {
+		if dockerUsername == "" || dockerUsername == defaults.DOCKER_USERNAME_PLACEHOLDER {
+			dockerUsername = TextInput("Enter a valid docker username:")
+		}
+		content = ReplacePlaceholderValues(content, defaults.DOCKER_USERNAME_PLACEHOLDER, dockerUsername)
+
 	}
 	if isAwsConnectorYAML(content) {
 		if awsCrossAccountRoleArn == "" || awsCrossAccountRoleArn == defaults.AWS_CROSS_ACCOUNT_ROLE_ARN {
@@ -157,6 +165,11 @@ func isGithubConnectorYAML(str string) bool {
 
 func isK8sConnectorYAML(str string) bool {
 	regexPattern := `type:\s+K8sCluster`
+	match, _ := regexp.MatchString(regexPattern, str)
+	return match
+}
+func isDockerConnectorYAML(str string) bool {
+	regexPattern := `type:\s+DockerRegistry`
 	match, _ := regexp.MatchString(regexPattern, str)
 	return match
 }

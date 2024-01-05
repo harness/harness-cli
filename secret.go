@@ -135,7 +135,6 @@ func applySecret(ctx *cli.Context) error {
 			)
 
 		} else {
-			fmt.Println("createSecretURL: " + createSecretURL)
 			_, err = client.Post(createSecretURL, shared.CliCdRequestData.AuthToken, secretBody, defaults.CONTENT_TYPE_JSON, nil)
 		}
 		if err == nil {
@@ -286,7 +285,7 @@ func createSecret(orgIdentifier string, projectIdentifier string,
 
 func getSecretIdentifier(secName string) string {
 	secretIdentifier := ""
-        reCleaner := regexp.MustCompile(`[^a-zA-Z0-9_]`)
+	reCleaner := regexp.MustCompile(`[^a-zA-Z0-9_]`)
 	secretIdentifier = reCleaner.ReplaceAllString(secName, "")
 	return secretIdentifier
 }
