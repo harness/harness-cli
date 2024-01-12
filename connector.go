@@ -62,7 +62,6 @@ func applyConnector(c *cli.Context) error {
 			dockerUsername = TextInput("Enter a valid docker username:")
 		}
 		content = ReplacePlaceholderValues(content, defaults.DOCKER_USERNAME_PLACEHOLDER, dockerUsername)
-
 	}
 	if isAwsConnectorYAML(content) {
 		if awsCrossAccountRoleArn == "" || awsCrossAccountRoleArn == defaults.AWS_CROSS_ACCOUNT_ROLE_ARN {
