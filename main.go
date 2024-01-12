@@ -549,16 +549,6 @@ func main() {
 						Name:  "file",
 						Usage: "`YAML` file path for the pipeline",
 					},
-					altsrc.NewStringFlag(&cli.StringFlag{
-						Name:        "org-id",
-						Usage:       "provide an Organization Identifier",
-						Destination: &CliCdRequestData.OrgName,
-					}),
-					altsrc.NewStringFlag(&cli.StringFlag{
-						Name:        "project-id",
-						Usage:       "provide a Project Identifier",
-						Destination: &CliCdRequestData.ProjectName,
-					}),
 				},
 				Before: func(ctx *cli.Context) error {
 					auth.HydrateCredsFromPersistence(ctx)
@@ -568,6 +558,24 @@ func main() {
 					{
 						Name:  "apply",
 						Usage: "Create a new pipeline or Update  an existing one.",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "docker-user",
+								Usage: "docker username for the docker connector",
+							},
+							&cli.StringFlag{
+								Name:  "git-user",
+								Usage: "git username for the github connector",
+							},
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "org-id",
+								Usage: "provide an Organization Identifier",
+							}),
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "project-id",
+								Usage: "provide a Project Identifier",
+							}),
+						},
 						Action: func(context *cli.Context) error {
 							return cliWrapper(applyPipeline, context)
 						},
