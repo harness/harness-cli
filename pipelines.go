@@ -2,19 +2,26 @@ package main
 
 import (
 	"fmt"
-	"github.com/fatih/color"
-	"github.com/urfave/cli/v2"
 	"harness/client"
 	"harness/defaults"
 	. "harness/shared"
 	"harness/telemetry"
 	. "harness/types"
 	. "harness/utils"
+	"regexp"
+
+	"github.com/fatih/color"
+	"github.com/urfave/cli/v2"
 )
 
 // create or update Pipeline
 func applyPipeline(c *cli.Context) error {
 	filePath := c.String("file")
+	dockerUsername := c.String("docker-user")
+	githubUsername := c.String("git-user")
+	orgIdentifier := c.String("org-id")
+	projectIdentifier := c.String("project-id")
+
 	baseURL := GetBaseUrl(c, defaults.PIPELINES_BASE_URL)
 	if filePath == "" {
 		fmt.Println("Please enter valid filename")
@@ -24,6 +31,18 @@ func applyPipeline(c *cli.Context) error {
 		GetColoredText(filePath, color.FgCyan))
 	var content, _ = ReadFromFile(c.String("file"))
 
+	if yamlHasDockerUsername(content) {
+		if dockerUsername == "" || dockerUsername == defaults.DOCKER_USERNAME_PLACEHOLDER {
+			dockerUsername = TextInput("Enter a valid docker username:")
+		}
+		content = ReplacePlaceholderValues(content, defaults.DOCKER_USERNAME_PLACEHOLDER, dockerUsername)
+	}
+	if yamlHasGithubUsername(content) {
+		if githubUsername == "" || githubUsername == defaults.GITHUB_USERNAME_PLACEHOLDER {
+			githubUsername = TextInput("Enter valid github username:")
+		}
+		content = ReplacePlaceholderValues(content, defaults.GITHUB_USERNAME_PLACEHOLDER, githubUsername)
+	}
 	requestBody := GetJsonFromYaml(content)
 
 	if requestBody == nil {
@@ -31,8 +50,20 @@ func applyPipeline(c *cli.Context) error {
 	}
 
 	identifier := ValueToString(GetNestedValue(requestBody, "pipeline", "identifier").(string))
-	projectIdentifier := ValueToString(GetNestedValue(requestBody, "pipeline", "projectIdentifier").(string))
-	orgIdentifier := ValueToString(GetNestedValue(requestBody, "pipeline", "orgIdentifier").(string))
+	if orgIdentifier != "" {
+		content = ReplacePlaceholderValues(content, defaults.DEFAULT_ORG, orgIdentifier)
+	} else {
+		orgIdentifier = ValueToString(GetNestedValue(requestBody, "pipeline", "orgIdentifier").(string))
+	}
+	if projectIdentifier == "" {
+		projectIdentifier = ValueToString(GetNestedValue(requestBody, "connector", "projectIdentifier").(string))
+	}
+	if projectIdentifier != "" {
+		content = ReplacePlaceholderValues(content, defaults.DEFAULT_PROJECT, projectIdentifier)
+	} else {
+		projectIdentifier = ValueToString(GetNestedValue(requestBody, "pipeline", "projectIdentifier").(string))
+	}
+
 	createOrUpdatePipelineURL := GetUrlWithQueryParams("", baseURL, defaults.PIPELINES_ENDPOINT_V2, map[string]string{
 		"accountIdentifier": CliCdRequestData.Account,
 		"orgIdentifier":     orgIdentifier,
@@ -93,4 +124,16 @@ func deletePipeline(*cli.Context) error {
 func listPipeline(*cli.Context) error {
 	fmt.Println(defaults.NOT_IMPLEMENTED)
 	return nil
+}
+
+func yamlHasDockerUsername(str string) bool {
+	regexPattern := `value:\s+DOCKER_USERNAME`
+	match, _ := regexp.MatchString(regexPattern, str)
+	return match
+}
+
+func yamlHasGithubUsername(str string) bool {
+	regexPattern := `github.com/GITHUB_USERNAME`
+	match, _ := regexp.MatchString(regexPattern, str)
+	return match
 }
