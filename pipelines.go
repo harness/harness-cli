@@ -55,9 +55,6 @@ func applyPipeline(c *cli.Context) error {
 	} else {
 		orgIdentifier = ValueToString(GetNestedValue(requestBody, "pipeline", "orgIdentifier").(string))
 	}
-	if projectIdentifier == "" {
-		projectIdentifier = ValueToString(GetNestedValue(requestBody, "connector", "projectIdentifier").(string))
-	}
 	if projectIdentifier != "" {
 		content = ReplacePlaceholderValues(content, defaults.DEFAULT_PROJECT, projectIdentifier)
 	} else {
