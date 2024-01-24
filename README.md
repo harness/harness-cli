@@ -43,7 +43,11 @@ We ask all of our users and contributors to adhere to the [Harness Code of Condu
 
 ## Get Involved
 
-We welcome your feedback and ideas. Here's how to reach us with feedback and questions: Join [Harness Community](https://join.slack.com/t/harnesscommunity/shared_invite/zt-1h2cy1up2-Bf3MQQvKTf~YkVcsnkJ5pw) Slack space. Refer to [Harness Community Communications Guide](https://github.com/harness-community/overview/blob/main/community_communication_guide.rst) to interact with the wider community users/contributors.
+We welcome contributions. Please see the [Contributors Guide](CONTRIBUTING.md) for details on how to contribute.
+
+To reach us with feedback and questions:
+- Join the [Harness Community](https://join.slack.com/t/harnesscommunity/shared_invite/zt-1h2cy1up2-Bf3MQQvKTf~YkVcsnkJ5pw) Slack space
+- Refer to [Harness Community Communications Guide](https://github.com/harness-community/overview/blob/main/community_communication_guide.md) to interact with the wider community users/contributors.
 
 ## License
 
