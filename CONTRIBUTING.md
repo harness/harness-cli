@@ -14,7 +14,7 @@ To propose a change to the codebase, open a [pull request](https://github.com/ha
 
 The Harness CLI is a Go module that interacts heavily with the [Harness API](https://apidocs.harness.io/). Most functionality requires authentication to a Harness account (SaaS or self-managed). You can sign up for free account [here](https://app.harness.io/auth/#/signup?utm_source=harness_io&utm_medium=cta&utm_campaign=platform&utm_content=main_nav). 
 
-### Building and testing locally
+### Build and test locally
 1. Ensure you have Go [installed](https://go.dev/doc/install) (version >= 1.19). 
 2. [Fork](https://github.com/harness/harness-cli/fork) this repository, then [clone](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) locally.
 3. Navigate into the project directory.
