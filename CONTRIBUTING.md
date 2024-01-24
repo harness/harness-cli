@@ -8,7 +8,7 @@ To report a bug or request a feature enhancement, create a [GitHub issue](https:
 
 ### Code contributions
 
-To propose a change to the codebase, open a [pull request](https://github.com/harness/harness-cli/pulls). A maintainer will be happy to triage and ask clarifying questions as needed. We also ask that you build and test proposed changes locally, and include any relevant output and/or screenshots in the PR.
+To propose a change to the codebase, open a [pull request](https://github.com/harness/harness-cli/pulls). A maintainer will be happy to triage and ask clarifying questions as needed. We also ask that you build and test proposed changes yourself, and include any relevant output and/or screenshots in the PR.
 
 ## Development
 
