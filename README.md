@@ -47,7 +47,7 @@ We welcome contributions. Please see the [Contributors Guide](CONTRIBUTING.md) f
 
 To reach us with feedback and questions:
 - Join the [Harness Community](https://join.slack.com/t/harnesscommunity/shared_invite/zt-1h2cy1up2-Bf3MQQvKTf~YkVcsnkJ5pw) Slack space
-- Refer to [Harness Community Communications Guide](https://github.com/harness-community/overview/blob/main/community_communication_guide.md) to interact with the wider community users/contributors.
+- Refer to the [Harness Community Communications Guide](https://github.com/harness-community/overview/blob/main/community_communication_guide.md) to interact with the wider community users/contributors.
 
 ## License
 
