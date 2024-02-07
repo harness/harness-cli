@@ -543,7 +543,7 @@ func main() {
 			{
 				Name:    "pipeline",
 				Aliases: []string{"pipeline"},
-				Usage:   "Pipeline specific commands, eg: apply (create/update), delete, list",
+				Usage:   "Pipeline specific commands, eg: apply (create/update), delete, run, list",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:  "file",
@@ -587,6 +587,13 @@ func main() {
 							return cliWrapper(deletePipeline, context)
 						},
 					},
+                                        {
+                                                Name: "run",
+                                                Usage: "Run a pipeline.",
+                                                Action: func(context *cli.Context) error {
+                                                        return cliWrapper(runPipeline, context)
+                                                },
+                                        },
 				},
 			},
 			{

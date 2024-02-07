@@ -123,6 +123,12 @@ func listPipeline(*cli.Context) error {
 	return nil
 }
 
+// Run an existing Pipeline
+func runPipeline(*cli.Context) error {
+        fmt.Println(defaults.NOT_IMPLEMENTED)
+        return nil
+}
+
 func yamlHasDockerUsername(str string) bool {
 	regexPattern := `value:\s+DOCKER_USERNAME`
 	match, _ := regexp.MatchString(regexPattern, str)
