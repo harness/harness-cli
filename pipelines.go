@@ -135,10 +135,13 @@ func runPipeline(c *cli.Context) error {
                 projectIdentifier = defaults.DEFAULT_PROJECT
         }
         pipelineIdentifier := c.String ("pipeline-id")
-        entityExists := GetEntity(baseURL, fmt.Sprintf("%s/%s", defaults.PIPELINES_ENDPOINT, pipelineIdentifier),
+        if pipelineIdentifier == "" {
+                return fmt.Errorf("Pipeline id required. See: harness pipeline run --help") 
+        }
+        pipelineExists := GetEntity(baseURL, fmt.Sprintf("%s/%s", defaults.PIPELINES_ENDPOINT, pipelineIdentifier),
                 projectIdentifier, orgIdentifier, map[string]string{})
-        if !entityExists {
-                return fmt.Errorf("Could not fetch pipeline. Check pipeline identifier and scope.")
+        if !pipelineExists {
+                return fmt.Errorf("Could not fetch pipeline. Check pipeline id and scope.")
         } 
         println("Pipeline is " + pipelineIdentifier) // WIP placeholder before execution
         return nil
