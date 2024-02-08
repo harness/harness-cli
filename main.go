@@ -590,6 +590,21 @@ func main() {
                                         {
                                                 Name: "run",
                                                 Usage: "Run a pipeline.",
+                                                Flags: []cli.Flag{
+                                                        &cli.StringFlag{
+                                                                Name:  "pipeline-id",
+                                                                Usage: "identifier of pipeline to execute",
+                                                        },
+                                                        altsrc.NewStringFlag(&cli.StringFlag{
+                                                                Name:  "org-id",
+                                                                Usage: "provide an Organization Identifier",
+                                                        }),
+                                                        altsrc.NewStringFlag(&cli.StringFlag{
+                                                                Name:  "project-id",
+                                                                Usage: "provide a Project Identifier",
+                                                        }),
+                                                },
+
                                                 Action: func(context *cli.Context) error {
                                                         return cliWrapper(runPipeline, context)
                                                 },

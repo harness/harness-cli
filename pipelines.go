@@ -117,15 +117,30 @@ func deletePipeline(*cli.Context) error {
 	return nil
 }
 
-// Delete an existing Pipeline
+// List details of an existing Pipeline
 func listPipeline(*cli.Context) error {
 	fmt.Println(defaults.NOT_IMPLEMENTED)
-	return nil
+        return nil
 }
 
 // Run an existing Pipeline
-func runPipeline(*cli.Context) error {
-        fmt.Println(defaults.NOT_IMPLEMENTED)
+func runPipeline(c *cli.Context) error {
+	baseURL := GetBaseUrl(c, defaults.PIPELINES_BASE_URL)
+        orgIdentifier := c.String("org-id")
+        if orgIdentifier == "" {
+                orgIdentifier = defaults.DEFAULT_ORG
+        }
+        projectIdentifier := c.String("project-id")
+        if projectIdentifier == "" {
+                projectIdentifier = defaults.DEFAULT_PROJECT
+        }
+        pipelineIdentifier := c.String ("pipeline-id")
+        entityExists := GetEntity(baseURL, fmt.Sprintf("%s/%s", defaults.PIPELINES_ENDPOINT, pipelineIdentifier),
+                projectIdentifier, orgIdentifier, map[string]string{})
+        if !entityExists {
+                return fmt.Errorf("Could not fetch pipeline. Check pipeline identifier and scope.")
+        } 
+        println("Pipeline is " + pipelineIdentifier) // WIP placeholder before execution
         return nil
 }
 
