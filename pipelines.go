@@ -125,6 +125,7 @@ func listPipeline(*cli.Context) error {
 
 // Run an existing Pipeline
 func runPipeline(c *cli.Context) error {
+        // TO-DO: print execution URL and remove magic strings
         baseURL := GetBaseUrl(c, defaults.PIPELINES_BASE_URL)	
         betaBaseURL := GetBetaPipelineBaseUrl(c)
         orgIdentifier := c.String("org-id")
@@ -144,11 +145,9 @@ func runPipeline(c *cli.Context) error {
         if !pipelineExists {
                 return fmt.Errorf("Could not fetch pipeline. Check pipeline id and scope.")
         } 
-        requestBody := ""
-        dummyYAML := ""
-        executePipelinePUTUrl := GetUrlWithQueryParams("", betaBaseURL,
-                        fmt.Sprintf("%s/%s", "execute", pipelineIdentifier), map[string]string{})
-        _, err := client.Put(executePipelinePUTUrl, CliCdRequestData.AuthToken, requestBody, dummyYAML, nil)
+        executePipelinePOSTUrl := GetUrlWithQueryParams("", betaBaseURL,
+                        fmt.Sprintf("%s/%s", pipelineIdentifier, "execute"), map[string]string{})
+        _, err := client.Post(executePipelinePOSTUrl, CliCdRequestData.AuthToken, nil, defaults.CONTENT_TYPE_JSON, nil)
         if err == nil {
             println(GetColoredText("Successfully started pipeline execution with id= ", color.FgGreen) +
                    GetColoredText(pipelineIdentifier, color.FgBlue))
@@ -178,6 +177,6 @@ func GetBetaPipelineBaseUrl(c *cli.Context) string {
         if projectIdentifier == "" {
                 projectIdentifier = defaults.DEFAULT_PROJECT
         }
-        betaPipelineBaseURL := GetBaseUrl(c, fmt.Sprintf("%s/%s/%s/%s/%s", "/v1/orgs", orgIdentifier, "projects", projectIdentifier, "pipeline"))
+        betaPipelineBaseURL := GetBaseUrl(c, fmt.Sprintf("%s/%s/%s/%s/%s", "/v1/orgs", orgIdentifier, "projects", projectIdentifier, "pipelines"))
         return betaPipelineBaseURL
 }
