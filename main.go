@@ -596,6 +596,10 @@ func main() {
                                                                 Usage: "identifier of pipeline to execute",
                                                         },
                                                         altsrc.NewStringFlag(&cli.StringFlag{
+                                                                Name: "inputs-file",
+                                                                Usage: "path to YAML file containing pipeline inputs",
+                                                        }),
+                                                        altsrc.NewStringFlag(&cli.StringFlag{
                                                                 Name:  "org-id",
                                                                 Usage: "provide an Organization Identifier",
                                                         }),
@@ -604,7 +608,6 @@ func main() {
                                                                 Usage: "provide a Project Identifier",
                                                         }),
                                                 },
-
                                                 Action: func(context *cli.Context) error {
                                                         return cliWrapper(runPipeline, context)
                                                 },

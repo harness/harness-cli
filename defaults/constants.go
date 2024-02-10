@@ -43,7 +43,7 @@ const (
 )
 
 const NOT_IMPLEMENTED = "Command Not_Implemented. Check back later.."
-const EXECUTE_PIPELINE_ENDPOINT = "execute"
+const EXECUTE_PIPELINE_ENDPOINT = "pipeline/execute"
 const PIPELINES_BASE_URL = "/gateway/pipeline/api"
 const PIPELINES_ENDPOINT = "pipelines"
 const PIPELINES_ENDPOINT_V2 = "pipelines/v2"

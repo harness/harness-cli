@@ -125,7 +125,6 @@ func listPipeline(*cli.Context) error {
 
 // Run an existing Pipeline
 func runPipeline(c *cli.Context) error {
-        // TO-DO: print execution URL and remove magic strings
         baseURL := GetBaseUrl(c, defaults.PIPELINES_BASE_URL)	
         orgIdentifier := c.String("org-id")
         if orgIdentifier == "" {
@@ -139,22 +138,30 @@ func runPipeline(c *cli.Context) error {
         if pipelineIdentifier == "" {
                 return fmt.Errorf("Pipeline id required. See: harness pipeline run --help") 
         }
+        var content, _ = ReadFromFile(c.String("inputs-file"))
+        requestBody := GetJsonFromYaml(content)
         pipelineEndpoint := fmt.Sprintf("%s/%s", defaults.PIPELINES_ENDPOINT, pipelineIdentifier)
         pipelineExists := GetEntity(baseURL, pipelineEndpoint, projectIdentifier, orgIdentifier, map[string]string{})
         if !pipelineExists {
                 return fmt.Errorf("Could not fetch pipeline. Check pipeline id and scope.")
         }
-        execPipelineEndpoint := GetPipelineExecUrl(c, pipelineIdentifier)       
-        execPipelinePOSTEndpoint := GetUrlWithQueryParams("", execPipelineEndpoint, "", map[string]string{})
-        resp, err := client.PipelineExecPost(execPipelinePOSTEndpoint, CliCdRequestData.AuthToken, nil, defaults.CONTENT_TYPE_JSON, nil)
-        pipelineExecLink := GetPipelineExecLink(resp, CliCdRequestData.Account, orgIdentifier, projectIdentifier, pipelineIdentifier)
-        if err == nil {
-            println(GetColoredText("Successfully started execution of pipeline ", color.FgGreen) +
-                   GetColoredText(pipelineIdentifier, color.FgBlue))
-            println(GetColoredText("View execution at ", color.FgGreen) +
-                   GetColoredText(pipelineExecLink , color.FgYellow))
-            return nil
+        execPipelineEndpoint := fmt.Sprintf("%s/%s", defaults.EXECUTE_PIPELINE_ENDPOINT, pipelineIdentifier)     
+        execPipelineURL := GetUrlWithQueryParams("", baseURL, execPipelineEndpoint, map[string]string{
+                "accountIdentifier": CliCdRequestData.Account,
+                "orgIdentifier":     orgIdentifier,
+                "projectIdentifier": projectIdentifier,
+        })
+        var err error
+        var resp ResponseBody
+        resp, err = client.Post(execPipelineURL, CliCdRequestData.AuthToken, requestBody, defaults.CONTENT_TYPE_YAML, nil)
+        if err != nil {
+            return fmt.Errorf("Could not start execution of pipeline %s. Check pipeline configuration and inputs.", pipelineIdentifier)
         }
+        pipelineExecLink := GetPipelineExecLink(resp, CliCdRequestData.Account, orgIdentifier, projectIdentifier, pipelineIdentifier)
+        println(GetColoredText("Successfully started execution of pipeline ", color.FgGreen) +
+               GetColoredText(pipelineIdentifier, color.FgBlue))
+        println(GetColoredText("Execution URL: ", color.FgGreen) +
+               GetColoredText(pipelineExecLink , color.FgYellow))
         return nil
 }
 
@@ -170,20 +177,7 @@ func yamlHasGithubUsername(str string) bool {
 	return match
 }
 
-func GetPipelineUrl(ctx *cli.Context, pipelineId string) string {
-        projectPath := GetProjectUrl(ctx)
-        pipelinesPath := fmt.Sprintf("%s%s/", projectPath, defaults.PIPELINES_ENDPOINT)
-        fullPipelineUrl:= fmt.Sprintf("%s%s/", pipelinesPath, pipelineId)
-        return fullPipelineUrl
-}
-
-func GetPipelineExecUrl(ctx *cli.Context, pipelineId string) string {
-        pipelinePath := GetPipelineUrl(ctx, pipelineId)
-        pipelineExecPath := fmt.Sprintf("%s%s", pipelinePath, defaults.EXECUTE_PIPELINE_ENDPOINT)
-        return pipelineExecPath
-}
-
-func GetPipelineExecLink(respBodyObj PipelineExecRespBody, accountId string, orgId string, projectId string, pipelineId string) string {
+func GetPipelineExecLink(respBodyObj ResponseBody, accountId string, orgId string, projectId string, pipelineId string) string {
         // Get Harness host from user or use default
         var baseUrl string
         if CliCdRequestData.BaseUrl == "" {
@@ -193,9 +187,9 @@ func GetPipelineExecLink(respBodyObj PipelineExecRespBody, accountId string, org
         }
 
         // Get pipeline execution ID from custom HTTP reponse object
-        execData := respBodyObj.ExecDetails.(map[string]interface{})
-        execId := execData["execution_id"].(string)
-
+        execData := respBodyObj.Data.(map[string]interface{})
+        planExecutionData := execData["planExecution"].(map[string]interface{})
+        execId := planExecutionData["uuid"]
         // Build pipeline execution URL
         // Start with individual entity segments
         uxSegement := fmt.Sprintf("%s%s/", baseUrl, defaults.HARNESS_UX_VERSION)
@@ -212,4 +206,4 @@ func GetPipelineExecLink(respBodyObj PipelineExecRespBody, accountId string, org
         // Cat the ux and pipieline exec paths into complete URL
         fullPipelineExecLink := fmt.Sprintf("%s%s", uxProjectPath, pipelineExecPath)
         return fullPipelineExecLink
-}
+} 

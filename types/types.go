@@ -141,10 +141,6 @@ type ResponseBody struct {
 	Messages []ResponseMessages `json:"responseMessages"`
 }
 
-type PipelineExecRespBody struct {
-        ExecDetails interface{} `json:"execution_details"`
-}
-
 type ResponseMessages struct {
 	Code         string      `json:"code"`
 	Level        string      `json:"level"`
