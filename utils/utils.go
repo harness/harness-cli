@@ -42,6 +42,7 @@ func TextInput(question string) string {
 }
 
 func GetUrlWithQueryParams(environment string, service string, endpoint string, queryParams map[string]string) string {
+        // Outer if-else handles requests with no query params
         if len(queryParams) > 0 {
             params := ""
 	    totalItems := len(queryParams)

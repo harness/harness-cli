@@ -184,19 +184,32 @@ func GetPipelineExecUrl(ctx *cli.Context, pipelineId string) string {
 }
 
 func GetPipelineExecLink(respBodyObj PipelineExecRespBody, accountId string, orgId string, projectId string, pipelineId string) string {
+        // Get Harness host from user or use default
         var baseUrl string
         if CliCdRequestData.BaseUrl == "" {
                 baseUrl = defaults.HARNESS_PROD_URL
             } else {
                 baseUrl = CliCdRequestData.BaseUrl
         }
-        executionData := respBodyObj.ExecDetails.(map[string]interface{})
-        executionId := executionData["execution_id"].(string)
-        execLink := fmt.Sprintf("%s%s/%s/%s/%s%s%s/%s%s/%s/%s/%s/%s", baseUrl, "ng", 
-            "account", accountId, "home/", 
-            defaults.ORGANIZATIONS_ENDPOINT, orgId, 
-            defaults.PROJECTS_ENDPOINT, projectId, 
-            defaults.PIPELINES_ENDPOINT, pipelineId,
-            "executions", executionId)  
-       return execLink
+
+        // Get pipeline execution ID from custom HTTP reponse object
+        execData := respBodyObj.ExecDetails.(map[string]interface{})
+        execId := execData["execution_id"].(string)
+
+        // Build pipeline execution URL
+        // Start with individual entity segments
+        uxSegement := fmt.Sprintf("%s%s/", baseUrl, defaults.HARNESS_UX_VERSION)
+        accountSegment := fmt.Sprintf("%s/%s/%s/", "account", accountId, "home")
+        orgSegment := fmt.Sprintf("%s%s/", defaults.ORGANIZATIONS_ENDPOINT, orgId)
+        projectSegment := fmt.Sprintf("%s%s/", defaults.PROJECTS_ENDPOINT, projectId)
+        pipelineSegment := fmt.Sprintf("%s/%s/", defaults.PIPELINES_ENDPOINT, pipelineId) 
+        execSegment := fmt.Sprintf("%s/%s/", "executions", execId) 
+ 
+        // From previous segments, build user's project path and pipeline execution path
+        uxProjectPath := fmt.Sprintf("%s%s%s%s", uxSegement, accountSegment, orgSegment, projectSegment)
+        pipelineExecPath := fmt.Sprintf("%s%s", pipelineSegment, execSegment)
+
+        // Cat the ux and pipieline exec paths into complete URL
+        fullPipelineExecLink := fmt.Sprintf("%s%s", uxProjectPath, pipelineExecPath)
+        return fullPipelineExecLink
 }

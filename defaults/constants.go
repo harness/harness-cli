@@ -34,6 +34,7 @@ const SSH_KEY_FILE_SECRET_IDENTIFIER = "harness_sshsecretfile"
 const WINRM_SECRET_IDENTIFIER = "harness_winrmpwd"
 const WINRM_PASSWORD_SECRET_IDENTIFIER = "winrm_passwd"
 const INFRA_ENDPOINT = "infrastructures"
+const HARNESS_UX_VERSION = "ng"
 
 // Enum for multiple platforms
 const (
