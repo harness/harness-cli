@@ -167,6 +167,19 @@ func GetBaseUrl(c *cli.Context, serviceUrl string) string {
 	return baseURL
 }
 
+func GetBetaBaseURL(c *cli.Context) string {
+        baseURL := c.String("base-url")
+        if baseURL == "" {
+                if CliCdRequestData.BaseUrl == "" {
+                    baseURL = defaults.HARNESS_PROD_URL
+                } else {
+                        baseURL = CliCdRequestData.BaseUrl
+                }
+        }
+        baseURL += fmt.Sprintf("%s/", defaults.API_VERSION)
+        return baseURL
+}
+
 func GetJsonFromYaml(content string) map[string]interface{} {
 	requestBody := make(map[string]interface{})
 	err := yaml.Unmarshal([]byte(content), requestBody)
@@ -175,6 +188,7 @@ func GetJsonFromYaml(content string) map[string]interface{} {
 	}
 	return requestBody
 }
+
 func GetNestedValue(data map[string]interface{}, keys ...string) interface{} {
 	if len(keys) == 0 {
 		return nil
@@ -198,6 +212,7 @@ func GetNestedValue(data map[string]interface{}, keys ...string) interface{} {
 
 	return value
 }
+
 func GetUserHomePath() string {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -206,6 +221,7 @@ func GetUserHomePath() string {
 	}
 	return homeDir
 }
+
 func ValueToString(value interface{}) string {
 	switch v := value.(type) {
 	case string:
@@ -306,6 +322,33 @@ func GetAccountDetails(ctx *cli.Context) error {
 		return err
 	}
 	return nil
+}
+
+func GetOrgUrl(ctx *cli.Context) string {
+        // Return org path URL, required for API endpoints with path params
+        var orgId string;      
+        if CliCdRequestData.OrgName == "" {
+                orgId = defaults.DEFAULT_ORG
+            } else {
+                orgId = CliCdRequestData.OrgName
+        }
+        
+        orgEndpoint := fmt.Sprintf("%s%s/", defaults.ORGANIZATIONS_ENDPOINT, orgId)
+        fullOrgUrl := fmt.Sprintf("%s%s", GetBetaBaseURL(ctx), orgEndpoint)
+        return fullOrgUrl 
+}
+
+func GetProjectUrl(ctx *cli.Context) string {
+        // Return project path URL, required for API endpoints with path params
+        var projectId string;
+        if CliCdRequestData.ProjectName == "" {
+                projectId = defaults.DEFAULT_PROJECT
+            } else {
+                projectId = CliCdRequestData.ProjectName
+        }
+        projectEndpoint := fmt.Sprintf("%s%s/", defaults.PROJECTS_ENDPOINT, projectId)
+        fullProjectUrl := fmt.Sprintf("%s%s", GetOrgUrl(ctx), projectEndpoint)
+        return fullProjectUrl
 }
 
 func GetUserDetails(ctx *cli.Context) error {

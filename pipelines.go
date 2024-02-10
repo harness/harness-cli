@@ -127,7 +127,6 @@ func listPipeline(*cli.Context) error {
 func runPipeline(c *cli.Context) error {
         // TO-DO: print execution URL and remove magic strings
         baseURL := GetBaseUrl(c, defaults.PIPELINES_BASE_URL)	
-        betaBaseURL := GetBetaPipelineBaseUrl(c)
         orgIdentifier := c.String("org-id")
         if orgIdentifier == "" {
                 orgIdentifier = defaults.DEFAULT_ORG
@@ -140,19 +139,22 @@ func runPipeline(c *cli.Context) error {
         if pipelineIdentifier == "" {
                 return fmt.Errorf("Pipeline id required. See: harness pipeline run --help") 
         }
-        pipelineExists := GetEntity(baseURL, fmt.Sprintf("%s/%s", defaults.PIPELINES_ENDPOINT, pipelineIdentifier),
-                projectIdentifier, orgIdentifier, map[string]string{})
+        pipelineEndpoint := fmt.Sprintf("%s/%s", defaults.PIPELINES_ENDPOINT, pipelineIdentifier)
+        pipelineExists := GetEntity(baseURL, pipelineEndpoint, projectIdentifier, orgIdentifier, map[string]string{})
         if !pipelineExists {
                 return fmt.Errorf("Could not fetch pipeline. Check pipeline id and scope.")
-        } 
-        executePipelinePOSTUrl := GetUrlWithQueryParams("", betaBaseURL,
-                        fmt.Sprintf("%s/%s", pipelineIdentifier, "execute"), map[string]string{})
-        _, err := client.Post(executePipelinePOSTUrl, CliCdRequestData.AuthToken, nil, defaults.CONTENT_TYPE_JSON, nil)
+        }
+        execPipelineEndpoint := GetPipelineExecUrl(c, pipelineIdentifier)       
+        execPipelinePOSTEndpoint := GetUrlWithQueryParams("", execPipelineEndpoint, "", map[string]string{})
+        resp, err := client.PipelineExecPost(execPipelinePOSTEndpoint, CliCdRequestData.AuthToken, nil, defaults.CONTENT_TYPE_JSON, nil)
+        pipelineExecLink := GetPipelineExecLink(resp, CliCdRequestData.Account, orgIdentifier, projectIdentifier, pipelineIdentifier)
         if err == nil {
-            println(GetColoredText("Successfully started pipeline execution with id= ", color.FgGreen) +
+            println(GetColoredText("Successfully started execution of pipeline ", color.FgGreen) +
                    GetColoredText(pipelineIdentifier, color.FgBlue))
+            println(GetColoredText("View execution at ", color.FgGreen) +
+                   GetColoredText(pipelineExecLink , color.FgYellow))
             return nil
-        }       
+        }
         return nil
 }
 
@@ -168,15 +170,33 @@ func yamlHasGithubUsername(str string) bool {
 	return match
 }
 
-func GetBetaPipelineBaseUrl(c *cli.Context) string {
-        orgIdentifier := c.String("org-id")
-        if orgIdentifier == "" {
-                orgIdentifier = defaults.DEFAULT_ORG
+func GetPipelineUrl(ctx *cli.Context, pipelineId string) string {
+        projectPath := GetProjectUrl(ctx)
+        pipelinesPath := fmt.Sprintf("%s%s/", projectPath, defaults.PIPELINES_ENDPOINT)
+        fullPipelineUrl:= fmt.Sprintf("%s%s/", pipelinesPath, pipelineId)
+        return fullPipelineUrl
+}
+
+func GetPipelineExecUrl(ctx *cli.Context, pipelineId string) string {
+        pipelinePath := GetPipelineUrl(ctx, pipelineId)
+        pipelineExecPath := fmt.Sprintf("%s%s", pipelinePath, defaults.EXECUTE_PIPELINE_ENDPOINT)
+        return pipelineExecPath
+}
+
+func GetPipelineExecLink(respBodyObj PipelineExecRespBody, accountId string, orgId string, projectId string, pipelineId string) string {
+        var baseUrl string
+        if CliCdRequestData.BaseUrl == "" {
+                baseUrl = defaults.HARNESS_PROD_URL
+            } else {
+                baseUrl = CliCdRequestData.BaseUrl
         }
-        projectIdentifier := c.String("project-id")
-        if projectIdentifier == "" {
-                projectIdentifier = defaults.DEFAULT_PROJECT
-        }
-        betaPipelineBaseURL := GetBaseUrl(c, fmt.Sprintf("%s/%s/%s/%s/%s", "/v1/orgs", orgIdentifier, "projects", projectIdentifier, "pipelines"))
-        return betaPipelineBaseURL
+        executionData := respBodyObj.ExecDetails.(map[string]interface{})
+        executionId := executionData["execution_id"].(string)
+        execLink := fmt.Sprintf("%s%s/%s/%s/%s%s%s/%s%s/%s/%s/%s/%s", baseUrl, "ng", 
+            "account", accountId, "home/", 
+            defaults.ORGANIZATIONS_ENDPOINT, orgId, 
+            defaults.PROJECTS_ENDPOINT, projectId, 
+            defaults.PIPELINES_ENDPOINT, pipelineId,
+            "executions", executionId)  
+       return execLink
 }
