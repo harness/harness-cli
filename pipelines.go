@@ -125,6 +125,7 @@ func listPipeline(*cli.Context) error {
 
 // Run an existing Pipeline
 func runPipeline(c *cli.Context) error {
+        // Get path and query parameters from user and/or defaults
         baseURL := GetBaseUrl(c, defaults.PIPELINES_BASE_URL)	
         orgIdentifier := c.String("org-id")
         if orgIdentifier == "" {
@@ -138,25 +139,37 @@ func runPipeline(c *cli.Context) error {
         if pipelineIdentifier == "" {
                 return fmt.Errorf("Pipeline id required. See: harness pipeline run --help") 
         }
+
+        // Process optional inputs YAML into request body
         var content, _ = ReadFromFile(c.String("inputs-file"))
         requestBody := GetJsonFromYaml(content)
+
+        // Return error if pipeline doesn't exist
         pipelineEndpoint := fmt.Sprintf("%s/%s", defaults.PIPELINES_ENDPOINT, pipelineIdentifier)
         pipelineExists := GetEntity(baseURL, pipelineEndpoint, projectIdentifier, orgIdentifier, map[string]string{})
         if !pipelineExists {
                 return fmt.Errorf("Could not fetch pipeline. Check pipeline id and scope.")
         }
+
+        // Generate endpoint, tack on query parameters
         execPipelineEndpoint := fmt.Sprintf("%s/%s", defaults.EXECUTE_PIPELINE_ENDPOINT, pipelineIdentifier)     
         execPipelineURL := GetUrlWithQueryParams("", baseURL, execPipelineEndpoint, map[string]string{
                 "accountIdentifier": CliCdRequestData.Account,
                 "orgIdentifier":     orgIdentifier,
                 "projectIdentifier": projectIdentifier,
         })
+
+        // Make execute pipeline POST call
         var err error
         var resp ResponseBody
         resp, err = client.Post(execPipelineURL, CliCdRequestData.AuthToken, requestBody, defaults.CONTENT_TYPE_YAML, nil)
+        
+        // Break and write to console if error 
         if err != nil {
             return fmt.Errorf("Could not start execution of pipeline %s. Check pipeline configuration and inputs.", pipelineIdentifier)
         }
+
+        // Otherwise print success message and execution link
         pipelineExecLink := GetPipelineExecLink(resp, CliCdRequestData.Account, orgIdentifier, projectIdentifier, pipelineIdentifier)
         println(GetColoredText("Successfully started execution of pipeline ", color.FgGreen) +
                GetColoredText(pipelineIdentifier, color.FgBlue))
