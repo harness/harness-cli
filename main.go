@@ -543,7 +543,7 @@ func main() {
 			{
 				Name:    "pipeline",
 				Aliases: []string{"pipeline"},
-				Usage:   "Pipeline specific commands, eg: apply (create/update), delete, list",
+				Usage:   "Pipeline specific commands, eg: apply (create/update), delete, run, list",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:  "file",
@@ -587,6 +587,31 @@ func main() {
 							return cliWrapper(deletePipeline, context)
 						},
 					},
+                                        {
+                                                Name: "run",
+                                                Usage: "Run a pipeline.",
+                                                Flags: []cli.Flag{
+                                                        &cli.StringFlag{
+                                                                Name:  "pipeline-id",
+                                                                Usage: "identifier of pipeline to execute",
+                                                        },
+                                                        altsrc.NewStringFlag(&cli.StringFlag{
+                                                                Name: "inputs-file",
+                                                                Usage: "path to YAML file containing pipeline inputs",
+                                                        }),
+                                                        altsrc.NewStringFlag(&cli.StringFlag{
+                                                                Name:  "org-id",
+                                                                Usage: "provide an Organization Identifier",
+                                                        }),
+                                                        altsrc.NewStringFlag(&cli.StringFlag{
+                                                                Name:  "project-id",
+                                                                Usage: "provide a Project Identifier",
+                                                        }),
+                                                },
+                                                Action: func(context *cli.Context) error {
+                                                        return cliWrapper(runPipeline, context)
+                                                },
+                                        },
 				},
 			},
 			{

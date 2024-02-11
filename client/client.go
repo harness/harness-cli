@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-
 	log "github.com/sirupsen/logrus"
 )
 
@@ -98,12 +97,10 @@ func handleResp(req *http.Request) (respBodyObj ResponseBody, err error) {
 	log.WithFields(log.Fields{
 		"body": string(respBody),
 	}).Debug("The response body")
-
 	if err != nil {
 		return
 	}
 	_ = json.Unmarshal(respBody, &respBodyObj)
-
 	if resp.StatusCode != 200 {
 		if resp.StatusCode >= 400 || resp.StatusCode < 500 {
 			println(respBodyObj.Message)
@@ -125,3 +122,4 @@ func AuthHeaderKey(auth string) string {
 	}
 	return "x-api-key"
 }
+

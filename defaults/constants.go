@@ -1,5 +1,6 @@
 package defaults
 
+const API_VERSION = "v1"
 const AWS_CROSS_ACCOUNT_ROLE_ARN = "ROLE_ARN"
 const AWS_ACCESS_KEY = "AWS_ACCESS_KEY"
 const AWS_SECRET_IDENTIFIER = "awssecret"
@@ -24,6 +25,8 @@ const HOST_IP_PLACEHOLDER = "HOST_IP_OR_FQDN"
 const HOST_PORT_PLACEHOLDER = "PORT"
 const INSTANCE_NAME_PLACEHOLDER = "INSTANCE_NAME"
 const NG_BASE_URL = "/gateway/ng/api"
+const ORGANIZATIONS_ENDPOINT = "orgs/"
+const PROJECTS_ENDPOINT = "projects/"
 const PROJECT_NAME_PLACEHOLDER = "CLOUD_PROJECT_NAME"
 const REGION_NAME_PLACEHOLDER = "CLOUD_REGION_NAME"
 const SSH_PRIVATE_KEY_SECRET_IDENTIFIER = "harness_sshprivatekey"
@@ -31,6 +34,7 @@ const SSH_KEY_FILE_SECRET_IDENTIFIER = "harness_sshsecretfile"
 const WINRM_SECRET_IDENTIFIER = "harness_winrmpwd"
 const WINRM_PASSWORD_SECRET_IDENTIFIER = "winrm_passwd"
 const INFRA_ENDPOINT = "infrastructures"
+const HARNESS_UX_VERSION = "ng"
 
 // Enum for multiple platforms
 const (
@@ -39,6 +43,7 @@ const (
 )
 
 const NOT_IMPLEMENTED = "Command Not_Implemented. Check back later.."
+const EXECUTE_PIPELINE_ENDPOINT = "pipeline/execute"
 const PIPELINES_BASE_URL = "/gateway/pipeline/api"
 const PIPELINES_ENDPOINT = "pipelines"
 const PIPELINES_ENDPOINT_V2 = "pipelines/v2"

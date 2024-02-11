@@ -42,26 +42,31 @@ func TextInput(question string) string {
 }
 
 func GetUrlWithQueryParams(environment string, service string, endpoint string, queryParams map[string]string) string {
-	params := ""
-	totalItems := len(queryParams)
-	currentIndex := 0
-	for k, v := range queryParams {
-		currentIndex++
-		if v != "" {
-			if currentIndex == totalItems {
-				params = params + k + "=" + v
-			} else {
-				params = params + k + "=" + v + "&"
-			}
-		}
-	}
-	// remove trailing & char
-	lastChar := params[len(params)-1]
-	if lastChar == '&' {
-		params = strings.TrimSuffix(params, string('&'))
-	}
-
-	return fmt.Sprintf("%s/%s?%s", service, endpoint, params)
+        // Outer if-else handles requests with no query params
+        if len(queryParams) > 0 {
+            params := ""
+	    totalItems := len(queryParams)
+	    currentIndex := 0
+	    for k, v := range queryParams {
+                    currentIndex++
+		    if v != "" {
+			    if currentIndex == totalItems {
+				    params = params + k + "=" + v
+			    } else {
+				    params = params + k + "=" + v + "&"
+			    }
+		    }
+                
+	    }
+	    // remove trailing & char
+	    lastChar := params[len(params)-1]
+	    if lastChar == '&' {
+		    params = strings.TrimSuffix(params, string('&'))
+	    }
+            return fmt.Sprintf("%s/%s?%s", service, endpoint, params)
+        } else {
+            return fmt.Sprintf("%s/%s", service, endpoint)
+        }
 }
 
 func PrintJson(v any) {
@@ -171,6 +176,7 @@ func GetJsonFromYaml(content string) map[string]interface{} {
 	}
 	return requestBody
 }
+
 func GetNestedValue(data map[string]interface{}, keys ...string) interface{} {
 	if len(keys) == 0 {
 		return nil
@@ -194,6 +200,7 @@ func GetNestedValue(data map[string]interface{}, keys ...string) interface{} {
 
 	return value
 }
+
 func GetUserHomePath() string {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -202,6 +209,7 @@ func GetUserHomePath() string {
 	}
 	return homeDir
 }
+
 func ValueToString(value interface{}) string {
 	switch v := value.(type) {
 	case string:
