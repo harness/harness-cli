@@ -265,7 +265,7 @@ func main() {
 			{
 				Name:    "connector",
 				Aliases: []string{"conn"},
-				Usage:   "Connector specific commands, eg: apply (create/update), delete, list",
+				Usage:   "Connector specific commands, eg: apply (create/update)",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:  "file",
@@ -329,13 +329,6 @@ func main() {
 						},
 						Action: func(context *cli.Context) error {
 							return cliWrapper(applyConnector, context)
-						},
-					},
-					{
-						Name:  "delete",
-						Usage: "Delete a connector.",
-						Action: func(context *cli.Context) error {
-							return cliWrapper(deleteConnector, context)
 						},
 					},
 				},
