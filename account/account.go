@@ -2,11 +2,12 @@ package account
 
 import (
 	"fmt"
-	"github.com/urfave/cli/v2"
 	"harness/client"
 	"harness/defaults"
 	. "harness/shared"
 	"harness/utils"
+
+	"github.com/urfave/cli/v2"
 )
 
 func GetAccountDetails(ctx *cli.Context) error {
