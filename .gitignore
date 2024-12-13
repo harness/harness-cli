@@ -4,3 +4,4 @@ harness-upgrade
 .secrets.json
 harness
 harnesscd-example-apps
+.vscode/

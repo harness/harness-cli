@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"harness/account"
 	"harness/auth"
+	"harness/client"
+	"harness/shared"
 	"os"
 	"regexp"
 
@@ -697,31 +699,73 @@ func main() {
 							return cliWrapper(deletePipeline, context)
 						},
 					},
-                                        {
-                                                Name: "run",
-                                                Usage: "Run a pipeline.",
-                                                Flags: []cli.Flag{
-                                                        &cli.StringFlag{
-                                                                Name:  "pipeline-id",
-                                                                Usage: "identifier of pipeline to execute",
-                                                        },
-                                                        altsrc.NewStringFlag(&cli.StringFlag{
-                                                                Name: "inputs-file",
-                                                                Usage: "path to YAML file containing pipeline inputs",
-                                                        }),
-                                                        altsrc.NewStringFlag(&cli.StringFlag{
-                                                                Name:  "org-id",
-                                                                Usage: "provide an Organization Identifier",
-                                                        }),
-                                                        altsrc.NewStringFlag(&cli.StringFlag{
-                                                                Name:  "project-id",
-                                                                Usage: "provide a Project Identifier",
-                                                        }),
-                                                },
-                                                Action: func(context *cli.Context) error {
-                                                        return cliWrapper(runPipeline, context)
-                                                },
-                                        },
+					{
+						Name:  "run",
+						Usage: "Run a pipeline.",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "pipeline-id",
+								Usage: "identifier of pipeline to execute",
+							},
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "inputs-file",
+								Usage: "path to YAML file containing pipeline inputs",
+							}),
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "org-id",
+								Usage: "provide an Organization Identifier",
+							}),
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "project-id",
+								Usage: "provide a Project Identifier",
+							}),
+						},
+						Action: func(context *cli.Context) error {
+							return cliWrapper(runPipeline, context)
+						},
+					},
+				},
+			},
+			{
+				Name:    "iacm",
+				Aliases: []string{"iacm"},
+				Usage:   "IACM specific commands, eg: plan",
+				Before: func(ctx *cli.Context) error {
+					auth.HydrateCredsFromPersistence(ctx)
+					return nil
+				},
+				Subcommands: []*cli.Command{
+					{
+						Name:  "plan",
+						Usage: "Run a remote plan on the supplied workspace",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:     "workspace-id",
+								Usage:    "provide a workspace id",
+								Required: true,
+							},
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:     "org-id",
+								Usage:    "provide an Organization Identifier",
+								Required: true,
+							}),
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:     "project-id",
+								Usage:    "provide a Project Identifier",
+								Required: true,
+							}),
+						},
+						Action: func(context *cli.Context) error {
+							iacmClient := client.NewIacmClient(
+								shared.CliCdRequestData.Account,
+								fmt.Sprintf("%sgateway", shared.CliCdRequestData.BaseUrl),
+								shared.CliCdRequestData.AuthToken,
+								shared.CliCdRequestData.Debug,
+							)
+							iacmCommand := NewIacmCommand(shared.CliCdRequestData.Account, iacmClient)
+							return cliWrapper(iacmCommand.ExecutePlan, context)
+						},
+					},
 				},
 			},
 			{
