@@ -7,7 +7,6 @@ import (
 	"harness/client"
 	"harness/shared"
 	"os"
-	"regexp"
 
 	. "harness/shared"
 
@@ -481,121 +480,6 @@ func main() {
 						Action: func(context *cli.Context) error {
 							return cliWrapper(applyRepository, context)
 						},
-					},
-				},
-			},
-			{
-				Name:    "internal-developer-portal",
-				Aliases: []string{"idp"},
-				Usage:   "IDP module specific commands, eg: create, delete, list",
-				Flags: append(globalFlags,
-					altsrc.NewStringFlag(&cli.StringFlag{
-						Name:  "file",
-						Usage: "`YAML` file path for the catalog-entities",
-					}),
-				),
-				Before: func(ctx *cli.Context) error {
-					auth.HydrateCredsFromPersistence(ctx)
-					return nil
-				},
-				Subcommands: []*cli.Command{
-					{
-						Name:  "create-catalog-entity",
-						Usage: "Create a catalog entity using the template YAML",
-						Flags: []cli.Flag{
-							&cli.StringFlag{
-								Name:  "yaml-template-name",
-								Usage: "provide the name to be used for catalog-info yaml",
-							},
-						},
-						Action: func(context *cli.Context) error {
-							return cliWrapper(createCatalog, context)
-						},
-					},
-					{
-						Name:  "register",
-						Usage: "Register the YAMLs in your git provider.",
-						Flags: []cli.Flag{
-							&cli.StringFlag{
-								Name:  "yaml-template",
-								Usage: "provide the yaml template path",
-							},
-							&cli.StringFlag{
-								Name:  "default",
-								Usage: "Use the default template",
-							},
-						},
-						Action: func(context *cli.Context) error {
-							return cliWrapper(createDirectoryYaml, context)
-						},
-					},
-					{
-						Name:  "list",
-						Usage: "List repositories in a GitHub organization and manage catalog-info.yaml files.",
-						Flags: []cli.Flag{
-							&cli.StringFlag{
-								Name:  "org",
-								Usage: "provide the github organization name",
-							},
-							&cli.StringFlag{
-								Name:  "repo-pattern",
-								Usage: "Optional regex pattern to filter repositories",
-							},
-							&cli.StringFlag{
-								Name:  "run-all",
-								Usage: "Run all operations: create, register, and run",
-							},
-						},
-					},
-					Action: func(context *cli.Context) error {
-						org := context.String("org")
-						repoPattern := context.String("repo-pattern")
-						runAll := context.Bool("run-all")
-		
-						if org == "" {
-							return fmt.Errorf("organization name is required")
-						}
-		
-						client := github.NewClient(nil)
-		
-						opt := &github.RepositoryListByOrgOptions{
-							ListOptions: github.ListOptions{PerPage: 10},
-						}
-		
-						for {
-							repos, resp, err := client.Repositories.ListByOrg(context.Context, org, opt)
-							if err != nil {
-								return fmt.Errorf("error listing repositories: %v", err)
-							}
-		
-							for _, repo := range repos {
-								if repoPattern != "" {
-									matched, err := regexp.MatchString(repoPattern, *repo.Name)
-									if err != nil {
-										return fmt.Errorf("error matching repository pattern: %v", err)
-									}
-									if !matched {
-										continue
-									}
-		
-								}
-								fmt.Printf("Repository: %s\n", *repo.Name)
-		
-								// Implement your catalog-info.yaml management logic here
-		
-								if runAll {
-									fmt.Println("Running all operations for repository:", *repo.Name)
-									// Implement create, register, and run logic here
-								}
-							}
-		
-							if resp.NextPage == 0 {
-								break
-							}
-							opt.Page = resp.NextPage
-						}
-		
-						return nil
 					},
 				},
 			},
