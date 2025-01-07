@@ -3,10 +3,16 @@ package client
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/go-resty/resty/v2"
+)
+
+const (
+	apiKeyHeaderKey         = "X-Api-Key"
+	harnessAccountHeaderKey = "harness-account"
 )
 
 type IacmClient struct {
@@ -24,8 +30,8 @@ func NewIacmClient(account string, host string, authToken string, debug bool) *I
 	r.SetRetryMaxWaitTime(60 * time.Second)
 	r.SetDebug(debug)
 	r.SetHeaders(map[string]string{
-		"x-api-key":       authToken,
-		"harness-account": account,
+		apiKeyHeaderKey:         authToken,
+		harnessAccountHeaderKey: account,
 	})
 	return &IacmClient{
 		authToken: authToken,
@@ -35,18 +41,12 @@ func NewIacmClient(account string, host string, authToken string, debug bool) *I
 }
 
 type IacmError struct {
-	// Is the error a server-side fault?
-	Fault bool `json:"fault"`
-	// ID is a unique identifier for this particular occurrence of the problem.
-	Id string `json:"id"`
-	// Message is a human-readable explanation specific to this occurrence of the problem.
-	Message string `json:"message"`
-	// Name is the name of this class of errors.
-	Name string `json:"name"`
-	// Is the error temporary?
-	Temporary bool `json:"temporary"`
-	// Is the error a timeout?
-	Timeout bool `json:"timeout"`
+	Fault     bool   `json:"fault"`
+	Id        string `json:"id"`
+	Message   string `json:"message"`
+	Name      string `json:"name"`
+	Temporary bool   `json:"temporary"`
+	Timeout   bool   `json:"timeout"`
 }
 
 func (e *IacmError) Error() string {
@@ -67,29 +67,23 @@ type RemoteExecution struct {
 }
 
 type Workspace struct {
-	Account               string                              `json:"account"`
-	Org                   string                              `json:"org"`
-	Project               string                              `json:"project"`
-	Identifier            string                              `json:"identifier"`
-	Created               int                                 `json:"created,omitempty"`
-	Updated               int                                 `json:"updated,omitempty"`
-	Name                  string                              `json:"name"`
-	Status                string                              `json:"status"`
-	Description           *string                             `json:"description,omitempty"`
-	Provisioner           string                              `json:"provisioner,omitempty"`
-	ProvisionerVersion    string                              `json:"provisioner_version,omitempty"`
-	ProvisionerData       map[string]string                   `json:"provisioner_data,omitempty"`
-	ProviderConnector     string                              `json:"provider_connector,omitempty"`
-	Repository            string                              `json:"repository,omitempty"`
-	RepositoryBranch      string                              `json:"repository_branch,omitempty"`
-	RepositoryCommit      string                              `json:"repository_commit,omitempty"`
-	RepositorySha         string                              `json:"repository_sha,omitempty"`
-	RepositoryConnector   string                              `json:"repository_connector,omitempty"`
-	RepositoryPath        string                              `json:"repository_path,omitempty"`
-	CostEstimationEnabled bool                                `json:"cost_estimation_enabled"`
-	DefaultPipelines      map[string]*DefaultPipelineOverride `json:"default_pipelines"`
-	BackendLocked         bool                                `json:"backend_locked,omitempty"`
-	StateChecksum         string                              `json:"state_checksum,omitempty"`
+	Account          string                              `json:"account"`
+	Org              string                              `json:"org"`
+	Project          string                              `json:"project"`
+	Identifier       string                              `json:"identifier"`
+	RepositoryPath   string                              `json:"repository_path,omitempty"`
+	DefaultPipelines map[string]*DefaultPipelineOverride `json:"default_pipelines"`
+}
+
+type PipelineExecutionError struct {
+	Status          string
+	Code            string
+	Message         string
+	DetailedMessage string
+}
+
+func (e *PipelineExecutionError) Error() string {
+	return e.Message
 }
 
 type DefaultPipelineOverride struct {
@@ -168,4 +162,117 @@ func (c *IacmClient) ExecuteRemoteExecution(ctx context.Context, org, project, w
 		return nil, errorResult
 	}
 	return result, nil
+}
+
+func (c *IacmClient) GetPipelineExecution(ctx context.Context, org, project, executionID string, stageNodeID string) (*PipelineExecutionDetail, error) {
+	result := &ResponseDtoPipelineExecutionDetail{}
+	errorResult := &PipelineExecutionError{}
+	resp, err := c.resty.R().
+		SetError(errorResult).
+		SetResult(result).
+		SetQueryParams(map[string]string{
+			"accountIdentifier":     c.account,
+			"orgIdentifier":         org,
+			"projectIdentifier":     project,
+			"stageNodeId":           stageNodeID,
+			"renderFullBottomGraph": "true",
+		}).
+		Get(fmt.Sprintf("/pipeline/api/pipelines/execution/v2/%s", executionID))
+	if err != nil {
+		return nil, err
+	}
+	if resp.IsError() {
+		return nil, errorResult
+	}
+	return result.Data, nil
+}
+
+func (c *IacmClient) GetLogToken(ctx context.Context) (string, error) {
+	resp, err := c.resty.R().
+		SetQueryParams(map[string]string{
+			"accountID": c.account,
+			"routingId": c.account,
+		}).
+		ForceContentType("text/plain").
+		Get("/log-service/token")
+	if err != nil {
+		return "", err
+	}
+	if resp.IsError() {
+		return "", errors.New(string(string(resp.Body())))
+	}
+	return string(resp.Body()), nil
+}
+
+type ResponseDtoPipelineExecutionDetail struct {
+	Status        string                   `json:"status,omitempty"`
+	Data          *PipelineExecutionDetail `json:"data,omitempty"`
+	CorrelationId string                   `json:"correlationId,omitempty"`
+}
+
+type PipelineExecutionDetail struct {
+	PipelineExecutionSummary *PipelineExecutionSummary `json:"pipelineExecutionSummary,omitempty"`
+	ExecutionGraph           *ExecutionGraph           `json:"executionGraph,omitempty"`
+}
+
+type ExecutionGraph struct {
+	RootNodeId           string                                `json:"rootNodeId,omitempty"`
+	NodeMap              map[string]ExecutionNode              `json:"nodeMap,omitempty"`
+	NodeAdjacencyListMap map[string]ExecutionNodeAdjacencyList `json:"nodeAdjacencyListMap,omitempty"`
+}
+
+type ExecutionNodeAdjacencyList struct {
+	Children []string `json:"children,omitempty"`
+	NextIds  []string `json:"nextIds,omitempty"`
+}
+
+type ExecutionNode struct {
+	Uuid       string `json:"uuid,omitempty"`
+	SetupId    string `json:"setupId,omitempty"`
+	Name       string `json:"name,omitempty"`
+	Identifier string `json:"identifier,omitempty"`
+	StepType   string `json:"stepType,omitempty"`
+	Status     string `json:"status,omitempty"`
+	LogBaseKey string `json:"logBaseKey,omitempty"`
+}
+
+type ResponseMessage struct {
+	Code           string            `json:"code,omitempty"`
+	Level          string            `json:"level,omitempty"`
+	Message        string            `json:"message,omitempty"`
+	FailureTypes   []string          `json:"failureTypes,omitempty"`
+	AdditionalInfo map[string]string `json:"additionalInfo,omitempty"`
+}
+
+type FailureInfoDto struct {
+	Message          string            `json:"message,omitempty"`
+	FailureTypeList  []string          `json:"failureTypeList,omitempty"`
+	ResponseMessages []ResponseMessage `json:"responseMessages,omitempty"`
+}
+
+type PipelineExecutionSummary struct {
+	PipelineIdentifier string                     `json:"pipelineIdentifier,omitempty"`
+	OrgIdentifier      string                     `json:"orgIdentifier"`
+	ProjectIdentifier  string                     `json:"projectIdentifier"`
+	PlanExecutionId    string                     `json:"planExecutionId,omitempty"`
+	Name               string                     `json:"name,omitempty"`
+	YamlVersion        string                     `json:"yamlVersion,omitempty"`
+	Status             string                     `json:"status,omitempty"`
+	LayoutNodeMap      map[string]GraphLayoutNode `json:"layoutNodeMap,omitempty"`
+	StartingNodeId     string                     `json:"startingNodeId,omitempty"`
+}
+
+type GraphLayoutNode struct {
+	NodeType       string          `json:"nodeType,omitempty"`
+	NodeGroup      string          `json:"nodeGroup,omitempty"`
+	NodeIdentifier string          `json:"nodeIdentifier,omitempty"`
+	Name           string          `json:"name,omitempty"`
+	NodeUuid       string          `json:"nodeUuid,omitempty"`
+	Status         string          `json:"status,omitempty"`
+	EdgeLayoutList *EdgeLayoutList `json:"edgeLayoutList,omitempty"`
+}
+
+type EdgeLayoutList struct {
+	CurrentNodeChildren []string `json:"currentNodeChildren,omitempty"`
+	NextIds             []string `json:"nextIds,omitempty"`
 }

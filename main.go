@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"harness/account"
 	"harness/auth"
@@ -639,15 +640,21 @@ func main() {
 								Required: true,
 							}),
 						},
-						Action: func(context *cli.Context) error {
+						Action: func(ctx *cli.Context) error {
 							iacmClient := client.NewIacmClient(
 								shared.CliCdRequestData.Account,
 								fmt.Sprintf("%sgateway", shared.CliCdRequestData.BaseUrl),
 								shared.CliCdRequestData.AuthToken,
 								shared.CliCdRequestData.Debug,
 							)
-							iacmCommand := NewIacmCommand(shared.CliCdRequestData.Account, iacmClient)
-							return cliWrapper(iacmCommand.ExecutePlan, context)
+							t, _ := iacmClient.GetLogToken(context.Background())
+							logClient := client.NewLogClient(
+								fmt.Sprintf("%sgateway", shared.CliCdRequestData.BaseUrl),
+								shared.CliCdRequestData.Account,
+								t,
+							)
+							iacmCommand := NewIacmCommand(shared.CliCdRequestData.Account, iacmClient, logClient)
+							return cliWrapper(iacmCommand.ExecutePlan, ctx)
 						},
 					},
 				},
