@@ -95,6 +95,11 @@ func (c IacmCommand) executePlan(ctx context.Context) error {
 
 	fmt.Println(warning)
 
+	confirm := utils.ConfirmInput("Do you want to continue?")
+	if !confirm {
+		return errors.New("some error")
+	}
+
 	packer, err := slug.NewPacker(slug.ApplyTerraformIgnore())
 	if err != nil {
 		return err
