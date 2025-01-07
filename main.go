@@ -69,7 +69,6 @@ func main() {
 			Destination: &CliCdRequestData.Json,
 		}),
 	}
-	Action := 
 	app := &cli.App{
 		Name:                 "harness",
 		Version:              Version,
