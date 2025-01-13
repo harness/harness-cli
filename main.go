@@ -68,7 +68,6 @@ func main() {
 			Destination: &CliCdRequestData.Json,
 		}),
 	}
-	Action := 
 	app := &cli.App{
 		Name:                 "harness",
 		Version:              Version,
@@ -638,16 +637,35 @@ func main() {
 								Usage:    "provide a Project Identifier",
 								Required: true,
 							}),
+							altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+								Name:     "target",
+								Usage:    "",
+								Required: false,
+							}),
+							altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+								Name:     "replace",
+								Usage:    "",
+								Required: false,
+							}),
 						},
-						Action: func(context *cli.Context) error {
+						Action: func(ctx *cli.Context) error {
 							iacmClient := client.NewIacmClient(
 								shared.CliCdRequestData.Account,
-								fmt.Sprintf("%sgateway", shared.CliCdRequestData.BaseUrl),
+								shared.CliCdRequestData.BaseUrl,
 								shared.CliCdRequestData.AuthToken,
 								shared.CliCdRequestData.Debug,
 							)
-							iacmCommand := NewIacmCommand(shared.CliCdRequestData.Account, iacmClient)
-							return cliWrapper(iacmCommand.ExecutePlan, context)
+							token, err := iacmClient.GetLogToken(ctx.Context)
+							if err != nil {
+								return err
+							}
+							logClient := client.NewLogClient(
+								shared.CliCdRequestData.BaseUrl,
+								shared.CliCdRequestData.Account,
+								token,
+							)
+							iacmCommand := NewIacmCommand(shared.CliCdRequestData.Account, iacmClient, logClient)
+							return cliWrapper(iacmCommand.ExecutePlan, ctx)
 						},
 					},
 				},
