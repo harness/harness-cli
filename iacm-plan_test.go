@@ -23,7 +23,7 @@ func (m *GetPipelineExecutionMock) GetPipelineExecution(ctx context.Context, org
 func (m *GetPipelineExecutionMock) GetWorkspace(ctx context.Context, org string, project string, workspace string) (*client.Workspace, error) {
 	return nil, nil
 }
-func (m *GetPipelineExecutionMock) CreateRemoteExecution(ctx context.Context, org, project, workspace string) (*client.RemoteExecution, error) {
+func (m *GetPipelineExecutionMock) CreateRemoteExecution(ctx context.Context, org, project, workspace string, customArguments map[string][]string) (*client.RemoteExecution, error) {
 	return nil, nil
 }
 func (m *GetPipelineExecutionMock) UploadRemoteExecution(ctx context.Context, org, project, workspace, id string, file []byte) (*client.RemoteExecution, error) {

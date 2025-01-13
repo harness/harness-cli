@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"harness/account"
 	"harness/auth"
@@ -638,19 +637,32 @@ func main() {
 								Usage:    "provide a Project Identifier",
 								Required: true,
 							}),
+							altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+								Name:     "target",
+								Usage:    "",
+								Required: false,
+							}),
+							altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
+								Name:     "replace",
+								Usage:    "",
+								Required: false,
+							}),
 						},
 						Action: func(ctx *cli.Context) error {
 							iacmClient := client.NewIacmClient(
 								shared.CliCdRequestData.Account,
-								fmt.Sprintf("%sgateway", shared.CliCdRequestData.BaseUrl),
+								shared.CliCdRequestData.BaseUrl,
 								shared.CliCdRequestData.AuthToken,
 								shared.CliCdRequestData.Debug,
 							)
-							t, _ := iacmClient.GetLogToken(context.Background())
+							token, err := iacmClient.GetLogToken(ctx.Context)
+							if err != nil {
+								return err
+							}
 							logClient := client.NewLogClient(
-								fmt.Sprintf("%sgateway", shared.CliCdRequestData.BaseUrl),
+								shared.CliCdRequestData.BaseUrl,
 								shared.CliCdRequestData.Account,
-								t,
+								token,
 							)
 							iacmCommand := NewIacmCommand(shared.CliCdRequestData.Account, iacmClient, logClient)
 							return cliWrapper(iacmCommand.ExecutePlan, ctx)

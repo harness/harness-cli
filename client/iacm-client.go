@@ -54,16 +54,21 @@ func (e *IacmError) Error() string {
 }
 
 type RemoteExecution struct {
-	ID                   string `json:"id"`
-	Workspace            string `json:"workspace"`
-	Account              string `json:"account"`
-	Org                  string `json:"org"`
-	Project              string `json:"project"`
-	PipelineExecutionID  string `json:"pipeline_execution_id"`
-	PipelineExecutionURL string `json:"pipeline_execution_url"`
-	Sha256Checksum       string `json:"sha256_checksum"`
-	Created              int    `json:"created"`
-	Updated              int    `json:"updated"`
+	ID                   string              `json:"id"`
+	Workspace            string              `json:"workspace"`
+	Account              string              `json:"account"`
+	Org                  string              `json:"org"`
+	Project              string              `json:"project"`
+	PipelineExecutionID  string              `json:"pipeline_execution_id"`
+	PipelineExecutionURL string              `json:"pipeline_execution_url"`
+	Sha256Checksum       string              `json:"sha256_checksum"`
+	Created              int                 `json:"created"`
+	Updated              int                 `json:"updated"`
+	CustomArguments      map[string][]string `json:"custom_arguments"`
+}
+
+type CreateRemoteExecutionPayload struct {
+	CustomArguments map[string][]string `json:"custom_arguments"`
 }
 
 type Workspace struct {
@@ -97,7 +102,7 @@ func (c *IacmClient) GetWorkspace(ctx context.Context, org, project, workspace s
 	resp, err := c.resty.R().
 		SetError(errorResult).
 		SetResult(result).
-		Get(fmt.Sprintf("/iacm/api/orgs/%s/projects/%s/workspaces/%s", org, project, workspace))
+		Get(fmt.Sprintf("/gateway/iacm/api/orgs/%s/projects/%s/workspaces/%s", org, project, workspace))
 	if err != nil {
 		return nil, err
 	}
@@ -107,13 +112,17 @@ func (c *IacmClient) GetWorkspace(ctx context.Context, org, project, workspace s
 	return result, nil
 }
 
-func (c *IacmClient) CreateRemoteExecution(ctx context.Context, org, project, workspace string) (*RemoteExecution, error) {
+func (c *IacmClient) CreateRemoteExecution(ctx context.Context, org, project, workspace string, customArguments map[string][]string) (*RemoteExecution, error) {
 	result := &RemoteExecution{}
+	body := &CreateRemoteExecutionPayload{
+		CustomArguments: customArguments,
+	}
 	errorResult := &IacmError{}
 	resp, err := c.resty.R().
 		SetError(errorResult).
 		SetResult(result).
-		Post(fmt.Sprintf("/iacm/api/orgs/%s/projects/%s/workspaces/%s/remote-executions", org, project, workspace))
+		SetBody(body).
+		Post(fmt.Sprintf("/gateway/iacm/api/orgs/%s/projects/%s/workspaces/%s/remote-executions", org, project, workspace))
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +147,7 @@ func (c *IacmClient) UploadRemoteExecution(ctx context.Context, org, project, wo
 		SetResult(result).
 		SetBody(file).
 		SetHeader("Content-Digest", fmt.Sprintf("sha256=%x", sha256)).
-		Post(fmt.Sprintf("/iacm/api/orgs/%s/projects/%s/workspaces/%s/remote-executions/%s/upload", org, project, workspace, id))
+		Post(fmt.Sprintf("/gateway/iacm/api/orgs/%s/projects/%s/workspaces/%s/remote-executions/%s/upload", org, project, workspace, id))
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +163,7 @@ func (c *IacmClient) ExecuteRemoteExecution(ctx context.Context, org, project, w
 	resp, err := c.resty.R().
 		SetResult(result).
 		SetError(errorResult).
-		Post(fmt.Sprintf("/iacm/api/orgs/%s/projects/%s/workspaces/%s/remote-executions/%s/execute", org, project, workspace, id))
+		Post(fmt.Sprintf("/gateway/iacm/api/orgs/%s/projects/%s/workspaces/%s/remote-executions/%s/execute", org, project, workspace, id))
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +203,7 @@ func (c *IacmClient) GetLogToken(ctx context.Context) (string, error) {
 			"routingId": c.account,
 		}).
 		ForceContentType("text/plain").
-		Get("/log-service/token")
+		Get("/gateway/log-service/token")
 	if err != nil {
 		return "", err
 	}

@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	streamEndpoint      = "/log-service/stream"
-	blobEndpoint        = "/log-service/blob"
+	streamEndpoint      = "/gateway/log-service/stream"
+	blobEndpoint        = "/gateway/log-service/blob"
 	accountIDQueryParam = "accountID"
 	keyQueryParam       = "key"
 	authHeaderKey       = "X-Harness-Token"

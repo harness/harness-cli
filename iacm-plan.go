@@ -22,6 +22,8 @@ const (
 	orgIdFlag       = "org-id"
 	projectIdFlag   = "project-id"
 	workspaceIdFlag = "workspace-id"
+	targetFlag      = "target"
+	replaceFlag     = "replace"
 
 	folderPathWarningMsg   = "The workspace is configured with the folder path %s,\nHarness will upload the following directory and its contents: \n%s"
 	noFolderPathWarningMsg = "The workspace has no configured folder path,\nHarness will upload the following directory and its contents \n%s"
@@ -34,7 +36,7 @@ const (
 
 type IacmClient interface {
 	GetWorkspace(ctx context.Context, org string, project string, workspace string) (*client.Workspace, error)
-	CreateRemoteExecution(ctx context.Context, org, project, workspace string) (*client.RemoteExecution, error)
+	CreateRemoteExecution(ctx context.Context, org, project, workspace string, customArguments map[string][]string) (*client.RemoteExecution, error)
 	UploadRemoteExecution(ctx context.Context, org, project, workspace, id string, file []byte) (*client.RemoteExecution, error)
 	ExecuteRemoteExecution(ctx context.Context, org, project, workspace, id string) (*client.RemoteExecution, error)
 	GetPipelineExecution(ctx context.Context, org, project, executionID string, stageNodeId string) (*client.PipelineExecutionDetail, error)
@@ -47,13 +49,15 @@ type LogClient interface {
 }
 
 type IacmCommand struct {
-	client    IacmClient
-	logClient LogClient
-	account   string
-	org       string
-	project   string
-	workspace string
-	debug     bool
+	client       IacmClient
+	logClient    LogClient
+	account      string
+	org          string
+	project      string
+	workspace    string
+	debug        bool
+	targets      []string
+	replacements []string
 }
 
 func NewIacmCommand(account string, client IacmClient, logClient LogClient) IacmCommand {
@@ -111,7 +115,14 @@ func (c IacmCommand) executePlan(ctx context.Context) error {
 		return err
 	}
 
-	plan, err := c.client.CreateRemoteExecution(ctx, c.org, c.project, c.workspace)
+	customArguments := map[string][]string{}
+	if len(c.replacements) > 0 {
+		customArguments["replace"] = c.replacements
+	}
+	if len(c.targets) > 0 {
+		customArguments["target"] = c.targets
+	}
+	plan, err := c.client.CreateRemoteExecution(ctx, c.org, c.project, c.workspace, customArguments)
 	if err != nil {
 		fmt.Println(utils.GetColoredText(fmt.Sprintf("An error occurred creating the remote execution: %v", err.Error()), color.FgRed))
 		return err
@@ -148,10 +159,13 @@ func (c IacmCommand) ExecutePlan(ctx *cli.Context) error {
 	org := ctx.String(orgIdFlag)
 	project := ctx.String(projectIdFlag)
 	workspace := ctx.String(workspaceIdFlag)
+	target := ctx.StringSlice(targetFlag)
+	replacements := ctx.StringSlice(replaceFlag)
 	c.org = org
 	c.project = project
 	c.workspace = workspace
-
+	c.targets = target
+	c.replacements = replacements
 	err := c.executePlan(gracefulShutdown(ctx.Context))
 	if err != nil && c.debug {
 		return err
