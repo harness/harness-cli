@@ -78,8 +78,9 @@ func (c *LogClient) Tail(ctx context.Context, key string) error {
 		line, err := formatLogs(event.Data)
 		if err != nil {
 			fmt.Println(err)
+		} else {
+			fmt.Println(line)
 		}
-		fmt.Println(line)
 	})
 	err = conn.Connect()
 	if err != nil {
