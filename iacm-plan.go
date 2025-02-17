@@ -323,7 +323,7 @@ func (c *IacmCommand) walkStage(ctx context.Context, executionID string, stageNo
 				if lastStepNodeID != "" && !ok {
 					go func() {
 						fmt.Printf(startingStepMsg, stepNode.Name)
-						err := c.logClient.Tail(ctx, getLogKeyFromStepNode(stepNode))
+						err := c.logClient.Blob(ctx, getLogKeyFromStepNode(stepNode))
 						if err != nil {
 							fmt.Println(err)
 						}
