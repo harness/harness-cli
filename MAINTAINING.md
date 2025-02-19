@@ -6,3 +6,6 @@ If a new release is cut. will need to cut a PR against HDH. HDH uses a template 
 so each MD per distribution can be updated here:
 https://github.com/harness/developer-hub/tree/main/docs/platform/shared/cli
 
+## Create a Release
+Can use GitHub's release functionality.
+https://github.com/harness/harness-cli/releases/new
