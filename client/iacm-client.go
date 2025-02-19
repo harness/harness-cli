@@ -236,13 +236,22 @@ type ExecutionNodeAdjacencyList struct {
 }
 
 type ExecutionNode struct {
-	Uuid       string `json:"uuid,omitempty"`
-	SetupId    string `json:"setupId,omitempty"`
-	Name       string `json:"name,omitempty"`
-	Identifier string `json:"identifier,omitempty"`
-	StepType   string `json:"stepType,omitempty"`
-	Status     string `json:"status,omitempty"`
-	LogBaseKey string `json:"logBaseKey,omitempty"`
+	Uuid                string               `json:"uuid,omitempty"`
+	SetupId             string               `json:"setupId,omitempty"`
+	Name                string               `json:"name,omitempty"`
+	Identifier          string               `json:"identifier,omitempty"`
+	StepType            string               `json:"stepType,omitempty"`
+	Status              string               `json:"status,omitempty"`
+	LogBaseKey          string               `json:"logBaseKey,omitempty"`
+	ExecutableResponses []ExecutableResponse `json:"executableResponses"`
+}
+
+type ExecutableResponse struct {
+	Async Async `json:"async"`
+}
+
+type Async struct {
+	LogKeys []string `json:"logKeys"`
 }
 
 type ResponseMessage struct {

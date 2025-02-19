@@ -306,7 +306,7 @@ func (c *IacmCommand) walkStage(ctx context.Context, executionID string, stageNo
 				if lastStepNodeID != "" && !ok {
 					go func() {
 						fmt.Printf(startingStepMsg, stepNode.Name)
-						err := c.logClient.Tail(ctx, stepNode.LogBaseKey)
+						err := c.logClient.Tail(ctx, getLogKeyFromStepNode(stepNode))
 						if err != nil {
 							fmt.Println(err)
 						}
@@ -323,7 +323,7 @@ func (c *IacmCommand) walkStage(ctx context.Context, executionID string, stageNo
 				if lastStepNodeID != "" && !ok {
 					go func() {
 						fmt.Printf(startingStepMsg, stepNode.Name)
-						err := c.logClient.Blob(ctx, stepNode.LogBaseKey)
+						err := c.logClient.Blob(ctx, getLogKeyFromStepNode(stepNode))
 						if err != nil {
 							fmt.Println(err)
 						}
@@ -399,8 +399,17 @@ func isInactiveStageNode(status string) bool {
 }
 
 func shouldIgnoreStepType(stepType string) bool {
-	if stepType == "IntegrationStageStepPMS" || stepType == "NG_EXECUTION" || stepType == "IACMPrepareExecution" {
+	if stepType == "IACMIntegrationStageStepPMS" || stepType == "IntegrationStageStepPMS" || stepType == "NG_EXECUTION" || stepType == "IACMPrepareExecution" {
 		return true
 	}
 	return false
+}
+
+func getLogKeyFromStepNode(stepNode client.ExecutionNode) string {
+	if len(stepNode.ExecutableResponses) >= 1 {
+		if len(stepNode.ExecutableResponses[0].Async.LogKeys) >= 1 {
+			return stepNode.ExecutableResponses[0].Async.LogKeys[0]
+		}
+	}
+	return stepNode.LogBaseKey
 }
