@@ -48,6 +48,7 @@ func NewLogClient(endpoint, accountID, token string) *LogClient {
 		Backoff: sse.Backoff{
 			MaxRetries: 5,
 		},
+		HTTPClient: http.DefaultClient,
 	}
 	return &LogClient{
 		endpoint:  endpoint,
@@ -112,7 +113,6 @@ func (c *LogClient) Blob(ctx context.Context, key string) error {
 	if err != nil {
 		return err
 	}
-
 	if resp.StatusCode != 200 {
 		logErr := &LogError{}
 		if err := json.Unmarshal(body, logErr); err != nil {
@@ -146,15 +146,18 @@ func formatLogs(line string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	timestamp, err := time.Parse(time.RFC3339, decodedLine.Time)
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	out := strings.Replace(decodedLine.Out, "\u001b[33;", "", -1)
 	formattedTimestamp := timestamp.Format("02/01/2006 15:04:05")
 	return fmt.Sprintf(
 		"%s %s %s",
 		strings.ToUpper(decodedLine.Level),
 		formattedTimestamp,
-		strings.TrimSpace(decodedLine.Out),
+		strings.TrimSpace(out),
 	), nil
 }
