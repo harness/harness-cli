@@ -281,7 +281,7 @@ func (c *IacmCommand) walkStage(ctx context.Context, executionID string, stageNo
 	}
 	rootNodeID = execution.ExecutionGraph.RootNodeId
 
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	lastStepNodeID := rootNodeID
 	visited := map[string]struct{}{}
 	for {
@@ -306,9 +306,15 @@ func (c *IacmCommand) walkStage(ctx context.Context, executionID string, stageNo
 				if lastStepNodeID != "" && !ok {
 					go func() {
 						fmt.Printf(startingStepMsg, stepNode.Name)
-						err := c.logClient.Tail(ctx, getLogKeyFromStepNode(stepNode))
+						// some steps finish so quickly that the stream is closed by the time we try and
+						// tail it. To mitigate this we try and use the blob endpoint and fall back to tail
+						// if it throws an error
+						err := c.logClient.Blob(ctx, getLogKeyFromStepNode(stepNode))
 						if err != nil {
-							fmt.Println(err)
+							err := c.logClient.Tail(ctx, getLogKeyFromStepNode(stepNode))
+							if err != nil {
+								fmt.Println(err)
+							}
 						}
 					}()
 					visited[lastStepNodeID] = struct{}{}
