@@ -625,17 +625,17 @@ func main() {
 							&cli.StringFlag{
 								Name:     "workspace-id",
 								Usage:    "provide a workspace id",
-								Required: true,
+								Required: false,
 							},
 							altsrc.NewStringFlag(&cli.StringFlag{
 								Name:     "org-id",
 								Usage:    "provide an Organization Identifier",
-								Required: true,
+								Required: false,
 							}),
 							altsrc.NewStringFlag(&cli.StringFlag{
 								Name:     "project-id",
 								Usage:    "provide a Project Identifier",
-								Required: true,
+								Required: false,
 							}),
 							altsrc.NewStringSliceFlag(&cli.StringSliceFlag{
 								Name:     "target",

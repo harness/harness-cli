@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 )
 
 type GetPipelineExecutionMock struct {
@@ -37,35 +38,41 @@ func (m *GetPipelineExecutionMock) GetLogToken(ctx context.Context) (string, err
 }
 
 func TestValidateWorkingDirectory(t *testing.T) {
-	t.Run("working directory does not contain folder path", func(*testing.T) {
+	t.Run("working directory does not contain repository path", func(*testing.T) {
 		ws := &client.Workspace{
 			RepositoryPath: "tf/aws",
 		}
-		wd := t.TempDir()
-		warning, err := validateWorkingDirectory(wd, ws)
+		actualRepoRoot := t.TempDir()
+		workingDirectory := actualRepoRoot
+		repoRoot, warning, err := getRepoRootFromWorkingDirectory(workingDirectory, ws)
+		assert.Empty(t, repoRoot)
 		assert.Empty(t, warning)
 		assert.Equal(t, fmt.Sprintf(folderPathNotFoundErr, ws.RepositoryPath), err.Error())
 	})
-	t.Run("working directory contains folder path", func(*testing.T) {
+	t.Run("working directory contains the repository path", func(*testing.T) {
+		ws := &client.Workspace{
+			RepositoryPath: "tf/a3ws",
+		}
+		actualRepoRoot := t.TempDir()
+		workingDirectory := actualRepoRoot
+		err := os.MkdirAll(filepath.Join(actualRepoRoot, ws.RepositoryPath), 0700)
+		assert.Nil(t, err)
+		repoRoot, warning, err := getRepoRootFromWorkingDirectory(workingDirectory, ws)
+		assert.Equal(t, repoRoot, actualRepoRoot)
+		assert.Equal(t, fmt.Sprintf(folderPathWarningMsg, ws.RepositoryPath, actualRepoRoot), warning)
+		assert.Nil(t, err)
+	})
+	t.Run("working directory is the same as the repository path", func(*testing.T) {
 		ws := &client.Workspace{
 			RepositoryPath: "tf/aws",
 		}
-		wd := t.TempDir()
-		err := os.MkdirAll(filepath.Join(wd, ws.RepositoryPath), 0700)
+		actualRepoRoot := t.TempDir()
+		workingDirectory := filepath.Join(actualRepoRoot, ws.RepositoryPath)
+		err := os.MkdirAll(workingDirectory, 0700)
 		assert.Nil(t, err)
-		warning, err := validateWorkingDirectory(wd, ws)
-		assert.Equal(t, fmt.Sprintf(folderPathWarningMsg, ws.RepositoryPath, wd), warning)
-		assert.Nil(t, err)
-	})
-	t.Run("no folder path", func(*testing.T) {
-		ws := &client.Workspace{
-			RepositoryPath: "",
-		}
-		wd := t.TempDir()
-		err := os.MkdirAll(filepath.Join(wd, ws.RepositoryPath), 0700)
-		assert.Nil(t, err)
-		warning, err := validateWorkingDirectory(wd, ws)
-		assert.Equal(t, fmt.Sprintf(noFolderPathWarningMsg, wd), warning)
+		repoRoot, warning, err := getRepoRootFromWorkingDirectory(workingDirectory, ws)
+		assert.Equal(t, repoRoot, actualRepoRoot)
+		assert.Equal(t, fmt.Sprintf(folderPathWarningMsg, ws.RepositoryPath, actualRepoRoot), warning)
 		assert.Nil(t, err)
 	})
 }
@@ -290,4 +297,94 @@ func TestGetStartingNodeID(t *testing.T) {
 		assert.Equal(t, expectedStartingNodeID, actualStartingNodeID)
 		assert.Equal(t, expectedErr, actualErr)
 	})
+}
+
+func TestWorkspaceInfo(t *testing.T) {
+	tt := map[string]struct {
+		ExpectedWorkspaceInfo *WorkspaceInfo
+		ExpectedErr           error
+		CliArgWorkspaceInfo   *WorkspaceInfo
+		FileWorkspaceInfo     *WorkspaceInfo
+	}{
+		"cli args are returned when they are all present": {
+			ExpectedWorkspaceInfo: &WorkspaceInfo{
+				Org:       "cli-arg-org",
+				Project:   "cli-arg-project",
+				Workspace: "cli-arg-workspace",
+			},
+			ExpectedErr: nil,
+			CliArgWorkspaceInfo: &WorkspaceInfo{
+				Org:       "cli-arg-org",
+				Project:   "cli-arg-project",
+				Workspace: "cli-arg-workspace",
+			},
+			FileWorkspaceInfo: &WorkspaceInfo{
+				Org:       "file-org",
+				Project:   "file-project",
+				Workspace: "file-workspace",
+			},
+		},
+		"an error is returned cli arguments are not all present": {
+			ExpectedWorkspaceInfo: nil,
+			ExpectedErr:           errors.New(workspaceInfoCliArgErr),
+			CliArgWorkspaceInfo: &WorkspaceInfo{
+				Org:     "cli-arg-org",
+				Project: "cli-arg-project",
+			},
+			FileWorkspaceInfo: &WorkspaceInfo{
+				Org:       "file-org",
+				Project:   "file-project",
+				Workspace: "file-workspace",
+			},
+		},
+		"file info is returned when file is present": {
+			ExpectedWorkspaceInfo: &WorkspaceInfo{
+				Org:       "file-org",
+				Project:   "file-project",
+				Workspace: "file-workspace",
+			},
+			ExpectedErr: nil,
+			CliArgWorkspaceInfo: &WorkspaceInfo{
+				Org:       "",
+				Project:   "",
+				Workspace: "",
+			},
+			FileWorkspaceInfo: &WorkspaceInfo{
+				Org:       "file-org",
+				Project:   "file-project",
+				Workspace: "file-workspace",
+			},
+		},
+		"an error is returned when file is not present": {
+			ExpectedWorkspaceInfo: nil,
+			ExpectedErr:           errors.New(workspaceInfoFileErr),
+			CliArgWorkspaceInfo: &WorkspaceInfo{
+				Org:       "",
+				Project:   "",
+				Workspace: "",
+			},
+			FileWorkspaceInfo: nil,
+		},
+	}
+	for name, test := range tt {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			if test.FileWorkspaceInfo != nil {
+				workspaceFileYaml, err := yaml.Marshal(test.FileWorkspaceInfo)
+				assert.Nil(t, err)
+				err = os.Mkdir(filepath.Join(dir, ".harness/"), 0777)
+				assert.Nil(t, err)
+				err = os.WriteFile(filepath.Join(dir, ".harness/workspace.yaml"), workspaceFileYaml, 0777)
+				assert.Nil(t, err)
+			}
+			actualWorkspaceInfo, actualErr := getWorkspaceInfo(
+				test.CliArgWorkspaceInfo.Org,
+				test.CliArgWorkspaceInfo.Project,
+				test.CliArgWorkspaceInfo.Workspace,
+				dir,
+			)
+			assert.Equal(t, test.ExpectedErr, actualErr)
+			assert.Equal(t, test.ExpectedWorkspaceInfo, actualWorkspaceInfo)
+		})
+	}
 }
