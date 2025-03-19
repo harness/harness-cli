@@ -10,10 +10,12 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fatih/color"
 	"github.com/hashicorp/go-slug"
+	"gopkg.in/yaml.v3"
 
 	"github.com/urfave/cli/v2"
 )
@@ -28,7 +30,10 @@ const (
 	folderPathWarningMsg   = "The workspace is configured with the folder path %s,\nHarness will upload the following directory and its contents: \n%s"
 	noFolderPathWarningMsg = "The workspace has no configured folder path,\nHarness will upload the following directory and its contents \n%s"
 	folderPathNotFoundErr  = "The folder path configured in the workspace %s does not exist in the current directory"
-	folderPathErr          = "An error occurred when trying to find the folder path in the current directory: %v"
+	folderPathErr          = "An error occurred when trying to find the repo root from the current current directory: %v"
+
+	workspaceInfoCliArgErr = "When supplying workspace info via CLI arguments the org-id, project-id and workspace-id must all be present"
+	workspaceInfoFileErr   = "No workspace.yaml file present in the .harness folder in the current directory, consider creating one or supplying workspace info via cli argument"
 
 	startingStepMsg  = "========================== Starting step %s ==========================\n"
 	startingStageMsg = "========================== Starting stage %s ==========================\n"
@@ -46,6 +51,12 @@ type IacmClient interface {
 type LogClient interface {
 	Tail(ctx context.Context, key string) error
 	Blob(ctx context.Context, key string) error
+}
+
+type WorkspaceInfo struct {
+	Org       string `yaml:"org"`
+	Project   string `yaml:"project"`
+	Workspace string `yaml:"workspace"`
 }
 
 type IacmCommand struct {
@@ -69,8 +80,20 @@ func NewIacmCommand(account string, client IacmClient, logClient LogClient) Iacm
 }
 
 func (c IacmCommand) executePlan(ctx context.Context) error {
-	fmt.Printf("Fetching workspace %s... \n", c.workspace)
-	ws, err := c.client.GetWorkspace(ctx, c.org, c.project, c.workspace)
+	wd, err := os.Getwd()
+	if err != nil {
+		fmt.Println(utils.GetColoredText(err.Error(), color.FgRed))
+		return err
+	}
+
+	workspaceInfo, err := getWorkspaceInfo(c.org, c.project, c.workspace, wd)
+	if err != nil {
+		fmt.Println(utils.GetColoredText(err.Error(), color.FgRed))
+		return err
+	}
+
+	fmt.Printf("Fetching workspace %s... \n", workspaceInfo.Workspace)
+	ws, err := c.client.GetWorkspace(ctx, workspaceInfo.Org, workspaceInfo.Project, workspaceInfo.Workspace)
 	if err != nil {
 		fmt.Printf("An error occurred when fetching the workspace: %v \n", err)
 		return err
@@ -86,12 +109,7 @@ func (c IacmCommand) executePlan(ctx context.Context) error {
 		utils.GetColoredText(defaultPipeline, color.FgCyan),
 	)
 
-	wd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	warning, err := validateWorkingDirectory(wd, ws)
+	repoRoot, warning, err := getRepoRootFromWorkingDirectory(wd, ws)
 	if err != nil {
 		fmt.Println(utils.GetColoredText(err.Error(), color.FgRed))
 		return err
@@ -110,7 +128,7 @@ func (c IacmCommand) executePlan(ctx context.Context) error {
 	}
 
 	archive := bytes.NewBuffer([]byte{})
-	_, err = packer.Pack(wd, archive)
+	_, err = packer.Pack(repoRoot, archive)
 	if err != nil {
 		return err
 	}
@@ -122,26 +140,26 @@ func (c IacmCommand) executePlan(ctx context.Context) error {
 	if len(c.targets) > 0 {
 		customArguments["target"] = c.targets
 	}
-	plan, err := c.client.CreateRemoteExecution(ctx, c.org, c.project, c.workspace, customArguments)
+	plan, err := c.client.CreateRemoteExecution(ctx, ws.Org, ws.Project, ws.Identifier, customArguments)
 	if err != nil {
 		fmt.Println(utils.GetColoredText(fmt.Sprintf("An error occurred creating the remote execution: %v", err.Error()), color.FgRed))
 		return err
 	}
 
-	plan, err = c.client.UploadRemoteExecution(ctx, c.org, c.project, c.workspace, plan.ID, archive.Bytes())
+	plan, err = c.client.UploadRemoteExecution(ctx, ws.Org, ws.Project, ws.Identifier, plan.ID, archive.Bytes())
 	if err != nil {
 		fmt.Println(utils.GetColoredText(fmt.Sprintf("An error occurred uploading the source code: %v", err.Error()), color.FgRed))
 		return err
 	}
 
-	plan, err = c.client.ExecuteRemoteExecution(ctx, c.org, c.project, c.workspace, plan.ID)
+	plan, err = c.client.ExecuteRemoteExecution(ctx, ws.Org, ws.Project, ws.Identifier, plan.ID)
 	if err != nil {
 		fmt.Println(utils.GetColoredText(fmt.Sprintf("An error occurred executing the pipeline: %v", err.Error()), color.FgRed))
 		return err
 	}
 	fmt.Printf("Pipeline execution: %s\n", utils.GetColoredText(plan.PipelineExecutionURL, color.FgCyan))
 
-	startingNodeID, err := c.getStartingNodeID(ctx, c.org, c.project, plan.PipelineExecutionID)
+	startingNodeID, err := c.getStartingNodeID(ctx, ws.Org, ws.Project, plan.PipelineExecutionID)
 	if err != nil {
 		fmt.Println(utils.GetColoredText(fmt.Sprintf("An error occurred fetching starting node id: %v", err.Error()), color.FgRed))
 		return err
@@ -202,22 +220,79 @@ func getDefaultPipeline(defaultPipelines map[string]*client.DefaultPipelineOverr
 	return "", err
 }
 
-func validateWorkingDirectory(workingDirectory string, workspace *client.Workspace) (string, error) {
-	if workspace.RepositoryPath != "" {
-		_, err := os.Stat(filepath.Join(workingDirectory, workspace.RepositoryPath))
+func getRepoRootFromWorkingDirectory(workingDirectory string, workspace *client.Workspace) (string, string, error) {
+	if workspace.RepositoryPath == "" {
+		return workingDirectory, fmt.Sprintf(noFolderPathWarningMsg, utils.GetColoredText(workingDirectory, color.FgCyan)), nil
+	}
+
+	workingDirectory = filepath.Clean(workingDirectory)
+	repositoryPath := filepath.Clean(workspace.RepositoryPath)
+	// if the working directory is the same as the configured workspace repository
+	// path we trim the repository path from the working directory to find the repo
+	// root
+	if strings.HasSuffix(workingDirectory, repositoryPath) {
+		repoRoot := strings.TrimSuffix(workingDirectory, workspace.RepositoryPath)
+		repoRoot = filepath.Clean(repoRoot)
+		_, err := os.Stat(repoRoot)
 		if err != nil {
-			if os.IsNotExist(err) {
-				return "", fmt.Errorf(folderPathNotFoundErr, workspace.RepositoryPath)
-			}
-			return "", fmt.Errorf(folderPathErr, err)
+			return "", "", fmt.Errorf(folderPathErr, err)
 		}
-		return fmt.Sprintf(
+		return repoRoot,
+			fmt.Sprintf(
+				folderPathWarningMsg,
+				utils.GetColoredText(repositoryPath, color.FgCyan),
+				utils.GetColoredText(repoRoot, color.FgCyan),
+			), nil
+	}
+
+	// the working directory is not the repository path so we try and find
+	// the repository path within the working directory and if found use the
+	// working directory as the repo root
+	_, err := os.Stat(filepath.Join(workingDirectory, repositoryPath))
+	if os.IsNotExist(err) {
+		return "", "", fmt.Errorf(folderPathNotFoundErr, repositoryPath)
+	}
+
+	return workingDirectory,
+		fmt.Sprintf(
 			folderPathWarningMsg,
-			utils.GetColoredText(workspace.RepositoryPath, color.FgCyan),
+			utils.GetColoredText(repositoryPath, color.FgCyan),
 			utils.GetColoredText(workingDirectory, color.FgCyan),
 		), nil
+}
+
+// getWorkspaceInfo returns the values supplied directly to the cli if they are present
+// and falls back to a config file in .harness/workspace.yaml if not
+func getWorkspaceInfo(org, project, workspace, workingDirectory string) (*WorkspaceInfo, error) {
+	if org != "" && project != "" && workspace != "" {
+		return &WorkspaceInfo{
+			Org:       org,
+			Project:   project,
+			Workspace: workspace,
+		}, nil
 	}
-	return fmt.Sprintf(noFolderPathWarningMsg, utils.GetColoredText(workingDirectory, color.FgCyan)), nil
+	if org == "" && (project != "" || workspace != "") {
+		return nil, errors.New(workspaceInfoCliArgErr)
+	}
+	if project == "" && (org != "" || workspace != "") {
+		return nil, errors.New(workspaceInfoCliArgErr)
+	}
+	if workspace == "" && (org != "" || project != "") {
+		return nil, errors.New(workspaceInfoCliArgErr)
+	}
+
+	file, err := os.ReadFile(filepath.Join(workingDirectory, ".harness/workspace.yaml"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, errors.New(workspaceInfoFileErr)
+		}
+	}
+	workspaceInfo := &WorkspaceInfo{}
+	err = yaml.Unmarshal(file, workspaceInfo)
+	if err != nil {
+		return nil, err
+	}
+	return workspaceInfo, nil
 }
 
 func (c *IacmCommand) getStartingNodeID(ctx context.Context, org, project, executionID string) (string, error) {
