@@ -1,0 +1,44 @@
+version: "1"
+migration:
+  # Whether to perform a dry run first without pushing anything to the destination
+  dryRun: false
+  # Number of concurrent threads or workers for pulling and pushing artifacts
+  concurrency: 5
+  # Optional: define how to handle partial failures
+  # - "continue": skip the failing artifact and continue
+  # - "stop": abort the entire process on failure
+  failureMode: "continue"
+source:
+  type: "JFROG"
+  endpoint: "https://org.jfrog.io/artifactory"
+  credentials:
+    username: "${JFROG_USERNAME}"
+    password: "${JFROG_PASSWORD}"
+  filters:
+    registries:
+      - "my-python-reg"
+      - "my-maven-reg"
+    artifactNamePatterns:
+      include:
+        - ".*:stable"
+      exclude:
+        - ".*:experimental"
+    artifactTypes:
+      - "maven"
+      - "python"
+destination:
+  type: "HAR"
+  accountIdentifier: "accountId"
+  registryEndpoint: "pkg.harness.io"
+  credentials:
+    username: "${DESTINATION_USERNAME}"
+    token: "${DESTINATION_TOKEN}"
+  # Slashes are used to defined the scope. The format would be 
+  # - "registry": Create registry at Account level
+  # - "org/registry": Create registry at Org level
+  # - "org/project/registry": Create registry at Project level
+  mappings:
+    - sourceRegistry: "my-python-reg"
+      destinationRegistry: "myorg/my-python-prod"
+    - sourceRegistry: "my-maven-reg"
+      destinationRegistry: "myorg/my-maven"
