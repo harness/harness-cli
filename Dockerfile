@@ -14,7 +14,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o registry ./cmd/registry
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o ar ./cmd/ar
 
 # Start a new stage from scratch
 FROM alpine:latest

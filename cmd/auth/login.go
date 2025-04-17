@@ -29,14 +29,14 @@ func getLoginCmd() *cobra.Command {
 	}
 
 	// Add flags specific to login
-	cmd.Flags().StringVar(&apiURL, "api-url", "", "Harness API URL")
+	cmd.Flags().StringVar(&apiURL, "clients-url", "", "Harness API URL")
 	cmd.Flags().StringVar(&token, "token", "", "Authentication token")
 	cmd.Flags().StringVar(&accountID, "account", "", "Account ID")
 	cmd.Flags().StringVar(&orgID, "org", "", "Organization ID")
 	cmd.Flags().StringVar(&projectID, "project", "", "Project ID")
 
 	// Mark required flags
-	cmd.MarkFlagRequired("api-url")
+	cmd.MarkFlagRequired("clients-url")
 	cmd.MarkFlagRequired("token")
 	cmd.MarkFlagRequired("account")
 

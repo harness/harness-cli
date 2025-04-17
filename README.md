@@ -17,14 +17,14 @@ Registry CLI is a command-line tool for migrating artifacts between different ar
 
 ```bash
 git clone <repository-url>
-cd registry
-go build -o registry ./cmd/registry
+cd ar
+go build -o ar ./cmd/ar
 ```
 
 ### Using Docker
 
 ```bash
-docker build -t registry .
+docker build -t ar .
 ```
 
 ## Configuration
@@ -60,7 +60,7 @@ The configuration file supports environment variable substitution. Use `${VARIAB
 ### Starting a Migration
 
 ```bash
-./registry migrate --config config.yaml
+./ar migrate --config config.yaml
 ```
 
 Options:
@@ -73,7 +73,7 @@ Options:
 ### Checking Migration Status
 
 ```bash
-./registry status --id <migration-id>
+./ar status --id <migration-id>
 ```
 
 Options:
@@ -86,7 +86,7 @@ Options:
 ### Using Docker
 
 ```bash
-docker run -v $(pwd)/config.yaml:/root/config/config.yaml registry migrate --config /root/config/config.yaml
+docker run -v $(pwd)/config.yaml:/root/config/config.yaml ar migrate --config /root/config/config.yaml
 ```
 
 ## API Integration
