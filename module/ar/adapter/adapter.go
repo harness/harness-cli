@@ -9,14 +9,14 @@ import (
 
 type Adapter interface {
 	// ListArtifacts lists all artifacts from a specified registry
-	ListArtifacts(registry string) ([]types.Artifact, error)
-	
+	ListArtifacts(registry string, artifactType types.ArtifactType) ([]types.Artifact, error)
+
 	// CreateRegistry creates a registry in the system
-	CreateRegistry(registryID string, packageType string) (string, error)
-	
+	PrepareForPush(registry string, packageType string) (string, error)
+
 	// PullArtifact pulls an artifact from the source registry
 	PullArtifact(registry string, artifact types.Artifact) ([]byte, error)
-	
+
 	// PushArtifact pushes an artifact to the destination registry
 	PushArtifact(registry string, artifact types.Artifact, data []byte) error
 }
@@ -24,7 +24,7 @@ type Adapter interface {
 var registry = map[types.RegistryType]Factory{}
 
 type Factory interface {
-	Create(ctx context.Context) (Adapter, error)
+	Create(ctx context.Context, config types.RegistryConfig) (Adapter, error)
 }
 
 // RegisterFactory registers one adapter factory to the registry.

@@ -14,6 +14,19 @@ var (
 	JFROG RegistryType = "JFROG"
 )
 
+type ArtifactType string
+
+var (
+	DOCKER  ArtifactType = "DOCKER"
+	HELM    ArtifactType = "HELM"
+	GENERIC ArtifactType = "GENERIC"
+	PYTHON  ArtifactType = "PYTHON"
+	MAVEN   ArtifactType = "MAVEN"
+	NPM     ArtifactType = "NPM"
+	NUGET   ArtifactType = "NUGET"
+	RPM     ArtifactType = "RPM"
+)
+
 // Config represents the top-level configuration structure
 type Config struct {
 	Version   string             `yaml:"version"`
@@ -40,8 +53,8 @@ type RegistryConfig struct {
 
 // FiltersConfig defines filters for source artifacts. This will be an intersection of all the properties
 type FiltersConfig struct {
-	Registries    []string `yaml:"registries"`
-	ArtifactTypes []string `yaml:"artifactTypes"`
+	Registries   []string     `yaml:"registries"`
+	ArtifactType ArtifactType `yaml:"artifactType"`
 }
 
 // RegistryOverride defines the mapping between source and destination registries
@@ -145,12 +158,8 @@ func validateConfig(config *Config) error {
 		}
 	}
 
-	if len(config.Filters.ArtifactTypes) > 0 {
-		for i, artifactType := range config.Filters.ArtifactTypes {
-			if artifactType == "" {
-				return fmt.Errorf("filter artifact type %d cannot be empty", i)
-			}
-		}
+	if len(config.Filters.ArtifactType) == 0 {
+		return fmt.Errorf("filter artifact type cannot be empty")
 	}
 
 	return nil

@@ -24,27 +24,27 @@ type MigrationService struct {
 // NewMigrationService creates a new migration service
 func NewMigrationService(cfg *types.Config, apiClient *ar.Client) (*MigrationService, error) {
 	ctx := context.Background()
-	
+
 	// Get source adapter factory
 	sourceFactory, err := adapter.GetFactory(cfg.Source.Type)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get source adapter factory: %w", err)
 	}
-	
+
 	// Create source adapter
-	sourceAdapter, err := sourceFactory.Create(ctx)
+	sourceAdapter, err := sourceFactory.Create(ctx, cfg.Source)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create source adapter: %w", err)
 	}
-	
+
 	// Get destination adapter factory
 	destFactory, err := adapter.GetFactory(cfg.Dest.Type)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get destination adapter factory: %w", err)
 	}
-	
+
 	// Create destination adapter
-	destAdapter, err := destFactory.Create(ctx)
+	destAdapter, err := destFactory.Create(ctx, cfg.Dest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create destination adapter: %w", err)
 	}
@@ -67,6 +67,7 @@ func (m *MigrationService) Run(ctx context.Context) error {
 		inputReg := types.InputRegistry{}
 		inputReg.SourceRegistry = registry
 		inputReg.DestinationRegistry = registry
+		inputReg.ArtifactType = m.config.Filters.ArtifactType
 
 		for _, mapping := range m.config.Mappings {
 			if mapping.SourceRegistry == registry {
@@ -96,48 +97,30 @@ func (m *MigrationService) Run(ctx context.Context) error {
 }
 
 // processRegistry handles a single registry mapping
-func (m *MigrationService) processRegistry(ctx context.Context, mapping types.InputRegistry) error {
-	log.Printf("Processing mapping from '%s' to '%s'", mapping.SourceRegistry, mapping.DestinationRegistry)
+func (m *MigrationService) processRegistry(ctx context.Context, registry types.InputRegistry) error {
+	log.Printf("Processing registry from '%s' to '%s'", registry.SourceRegistry, registry.DestinationRegistry)
 
 	// Create a destination registry if needed
 	log.Println("Ensuring destination registry exists")
-	if err := m.ensureDestinationRegistry(mapping.DestinationRegistry); err != nil {
+	if err := m.ensureDestinationRegistry(registry.DestinationRegistry); err != nil {
 		return fmt.Errorf("failed to ensure destination ar: %w", err)
 	}
 
 	// List artifacts from source ar
-	typesArtifacts, err := m.source.ListArtifacts(mapping.SourceRegistry)
+	srcArtifacts, err := m.source.ListArtifacts(registry.SourceRegistry, registry.ArtifactType)
+	destArtifacts, err := m.destination.ListArtifacts(registry.DestinationRegistry, registry.ArtifactType)
+
+	artifacts := minus(srcArtifacts, destArtifacts)
+
 	if err != nil {
 		return fmt.Errorf("failed to list artifacts from source ar: %w", err)
-	}
-
-	// Convert types.Artifact to ar.Artifact
-	artifacts := make([]Artifact, len(typesArtifacts))
-	for i, artifact := range typesArtifacts {
-		artifacts[i] = Artifact{
-			Name:     artifact.Name,
-			Version:  artifact.Tag,
-			Type:     artifact.Type,
-			Registry: mapping.SourceRegistry,
-			Size:     artifact.Size,
-			Properties: map[string]string{
-				"digest": artifact.Digest,
-			},
-		}
-
-		// Add any metadata as properties
-		for k, v := range artifact.Metadata {
-			if strVal, ok := v.(string); ok {
-				artifacts[i].Properties[k] = strVal
-			}
-		}
 	}
 
 	log.Printf("Found %d artifacts to migrate", len(artifacts))
 
 	// Start migration tracking
 	migReq := ar.MigrationRequest{
-		RegistryID:        mapping.SourceRegistry,
+		RegistryID:        registry.SourceRegistry,
 		AccountIdentifier: config.Global.AccountID,
 		TotalImages:       len(artifacts),
 	}
@@ -150,13 +133,33 @@ func (m *MigrationService) processRegistry(ctx context.Context, mapping types.In
 	log.Printf("Migration tracking started with ID: %s", migrationID)
 
 	// Process artifacts
-	return m.processArtifacts(ctx, migrationID, artifacts, mapping)
+	return m.processArtifacts(ctx, migrationID, artifacts, registry)
+}
+
+func minus(iArtifacts, jArtifacts []types.Artifact) []types.Artifact {
+	seenArtifacts := make(map[string]bool)
+
+	for _, artifact := range jArtifacts {
+		key := artifact.Name + ":" + artifact.Version
+		seenArtifacts[key] = true
+	}
+
+	result := make([]types.Artifact, 0, len(iArtifacts))
+
+	for _, artifact := range iArtifacts {
+		key := artifact.Name + ":" + artifact.Version
+		if !seenArtifacts[key] {
+			result = append(result, artifact)
+		}
+	}
+
+	return result
 }
 
 // ensureDestinationRegistry makes sure the destination ar exists
 func (m *MigrationService) ensureDestinationRegistry(destRegistry string) error {
 	// Use the adapter directly to create the registry
-	_, err := m.destination.CreateRegistry(destRegistry, string(m.config.Dest.Type))
+	_, err := m.destination.PrepareForPush(destRegistry, string(m.config.Dest.Type))
 	if err != nil {
 		return fmt.Errorf("failed to create destination ar: %w", err)
 	}
@@ -168,8 +171,8 @@ func (m *MigrationService) ensureDestinationRegistry(destRegistry string) error 
 func (m *MigrationService) processArtifacts(
 	ctx context.Context,
 	migrationID string,
-	artifacts []Artifact,
-	mapping types.RegistryOverride,
+	artifacts []types.Artifact,
+	inputRegistry types.InputRegistry,
 ) error {
 	concurrency := m.config.Migration.Concurrency
 	if concurrency <= 0 {
@@ -194,7 +197,7 @@ func (m *MigrationService) processArtifacts(
 			defer wg.Done()
 			defer func() { <-sem }() // Release semaphore
 
-			if err := m.processArtifact(ctx, migrationID, art, mapping); err != nil {
+			if err := m.processArtifact(ctx, migrationID, art, inputRegistry); err != nil {
 				log.Printf("Error processing artifact %s: %v", art.Name, err)
 				errCh <- err
 

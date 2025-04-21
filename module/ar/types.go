@@ -12,7 +12,7 @@ var (
 	ErrInvalidCredentials      = errors.New("invalid credentials")
 )
 
-// Artifact represents a single artifact in a ar
+// Artifact represents a single artifact in ar
 type Artifact struct {
 	Name       string
 	Version    string
@@ -42,5 +42,5 @@ type DestinationRegistry interface {
 
 // Legacy function types for reference (implementation moved to adapter_bridge.go)
 //
-// func NewSourceRegistry(cfg types.RegistryConfig) (SourceRegistry, error) 
+// func NewSourceRegistry(cfg types.RegistryConfig) (SourceRegistry, error)
 // func NewDestinationRegistry(cfg types.RegistryConfig) (DestinationRegistry, error)
