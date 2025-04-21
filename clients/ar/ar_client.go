@@ -268,7 +268,7 @@ func (c *Client) ListArtifacts(
 	page, size int,
 	searchTerm string,
 ) (*ListArtifactsResponse, error) {
-	endpoint := fmt.Sprintf("/ar/%s/+/artifacts", registryRef)
+	endpoint := fmt.Sprintf("/registry/%s/+/artifacts", client.GetRef(c.AccountID, c.OrgID, c.ProjectID, registryRef))
 
 	// Build query parameters
 	params := url.Values{}
