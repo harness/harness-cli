@@ -479,7 +479,7 @@ func (c *Client) doRequest(method, path string, body []byte) (*http.Response, er
 	var req *http.Request
 	var err error
 
-	fmt.Println(requestURL)
+	//fmt.Println(requestURL)
 
 	if body != nil {
 		req, err = http.NewRequest(method, requestURL, bytes.NewBuffer(body))
