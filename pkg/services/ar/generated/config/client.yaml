@@ -1,0 +1,5 @@
+package: ar
+generate:
+  models: true
+  client: true
+output: pkg/services/ar/generated/client.gen.go
