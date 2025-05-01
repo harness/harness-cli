@@ -1,11 +1,11 @@
-package ar
+package migrate
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"harness/config"
-	"harness/module/ar/types"
+	"harness/module/ar/migrate/types"
 	"io"
 	"mime/multipart"
 	"net/http"

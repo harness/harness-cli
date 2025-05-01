@@ -1,11 +1,9 @@
 package jfrog
 
 import (
-	"harness/clients/ar"
-	"harness/config"
-	"harness/module/ar/http"
-	"harness/module/ar/http/auth/basic"
-	"harness/module/ar/types"
+	"harness/module/ar/migrate/http"
+	"harness/module/ar/migrate/http/auth/basic"
+	"harness/module/ar/migrate/types"
 	http2 "net/http"
 )
 
@@ -27,16 +25,13 @@ func newClient(reg *types.RegistryConfig) *client {
 		insecure: true,
 		username: username,
 		password: password,
-		apiClient: ar.NewHARClient(config.Global.APIBaseURL, config.Global.AuthToken, config.Global.AccountID,
-			config.Global.OrgID, config.Global.ProjectID),
 	}
 }
 
 type client struct {
-	apiClient *ar.Client
-	client    *http.Client
-	url       string
-	insecure  bool
-	username  string
-	password  string
+	client   *http.Client
+	url      string
+	insecure bool
+	username string
+	password string
 }

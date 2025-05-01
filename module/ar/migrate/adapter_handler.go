@@ -1,8 +1,8 @@
-package ar
+package migrate
 
 import (
-	"harness/module/ar/adapter"
-	"harness/module/ar/types"
+	"harness/module/ar/migrate/adapter"
+	"harness/module/ar/migrate/types"
 )
 
 // AdapterArtifactHandler adapts between the new adapter.Adapter interface and the existing

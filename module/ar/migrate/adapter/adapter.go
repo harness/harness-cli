@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"harness/module/ar/types"
+	"harness/module/ar/migrate/types"
 )
 
 type Adapter interface {

@@ -1,8 +1,8 @@
-package ar
+package migrate
 
 import (
 	"fmt"
-	"harness/module/ar/types"
+	"harness/module/ar/migrate/types"
 )
 
 // InitializeRegistryFactories creates the registry factories for all supported registry types

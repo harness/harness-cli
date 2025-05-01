@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"github.com/goharbor/harbor/src/lib/log"
 	"harness/clients/ar"
-	"harness/module/ar/adapter"
-	"harness/module/ar/types"
+	"harness/module/ar/migrate/adapter"
+	"harness/module/ar/migrate/types"
 )
 
 // factory section

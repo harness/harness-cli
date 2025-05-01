@@ -1,9 +1,9 @@
-package ar
+package migrate
 
 import (
 	"encoding/json"
 	"fmt"
-	"harness/module/ar/types"
+	"harness/module/ar/migrate/types"
 	"io"
 	"net/http"
 	"net/url"

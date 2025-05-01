@@ -15,7 +15,7 @@
 package basic
 
 import (
-	"harness/module/ar/lib"
+	"harness/module/ar/migrate/lib"
 	"net/http"
 )
 

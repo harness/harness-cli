@@ -7,8 +7,8 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg/reg/filter"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
-	"harness/module/ar/adapter"
-	"harness/module/ar/types"
+	"harness/module/ar/migrate/adapter"
+	"harness/module/ar/migrate/types"
 	"strings"
 )
 

@@ -1,4 +1,4 @@
-package ar
+package migrate
 
 import (
 	"fmt"
@@ -33,7 +33,12 @@ func NewArtifactHandler(packageType string) (ArtifactHandler, error) {
 type GenericArtifactHandler struct{}
 
 // CopyArtifact for generic artifacts performs a simple download and upload
-func (h *GenericArtifactHandler) CopyArtifact(source SourceRegistry, destination DestinationRegistry, artifact Artifact, destRegistry string) error {
+func (h *GenericArtifactHandler) CopyArtifact(
+	source SourceRegistry,
+	destination DestinationRegistry,
+	artifact Artifact,
+	destRegistry string,
+) error {
 	// Download artifact
 	log.Printf("Downloading generic artifact %s:%s", artifact.Name, artifact.Version)
 	artifactBytes, err := source.DownloadArtifact(artifact)
@@ -62,7 +67,12 @@ func (h *GenericArtifactHandler) CopyArtifact(source SourceRegistry, destination
 type PythonArtifactHandler struct{}
 
 // CopyArtifact for Python packages handles Python-specific versioning and metadata
-func (h *PythonArtifactHandler) CopyArtifact(source SourceRegistry, destination DestinationRegistry, artifact Artifact, destRegistry string) error {
+func (h *PythonArtifactHandler) CopyArtifact(
+	source SourceRegistry,
+	destination DestinationRegistry,
+	artifact Artifact,
+	destRegistry string,
+) error {
 	// Download artifact
 	log.Printf("Downloading Python package %s:%s", artifact.Name, artifact.Version)
 	artifactBytes, err := source.DownloadArtifact(artifact)
@@ -76,9 +86,9 @@ func (h *PythonArtifactHandler) CopyArtifact(source SourceRegistry, destination 
 	if prop, ok := artifact.Properties["format"]; ok {
 		packageFormat = prop
 	}
-	
+
 	log.Printf("Processing Python package in %s format", packageFormat)
-	
+
 	// We could extract metadata or validate the package here
 	// For demo purposes, we're just logging the format
 
@@ -106,7 +116,12 @@ func (h *PythonArtifactHandler) CopyArtifact(source SourceRegistry, destination 
 type MavenArtifactHandler struct{}
 
 // CopyArtifact for Maven artifacts handles Maven coordinates and POM files
-func (h *MavenArtifactHandler) CopyArtifact(source SourceRegistry, destination DestinationRegistry, artifact Artifact, destRegistry string) error {
+func (h *MavenArtifactHandler) CopyArtifact(
+	source SourceRegistry,
+	destination DestinationRegistry,
+	artifact Artifact,
+	destRegistry string,
+) error {
 	// Download artifact
 	log.Printf("Downloading Maven artifact %s:%s", artifact.Name, artifact.Version)
 	artifactBytes, err := source.DownloadArtifact(artifact)
@@ -141,7 +156,12 @@ func (h *MavenArtifactHandler) CopyArtifact(source SourceRegistry, destination D
 type NpmArtifactHandler struct{}
 
 // CopyArtifact for NPM packages handles package.json and scoped packages
-func (h *NpmArtifactHandler) CopyArtifact(source SourceRegistry, destination DestinationRegistry, artifact Artifact, destRegistry string) error {
+func (h *NpmArtifactHandler) CopyArtifact(
+	source SourceRegistry,
+	destination DestinationRegistry,
+	artifact Artifact,
+	destRegistry string,
+) error {
 	// Download artifact
 	log.Printf("Downloading NPM package %s:%s", artifact.Name, artifact.Version)
 	artifactBytes, err := source.DownloadArtifact(artifact)
@@ -151,9 +171,9 @@ func (h *NpmArtifactHandler) CopyArtifact(source SourceRegistry, destination Des
 
 	// For NPM, we might need to handle scoped packages (@org/package-name)
 	// and versioning like major.minor.patch-tag
-	
+
 	// We might also need to preserve or update package.json contents
-	
+
 	// Upload artifact
 	log.Printf("Uploading NPM package %s:%s to destination", artifact.Name, artifact.Version)
 	destArtifact := Artifact{

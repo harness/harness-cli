@@ -16,8 +16,8 @@ package auth
 
 import (
 	"errors"
-	"harness/module/ar/http/modifier"
-	"harness/module/ar/secret"
+	"harness/module/ar/migrate/http/modifier"
+	"harness/module/ar/migrate/secret"
 	"net/http"
 )
 

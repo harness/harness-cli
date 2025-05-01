@@ -1,12 +1,12 @@
-package ar
+package migrate
 
 import (
 	"context"
 	"fmt"
 	"harness/clients/ar"
 	"harness/config"
-	"harness/module/ar/adapter"
-	"harness/module/ar/types"
+	"harness/module/ar/migrate/adapter"
+	"harness/module/ar/migrate/types"
 	"log"
 	"strings"
 	"sync"

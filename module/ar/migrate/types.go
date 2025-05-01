@@ -1,4 +1,4 @@
-package ar
+package migrate
 
 import (
 	"errors"
