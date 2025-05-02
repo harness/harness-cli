@@ -11,9 +11,9 @@ type Adapter interface {
 	ValidateCredentials() (bool, error)
 	GetRegistry(registry string) (interface{}, error)
 	CreateRegistryIfDoesntExist(registry string) (bool, error)
-	GetPackages()
-	GetVersions()
-	GetFiles()
+	GetPackages(registry string)
+	GetVersions(registry, pkg string)
+	GetFiles(registry, pkg, version string)
 
 	// ListArtifacts lists all artifacts from a specified registry
 	ListArtifacts(registry string, artifactType types.ArtifactType) ([]types.Artifact, error)
