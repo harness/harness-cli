@@ -50,25 +50,25 @@ func runMigration(cmd *cobra.Command, args []string) {
 	}
 
 	if config.Global.Registry.Migrate.DryRun {
-		cfg.Migration.DryRun = true
+		cfg.DryRun = true
 	}
 	if config.Global.Registry.Migrate.Concurrency > 0 {
-		cfg.Migration.Concurrency = config.Global.Registry.Migrate.Concurrency
+		cfg.Concurrency = config.Global.Registry.Migrate.Concurrency
 	}
 
 	// Create an API client for orchestration purpose. The registry clients will be initiated separately
 	apiClient := ar.NewHARClient(config.Global.APIBaseURL, config.Global.AuthToken, config.Global.AccountID,
 		config.Global.OrgID, config.Global.ProjectID)
 
-	// Create a migration service
-	migrationSvc, err := ar2.NewMigrationService(cfg, apiClient)
-	if err != nil {
-		log.Fatalf("Failed to create migration service: %v", err)
-	}
-
 	// Set up context with cancellation for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Create a migration service
+	migrationSvc, err := ar2.NewMigrationService(ctx, cfg, apiClient)
+	if err != nil {
+		log.Fatalf("Failed to create migration service: %v", err)
+	}
 
 	// Set up signal handling for graceful shutdown
 	signalChan := make(chan os.Signal, 1)

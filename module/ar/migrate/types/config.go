@@ -29,42 +29,31 @@ var (
 
 // Config represents the top-level configuration structure
 type Config struct {
-	Version   string             `yaml:"version"`
-	Migration MigrationConfig    `yaml:"migration"`
-	Source    RegistryConfig     `yaml:"source"`
-	Dest      RegistryConfig     `yaml:"destination"`
-	Mappings  []RegistryOverride `yaml:"overrides"`
-	Filters   FiltersConfig      `yaml:"filters"`
-}
-
-// MigrationConfig contains settings for a migration process
-type MigrationConfig struct {
-	DryRun      bool   `yaml:"dryRun"`
-	Concurrency int    `yaml:"concurrency"`
-	FailureMode string `yaml:"failureMode"`
+	Version     string            `yaml:"version"`
+	DryRun      bool              `yaml:"dryRun"`
+	Concurrency int               `yaml:"concurrency"`
+	FailureMode string            `yaml:"failureMode"`
+	Source      RegistryConfig    `yaml:"source"`
+	Dest        RegistryConfig    `yaml:"destination"`
+	Mappings    []RegistryMapping `yaml:"mappings"`
 }
 
 // RegistryConfig defines the source ar configuration
 type RegistryConfig struct {
 	Endpoint    string            `yaml:"endpoint"`
 	Type        RegistryType      `yaml:"type"`
-	Credentials CredentialsConfig `yaml:"credentials"`
+	Credentials CredentialsConfig `yaml:"credentials,omitempty"`
 }
 
-// FiltersConfig defines filters for source artifacts. This will be an intersection of all the properties
-type FiltersConfig struct {
-	Registries   []string     `yaml:"registries"`
-	ArtifactType ArtifactType `yaml:"artifactType"`
-}
-
-// RegistryOverride defines the mapping between source and destination registries
+// RegistryMapping defines the mapping between source and destination registries
 // Slashes are used to defined the scope. The format would be
 // - "registry": Create registry at Account level
 // - "org/registry": Create registry at Org level
 // - "org/project/registry": Create registry at Project level
-type RegistryOverride struct {
-	SourceRegistry       string `yaml:"sourceRegistry"`
-	DestinationRegistry  string `yaml:"destinationRegistry"`
+type RegistryMapping struct {
+	ArtifactType         ArtifactType `yaml:"artifactType"`
+	SourceRegistry       string       `yaml:"sourceRegistry"`
+	DestinationRegistry  string       `yaml:"destinationRegistry"`
 	ArtifactNamePatterns struct {
 		Include []string `yaml:"include"`
 		Exclude []string `yaml:"exclude"`
@@ -73,7 +62,7 @@ type RegistryOverride struct {
 
 // CredentialsConfig defines the credential configuration
 type CredentialsConfig struct {
-	Username string `yaml:"username"`
+	Username string `yaml:"username,omitempty"`
 	Password string `yaml:"password,omitempty"`
 	Token    string `yaml:"token,omitempty"`
 }
@@ -114,15 +103,15 @@ func expandEnvInYaml(content string) string {
 // validateConfig performs basic validation on the configuration
 func validateConfig(config *Config) error {
 	// Check migration configuration
-	if config.Migration.Concurrency <= 0 {
+	if config.Concurrency <= 0 {
 		return fmt.Errorf("concurrency must be greater than 0")
 	}
 
-	switch strings.ToLower(config.Migration.FailureMode) {
+	switch strings.ToLower(config.FailureMode) {
 	case "continue", "stop":
 		// Valid values
 	default:
-		return fmt.Errorf("invalid failure mode: %s, must be 'continue' or 'stop'", config.Migration.FailureMode)
+		return fmt.Errorf("invalid failure mode: %s, must be 'continue' or 'stop'", config.FailureMode)
 	}
 
 	// Validate source and destination registry configurations
@@ -138,7 +127,6 @@ func validateConfig(config *Config) error {
 	if len(config.Mappings) == 0 {
 		return fmt.Errorf("at least one registry mapping must be defined")
 	}
-
 	// Validate each mapping
 	for i, mapping := range config.Mappings {
 		if mapping.SourceRegistry == "" {
@@ -147,19 +135,6 @@ func validateConfig(config *Config) error {
 		if mapping.DestinationRegistry == "" {
 			return fmt.Errorf("mapping %d: destination registry cannot be empty", i)
 		}
-	}
-
-	// Validate filters if specified
-	if len(config.Filters.Registries) > 0 {
-		for i, registry := range config.Filters.Registries {
-			if registry == "" {
-				return fmt.Errorf("filter registry %d cannot be empty", i)
-			}
-		}
-	}
-
-	if len(config.Filters.ArtifactType) == 0 {
-		return fmt.Errorf("filter artifact type cannot be empty")
 	}
 
 	return nil
@@ -186,14 +161,13 @@ func validateCredentials(registry RegistryConfig) error {
 
 	// Validate credentials
 	// Authentication must be provided via either token or username
-	hasToken := registry.Credentials.Token != ""
 	hasUsername := registry.Credentials.Username != ""
+	hasToken := registry.Credentials.Token != ""
 
 	if !hasToken && !hasUsername {
 		return fmt.Errorf("either token or username must be provided for authentication")
 	}
 
-	// If using username auth, password should also be provided
 	if hasUsername && registry.Credentials.Password == "" {
 		return fmt.Errorf("password must be provided when using username authentication")
 	}

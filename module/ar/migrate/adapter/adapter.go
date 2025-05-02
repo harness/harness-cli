@@ -8,6 +8,13 @@ import (
 )
 
 type Adapter interface {
+	ValidateCredentials() (bool, error)
+	GetRegistry(registry string) (interface{}, error)
+	CreateRegistryIfDoesntExist(registry string) (bool, error)
+	GetPackages()
+	GetVersions()
+	GetFiles()
+
 	// ListArtifacts lists all artifacts from a specified registry
 	ListArtifacts(registry string, artifactType types.ArtifactType) ([]types.Artifact, error)
 
@@ -50,4 +57,16 @@ func GetFactory(t types.RegistryType) (Factory, error) {
 		return nil, fmt.Errorf("adapter factory for %s not found", t)
 	}
 	return factory, nil
+}
+
+func GetAdapter(ctx context.Context, cfg types.RegistryConfig) (Adapter, error) {
+	factory, err := GetFactory(cfg.Type)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get adapter factory: %v", err)
+	}
+	adapter, err := factory.Create(ctx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create adapter: %v", err)
+	}
+	return adapter, nil
 }
