@@ -2,12 +2,15 @@ package main
 
 import (
 	"fmt"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"harness/cmd/ar"
 	"harness/cmd/auth"
 	"harness/config"
 	"harness/util/templates"
 	"os"
+	"time"
 )
 
 func main() {
@@ -84,6 +87,9 @@ func main() {
 	flags := rootCmd.PersistentFlags()
 
 	addProfilingFlags(flags)
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
+	//zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

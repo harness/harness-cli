@@ -38,7 +38,7 @@ func getMigrateCmd() *cobra.Command {
 	migrateCmd.Flags().StringVarP(&localConfigPath, "config", "c", "config.yaml", "Path to configuration file")
 	migrateCmd.Flags().StringVar(&localAPIBaseURL, "ar-url", "", "Base URL for the API (overrides config)")
 	migrateCmd.Flags().BoolVar(&localDryRun, "dry-run", false, "Perform a dry run (overrides config)")
-	migrateCmd.Flags().IntVar(&localConcurrency, "concurrency", 5, "Number of concurrent operations (overrides config)")
+	migrateCmd.Flags().IntVar(&localConcurrency, "concurrency", 1, "Number of concurrent operations (overrides config)")
 	return migrateCmd
 }
 

@@ -51,13 +51,11 @@ type RegistryConfig struct {
 // - "org/registry": Create registry at Org level
 // - "org/project/registry": Create registry at Project level
 type RegistryMapping struct {
-	ArtifactType         ArtifactType `yaml:"artifactType"`
-	SourceRegistry       string       `yaml:"sourceRegistry"`
-	DestinationRegistry  string       `yaml:"destinationRegistry"`
-	ArtifactNamePatterns struct {
-		Include []string `yaml:"include"`
-		Exclude []string `yaml:"exclude"`
-	} `yaml:"artifactNamePatterns"`
+	ArtifactType        ArtifactType `yaml:"artifactType"`
+	SourceRegistry      string       `yaml:"sourceRegistry"`
+	DestinationRegistry string       `yaml:"destinationRegistry"`
+	IncludePatterns     []string     `yaml:"includePatterns"`
+	ExcludePatterns     []string     `yaml:"excludePatterns"`
 }
 
 // CredentialsConfig defines the credential configuration

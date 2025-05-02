@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"harness/clients/ar"
 	"harness/module/ar/migrate/types"
 )
 
@@ -14,18 +15,6 @@ type Adapter interface {
 	GetPackages(registry string)
 	GetVersions(registry, pkg string)
 	GetFiles(registry, pkg, version string)
-
-	// ListArtifacts lists all artifacts from a specified registry
-	ListArtifacts(registry string, artifactType types.ArtifactType) ([]types.Artifact, error)
-
-	// CreateRegistry creates a registry in the system
-	PrepareForPush(registry string, packageType string) (string, error)
-
-	// PullArtifact pulls an artifact from the source registry
-	PullArtifact(registry string, artifact types.Artifact) ([]byte, error)
-
-	// PushArtifact pushes an artifact to the destination registry
-	PushArtifact(registry string, artifact types.Artifact, data []byte) error
 }
 
 var registry = map[types.RegistryType]Factory{}
@@ -59,7 +48,7 @@ func GetFactory(t types.RegistryType) (Factory, error) {
 	return factory, nil
 }
 
-func GetAdapter(ctx context.Context, cfg types.RegistryConfig) (Adapter, error) {
+func GetAdapter(ctx context.Context, cfg types.RegistryConfig, client *ar.Client) (Adapter, error) {
 	factory, err := GetFactory(cfg.Type)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get adapter factory: %v", err)

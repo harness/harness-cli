@@ -35,3 +35,8 @@ type client struct {
 	username string
 	password string
 }
+
+func (c *client) getFiles(registry string) (interface{}, error) {
+	
+	return nil, nil
+}

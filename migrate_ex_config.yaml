@@ -1,0 +1,35 @@
+version: 1.0.0
+dryRun: false
+concurrency: 1
+failureMode: continue
+source:
+  endpoint: https://jfrog.io
+  type: JFROG
+  credentials:
+    username: myuser
+    password: mypass
+    token: mytoken
+destination:
+  endpoint: https://jfrog.io
+  type: HAR
+  credentials:
+    username: myuser
+    password: mypass
+    token: mytoken
+mappings:
+  - artifactType: DOCKER
+    sourceRegistry: myreg1
+    destinationRegistry: mydes1
+    includePatterns:
+      - '*'
+    excludePatterns:
+      - abc
+      - def
+  - artifactType: DOCKER
+    sourceRegistry: myreg2
+    destinationRegistry: mydes2
+    includePatterns:
+      - '*'
+    excludePatterns:
+      - abc
+      - def

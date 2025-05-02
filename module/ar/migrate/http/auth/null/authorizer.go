@@ -15,9 +15,8 @@
 package null
 
 import (
+	"harness/module/ar/migrate/lib"
 	"net/http"
-
-	"github.com/goharbor/harbor/src/lib"
 )
 
 // NewAuthorizer returns a null authorizer

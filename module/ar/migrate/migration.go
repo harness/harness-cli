@@ -3,12 +3,15 @@ package migrate
 import (
 	"context"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"harness/clients/ar"
 	"harness/module/ar/migrate/adapter"
 	"harness/module/ar/migrate/engine"
 	"harness/module/ar/migrate/migratable"
 	"harness/module/ar/migrate/types"
-	"log"
+
+	_ "harness/module/ar/migrate/adapter/har"
+	_ "harness/module/ar/migrate/adapter/jfrog"
 )
 
 // MigrationService handles the migration process
@@ -21,11 +24,11 @@ type MigrationService struct {
 
 // NewMigrationService creates a new migration service
 func NewMigrationService(ctx context.Context, cfg *types.Config, apiClient *ar.Client) (*MigrationService, error) {
-	sourceAdapter, err := adapter.GetAdapter(ctx, cfg.Source)
+	sourceAdapter, err := adapter.GetAdapter(ctx, cfg.Source, apiClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get source adapter: %v", err)
 	}
-	destAdapter, err := adapter.GetAdapter(ctx, cfg.Dest)
+	destAdapter, err := adapter.GetAdapter(ctx, cfg.Dest, apiClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get destination adapter: %v", err)
 	}
@@ -40,20 +43,22 @@ func NewMigrationService(ctx context.Context, cfg *types.Config, apiClient *ar.C
 
 // Run executes the migration process
 func (m *MigrationService) Run(ctx context.Context) error {
-	log.Println("Starting migration process")
-	log.Printf("Source type: %s, Destination type: %s", m.config.Source.Type, m.config.Dest.Type)
+	logger := log.With().
+		Str("source_type", string(m.config.Source.Type)).
+		Str("destination_type", string(m.config.Dest.Type)).
+		Logger()
+
+	logger.Info().Msg("Starting migration process")
 
 	var jobs []migratable.Job
 
 	for _, mapping := range m.config.Mappings {
-		input := types.InputMapping{}
-		input.SourceRegistry = mapping.SourceRegistry
-		input.DestinationRegistry = mapping.DestinationRegistry
-		input.ArtifactType = mapping.ArtifactType
-		input.ArtifactNamePatterns.Include = mapping.ArtifactNamePatterns.Include
-		input.ArtifactNamePatterns.Exclude = mapping.ArtifactNamePatterns.Exclude
-		log.Printf("Processing registry migration from '%s' to '%s'", mapping.SourceRegistry,
-			mapping.DestinationRegistry)
+		mappingLogger := logger.With().
+			Str("source_registry", mapping.SourceRegistry).
+			Str("destination_registry", mapping.DestinationRegistry).
+			Logger()
+
+		mappingLogger.Info().Msg("Processing registry migration")
 
 		job := migratable.NewRegistryJob(m.source, m.destination, mapping.SourceRegistry,
 			mapping.DestinationRegistry)
@@ -64,8 +69,9 @@ func (m *MigrationService) Run(ctx context.Context) error {
 	eng := engine.NewEngine(m.config.Concurrency, jobs)
 	err := eng.Execute(ctx)
 	if err != nil {
+		logger.Error().Err(err).Msg("Engine execution failed")
 		return fmt.Errorf("engine execution failed: %w", err)
 	}
-	log.Println("Migration process completed")
+	logger.Info().Msg("Migration process completed")
 	return nil
 }

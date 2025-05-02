@@ -12,7 +12,6 @@ func GetRootCmd() *cobra.Command {
 	}
 
 	rootCmd.AddCommand(getMigrateCmd())
-	rootCmd.AddCommand(getStatusCmd())
 	rootCmd.AddCommand(getArtifactsCmd())
 	rootCmd.AddCommand(getRegistryCmds())
 

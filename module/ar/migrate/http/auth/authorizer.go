@@ -16,19 +16,18 @@ package auth
 
 import (
 	"fmt"
+	commonhttp "harness/module/ar/migrate/http"
+	"harness/module/ar/migrate/http/auth/basic"
+	"harness/module/ar/migrate/http/auth/bearer"
+	"harness/module/ar/migrate/http/auth/null"
+	"harness/module/ar/migrate/http/modifier"
+	"harness/module/ar/migrate/lib"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 
 	"github.com/docker/distribution/registry/client/auth/challenge"
-
-	commonhttp "github.com/goharbor/harbor/src/common/http"
-	"github.com/goharbor/harbor/src/common/http/modifier"
-	"github.com/goharbor/harbor/src/lib"
-	"github.com/goharbor/harbor/src/pkg/registry/auth/basic"
-	"github.com/goharbor/harbor/src/pkg/registry/auth/bearer"
-	"github.com/goharbor/harbor/src/pkg/registry/auth/null"
 )
 
 // NewAuthorizer creates an authorizer that can handle different auth schemes
