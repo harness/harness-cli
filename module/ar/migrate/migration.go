@@ -24,11 +24,11 @@ type MigrationService struct {
 
 // NewMigrationService creates a new migration service
 func NewMigrationService(ctx context.Context, cfg *types.Config, apiClient *ar.Client) (*MigrationService, error) {
-	sourceAdapter, err := adapter.GetAdapter(ctx, cfg.Source, apiClient)
+	sourceAdapter, err := adapter.GetAdapter(ctx, cfg.Source)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get source adapter: %v", err)
 	}
-	destAdapter, err := adapter.GetAdapter(ctx, cfg.Dest, apiClient)
+	destAdapter, err := adapter.GetAdapter(ctx, cfg.Dest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get destination adapter: %v", err)
 	}
@@ -50,7 +50,7 @@ func (m *MigrationService) Run(ctx context.Context) error {
 
 	logger.Info().Msg("Starting migration process")
 
-	var jobs []migratable.Job
+	var jobs []engine.Job
 
 	for _, mapping := range m.config.Mappings {
 		mappingLogger := logger.With().
@@ -61,7 +61,7 @@ func (m *MigrationService) Run(ctx context.Context) error {
 		mappingLogger.Info().Msg("Processing registry migration")
 
 		job := migratable.NewRegistryJob(m.source, m.destination, mapping.SourceRegistry,
-			mapping.DestinationRegistry)
+			mapping.DestinationRegistry, mapping.ArtifactType)
 		jobs = append(jobs, job)
 
 	}

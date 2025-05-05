@@ -12,42 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package bearer
+package xApiKey
 
 import (
-	"fmt"
 	"harness/module/ar/migrate/lib"
 	"net/http"
 )
 
-const (
-	cacheCapacity = 100
-)
-
-// NewAuthorizer return a bearer token authorizer
-// The parameter "a" is an authorizer used to fetch the token
+// NewAuthorizer return a basic authorizer
 func NewAuthorizer(token string) lib.Authorizer {
-	authorizer := &authorizer{
-		//realm:      realm,
-		//service:    service,
-		//authorizer: a,
-		//cache:      newCache(cacheCapacity),
+	return &authorizer{
+		token: token,
 	}
-
-	//authorizer.client = &http.Client{Transport: transport}
-	authorizer.token = token
-	return authorizer
 }
 
 type authorizer struct {
-	realm      string
-	service    string
-	authorizer lib.Authorizer
-	client     *http.Client
-	token      string
+	token string
 }
 
 func (a *authorizer) Modify(req *http.Request) error {
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", a.token))
+	req.Header.Add("x-api-key", a.token)
 	return nil
 }

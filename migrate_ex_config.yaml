@@ -3,31 +3,23 @@ dryRun: false
 concurrency: 1
 failureMode: continue
 source:
-  endpoint: https://jfrog.io
+  endpoint: ${SRC_ENDPOINT}
   type: JFROG
   credentials:
-    username: myuser
-    password: mypass
-    token: mytoken
+    username: ${SRC_USER}
+    password: ${SRC_PASS}
+    token: ${SRC_TOKEN}
 destination:
-  endpoint: https://jfrog.io
+  endpoint: ${DST_ENDPOINT}
   type: HAR
   credentials:
-    username: myuser
-    password: mypass
-    token: mytoken
+    username: ${DST_USER}
+    password: ${DST_PASS}
+    token: ${DST_TOKEN}
 mappings:
-  - artifactType: DOCKER
-    sourceRegistry: myreg1
-    destinationRegistry: mydes1
-    includePatterns:
-      - '*'
-    excludePatterns:
-      - abc
-      - def
-  - artifactType: DOCKER
-    sourceRegistry: myreg2
-    destinationRegistry: mydes2
+  - artifactType: GENERIC
+    sourceRegistry: ${SRC_REG}
+    destinationRegistry: ${DST_REG}
     includePatterns:
       - '*'
     excludePatterns:

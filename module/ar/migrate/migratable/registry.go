@@ -7,6 +7,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"harness/module/ar/migrate/adapter"
+	"harness/module/ar/migrate/engine"
+	"harness/module/ar/migrate/tree"
+	"harness/module/ar/migrate/types"
 	"time"
 )
 
@@ -15,10 +18,17 @@ type Registry struct {
 	destRegistry string
 	srcAdapter   adapter.Adapter
 	destAdapter  adapter.Adapter
+	artifactType types.ArtifactType
 	logger       zerolog.Logger
 }
 
-func NewRegistryJob(src adapter.Adapter, dest adapter.Adapter, srcRegistry string, destRegistry string) Job {
+func NewRegistryJob(
+	src adapter.Adapter,
+	dest adapter.Adapter,
+	srcRegistry string,
+	destRegistry string,
+	artifactType types.ArtifactType,
+) engine.Job {
 	jobID := uuid.New().String()
 
 	jobLogger := log.With().
@@ -33,6 +43,7 @@ func NewRegistryJob(src adapter.Adapter, dest adapter.Adapter, srcRegistry strin
 		destRegistry: destRegistry,
 		srcAdapter:   src,
 		destAdapter:  dest,
+		artifactType: artifactType,
 		logger:       jobLogger,
 	}
 }
@@ -81,10 +92,36 @@ func (r *Registry) Migrate(ctx context.Context) error {
 
 	startTime := time.Now()
 
-	r.srcAdapter.GetPackages(r.srcRegistry)
+	files, err2 := r.srcAdapter.GetFiles(r.srcRegistry)
+	if err2 != nil {
+		logger.Error().Msgf("Failed to get files from registry %s", r.srcRegistry)
+		return fmt.Errorf("get files from registry %s failed: %w", r.srcRegistry, err2)
+	}
+	root := tree.TransformToTree(files)
 
-	// Your migration code here
-	time.Sleep(time.Duration(5) * time.Second)
+	pkgs, err := r.srcAdapter.GetPackages(r.srcRegistry, r.artifactType)
+	if err != nil {
+		logger.Error().Msg("Failed to get packages")
+		return fmt.Errorf("get packages failed: %w", err)
+	}
+
+	var jobs []engine.Job
+	for _, pkg := range pkgs {
+		treeNode, err2 := tree.GetNodeForPath(root, pkg.Path)
+		if err2 != nil {
+			logger.Error().Msgf("Failed to get node for path %s", pkg.Path)
+			return fmt.Errorf("get node for path %s failed: %w", pkg.Path, err2)
+		}
+		job := NewPackageJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, pkg, treeNode)
+		jobs = append(jobs, job)
+	}
+
+	eng := engine.NewEngine(5, jobs)
+	err = eng.Execute(ctx)
+	if err != nil {
+		logger.Error().Err(err).Msg("Engine execution failed")
+		return fmt.Errorf("engine execution failed: %w", err)
+	}
 
 	logger.Info().
 		Dur("duration", time.Since(startTime)).

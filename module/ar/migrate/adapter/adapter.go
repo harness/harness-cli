@@ -4,17 +4,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"harness/clients/ar"
 	"harness/module/ar/migrate/types"
+	"io"
+	"net/http"
 )
 
 type Adapter interface {
 	ValidateCredentials() (bool, error)
 	GetRegistry(registry string) (interface{}, error)
 	CreateRegistryIfDoesntExist(registry string) (bool, error)
-	GetPackages(registry string)
-	GetVersions(registry, pkg string)
-	GetFiles(registry, pkg, version string)
+	GetPackages(registry string, artifactType types.ArtifactType) (packages []types.Package, err error)
+	GetVersions(registry, pkg string, artifactType types.ArtifactType) (versions []types.Version, err error)
+	GetFiles(registry string) ([]types.File, error)
+	DownloadFile(registry string, uri string) (io.ReadCloser, http.Header, error)
+	UploadFile(
+		registry string,
+		file io.ReadCloser,
+		f *types.File,
+		header http.Header,
+		artifactName string,
+		version string,
+	) error
 }
 
 var registry = map[types.RegistryType]Factory{}
@@ -48,7 +58,7 @@ func GetFactory(t types.RegistryType) (Factory, error) {
 	return factory, nil
 }
 
-func GetAdapter(ctx context.Context, cfg types.RegistryConfig, client *ar.Client) (Adapter, error) {
+func GetAdapter(ctx context.Context, cfg types.RegistryConfig) (Adapter, error) {
 	factory, err := GetFactory(cfg.Type)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get adapter factory: %v", err)

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
-	"harness/module/ar/migrate/migratable"
 	"runtime"
 	"sync"
 	"time"
@@ -14,10 +13,10 @@ import (
 
 type Engine struct {
 	concurrency int
-	jobs        []migratable.Job
+	jobs        []Job
 }
 
-func NewEngine(concurrency int, jobs []migratable.Job) *Engine {
+func NewEngine(concurrency int, jobs []Job) *Engine {
 	return &Engine{
 		concurrency: concurrency,
 		jobs:        jobs,
@@ -78,7 +77,7 @@ func (e *Engine) Execute(ctx context.Context) error {
 						Err(err).
 						Dur("duration", time.Since(stepStartTime)).
 						Msg("Step failed")
-					
+
 					errCh <- fmt.Errorf("job %d|%s: %s-step: %w", i, info, name, err)
 					return false
 				}
@@ -87,6 +86,7 @@ func (e *Engine) Execute(ctx context.Context) error {
 					Msg("Step completed successfully")
 				return true
 			}
+
 			if !step("pre", jb.Pre) || !step("migrate", jb.Migrate) || !step("post", jb.Post) {
 				jobLogger.Warn().
 					Dur("duration", time.Since(jobStartTime)).

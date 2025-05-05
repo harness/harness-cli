@@ -8,10 +8,84 @@ import (
 	"harness/cmd/ar"
 	"harness/cmd/auth"
 	"harness/config"
+	"harness/module/ar/migrate/tree"
+	"harness/module/ar/migrate/types"
 	"harness/util/templates"
 	"os"
 	"time"
 )
+
+func main_2() {
+	var files []types.File
+	files = append(files,
+		types.File{
+			Registry:     "r1",
+			Uri:          "/logs/1.log",
+			Folder:       false,
+			Size:         1,
+			LastModified: "abc",
+			SHA1:         "fsadf",
+			SHA2:         "Fsadf",
+		},
+		types.File{
+			Registry:     "r1",
+			Uri:          "1.out",
+			Folder:       false,
+			Size:         1,
+			LastModified: "abc",
+			SHA1:         "fsadf",
+			SHA2:         "Fsadf",
+		},
+		types.File{
+			Registry:     "r1",
+			Uri:          "happy/2.out",
+			Folder:       false,
+			Size:         1,
+			LastModified: "abc",
+			SHA1:         "fsadf",
+			SHA2:         "Fsadf",
+		},
+		types.File{
+			Registry:     "r1",
+			Uri:          "sad/3.out",
+			Folder:       false,
+			Size:         10,
+			LastModified: "abc",
+			SHA1:         "fsadf",
+			SHA2:         "Fsadf",
+		},
+		types.File{
+			Registry:     "r1",
+			Uri:          "sad/foo/11.out",
+			Folder:       false,
+			Size:         10,
+			LastModified: "abc",
+			SHA1:         "fsadf",
+			SHA2:         "Fsadf",
+		},
+		types.File{
+			Registry:     "r1",
+			Uri:          "sad/foo/bar/11.out",
+			Folder:       false,
+			Size:         10,
+			LastModified: "abc",
+			SHA1:         "fsadf",
+			SHA2:         "Fsadf",
+		},
+		types.File{
+			Registry:     "r1",
+			Uri:          "sad/1.out",
+			Folder:       false,
+			Size:         10,
+			LastModified: "abc",
+			SHA1:         "fsadf",
+			SHA2:         "Fsadf",
+		},
+	)
+
+	t := tree.TransformToTree(files)
+	fmt.Println(t)
+}
 
 func main() {
 	rootCmd := &cobra.Command{

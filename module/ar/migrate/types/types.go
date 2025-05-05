@@ -1,4 +1,4 @@
-package migrate
+package types
 
 import (
 	"errors"
@@ -12,10 +12,36 @@ var (
 	ErrInvalidCredentials      = errors.New("invalid credentials")
 )
 
-// Artifact represents a single artifact in ar
+type File struct {
+	Name         string
+	Registry     string
+	Uri          string
+	Folder       bool
+	Size         int
+	LastModified string
+	SHA1         string
+	SHA2         string
+}
+
+type TreeNode struct {
+	Name     string
+	Key      string
+	Children []TreeNode
+	IsLeaf   bool
+	File     *File
+}
+
 type Package struct {
 	Registry string
 	Path     string
+	Name     string
+	Size     int
+}
+
+type Version struct {
+	Registry string
+	Path     string
+	Pkg      string
 	Name     string
 	Size     int
 }

@@ -15,19 +15,14 @@
 package auth
 
 import (
-	"fmt"
 	commonhttp "harness/module/ar/migrate/http"
-	"harness/module/ar/migrate/http/auth/basic"
 	"harness/module/ar/migrate/http/auth/bearer"
-	"harness/module/ar/migrate/http/auth/null"
 	"harness/module/ar/migrate/http/modifier"
 	"harness/module/ar/migrate/lib"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
-
-	"github.com/docker/distribution/registry/client/auth/challenge"
 )
 
 // NewAuthorizer creates an authorizer that can handle different auth schemes
@@ -74,41 +69,8 @@ func (a *authorizer) Modify(req *http.Request) error {
 }
 
 func (a *authorizer) initialize(u *url.URL) error {
-	if a.authorizer != nil {
-		return nil
-	}
-	url, err := url.Parse(u.Scheme + "://" + u.Host + "/v2/")
-	if err != nil {
-		return err
-	}
-	a.url = url
-	resp, err := a.client.Get(a.url.String())
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	challenges := challenge.ResponseChallenges(resp)
-	// no challenge, mean no auth
-	if len(challenges) == 0 {
-		a.authorizer = null.NewAuthorizer()
-		return nil
-	}
-	cm := map[string]challenge.Challenge{}
-	for _, challenge := range challenges {
-		cm[challenge.Scheme] = challenge
-	}
-	if challenge, exist := cm["bearer"]; exist {
-		a.authorizer = bearer.NewAuthorizer(challenge.Parameters["realm"],
-			challenge.Parameters["service"], basic.NewAuthorizer(a.username, a.password),
-			a.client.Transport)
-		return nil
-	}
-	if _, exist := cm["basic"]; exist {
-		a.authorizer = basic.NewAuthorizer(a.username, a.password)
-		return nil
-	}
-	return fmt.Errorf("unspported auth scheme: %v", challenges)
+	a.authorizer = bearer.NewAuthorizer(a.password)
+	return nil
 }
 
 // Check whether the request targets to the registry.
