@@ -39,7 +39,7 @@ func NewVersionJob(
 	jobID := uuid.New().String()
 
 	jobLogger := log.With().
-		Str("job_type", "package").
+		Str("job_type", "version").
 		Str("job_id", jobID).
 		Str("source_registry", srcRegistry).
 		Str("dest_registry", destRegistry).
@@ -80,7 +80,6 @@ func (r *Version) Pre(ctx context.Context) error {
 	return nil
 }
 
-// Migrate Create down stream packages and migrate them
 func (r *Version) Migrate(ctx context.Context) error {
 	traceID, _ := ctx.Value("trace_id").(string)
 	logger := r.logger.With().
@@ -106,10 +105,9 @@ func (r *Version) Migrate(ctx context.Context) error {
 			err = r.destAdapter.UploadFile(r.destRegistry, downloadFile, file, header, r.pkg.Name, r.version.Name)
 			if err != nil {
 				logger.Error().Err(err).Msg("Failed to upload file")
-				return fmt.Errorf("upload file failed: %w", err)
+				//return fmt.Errorf("upload file failed: %w", err)
 			}
 		}
-
 	}
 
 	logger.Info().
