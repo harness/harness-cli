@@ -76,7 +76,7 @@ func (r *Version) Pre(ctx context.Context) error {
 
 	logger.Info().
 		Dur("duration", time.Since(startTime)).
-		Msg("Completed registry pre-migration step")
+		Msg("Completed version pre-migration step")
 	return nil
 }
 
@@ -87,27 +87,31 @@ func (r *Version) Migrate(ctx context.Context) error {
 		Str("trace_id", traceID).
 		Logger()
 
-	logger.Info().Msg("Starting registry migration step")
+	logger.Info().Msg("Starting version migration step")
 	startTime := time.Now()
 
-	if r.artifactType == types.GENERIC {
+	var jobs []engine.Job
+
+	if r.artifactType == types.GENERIC || r.artifactType == types.MAVEN {
 		files, err := tree.GetAllFiles(r.node)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to get files from tree")
 			return fmt.Errorf("get files from tree failed: %w", err)
 		}
 		for _, file := range files {
-			downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, file.Uri)
-			if err != nil {
-				logger.Error().Err(err).Msg("Failed to download file")
-				return fmt.Errorf("download file failed: %w", err)
-			}
-			err = r.destAdapter.UploadFile(r.destRegistry, downloadFile, file, header, r.pkg.Name, r.version.Name)
-			if err != nil {
-				logger.Error().Err(err).Msg("Failed to upload file")
-				//return fmt.Errorf("upload file failed: %w", err)
-			}
+			job := NewFileJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, r.pkg,
+				r.version, r.node, file)
+			jobs = append(jobs, job)
 		}
+	}
+
+	log.Info().Msgf("Jobs length: %d", len(jobs))
+
+	eng := engine.NewEngine(10, jobs)
+	err := eng.Execute(ctx)
+	if err != nil {
+		logger.Error().Err(err).Msg("Engine execution failed")
+		return fmt.Errorf("engine execution failed: %w", err)
 	}
 
 	logger.Info().
@@ -131,6 +135,6 @@ func (r *Version) Post(ctx context.Context) error {
 
 	logger.Info().
 		Dur("duration", time.Since(startTime)).
-		Msg("Completed registry post-migration step")
+		Msg("Completed version post-migration step")
 	return nil
 }

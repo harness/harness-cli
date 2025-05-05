@@ -11,6 +11,18 @@ import (
 	"net/http"
 )
 
+const (
+	mavenMetadataFile = "maven-metadata.xml"
+	extensionMD5      = ".md5"
+	extensionSHA1     = ".sha1"
+	extensionSHA256   = ".sha256"
+	extensionSHA512   = ".sha512"
+	extensionPom      = ".pom"
+	extensionJar      = ".jar"
+	contentTypeJar    = "application/java-archive"
+	contentTypeXML    = "text/xml"
+)
+
 func init() {
 	adapterType := types.JFROG
 	if err := adp.RegisterFactory(adapterType, new(factory)); err != nil {
@@ -43,18 +55,30 @@ func (a *adapter) ValidateCredentials() (bool, error)                        { r
 func (a *adapter) GetRegistry(registry string) (interface{}, error)          { return nil, nil }
 func (a *adapter) CreateRegistryIfDoesntExist(registry string) (bool, error) { return false, nil }
 
-func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType) ([]types.Package, error) {
+func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, root *types.TreeNode) (
+	[]types.Package,
+	error,
+) {
+	var packages []types.Package
 	if artifactType == types.GENERIC {
-		return []types.Package{
-			{
-				Registry: registry,
-				Path:     "/",
-				Name:     "default",
-				Size:     -1,
-			},
-		}, nil
+		packages = append(packages, types.Package{
+			Registry: registry,
+			Path:     "/",
+			Name:     "default",
+			Size:     -1,
+		})
+	} else if artifactType == types.MAVEN {
+		packages = append(packages, types.Package{
+			Registry: registry,
+			Path:     "/",
+			Name:     "",
+			Size:     -1,
+		})
+	} else {
+		return []types.Package{}, errors.New("unknown artifact type")
 	}
-	return []types.Package{}, errors.New("unknown artifact type")
+
+	return packages, nil
 }
 
 func (a *adapter) GetVersions(registry, pkg string, artifactType types.ArtifactType) ([]types.Version, error) {
@@ -65,6 +89,18 @@ func (a *adapter) GetVersions(registry, pkg string, artifactType types.ArtifactT
 				Pkg:      pkg,
 				Path:     "/",
 				Name:     "default",
+				Size:     -1,
+			},
+		}, nil
+	}
+
+	if artifactType == types.MAVEN {
+		return []types.Version{
+			{
+				Registry: registry,
+				Pkg:      pkg,
+				Path:     "/",
+				Name:     "",
 				Size:     -1,
 			},
 		}, nil
@@ -93,6 +129,15 @@ func (a *adapter) UploadFile(
 	header http.Header,
 	artifactName string,
 	version string,
+	artifactType types.ArtifactType,
 ) error {
 	return fmt.Errorf("not yet implemented")
+}
+
+func isMavenMetadataFile(filename string) bool {
+	return filename == mavenMetadataFile ||
+		filename == mavenMetadataFile+extensionMD5 ||
+		filename == mavenMetadataFile+extensionSHA1 ||
+		filename == mavenMetadataFile+extensionSHA256 ||
+		filename == mavenMetadataFile+extensionSHA512
 }

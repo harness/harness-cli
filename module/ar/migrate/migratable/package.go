@@ -106,7 +106,7 @@ func (r *Package) Migrate(ctx context.Context) error {
 		jobs = append(jobs, job)
 	}
 
-	log.Info().Msgf("Jobs: %v", jobs)
+	log.Info().Msgf("Jobs length: %d", len(jobs))
 
 	eng := engine.NewEngine(5, jobs)
 	err = eng.Execute(ctx)

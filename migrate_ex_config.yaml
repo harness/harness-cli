@@ -17,7 +17,7 @@ destination:
     password: ${DST_PASS}
     token: ${DST_TOKEN}
 mappings:
-  - artifactType: GENERIC
+  - artifactType: ${ARTIFACT_TYPE}
     sourceRegistry: ${SRC_REG}
     destinationRegistry: ${DST_REG}
     includePatterns:

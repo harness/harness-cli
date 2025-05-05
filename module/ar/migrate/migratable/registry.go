@@ -99,7 +99,7 @@ func (r *Registry) Migrate(ctx context.Context) error {
 	}
 	root := tree.TransformToTree(files)
 
-	pkgs, err := r.srcAdapter.GetPackages(r.srcRegistry, r.artifactType)
+	pkgs, err := r.srcAdapter.GetPackages(r.srcRegistry, r.artifactType, root)
 	if err != nil {
 		logger.Error().Msg("Failed to get packages")
 		return fmt.Errorf("get packages failed: %w", err)

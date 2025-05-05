@@ -10,6 +10,7 @@ import (
 	"io"
 	"mime/multipart"
 	http2 "net/http"
+	"strings"
 )
 
 // newClient constructs a jfrog client
@@ -44,7 +45,7 @@ type client struct {
 	password  string
 }
 
-func (c *client) uploadFile(registry, artifactName, version string, f *types.File, file io.ReadCloser) error {
+func (c *client) uploadGenericFile(registry, artifactName, version string, f *types.File, file io.ReadCloser) error {
 	url := fmt.Sprintf("%s/generic/%s/%s/%s/%s", c.url, config.Global.AccountID, registry, artifactName, version)
 
 	// Create a pipe to write the file contents
@@ -109,6 +110,39 @@ func (c *client) uploadFile(registry, artifactName, version string, f *types.Fil
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to upload file '%s/%s', status code: %d, response: %s",
 			artifactName, version, resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func (c *client) uploadMavenFile(
+	registry string,
+	name string,
+	version string,
+	f *types.File,
+	file io.ReadCloser,
+) error {
+	fileUri := strings.TrimPrefix(f.Uri, "/")
+	url := fmt.Sprintf("%s/maven/%s/%s/%s", c.url, config.Global.AccountID, registry, fileUri)
+	// Create request
+	req, err := http2.NewRequest(http2.MethodPut, url, file)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to upload file '%s': %w", fileUri, err)
+	}
+	defer resp.Body.Close()
+
+	// Check for successful response
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to upload file '%s', status code: %d, response: %s",
+			fileUri, resp.StatusCode, string(body))
 	}
 
 	return nil

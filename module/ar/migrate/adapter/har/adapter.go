@@ -50,7 +50,10 @@ func (a *adapter) GetRegistry(registry string) (interface{}, error) { return nil
 func (a *adapter) CreateRegistryIfDoesntExist(registryRef string) (bool, error) {
 	return false, nil
 }
-func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType) ([]types.Package, error) {
+func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, root *types.TreeNode) (
+	[]types.Package,
+	error,
+) {
 	return nil, nil
 }
 func (a *adapter) GetVersions(registry, pkg string, artifactType types.ArtifactType) ([]types.Version, error) {
@@ -69,9 +72,15 @@ func (a *adapter) UploadFile(
 	header http.Header,
 	artifactName string,
 	version string,
+	artifactType types.ArtifactType,
 ) error {
 	a.logger.Debug().Msgf("Uploaded file %s to registry: %s", f.Uri, registry)
-	err := a.client.uploadFile(registry, artifactName, version, f, file)
+	var err error
+	if artifactType == types.GENERIC {
+		err = a.client.uploadGenericFile(registry, artifactName, version, f, file)
+	} else if artifactType == types.MAVEN {
+		err = a.client.uploadMavenFile(registry, artifactName, version, f, file)
+	}
 	if err != nil {
 		a.logger.Error().Err(err).Msgf("Failed to upload file %s to registry: %s", f.Uri, registry)
 		return fmt.Errorf("failed to upload file %s to registry: %s", f.Uri, registry)

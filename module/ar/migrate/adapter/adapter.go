@@ -13,7 +13,10 @@ type Adapter interface {
 	ValidateCredentials() (bool, error)
 	GetRegistry(registry string) (interface{}, error)
 	CreateRegistryIfDoesntExist(registry string) (bool, error)
-	GetPackages(registry string, artifactType types.ArtifactType) (packages []types.Package, err error)
+	GetPackages(registry string, artifactType types.ArtifactType, root *types.TreeNode) (
+		packages []types.Package,
+		err error,
+	)
 	GetVersions(registry, pkg string, artifactType types.ArtifactType) (versions []types.Version, err error)
 	GetFiles(registry string) ([]types.File, error)
 	DownloadFile(registry string, uri string) (io.ReadCloser, http.Header, error)
@@ -24,6 +27,7 @@ type Adapter interface {
 		header http.Header,
 		artifactName string,
 		version string,
+		artifactType types.ArtifactType,
 	) error
 }
 
