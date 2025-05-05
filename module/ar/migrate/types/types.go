@@ -40,9 +40,9 @@ type Package struct {
 
 type Version struct {
 	Registry string
+	Name     string
 	Path     string
 	Pkg      string
-	Name     string
 	Size     int
 }
 

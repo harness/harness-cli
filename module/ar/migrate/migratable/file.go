@@ -57,6 +57,7 @@ func NewFileJob(
 		logger:       jobLogger,
 		pkg:          pkg,
 		node:         node,
+		version:      version,
 		file:         file,
 	}
 }
