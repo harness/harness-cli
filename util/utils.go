@@ -10,6 +10,14 @@ import (
 	"time"
 )
 
+func Safe[T any](p *T) T {
+	if p == nil {
+		var zero T
+		return zero
+	}
+	return *p
+}
+
 // SetupLogging configures logging to file and stdout
 func SetupLogging(logDir string, logLevel string) error {
 	// Create log directory if it doesn't exist

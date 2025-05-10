@@ -9,6 +9,7 @@ type GlobalFlags struct {
 	AccountID  string
 	OrgID      string
 	ProjectID  string
+	Format     string
 
 	// Command-specific configurations
 	Registry RegistryConfig

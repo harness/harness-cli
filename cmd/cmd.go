@@ -133,6 +133,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&config.Global.AccountID, "account", "", "Account (overrides saved config)")
 	rootCmd.PersistentFlags().StringVar(&config.Global.OrgID, "org", "", "Org (overrides saved config)")
 	rootCmd.PersistentFlags().StringVar(&config.Global.ProjectID, "project", "", "Project (overrides saved config)")
+	rootCmd.PersistentFlags().StringVar(&config.Global.Format, "format", "table", "Format of the result")
 
 	authConfig, err := loadAuthConfig()
 	if err == nil {

@@ -1,0 +1,68 @@
+package command
+
+import (
+	"context"
+	"harness/cmd/common/printer"
+	client2 "harness/util/client"
+
+	"github.com/spf13/cobra"
+	client "harness/internal/api/ar"
+)
+
+// newGetVersionCmd wires up:
+//
+//	hns ar version get <args>
+func NewGetVersionCmd(c *client.ClientWithResponses) *cobra.Command {
+	var name, registry, artifact string
+	var pageSize int32
+	var pageIndex int32
+	cmd := &cobra.Command{
+		Use:   "version",
+		Short: "Get artifact version details",
+		Long:  "Retrieves detailed information about a specific version of an artifact in the Harness Artifact Registry",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			params := client.GetAllArtifactVersionsParams{}
+			if len(name) > 0 {
+				params.SearchTerm = &name
+			}
+
+			if pageSize > 0 {
+				size := int64(pageSize)
+				params.Size = &size
+			}
+			if pageIndex > 0 {
+				page := int64(pageIndex)
+				params.Page = &page
+			}
+
+			response, err := c.GetAllArtifactVersionsWithResponse(context.Background(),
+				client2.GetRef(client2.GetScopeRef(), registry), artifact, nil)
+			if err != nil {
+				return err
+			}
+
+			err = printer.Print(response.JSON200.Data.ArtifactVersions, *response.JSON200.Data.PageIndex,
+				*response.JSON200.Data.PageCount, *response.JSON200.Data.ItemCount, true)
+
+			return err
+		},
+	}
+
+	// Common flags
+	cmd.Flags().StringVar(&name, "name", "", "version")
+	cmd.Flags().StringVar(&registry, "registry", "", "registry name")
+	cmd.Flags().StringVar(&artifact, "artifact", "", "artifact name")
+	cmd.Flags().Int32Var(&pageSize, "page-size", 10, "number of items per page")
+	cmd.Flags().Int32Var(&pageIndex, "page", 0, "page number (zero-indexed)")
+
+	err := cmd.MarkFlagRequired("registry")
+	if err != nil {
+		return nil
+	}
+	err = cmd.MarkFlagRequired("artifact")
+	if err != nil {
+		return nil
+	}
+
+	return cmd
+}

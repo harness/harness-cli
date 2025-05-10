@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/rs/zerolog/log"
-	"harness/clients/ar"
+	"harness/internal/api/ar"
 	"harness/module/ar/migrate/adapter"
 	"harness/module/ar/migrate/engine"
 	"harness/module/ar/migrate/migratable"

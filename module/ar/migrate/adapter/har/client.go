@@ -2,8 +2,8 @@ package jfrog
 
 import (
 	"fmt"
-	"harness/clients/ar"
 	"harness/config"
+	"harness/internal/api/ar"
 	"harness/module/ar/migrate/http"
 	"harness/module/ar/migrate/http/auth/xApiKey"
 	"harness/module/ar/migrate/types"
@@ -20,6 +20,7 @@ func newClient(reg *types.RegistryConfig) *client {
 	username = reg.Credentials.Username
 	token = reg.Credentials.Token
 
+	arclient, _ := ar.NewClient(config.Global.APIBaseURL)
 	return &client{
 		client: http.NewClient(
 			&http2.Client{
@@ -27,12 +28,13 @@ func newClient(reg *types.RegistryConfig) *client {
 			},
 			xApiKey.NewAuthorizer(token),
 		),
-		url:      reg.Endpoint,
-		insecure: true,
-		username: username,
-		password: token,
-		apiClient: ar.NewHARClient(config.Global.APIBaseURL, config.Global.AuthToken, config.Global.AccountID,
-			config.Global.OrgID, config.Global.ProjectID),
+		url:       reg.Endpoint,
+		insecure:  true,
+		username:  username,
+		password:  token,
+		apiClient: arclient,
+		//config.Global.AuthToken, config.Global.AccountID,
+		//	config.Global.OrgID, config.Global.ProjectID),
 	}
 }
 

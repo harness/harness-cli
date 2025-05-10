@@ -2,7 +2,6 @@ package ar
 
 import (
 	"fmt"
-	"harness/clients/ar"
 	"harness/config"
 	"os"
 	"strings"
@@ -60,11 +59,27 @@ func getArtifactsCmd() *cobra.Command {
 	return artifactCmd
 }
 
+func getGetCommand(cmds ...*cobra.Command) *cobra.Command {
+
+	// Artifact command
+	artifactCmd := &cobra.Command{
+		Use:   "get [ar-ref]",
+		Short: "Artifact management commands",
+		Long:  `Commands to manage Harness Artifact Registry artifacts`,
+	}
+
+	for _, cmd := range cmds {
+		artifactCmd.AddCommand(cmd)
+	}
+
+	return artifactCmd
+}
+
 func listArtifacts(cmd *cobra.Command, args []string) {
 	registryRef := args[0]
 
 	// Create client
-	client := ar.NewHARClient(config.Global.APIBaseURL, config.Global.AuthToken, config.Global.AccountID,
+	client := NewHARClient(config.Global.APIBaseURL, config.Global.AuthToken, config.Global.AccountID,
 		config.Global.OrgID, config.Global.ProjectID)
 
 	// Make API call
@@ -95,7 +110,7 @@ func getArtifact(cmd *cobra.Command, args []string) {
 	version := args[2]
 
 	// Create client
-	client := ar.NewHARClient(config.Global.APIBaseURL, config.Global.AuthToken, config.Global.AccountID,
+	client := NewHARClient(config.Global.APIBaseURL, config.Global.AuthToken, config.Global.AccountID,
 		config.Global.OrgID, config.Global.ProjectID)
 
 	// Make API call
@@ -132,7 +147,7 @@ func deleteArtifact(cmd *cobra.Command, args []string) {
 	version := args[2]
 
 	// Create client
-	client := ar.NewHARClient(config.Global.APIBaseURL, config.Global.AuthToken, config.Global.AccountID,
+	client := NewHARClient(config.Global.APIBaseURL, config.Global.AuthToken, config.Global.AccountID,
 		config.Global.OrgID, config.Global.ProjectID)
 
 	// Make API call

@@ -1,7 +1,12 @@
 package ar
 
 import (
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	commands "harness/cmd/ar/command"
+	"harness/cmd/common/auth"
+	"harness/config"
+	"harness/internal/api/ar"
 )
 
 func GetRootCmd() *cobra.Command {
@@ -11,9 +16,31 @@ func GetRootCmd() *cobra.Command {
 		Long:  `CLI tool for Harness Artifact Registry and migrate artifacts`,
 	}
 
-	rootCmd.AddCommand(getMigrateCmd())
-	rootCmd.AddCommand(getArtifactsCmd())
-	rootCmd.AddCommand(getRegistryCmds())
+	client, err := ar.NewClientWithResponses(config.Global.APIBaseURL+"/gateway/har/api/v1", auth.GetXApiKeyOption())
+	if err != nil {
+		log.Fatal().Msgf("Error creating client: %v", err)
+	}
+
+	rootCmd.AddCommand(
+		getMigrateCmd(client),
+	)
+
+	rootCmd.AddCommand(
+		getGetCommand(
+			commands.NewGetRegistryCmd(client),
+			commands.NewGetArtifactCmd(client),
+			commands.NewGetVersionCmd(client),
+			commands.NewFilesVersionCmd(client),
+		),
+	)
+
+	rootCmd.AddCommand(
+		getDeleteCmd(
+			commands.NewDeleteRegistryCmd(),
+			commands.NewDeleteArtifactCmd(),
+			commands.NewDeleteVersionCmd(),
+		),
+	)
 
 	return rootCmd
 }
