@@ -43,7 +43,11 @@ func NewFilesVersionCmd(c *client.ClientWithResponses) *cobra.Command {
 			}
 
 			err = printer.Print(response.JSON200.Files, *response.JSON200.PageIndex, *response.JSON200.PageCount,
-				*response.JSON200.ItemCount)
+				*response.JSON200.ItemCount, true, [][]string{
+					{"name", "File"},
+					{"downloadCommand", "Download Command"},
+					{"size", "Size"},
+				})
 
 			return err
 		},

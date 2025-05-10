@@ -8,7 +8,11 @@ import (
 	"sort"
 )
 
-func jsonToTable(jsonStr string) error {
+// ColumnMapping defines a mapping between original field names and display names
+type ColumnMapping [][]string
+
+// jsonToTableWithMapping converts JSON string to a table with custom column mapping
+func jsonToTableWithMapping(jsonStr string, mapping ColumnMapping) error {
 	var rows []map[string]interface{}
 	if err := json.Unmarshal([]byte(jsonStr), &rows); err != nil {
 		return fmt.Errorf("parse json: %w", err)
@@ -17,30 +21,59 @@ func jsonToTable(jsonStr string) error {
 		return nil
 	}
 
-	// Get a stable header order (lexicographic)
-	header := make([]string, 0, len(rows[0]))
-	for k := range rows[0] {
-		header = append(header, k)
+	// Prepare header and field mapping
+	var header []string
+	fieldToDisplay := make(map[string]string)
+
+	if len(mapping) > 0 {
+		// Use provided mapping for ordering and display names
+		for _, m := range mapping {
+			if len(m) >= 2 {
+				original, display := m[0], m[1]
+				header = append(header, display)
+				fieldToDisplay[original] = display
+			}
+		}
+	} else {
+		// Fall back to alphabetical ordering
+		for k := range rows[0] {
+			header = append(header, k)
+		}
+		sort.Strings(header)
 	}
-	sort.Strings(header)
 
 	table := pterm.TableData{header} // first row = header
 
 	for _, r := range rows {
 		row := make([]string, len(header))
-		for i, col := range header {
-			val, ok := r[col]
-			if !ok {
-				row[i] = "-" // missing key
-				continue
+
+		if len(mapping) > 0 {
+			// Use mapping order
+			for i, m := range mapping {
+				if len(m) >= 2 {
+					originalField := m[0]
+					val, ok := r[originalField]
+					if !ok {
+						row[i] = "-" // missing key
+						continue
+					}
+					row[i] = fmt.Sprint(val) // stringify numbers, bools, etc.
+				}
 			}
-			row[i] = fmt.Sprint(val) // stringify numbers, bools, etc.
+		} else {
+			// Fall back to alphabetical order
+			for i, col := range header {
+				val, ok := r[col]
+				if !ok {
+					row[i] = "-" // missing key
+					continue
+				}
+				row[i] = fmt.Sprint(val) // stringify numbers, bools, etc.
+			}
 		}
+
 		table = append(table, row)
 	}
-
-	pterm.SetForcedTerminalSize(300, 40)    // width, height :contentReference[oaicite:0]{index=0}
-	defer pterm.SetForcedTerminalSize(0, 0) // restore auto-detection later
 
 	return pterm.DefaultTable.
 		WithHasHeader().
@@ -49,16 +82,60 @@ func jsonToTable(jsonStr string) error {
 		Render()
 }
 
+// TableOptions provides configuration for table output
+type TableOptions struct {
+	// ColumnMapping defines custom column ordering and display names
+	// Format: [["originalField", "Display Name"], ...]
+	ColumnMapping ColumnMapping
+
+	// PageIndex is the current page number (zero-indexed)
+	PageIndex int64
+
+	// PageCount is the total number of pages
+	PageCount int64
+
+	// ItemCount is the total number of items
+	ItemCount int64
+
+	// ShowPagination determines whether to show pagination info
+	ShowPagination bool
+}
+
+// DefaultTableOptions returns default configuration for table printing
+func DefaultTableOptions() TableOptions {
+	return TableOptions{
+		ShowPagination: true,
+	}
+}
+
+// PrintTable prints the provided data in a table format
+// This function is backward compatible with existing code
 func PrintTable(res any, pageIndex, pageCount, itemCount int64) error {
-	mrListJSON, _ := json.Marshal(res)
-	err := jsonToTable(string(mrListJSON))
+	options := DefaultTableOptions()
+	options.PageIndex = pageIndex
+	options.PageCount = pageCount
+	options.ItemCount = itemCount
+
+	return PrintTableWithOptions(res, options)
+}
+
+// PrintTableWithOptions prints the data in a table format using the provided options
+func PrintTableWithOptions(res any, options TableOptions) error {
+	mrListJSON, err := json.Marshal(res)
+	if err != nil {
+		return fmt.Errorf("failed to marshal data to JSON: %w", err)
+	}
+
+	err = jsonToTableWithMapping(string(mrListJSON), options.ColumnMapping)
 	if err != nil {
 		log.Error().Msgf("failed to render table: %v", err)
 		return err
 	}
 
-	fmt.Printf("Page %d of %d (Total: %d)\n",
-		pageIndex, pageCount, itemCount)
-	
+	if options.ShowPagination {
+		fmt.Printf("Page %d of %d (Total: %d)\n",
+			options.PageIndex, options.PageCount, options.ItemCount)
+	}
+
 	return nil
 }

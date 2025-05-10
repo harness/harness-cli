@@ -44,7 +44,13 @@ func NewGetArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
 			}
 
 			err = printer.Print(response.JSON200.Data.Artifacts, *response.JSON200.Data.PageIndex,
-				*response.JSON200.Data.PageCount, *response.JSON200.Data.ItemCount)
+				*response.JSON200.Data.PageCount, *response.JSON200.Data.ItemCount, true, [][]string{
+					{"name", "Artifact"},
+					{"version", "Version"},
+					{"packageType", "Package Type"},
+					{"registryIdentifier", "Registry"},
+					{"downloadsCount", "Download Count"},
+				})
 
 			return err
 		},

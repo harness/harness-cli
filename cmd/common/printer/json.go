@@ -1,3 +1,4 @@
+// Package printer provides output formatting utilities for the CLI
 package printer
 
 import (
@@ -23,29 +24,41 @@ type JsonOptions struct {
 	PageCount int64
 	// ItemCount is the total number of items
 	ItemCount int64
+	// ShowPagination determines whether to show pagination info
+	ShowPagination bool
 }
 
 // DefaultJsonOptions returns standard options for JSON printing
 func DefaultJsonOptions() JsonOptions {
 	return JsonOptions{
-		Writer:       os.Stdout,
-		Indent:       true,
-		IndentPrefix: "",
-		IndentSize:   2,
+		Writer:         os.Stdout,
+		Indent:         true,
+		IndentPrefix:   "",
+		IndentSize:     2,
+		ShowPagination: true,
 	}
 }
 
 // PrintJson prints the provided data as JSON with default options
+// It provides backward compatibility with existing code
 func PrintJson(res any, pageIndex, pageCount, itemCount int64) error {
 	options := DefaultJsonOptions()
 	options.PageIndex = pageIndex
-	options.PageCount = pageCount
+	options.PageCount = pageCount 
 	options.ItemCount = itemCount
+	options.ShowPagination = false // Match previous behavior
 
 	return PrintJsonWithOptions(res, options)
 }
 
 // PrintJsonWithOptions prints the provided data as JSON with the specified options
+//
+// Example:
+//
+//	options := printer.DefaultJsonOptions()
+//	options.Indent = true
+//	options.ShowPagination = true
+//	printer.PrintJsonWithOptions(results, options)
 func PrintJsonWithOptions(res any, options JsonOptions) error {
 	// Use default writer if none provided
 	writer := options.Writer
@@ -68,6 +81,14 @@ func PrintJsonWithOptions(res any, options JsonOptions) error {
 	// Encode the data
 	if err := encoder.Encode(res); err != nil {
 		return fmt.Errorf("failed to encode JSON: %w", err)
+	}
+
+	// Print pagination info if requested
+	if options.ShowPagination {
+		if _, err := fmt.Fprintf(writer, "Page %d of %d (Total: %d)\n",
+			options.PageIndex, options.PageCount, options.ItemCount); err != nil {
+			return fmt.Errorf("failed to print pagination info: %w", err)
+		}
 	}
 
 	return nil

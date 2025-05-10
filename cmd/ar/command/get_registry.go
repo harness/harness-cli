@@ -46,7 +46,14 @@ func NewGetRegistryCmd(client *ar.ClientWithResponses) *cobra.Command {
 			}
 
 			err = printer.Print(response.JSON200.Data.Registries, *response.JSON200.Data.PageIndex,
-				*response.JSON200.Data.PageCount, *response.JSON200.Data.ItemCount, true)
+				*response.JSON200.Data.PageCount, *response.JSON200.Data.ItemCount, true, [][]string{
+					{"identifier", "Registry"},
+					{"packageType", "Package Type"},
+					{"registrySize", "Size"},
+					{"type", "Registry Type"},
+					{"description", "Description"},
+					{"url", "Link"},
+				})
 
 			return err
 		},
