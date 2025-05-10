@@ -3,6 +3,8 @@ package migratable
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -10,7 +12,6 @@ import (
 	"harness/module/ar/migrate/engine"
 	"harness/module/ar/migrate/tree"
 	"harness/module/ar/migrate/types"
-	"time"
 )
 
 type Package struct {

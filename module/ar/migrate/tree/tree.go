@@ -2,9 +2,10 @@ package tree
 
 import (
 	"fmt"
-	"harness/module/ar/migrate/types"
 	"sort"
 	"strings"
+
+	"harness/module/ar/migrate/types"
 )
 
 func TransformToTree(files []types.File) *types.TreeNode {

@@ -16,8 +16,9 @@ package bearer
 
 import (
 	"fmt"
-	"harness/module/ar/migrate/lib"
 	"net/http"
+
+	"harness/module/ar/migrate/lib"
 )
 
 const (

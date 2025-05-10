@@ -3,9 +3,10 @@ package printer
 
 import (
 	"fmt"
-	"harness/config"
 	"io"
 	"os"
+
+	"harness/config"
 )
 
 // PrintOptions combines options for both JSON and table output

@@ -2,9 +2,10 @@ package auth
 
 import (
 	"context"
+	"net/http"
+
 	"harness/config"
 	"harness/internal/api/ar"
-	"net/http"
 )
 
 func GetXApiKeyOption() func(client *ar.Client) error {

@@ -3507,7 +3507,7 @@ func NewDeleteRegistryRequest(server string, registryRef RegistryRefPathParam) (
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/registry/%s", pathParam0)
+	operationPath := fmt.Sprintf("/registry/%s/+", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -3541,7 +3541,7 @@ func NewGetRegistryRequest(server string, registryRef RegistryRefPathParam) (*ht
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/registry/%s", pathParam0)
+	operationPath := fmt.Sprintf("/registry/%s/+", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -3586,7 +3586,7 @@ func NewModifyRegistryRequestWithBody(server string, registryRef RegistryRefPath
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/registry/%s", pathParam0)
+	operationPath := fmt.Sprintf("/registry/%s/+", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}

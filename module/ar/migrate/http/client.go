@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"harness/module/ar/migrate/http/modifier"
 	"io"
 	"net/http"
+
+	"harness/module/ar/migrate/http/modifier"
 )
 
 // Client is a util for common HTTP operations, such Get, Head, Post, Put and Delete.

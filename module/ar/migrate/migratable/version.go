@@ -3,15 +3,15 @@ package migratable
 import (
 	"context"
 	"fmt"
-	"harness/module/ar/migrate/adapter"
-	"harness/module/ar/migrate/engine"
-	"harness/module/ar/migrate/tree"
-	"harness/module/ar/migrate/types"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"harness/module/ar/migrate/adapter"
+	"harness/module/ar/migrate/engine"
+	"harness/module/ar/migrate/tree"
+	"harness/module/ar/migrate/types"
 )
 
 type Version struct {

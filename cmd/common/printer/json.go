@@ -44,7 +44,7 @@ func DefaultJsonOptions() JsonOptions {
 func PrintJson(res any, pageIndex, pageCount, itemCount int64) error {
 	options := DefaultJsonOptions()
 	options.PageIndex = pageIndex
-	options.PageCount = pageCount 
+	options.PageCount = pageCount
 	options.ItemCount = itemCount
 	options.ShowPagination = false // Match previous behavior
 

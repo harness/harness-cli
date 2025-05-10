@@ -1,60 +1,42 @@
 package command
 
 import (
-	"errors"
+	"context"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	client "harness/internal/api/ar"
+	client2 "harness/util/client"
 )
 
-// newDeleteArtifactCmd wires up:
-//
-//	hns ar artifact delete <args>
-func NewDeleteArtifactCmd() *cobra.Command {
-	var host string
-	var format string
+func NewDeleteArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
+	var name, registry string
 	cmd := &cobra.Command{
-		Use:   "artifact delete n ",
+		Use:   "artifact",
 		Short: "Delete an artifact from a registry",
 		Long:  "Deletes a specific artifact and all its versions from the Harness Artifact Registry",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Create client
-			_, err := client.NewClient(host, nil)
+			response, err := c.DeleteArtifactWithResponse(context.Background(),
+				client2.GetRef(client2.GetScopeRef(), registry), name)
 			if err != nil {
 				return err
 			}
-
-			// Validate required arguments
-			if len(args) < 1 {
-				return errors.New("missing required arguments: n ")
+			if response.JSON200 != nil {
+				log.Info().Msgf("Deleted artifact %s; msg:%s", name, response.JSON200.Status)
+			} else {
+				log.Error().Msgf("failed to delete artifact %s %s", name, string(response.Body))
 			}
 
-			// Call API
-			//resp, err := cli.DeleteArtifact(context.Background(), args[0])
-			//if err != nil {
-			//	return err
-			//}
-
-			// Format output based on format flag
-			//switch format {
-			//case "json":
-			// TODO: output JSON here
-			//	fmt.Printf("%+v\n", resp)
-			//case "table":
-			// TODO: format as table
-			//	fmt.Printf("%+v\n", resp)
-			//default:
-			//	fmt.Printf("%+v\n", resp)
-			//}
 			return nil
 		},
 	}
 
 	// Common flags
-	cmd.Flags().StringVar(&host, "host", "http://localhost:8080", "service base URL")
-	cmd.Flags().StringVar(&format, "format", "table", "output format: table or json")
+	cmd.Flags().StringVar(&name, "name", "", "name of the artifact")
+	cmd.Flags().StringVar(&registry, "registry", "", "name of the registry")
 
-	// TODO: Add any command-specific flags here
+	cmd.MarkFlagRequired("name")
+	cmd.MarkFlagRequired("registry")
 
 	return cmd
 }

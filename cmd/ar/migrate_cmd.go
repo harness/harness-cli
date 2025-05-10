@@ -1,228 +1,90 @@
 package ar
 
 import (
+	"context"
 	"fmt"
-	"harness/config"
+	"log"
 	"os"
-	"strings"
-	"text/tabwriter"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
+	"harness/config"
+	"harness/internal/api/ar"
+	ar2 "harness/module/ar/migrate"
+	"harness/module/ar/migrate/types"
 )
 
-var (
-	registryTypeFlag     string
-	packageTypeFlag      string
-	descriptionFlag      string
-	labelsFlag           []string
-	allowedPatternFlag   []string
-	blockedPatternFlag   []string
-	pageFlag             int
-	sizeFlag             int
-	searchTermFlag       string
-	recursiveFlag        bool
-	packageTypesListFlag []string
-)
+func getMigrateCmd(*ar.ClientWithResponses) *cobra.Command {
+	// Create local variables for flag binding
+	var localConfigPath string
+	var localAPIBaseURL string
+	var localDryRun bool
+	var localConcurrency int
 
-func getRegistryCmds() *cobra.Command {
-	// Registry command
-	registryCmd := &cobra.Command{
-		Use:   "registry",
-		Short: "Registry management commands",
-		Long:  `Commands to manage Harness Artifact Registry registries`,
+	migrateCmd := &cobra.Command{
+		Use:   "migrate",
+		Short: "Start a migration based on configuration",
+		Run:   runMigration,
+		PreRun: func(cmd *cobra.Command, args []string) {
+			// Sync local flags to global config
+			config.Global.ConfigPath = localConfigPath
+			if localAPIBaseURL != "" {
+				config.Global.APIBaseURL = localAPIBaseURL
+			}
+			config.Global.Registry.Migrate.DryRun = localDryRun
+			config.Global.Registry.Migrate.Concurrency = localConcurrency
+		},
 	}
-
-	// Get ar command
-	getRegistryCmd := &cobra.Command{
-		Use:   "get [ar-ref]",
-		Short: "Get ar details",
-		Args:  cobra.ExactArgs(1),
-		Run:   getRegistry,
-	}
-
-	// Delete ar command
-	deleteRegistryCmd := &cobra.Command{
-		Use:   "delete [ar-ref]",
-		Short: "Delete ar",
-		Args:  cobra.ExactArgs(1),
-		Run:   deleteRegistry,
-	}
-
-	// List registries command
-	listRegistriesCmd := &cobra.Command{
-		Use:   "list",
-		Short: "List registries",
-		Run:   listRegistries,
-	}
-	listRegistriesCmd.Flags().IntVar(&pageFlag, "page", 0, "Page number")
-	listRegistriesCmd.Flags().IntVar(&sizeFlag, "size", 20, "Page size")
-	listRegistriesCmd.Flags().StringVar(&searchTermFlag, "search", "", "Search term")
-	listRegistriesCmd.Flags().StringVar(&registryTypeFlag, "type", "", "Registry type (VIRTUAL, UPSTREAM)")
-	listRegistriesCmd.Flags().StringSliceVar(&packageTypesListFlag, "package-types", nil,
-		"Package types to filter (comma-separated)")
-	listRegistriesCmd.Flags().BoolVar(&recursiveFlag, "recursive", false, "List registries recursively")
-
-	// Add commands to ar command
-	registryCmd.AddCommand(getRegistryCmd)
-	registryCmd.AddCommand(deleteRegistryCmd)
-	registryCmd.AddCommand(listRegistriesCmd)
-
-	return registryCmd
+	migrateCmd.Flags().StringVarP(&localConfigPath, "config", "c", "config.yaml", "Path to configuration file")
+	migrateCmd.Flags().StringVar(&localAPIBaseURL, "ar-url", "", "Base URL for the API (overrides config)")
+	migrateCmd.Flags().BoolVar(&localDryRun, "dry-run", false, "Perform a dry run (overrides config)")
+	migrateCmd.Flags().IntVar(&localConcurrency, "concurrency", 1, "Number of concurrent operations (overrides config)")
+	return migrateCmd
 }
 
-func getDeleteCmd(cmds ...*cobra.Command) *cobra.Command {
-	// Registry command
-	registryCmd := &cobra.Command{
-		Use:   "delete [ar-ref]",
-		Short: "Registry management commands",
-		Long:  `Commands to manage Harness Artifact Registry registries`,
-	}
-	for _, cmd := range cmds {
-		registryCmd.AddCommand(cmd)
-	}
-
-	return registryCmd
-}
-
-func getVersionCmds2(cmds ...*cobra.Command) *cobra.Command {
-	// Registry command
-	versionCmd := &cobra.Command{
-		Use:   "version",
-		Short: "Registry management commands",
-		Long:  `Commands to manage Harness Artifact Registry registries`,
-	}
-	for _, cmd := range cmds {
-		versionCmd.AddCommand(cmd)
-	}
-
-	return versionCmd
-}
-
-func getWebhookCmds2(cmds ...*cobra.Command) *cobra.Command {
-	// Registry command
-	versionCmd := &cobra.Command{
-		Use:   "webhook",
-		Short: "Registry management commands",
-		Long:  `Commands to manage Harness Artifact Registry registries`,
-	}
-	for _, cmd := range cmds {
-		versionCmd.AddCommand(cmd)
-	}
-
-	return versionCmd
-}
-
-func createRegistry(cmd *cobra.Command, args []string) {
-	identifier := args[0]
-
-	// Create client
-	client := NewHARClient(config.Global.APIBaseURL, config.Global.AuthToken, config.Global.AccountID,
-		config.Global.OrgID, config.Global.ProjectID)
-
-	// Prepare request
-	req := RegistryRequest{
-		Identifier:     identifier,
-		PackageType:    packageTypeFlag,
-		Description:    descriptionFlag,
-		Labels:         labelsFlag,
-		AllowedPattern: allowedPatternFlag,
-		BlockedPattern: blockedPatternFlag,
-	}
-
-	// Make API call
-	resp, err := client.CreateRegistry(req)
+func runMigration(cmd *cobra.Command, args []string) {
+	// Load configuration
+	cfg, err := types.LoadConfig(config.Global.ConfigPath)
 	if err != nil {
-		fmt.Printf("Error creating ar: %v\n", err)
-		os.Exit(1)
+		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	// Print response
-	fmt.Println("Registry created successfully:")
-	fmt.Printf("  Identifier: %s\n", resp.Data.Identifier)
-	fmt.Printf("  Package Type: %s\n", resp.Data.PackageType)
-	if resp.Data.Description != "" {
-		fmt.Printf("  Description: %s\n", resp.Data.Description)
+	if config.Global.Registry.Migrate.DryRun {
+		cfg.DryRun = true
 	}
-	fmt.Printf("  URL: %s\n", resp.Data.URL)
-	if len(resp.Data.Labels) > 0 {
-		fmt.Printf("  Labels: %s\n", strings.Join(resp.Data.Labels, ", "))
+	if config.Global.Registry.Migrate.Concurrency > 0 {
+		cfg.Concurrency = config.Global.Registry.Migrate.Concurrency
 	}
-}
 
-func getRegistry(cmd *cobra.Command, args []string) {
-	registryRef := args[0]
+	// Create an API client for orchestration purpose. The registry clients will be initiated separately
+	apiClient, _ := ar.NewClient(config.Global.APIBaseURL)
+	//, config.Global.AuthToken, config.Global.AccountID,
+	//	config.Global.OrgID, config.Global.ProjectID)
 
-	// Create client
-	client := NewHARClient(config.Global.APIBaseURL, config.Global.AuthToken, config.Global.AccountID,
-		config.Global.OrgID, config.Global.ProjectID)
+	// Set up context with cancellation for graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	// Make API call
-	resp, err := client.GetRegistry(registryRef)
+	// Create a migration service
+	migrationSvc, err := ar2.NewMigrationService(ctx, cfg, apiClient)
 	if err != nil {
-		fmt.Printf("Error getting ar details: %v\n", err)
-		os.Exit(1)
+		log.Fatalf("Failed to create migration service: %v", err)
 	}
 
-	// Print response
-	fmt.Println("Registry details:")
-	fmt.Printf("  Identifier: %s\n", resp.Data.Identifier)
-	fmt.Printf("  Package Type: %s\n", resp.Data.PackageType)
-	if resp.Data.Description != "" {
-		fmt.Printf("  Description: %s\n", resp.Data.Description)
-	}
-	fmt.Printf("  URL: %s\n", resp.Data.URL)
-	if len(resp.Data.Labels) > 0 {
-		fmt.Printf("  Labels: %s\n", strings.Join(resp.Data.Labels, ", "))
-	}
-	fmt.Printf("  Created At: %s\n", resp.Data.CreatedAt)
-	fmt.Printf("  Modified At: %s\n", resp.Data.ModifiedAt)
-}
+	// Set up signal handling for graceful shutdown
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-signalChan
+		fmt.Println("\nReceived interrupt signal, shutting down gracefully...")
+		cancel()
+	}()
 
-func deleteRegistry(cmd *cobra.Command, args []string) {
-	registryRef := args[0]
-
-	// Create client
-	client := NewHARClient(config.Global.APIBaseURL, config.Global.AuthToken, config.Global.AccountID,
-		config.Global.OrgID, config.Global.ProjectID)
-
-	// Make API call
-	err := client.DeleteRegistry(registryRef)
-	if err != nil {
-		fmt.Printf("Error deleting ar: %v\n", err)
-		os.Exit(1)
+	// Run the migration
+	if err := migrationSvc.Run(ctx); err != nil {
+		log.Fatalf("Migration failed: %v", err)
 	}
 
-	fmt.Printf("Registry '%s' deleted successfully\n", registryRef)
-}
-
-func listRegistries(cmd *cobra.Command, args []string) {
-	// Create client
-	client := NewHARClient(config.Global.APIBaseURL, config.Global.AuthToken, config.Global.AccountID,
-		config.Global.OrgID, config.Global.ProjectID)
-
-	// Make API call
-	resp, err := client.ListRegistries(packageTypesListFlag, registryTypeFlag, pageFlag, sizeFlag, searchTermFlag,
-		recursiveFlag)
-	if err != nil {
-		fmt.Printf("Error listing registries: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Print response
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "IDENTIFIER\tPACKAGE TYPE\tTYPE\tDESCRIPTION\tARTIFACTS\tDOWNLOADS\tSIZE")
-	for _, reg := range resp.Data.Registries {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%d\t%s\n",
-			reg.Identifier,
-			reg.PackageType,
-			reg.Type,
-			reg.Description,
-			reg.ArtifactsCount,
-			reg.DownloadsCount,
-			reg.RegistrySize)
-	}
-	w.Flush()
-
-	fmt.Printf("\nPage %d of %d (Total: %d registries)\n",
-		resp.Data.PageIndex, resp.Data.PageCount, resp.Data.ItemCount)
+	fmt.Println("Migration completed successfully")
 }

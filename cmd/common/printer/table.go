@@ -3,9 +3,10 @@ package printer
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
+
 	"github.com/pterm/pterm"
 	"github.com/rs/zerolog/log"
-	"sort"
 )
 
 // ColumnMapping defines a mapping between original field names and display names
@@ -106,17 +107,6 @@ func DefaultTableOptions() TableOptions {
 	return TableOptions{
 		ShowPagination: true,
 	}
-}
-
-// PrintTable prints the provided data in a table format
-// This function is backward compatible with existing code
-func PrintTable(res any, pageIndex, pageCount, itemCount int64) error {
-	options := DefaultTableOptions()
-	options.PageIndex = pageIndex
-	options.PageCount = pageCount
-	options.ItemCount = itemCount
-
-	return PrintTableWithOptions(res, options)
 }
 
 // PrintTableWithOptions prints the data in a table format using the provided options

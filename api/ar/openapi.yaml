@@ -2325,7 +2325,7 @@ paths:
       summary: Redirect to Harness Artifact Page
       tags:
         - Artifacts
-  /registry/{registry_ref}:
+  /registry/{registry_ref}/+:
     delete:
       description: Delete a Registry in the account for the given key
       operationId: DeleteRegistry

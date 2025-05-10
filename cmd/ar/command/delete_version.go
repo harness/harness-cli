@@ -1,60 +1,62 @@
 package command
 
 import (
-	"errors"
+	"context"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	client "harness/internal/api/ar"
+	client2 "harness/util/client"
 )
 
 // newDeleteVersionCmd wires up:
 //
 //	hns ar version delete <args>
-func NewDeleteVersionCmd() *cobra.Command {
-	var host string
-	var format string
+func NewDeleteVersionCmd(c *client.ClientWithResponses) *cobra.Command {
+	var name, registry, artifact string
+	var pageSize int32
+	var pageIndex int32
 	cmd := &cobra.Command{
-		Use:   "version delete version ",
+		Use:   "version",
 		Short: "Delete an artifact version",
 		Long:  "Deletes a specific version of an artifact from the Harness Artifact Registry",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Create client
-			_, err := client.NewClient(host, nil)
+			response, err := c.DeleteArtifactVersionWithResponse(context.Background(),
+				client2.GetRef(client2.GetScopeRef(), registry), artifact, name)
+
 			if err != nil {
 				return err
 			}
-
-			// Validate required arguments
-			if len(args) < 1 {
-				return errors.New("missing required arguments: version ")
+			if response.JSON200 != nil {
+				log.Info().Msgf("Deleted version %s; msg:%s", name, response.JSON200.Status)
+			} else {
+				log.Error().Msgf("failed to delete version %s %s", name, string(response.Body))
 			}
 
-			// Call API
-			//resp, err := cli.DeleteArtifactVersion(context.Background(), args[0])
-			//if err != nil {
-			//	return err
-			//}
-
-			// Format output based on format flag
-			//switch format {
-			//case "json":
-			// TODO: output JSON here
-			//	fmt.Printf("%+v\n", resp)
-			//case "table":
-			// TODO: format as table
-			//	fmt.Printf("%+v\n", resp)
-			//default:
-			//	fmt.Printf("%+v\n", resp)
-			//}
 			return nil
 		},
 	}
 
 	// Common flags
-	cmd.Flags().StringVar(&host, "host", "http://localhost:8080", "service base URL")
-	cmd.Flags().StringVar(&format, "format", "table", "output format: table or json")
+	cmd.Flags().StringVar(&name, "name", "", "version")
+	cmd.Flags().StringVar(&registry, "registry", "", "registry name")
+	cmd.Flags().StringVar(&artifact, "artifact", "", "artifact name")
+	cmd.Flags().Int32Var(&pageSize, "page-size", 10, "number of items per page")
+	cmd.Flags().Int32Var(&pageIndex, "page", 0, "page number (zero-indexed)")
 
-	// TODO: Add any command-specific flags here
+	err := cmd.MarkFlagRequired("registry")
+	if err != nil {
+		return nil
+	}
+	err = cmd.MarkFlagRequired("artifact")
+	if err != nil {
+		return nil
+	}
+
+	err = cmd.MarkFlagRequired("name")
+	if err != nil {
+		return nil
+	}
 
 	return cmd
 }

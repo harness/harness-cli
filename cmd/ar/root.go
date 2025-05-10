@@ -36,9 +36,9 @@ func GetRootCmd() *cobra.Command {
 
 	rootCmd.AddCommand(
 		getDeleteCmd(
-			commands.NewDeleteRegistryCmd(),
-			commands.NewDeleteArtifactCmd(),
-			commands.NewDeleteVersionCmd(),
+			commands.NewDeleteRegistryCmd(client),
+			commands.NewDeleteArtifactCmd(client),
+			commands.NewDeleteVersionCmd(client),
 		),
 	)
 

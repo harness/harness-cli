@@ -2,11 +2,11 @@ package command
 
 import (
 	"context"
-	"harness/cmd/common/printer"
-	client2 "harness/util/client"
 
 	"github.com/spf13/cobra"
+	"harness/cmd/common/printer"
 	client "harness/internal/api/ar"
+	client2 "harness/util/client"
 )
 
 // newGetVersionCmd wires up:

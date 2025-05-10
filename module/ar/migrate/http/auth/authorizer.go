@@ -15,14 +15,15 @@
 package auth
 
 import (
-	commonhttp "harness/module/ar/migrate/http"
-	"harness/module/ar/migrate/http/auth/bearer"
-	"harness/module/ar/migrate/http/modifier"
-	"harness/module/ar/migrate/lib"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
+
+	commonhttp "harness/module/ar/migrate/http"
+	"harness/module/ar/migrate/http/auth/bearer"
+	"harness/module/ar/migrate/http/modifier"
+	"harness/module/ar/migrate/lib"
 )
 
 // NewAuthorizer creates an authorizer that can handle different auth schemes

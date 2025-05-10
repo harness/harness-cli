@@ -2,12 +2,13 @@ package jfrog
 
 import (
 	"fmt"
-	"harness/module/ar/migrate/http"
-	"harness/module/ar/migrate/http/auth/bearer"
-	"harness/module/ar/migrate/types"
 	"io"
 	http2 "net/http"
 	"strings"
+
+	"harness/module/ar/migrate/http"
+	"harness/module/ar/migrate/http/auth/bearer"
+	"harness/module/ar/migrate/types"
 )
 
 // newClient constructs a jfrog client

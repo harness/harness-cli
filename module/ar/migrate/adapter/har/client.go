@@ -2,15 +2,16 @@ package jfrog
 
 import (
 	"fmt"
+	"io"
+	"mime/multipart"
+	http2 "net/http"
+	"strings"
+
 	"harness/config"
 	"harness/internal/api/ar"
 	"harness/module/ar/migrate/http"
 	"harness/module/ar/migrate/http/auth/xApiKey"
 	"harness/module/ar/migrate/types"
-	"io"
-	"mime/multipart"
-	http2 "net/http"
-	"strings"
 )
 
 // newClient constructs a jfrog client

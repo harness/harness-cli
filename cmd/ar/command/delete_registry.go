@@ -1,60 +1,44 @@
 package command
 
 import (
-	"errors"
+	"context"
+	"fmt"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"harness/config"
 	client "harness/internal/api/ar"
+	client2 "harness/util/client"
 )
 
-// newDeleteRegistryCmd wires up:
-//
-//	hns ar registry delete <args>
-func NewDeleteRegistryCmd() *cobra.Command {
-	var host string
-	var format string
+func NewDeleteRegistryCmd(c *client.ClientWithResponses) *cobra.Command {
+	var name string
 	cmd := &cobra.Command{
-		Use:   "registry delete n ",
-		Short: "Delete a registry",
-		Long:  "Deletes a specific Harness Artifact Registry and all artifacts it contains",
+		Use:   "registry",
+		Short: "Delete registry",
+		Long:  "Delete a registry from Harness Artifact Registry",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Create client
-			_, err := client.NewClient(host, nil)
+			// Create params for pagination if needed
+			if len(name) == 0 {
+				return fmt.Errorf("must specify registry name")
+			}
+
+			response, err := c.DeleteRegistryWithResponse(context.Background(),
+				client2.GetRef(config.Global.AccountID, config.Global.OrgID, config.Global.ProjectID, name))
 			if err != nil {
 				return err
 			}
-
-			// Validate required arguments
-			if len(args) < 1 {
-				return errors.New("missing required arguments: n ")
+			if response.JSON200 != nil {
+				log.Info().Msgf("Deleted registry %s", name)
+			} else {
+				log.Error().Msgf("failed to delete registry %s %s", name, string(response.Body))
 			}
 
-			// Call API
-			//resp, err := cli.DeleteRegistry(context.Background(), args[0])
-			//if err != nil {
-			//	return err
-			//}
-
-			// Format output based on format flag
-			//switch format {
-			//case "json":
-			// TODO: output JSON here
-			//	fmt.Printf("%+v\n", resp)
-			//case "table":
-			// TODO: format as table
-			//	fmt.Printf("%+v\n", resp)
-			//default:
-			//	fmt.Printf("%+v\n", resp)
-			//}
 			return nil
 		},
 	}
 
-	// Common flags
-	cmd.Flags().StringVar(&host, "host", "http://localhost:8080", "service base URL")
-	cmd.Flags().StringVar(&format, "format", "table", "output format: table or json")
-
-	// TODO: Add any command-specific flags here
+	cmd.Flags().StringVar(&name, "name", "", "registry name")
 
 	return cmd
 }

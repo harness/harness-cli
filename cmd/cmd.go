@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -11,8 +14,6 @@ import (
 	"harness/module/ar/migrate/tree"
 	"harness/module/ar/migrate/types"
 	"harness/util/templates"
-	"os"
-	"time"
 )
 
 func main_2() {

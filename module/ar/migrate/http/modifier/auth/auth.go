@@ -16,9 +16,10 @@ package auth
 
 import (
 	"errors"
+	"net/http"
+
 	"harness/module/ar/migrate/http/modifier"
 	"harness/module/ar/migrate/secret"
-	"net/http"
 )
 
 // Authorizer is a kind of Modifier used to authorize the requests
