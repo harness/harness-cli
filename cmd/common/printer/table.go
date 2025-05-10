@@ -56,5 +56,9 @@ func PrintTable(res any, pageIndex, pageCount, itemCount int64) error {
 		log.Error().Msgf("failed to render table: %v", err)
 		return err
 	}
+
+	fmt.Printf("Page %d of %d (Total: %d)\n",
+		pageIndex, pageCount, itemCount)
+	
 	return nil
 }

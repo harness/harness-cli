@@ -5,7 +5,7 @@ import (
 	"harness/config"
 )
 
-func Print(res any, pageIndex, pageCount, itemCount int64, printCountInfo bool) error {
+func Print(res any, pageIndex, pageCount, itemCount int64) error {
 	var err error
 	if config.Global.Format == "json" {
 		err = PrintJson(res, pageIndex, pageCount, itemCount)
@@ -18,9 +18,5 @@ func Print(res any, pageIndex, pageCount, itemCount int64, printCountInfo bool) 
 		return err
 	}
 
-	if printCountInfo {
-		fmt.Printf("Page %d of %d (Total: %d)\n",
-			pageIndex, pageCount, itemCount)
-	}
 	return nil
 }

@@ -44,7 +44,7 @@ func NewGetArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
 			}
 
 			err = printer.Print(response.JSON200.Data.Artifacts, *response.JSON200.Data.PageIndex,
-				*response.JSON200.Data.PageCount, *response.JSON200.Data.ItemCount, true)
+				*response.JSON200.Data.PageCount, *response.JSON200.Data.ItemCount)
 
 			return err
 		},
