@@ -127,7 +127,7 @@ func main() {
 	}
 
 	// Persistent flags available to all commands - bind them directly to global config
-	rootCmd.PersistentFlags().StringVar(&config.Global.APIBaseURL, "clients-url", "",
+	rootCmd.PersistentFlags().StringVar(&config.Global.APIBaseURL, "api-url", "",
 		"Base URL for the API (overrides saved config)")
 	rootCmd.PersistentFlags().StringVar(&config.Global.AuthToken, "token", "",
 		"Authentication token (overrides saved config)")

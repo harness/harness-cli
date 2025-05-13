@@ -38,7 +38,7 @@ make build
 
 The CLI can be configured using:
 
-1. Configuration file at `$HOME/.harness/config.yaml`
+1. Configuration file at `$HOME/.harness/auth.json`
 2. Environment variables
 3. Command-line flags
 
@@ -48,10 +48,13 @@ The CLI supports authentication with Harness services using an API key:
 
 ```bash
 # Set API key via environment variable
-export HARNESS_API_KEY=your_api_key
+export HARNESS_API_TOKEN=your_api_token
 
 # Or include it in your configuration file
-# $HOME/.harness/config.yaml
+# $HOME/.harness/auth.json
+
+# Or provide it as a flag
+# `hns --api-token <command> 
 ```
 
 ## Available Services
