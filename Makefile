@@ -30,8 +30,8 @@ generate-%:
 	$(GOCMD) run $(GEN) --service=$* --in=$(API_DIR)/$*/openapi.yaml --out=cmd/$* --cmd=$(API_DIR)/$*/command.yaml
 
 # Build the CLI (runs `generate` first so everything is up to date)
-build: generate
-	$(GOCMD) build ./...
+build: generate format
+	$(GOCMD) build -o hns ./cmd/ 
 
 # Remove generated artifacts
 clean:

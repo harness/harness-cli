@@ -2,11 +2,11 @@ package auth
 
 import (
 	"context"
-	"harness/internal/api/ar"
-	"harness/internal/api/ar_pkg"
 	"net/http"
 
 	"harness/config"
+	"harness/internal/api/ar"
+	"harness/internal/api/ar_pkg"
 )
 
 // GetXApiKeyOptionAR
