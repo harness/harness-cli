@@ -17,10 +17,12 @@ func NewDeleteVersionCmd(c *client.ClientWithResponses) *cobra.Command {
 	var pageSize int32
 	var pageIndex int32
 	cmd := &cobra.Command{
-		Use:   "version",
+		Use:   "version [name]",
 		Short: "Delete an artifact version",
 		Long:  "Deletes a specific version of an artifact from the Harness Artifact Registry",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			name = args[0]
 			response, err := c.DeleteArtifactVersionWithResponse(context.Background(),
 				client2.GetRef(client2.GetScopeRef(), registry), artifact, name)
 
@@ -38,7 +40,6 @@ func NewDeleteVersionCmd(c *client.ClientWithResponses) *cobra.Command {
 	}
 
 	// Common flags
-	cmd.Flags().StringVar(&name, "name", "", "version")
 	cmd.Flags().StringVar(&registry, "registry", "", "registry name")
 	cmd.Flags().StringVar(&artifact, "artifact", "", "artifact name")
 	cmd.Flags().Int32Var(&pageSize, "page-size", 10, "number of items per page")
@@ -49,11 +50,6 @@ func NewDeleteVersionCmd(c *client.ClientWithResponses) *cobra.Command {
 		return nil
 	}
 	err = cmd.MarkFlagRequired("artifact")
-	if err != nil {
-		return nil
-	}
-
-	err = cmd.MarkFlagRequired("name")
 	if err != nil {
 		return nil
 	}

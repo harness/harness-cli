@@ -18,12 +18,16 @@ func NewGetRegistryCmd(client *ar.ClientWithResponses) *cobra.Command {
 	var pageSize int32
 	var pageIndex int32
 	cmd := &cobra.Command{
-		Use:   "registry",
+		Use:   "registry [?name]",
 		Short: "Get registry details",
+		Args:  cobra.MaximumNArgs(1),
 		Long:  "Retrieves detailed information about a specific Harness Artifact Registry",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Create params for pagination if needed
 			params := &ar.GetAllRegistriesParams{}
+			if len(args) == 1 {
+				name = args[0]
+			}
 			if pageSize > 0 {
 				size := int64(pageSize)
 				params.Size = &size
@@ -60,7 +64,6 @@ func NewGetRegistryCmd(client *ar.ClientWithResponses) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&name, "name", "", "registry name")
 	cmd.Flags().Int32Var(&pageSize, "page-size", 10, "number of items per page")
 	cmd.Flags().Int32Var(&pageIndex, "page", 0, "page number (zero-indexed)")
 	cmd.Flags().StringVar(&packageType, "package-type", "", "package type")

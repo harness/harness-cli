@@ -14,11 +14,12 @@ import (
 func NewDeleteRegistryCmd(c *client.ClientWithResponses) *cobra.Command {
 	var name string
 	cmd := &cobra.Command{
-		Use:   "registry",
+		Use:   "registry [name]",
 		Short: "Delete registry",
 		Long:  "Delete a registry from Harness Artifact Registry",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Create params for pagination if needed
+			name = args[0]
 			if len(name) == 0 {
 				return fmt.Errorf("must specify registry name")
 			}
@@ -37,8 +38,5 @@ func NewDeleteRegistryCmd(c *client.ClientWithResponses) *cobra.Command {
 			return nil
 		},
 	}
-
-	cmd.Flags().StringVar(&name, "name", "", "registry name")
-
 	return cmd
 }

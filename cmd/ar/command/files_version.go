@@ -21,7 +21,12 @@ func NewFilesVersionCmd(c *client.ClientWithResponses) *cobra.Command {
 		Use:   "file",
 		Short: "Get artifact file for a version",
 		Long:  "Retrieves detailed list of files for a version from Harness Artifact Registry",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 1 {
+				name = args[0]
+			}
+
 			params := &client.GetArtifactFilesParams{}
 			if len(name) > 0 {
 				params.SearchTerm = &name
@@ -53,7 +58,6 @@ func NewFilesVersionCmd(c *client.ClientWithResponses) *cobra.Command {
 	}
 
 	// Common flags
-	cmd.Flags().StringVar(&name, "name", "", "file name")
 	cmd.Flags().StringVar(&version, "version", "", "version")
 	cmd.Flags().StringVar(&registry, "registry", "", "registry name")
 	cmd.Flags().StringVar(&artifact, "artifact", "", "artifact name")

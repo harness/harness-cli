@@ -17,10 +17,14 @@ func NewGetArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
 	var pageSize int32
 	var pageIndex int32
 	cmd := &cobra.Command{
-		Use:   "artifact",
+		Use:   "artifact [?artifact-name]",
 		Short: "Get artifact details",
 		Long:  "Retrieves detailed information about a specific artifact in the Harness Artifact Registry",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 1 {
+				name = args[0]
+			}
 			params := client.GetAllHarnessArtifactsParams{}
 			if len(registry) > 0 {
 				params.RegIdentifier = &[]string{registry}
@@ -56,8 +60,6 @@ func NewGetArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
 		},
 	}
 
-	// Common flags
-	cmd.Flags().StringVar(&name, "name", "", "name of the artifact")
 	cmd.Flags().StringVar(&registry, "registry", "", "name of the registry")
 	cmd.Flags().Int32Var(&pageSize, "page-size", 10, "number of items per page")
 	cmd.Flags().Int32Var(&pageIndex, "page", 0, "page number (zero-indexed)")

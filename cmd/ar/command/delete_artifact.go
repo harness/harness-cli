@@ -12,10 +12,12 @@ import (
 func NewDeleteArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
 	var name, registry string
 	cmd := &cobra.Command{
-		Use:   "artifact",
+		Use:   "artifact [name]",
 		Short: "Delete an artifact from a registry",
 		Long:  "Deletes a specific artifact and all its versions from the Harness Artifact Registry",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			name = args[0]
 			response, err := c.DeleteArtifactWithResponse(context.Background(),
 				client2.GetRef(client2.GetScopeRef(), registry), name)
 			if err != nil {
@@ -32,10 +34,8 @@ func NewDeleteArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
 	}
 
 	// Common flags
-	cmd.Flags().StringVar(&name, "name", "", "name of the artifact")
 	cmd.Flags().StringVar(&registry, "registry", "", "name of the registry")
 
-	cmd.MarkFlagRequired("name")
 	cmd.MarkFlagRequired("registry")
 
 	return cmd

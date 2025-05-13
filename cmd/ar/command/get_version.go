@@ -20,7 +20,12 @@ func NewGetVersionCmd(c *client.ClientWithResponses) *cobra.Command {
 		Use:   "version",
 		Short: "Get artifact version details",
 		Long:  "Retrieves detailed information about a specific version of an artifact in the Harness Artifact Registry",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 1 {
+				name = args[0]
+			}
+
 			params := client.GetAllArtifactVersionsParams{}
 			if len(name) > 0 {
 				params.SearchTerm = &name
@@ -36,7 +41,7 @@ func NewGetVersionCmd(c *client.ClientWithResponses) *cobra.Command {
 			}
 
 			response, err := c.GetAllArtifactVersionsWithResponse(context.Background(),
-				client2.GetRef(client2.GetScopeRef(), registry), artifact, nil)
+				client2.GetRef(client2.GetScopeRef(), registry), artifact, &params)
 			if err != nil {
 				return err
 			}
@@ -56,7 +61,6 @@ func NewGetVersionCmd(c *client.ClientWithResponses) *cobra.Command {
 	}
 
 	// Common flags
-	cmd.Flags().StringVar(&name, "name", "", "version")
 	cmd.Flags().StringVar(&registry, "registry", "", "registry name")
 	cmd.Flags().StringVar(&artifact, "artifact", "", "artifact name")
 	cmd.Flags().Int32Var(&pageSize, "page-size", 10, "number of items per page")
