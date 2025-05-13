@@ -19,6 +19,11 @@ const (
 	ApiKeyAuthScopes = "ApiKeyAuth.Scopes"
 )
 
+// DownloadGenericPackageParams defines parameters for DownloadGenericPackage.
+type DownloadGenericPackageParams struct {
+	Filename string `form:"filename" json:"filename"`
+}
+
 // UploadGenericPackageMultipartBody defines parameters for UploadGenericPackage.
 type UploadGenericPackageMultipartBody struct {
 	// Description Human-readable description of the package/version
@@ -107,8 +112,23 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// DownloadGenericPackage request
+	DownloadGenericPackage(ctx context.Context, accountId string, registry string, pPackage string, version string, params *DownloadGenericPackageParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// UploadGenericPackageWithBody request with any body
 	UploadGenericPackageWithBody(ctx context.Context, accountId string, registry string, pPackage string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) DownloadGenericPackage(ctx context.Context, accountId string, registry string, pPackage string, version string, params *DownloadGenericPackageParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDownloadGenericPackageRequest(c.Server, accountId, registry, pPackage, version, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) UploadGenericPackageWithBody(ctx context.Context, accountId string, registry string, pPackage string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -121,6 +141,79 @@ func (c *Client) UploadGenericPackageWithBody(ctx context.Context, accountId str
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewDownloadGenericPackageRequest generates requests for DownloadGenericPackage
+func NewDownloadGenericPackageRequest(server string, accountId string, registry string, pPackage string, version string, params *DownloadGenericPackageParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "registry", runtime.ParamLocationPath, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "package", runtime.ParamLocationPath, pPackage)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "version", runtime.ParamLocationPath, version)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pkg/%s/%s/generic/%s/%s", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "filename", runtime.ParamLocationQuery, params.Filename); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewUploadGenericPackageRequestWithBody generates requests for UploadGenericPackage with any type of body
@@ -223,8 +316,32 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// DownloadGenericPackageWithResponse request
+	DownloadGenericPackageWithResponse(ctx context.Context, accountId string, registry string, pPackage string, version string, params *DownloadGenericPackageParams, reqEditors ...RequestEditorFn) (*DownloadGenericPackageResp, error)
+
 	// UploadGenericPackageWithBodyWithResponse request with any body
 	UploadGenericPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, pPackage string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadGenericPackageResp, error)
+}
+
+type DownloadGenericPackageResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r DownloadGenericPackageResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DownloadGenericPackageResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type UploadGenericPackageResp struct {
@@ -248,6 +365,15 @@ func (r UploadGenericPackageResp) StatusCode() int {
 	return 0
 }
 
+// DownloadGenericPackageWithResponse request returning *DownloadGenericPackageResp
+func (c *ClientWithResponses) DownloadGenericPackageWithResponse(ctx context.Context, accountId string, registry string, pPackage string, version string, params *DownloadGenericPackageParams, reqEditors ...RequestEditorFn) (*DownloadGenericPackageResp, error) {
+	rsp, err := c.DownloadGenericPackage(ctx, accountId, registry, pPackage, version, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDownloadGenericPackageResp(rsp)
+}
+
 // UploadGenericPackageWithBodyWithResponse request with arbitrary body returning *UploadGenericPackageResp
 func (c *ClientWithResponses) UploadGenericPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, pPackage string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadGenericPackageResp, error) {
 	rsp, err := c.UploadGenericPackageWithBody(ctx, accountId, registry, pPackage, version, contentType, body, reqEditors...)
@@ -255,6 +381,22 @@ func (c *ClientWithResponses) UploadGenericPackageWithBodyWithResponse(ctx conte
 		return nil, err
 	}
 	return ParseUploadGenericPackageResp(rsp)
+}
+
+// ParseDownloadGenericPackageResp parses an HTTP response from a DownloadGenericPackageWithResponse call
+func ParseDownloadGenericPackageResp(rsp *http.Response) (*DownloadGenericPackageResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DownloadGenericPackageResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
 }
 
 // ParseUploadGenericPackageResp parses an HTTP response from a UploadGenericPackageWithResponse call

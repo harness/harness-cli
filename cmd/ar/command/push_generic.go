@@ -67,13 +67,8 @@ func NewPushGenericCmd(c *client.ClientWithResponses) *cobra.Command {
 				return fmt.Errorf("failed to read package file: %w", err)
 			}
 
-			// If package name is not provided, use the filename without extension
 			if filename == "" {
 				filename = filepath.Base(packageFilePath)
-				ext := filepath.Ext(filename)
-				if ext != "" {
-					filename = filename[:len(filename)-len(ext)]
-				}
 			}
 
 			filePart, err := writer.CreateFormFile("file", filename)
@@ -108,7 +103,7 @@ func NewPushGenericCmd(c *client.ClientWithResponses) *cobra.Command {
 
 			fmt.Printf("Uploading generic package '%s' (version '%s', filename '%s', description '%s') to registry '%s'...\n",
 				packageName, version, filename, description, registryName)
-			
+
 			// Call the API with the proper parameters and multipart form body
 			response, err := pkgClient.UploadGenericPackageWithBodyWithResponse(
 				context.Background(),
@@ -143,11 +138,12 @@ func NewPushGenericCmd(c *client.ClientWithResponses) *cobra.Command {
 	}
 
 	// Add flags
-	cmd.Flags().StringVar(&packageName, "name", "", "name for the artifact")
+	cmd.Flags().StringVarP(&packageName, "name", "n", "", "name for the artifact")
 	cmd.Flags().StringVar(&filename, "filename", "",
-		"name of the file being uploaded (defaults to filename without extension)")
-	cmd.Flags().StringVar(&packageVersion, "version", "", "version for the artifact (defaults to '1.0.0')")
-	cmd.Flags().StringVar(&description, "description", "", "description of the artifact")
+		"name of the file being uploaded (defaults to name of the file being uploaded)")
+	cmd.Flags().StringVarP(&packageVersion, "version", "v", "", "version for the artifact (defaults to '1.0.0')")
+	cmd.Flags().StringVarP(&description, "description", "d", "", "description of the artifact (default to empty)")
+
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
 
 	cmd.MarkFlagRequired("pkg-url")

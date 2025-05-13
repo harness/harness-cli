@@ -49,5 +49,11 @@ func GetRootCmd() *cobra.Command {
 		),
 	)
 
+	rootCmd.AddCommand(
+		getPullCommand(
+			commands.NewPullGenericCmd(client),
+		),
+	)
+
 	return rootCmd
 }

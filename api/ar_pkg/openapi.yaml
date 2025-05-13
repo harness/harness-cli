@@ -10,6 +10,46 @@ servers:
     url: /
 paths:
   /pkg/{accountId}/{registry}/generic/{package}/{version}:
+    get:
+      summary: Download a generic package file
+      operationId: downloadGenericPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: package
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: filename
+          in: query
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
     put:
       summary: Upload a generic package file
       operationId: uploadGenericPackage
