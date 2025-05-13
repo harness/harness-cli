@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"harness/cmd/common/auth"
 	"harness/cmd/common/printer"
+	"harness/cmd/common/progress"
 	"harness/config"
 	client "harness/internal/api/ar"
 	pkgclient "harness/internal/api/ar_pkg"
@@ -104,6 +105,11 @@ func NewPushGenericCmd(c *client.ClientWithResponses) *cobra.Command {
 			fmt.Printf("Uploading generic package '%s' (version '%s', filename '%s', description '%s') to registry '%s'...\n",
 				packageName, version, filename, description, registryName)
 
+			bufferSize := int64(buffer.Len())
+			progressBuffer := bytes.NewReader(buffer.Bytes())
+			reader, closer := progress.Reader(bufferSize, progressBuffer, filename)
+			defer closer()
+
 			// Call the API with the proper parameters and multipart form body
 			response, err := pkgClient.UploadGenericPackageWithBodyWithResponse(
 				context.Background(),
@@ -112,7 +118,7 @@ func NewPushGenericCmd(c *client.ClientWithResponses) *cobra.Command {
 				packageName,                  // package name
 				version,                      // version
 				writer.FormDataContentType(), // content type for multipart/form-data
-				&buffer,                      // multipart form data as io.Reader
+				reader,                       // multipart form data as io.Reader with progress tracking
 			)
 			if err != nil {
 				return fmt.Errorf("failed to upload package: %w", err)
@@ -130,6 +136,7 @@ func NewPushGenericCmd(c *client.ClientWithResponses) *cobra.Command {
 			// Use default json options for response printing
 			if response.Body != nil {
 				options := printer.DefaultJsonOptions()
+				options.ShowPagination = false
 				printer.PrintJsonWithOptions(response.Body, options)
 			}
 

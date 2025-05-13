@@ -39,18 +39,6 @@ func DefaultJsonOptions() JsonOptions {
 	}
 }
 
-// PrintJson prints the provided data as JSON with default options
-// It provides backward compatibility with existing code
-func PrintJson(res any, pageIndex, pageCount, itemCount int64) error {
-	options := DefaultJsonOptions()
-	options.PageIndex = pageIndex
-	options.PageCount = pageCount
-	options.ItemCount = itemCount
-	options.ShowPagination = false // Match previous behavior
-
-	return PrintJsonWithOptions(res, options)
-}
-
 // PrintJsonWithOptions prints the provided data as JSON with the specified options
 //
 // Example:

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"harness/cmd/common"
+	"harness/cmd/common/progress"
 	"io"
 	"log"
 	"os"
@@ -136,9 +138,13 @@ func NewPullGenericCmd(c *client.ClientWithResponses) *cobra.Command {
 				return fmt.Errorf("failed to create destination file: %w", err)
 			}
 			defer outFile.Close()
+			log.Printf("length: %d, size: %d, savefilename: %s\n", response.ContentLength, response.ContentLength,
+				saveFilename)
 
-			// Copy the response body to the file
-			written, err := io.Copy(outFile, response.Body)
+			reader, closer := progress.Reader(response.ContentLength, response.Body, saveFilename)
+			defer closer()
+			written, err := io.Copy(outFile, reader)
+
 			if err != nil {
 				return fmt.Errorf("failed to write to destination file: %w", err)
 			}
@@ -149,12 +155,13 @@ func NewPullGenericCmd(c *client.ClientWithResponses) *cobra.Command {
 
 			// Print success message - no JSON metadata is returned for download
 			options := printer.DefaultJsonOptions()
+			options.ShowPagination = false
 			metadata := map[string]interface{}{
 				"registry": registryName,
 				"package":  packageName,
 				"version":  packageVersion,
 				"filename": saveFilename,
-				"size":     written,
+				"size":     common.GetSize(written),
 				"path":     filePath,
 			}
 			printer.PrintJsonWithOptions(metadata, options)

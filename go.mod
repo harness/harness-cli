@@ -6,6 +6,7 @@ require (
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/getkin/kin-openapi v0.132.0
 	github.com/google/uuid v1.6.0
+	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/pterm/pterm v0.12.80
 	github.com/rs/zerolog v1.34.0
