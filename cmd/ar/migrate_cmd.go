@@ -18,7 +18,7 @@ import (
 func getMigrateCmd(*ar.ClientWithResponses) *cobra.Command {
 	// Create local variables for flag binding
 	var localConfigPath string
-	var localAPIBaseURL string
+	var localPkgBaseURL string
 	var localDryRun bool
 	var localConcurrency int
 
@@ -29,17 +29,19 @@ func getMigrateCmd(*ar.ClientWithResponses) *cobra.Command {
 		PreRun: func(cmd *cobra.Command, args []string) {
 			// Sync local flags to global config
 			config.Global.ConfigPath = localConfigPath
-			if localAPIBaseURL != "" {
-				config.Global.APIBaseURL = localAPIBaseURL
-			}
+			config.Global.Registry.PkgURL = localPkgBaseURL
 			config.Global.Registry.Migrate.DryRun = localDryRun
 			config.Global.Registry.Migrate.Concurrency = localConcurrency
 		},
 	}
 	migrateCmd.Flags().StringVarP(&localConfigPath, "config", "c", "config.yaml", "Path to configuration file")
-	migrateCmd.Flags().StringVar(&localAPIBaseURL, "ar-url", "", "Base URL for the API (overrides config)")
+	migrateCmd.Flags().StringVar(&localPkgBaseURL, "pkg-url", "", "Base URL for the API (overrides config)")
 	migrateCmd.Flags().BoolVar(&localDryRun, "dry-run", false, "Perform a dry run (overrides config)")
 	migrateCmd.Flags().IntVar(&localConcurrency, "concurrency", 1, "Number of concurrent operations (overrides config)")
+
+	migrateCmd.MarkFlagRequired("config")
+	migrateCmd.MarkFlagRequired("pkg-url")
+
 	return migrateCmd
 }
 

@@ -7,7 +7,7 @@ import (
 func getDeleteCmd(cmds ...*cobra.Command) *cobra.Command {
 	// Registry command
 	registryCmd := &cobra.Command{
-		Use:   "delete [ar-ref]",
+		Use:   "delete",
 		Short: "Registry management commands",
 		Long:  `Commands to manage Harness Artifact Registry registries`,
 	}

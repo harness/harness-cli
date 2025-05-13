@@ -1,0 +1,74 @@
+openapi: 3.0.3
+info:
+  title: Harness Artifact Registry Upload API
+  version: 1.0.0
+  description: |
+    Upload a package (file plus metadata) to the Harness artifact registry.
+
+servers:
+  - description: Registry
+    url: /
+paths:
+  /pkg/{accountId}/{registry}/generic/{package}/{version}:
+    put:
+      summary: Upload a generic package file
+      operationId: uploadGenericPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: package
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - filename
+              properties:
+                filename:
+                  type: string
+                  description: Original filename (mirrors form field `filename`)
+                file:
+                  type: string
+                  format: binary
+                  description: Package file to upload
+                description:
+                  type: string
+                  description: Human-readable description of the package/version
+      responses:
+        '201':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key

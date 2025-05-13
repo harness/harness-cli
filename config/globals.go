@@ -17,6 +17,7 @@ type GlobalFlags struct {
 
 // RegistryConfig holds ar-specific configurations
 type RegistryConfig struct {
+	PkgURL string
 	// For migrate command
 	Migrate MigrateConfig
 

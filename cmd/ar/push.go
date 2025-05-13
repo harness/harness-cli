@@ -4,11 +4,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func getGetCommand(cmds ...*cobra.Command) *cobra.Command {
-
+func getPushCommand(cmds ...*cobra.Command) *cobra.Command {
 	// Artifact command
+
 	artifactCmd := &cobra.Command{
-		Use:   "get",
+		Use:   "push",
 		Short: "Artifact management commands",
 		Long:  `Commands to manage Harness Artifact Registry artifacts`,
 	}

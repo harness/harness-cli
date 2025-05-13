@@ -16,7 +16,7 @@ func GetRootCmd() *cobra.Command {
 		Long:  `CLI tool for Harness Artifact Registry and migrate artifacts`,
 	}
 
-	client, err := ar.NewClientWithResponses(config.Global.APIBaseURL+"/gateway/har/api/v1", auth.GetXApiKeyOption())
+	client, err := ar.NewClientWithResponses(config.Global.APIBaseURL+"/gateway/har/api/v1", auth.GetXApiKeyOptionAR())
 	if err != nil {
 		log.Fatal().Msgf("Error creating client: %v", err)
 	}
@@ -39,6 +39,13 @@ func GetRootCmd() *cobra.Command {
 			commands.NewDeleteRegistryCmd(client),
 			commands.NewDeleteArtifactCmd(client),
 			commands.NewDeleteVersionCmd(client),
+		),
+	)
+
+	rootCmd.AddCommand(
+		getPushCommand(
+			commands.NewPushGenericCmd(client),
+			commands.NewPushMavenCmd(client),
 		),
 	)
 
