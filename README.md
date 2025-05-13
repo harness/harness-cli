@@ -65,28 +65,28 @@ Commands for interacting with the Harness Artifact Registry.
 
 ```bash
 # List all registries
-hns ar get registries
+hns ar get registry
 
 # Get information about a specific artifact
-hns ar get artifact <artifact-name> --registry=<registry-name>
+hns ar get artifact [?artifact-name] --registry=<registry-name>
 
 # Get version information
-hns ar get version <version> --registry=<registry-name> --artifact=<artifact-name>
+hns ar get version [?version] --registry=<registry-name> --artifact=<artifact-name>
 
 # Push generic artifact
-hns ar push generic --registry=<registry-name> --artifact=<artifact-name> --version=<version> --file=<file-path>
+hns ar push generic [registry-name] [file-path] --name <artifact-name> --version=<version>
 
-# Push maven artifact
-hns ar push maven --registry=<registry-name> --artifact=<artifact-name> --version=<version> --file=<file-path>
+# Pull generic artifact
+hns ar pull generic [registry-name] [artifact-path] [destination]
 
 # Delete a registry
-hns ar delete registry <registry-name>
+hns ar delete registry [registry-name]
 
 # Delete an artifact
-hns ar delete artifact <artifact-name> --registry=<registry-name>
+hns ar delete artifact [artifact-name] --registry=<registry-name>
 
 # Delete a version
-hns ar delete version <version> --registry=<registry-name> --artifact=<artifact-name>
+hns ar delete version [version-name] --registry=<registry-name> --artifact=<artifact-name>
 ```
 
 ## Output Formatting
