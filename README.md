@@ -127,7 +127,7 @@ harness-cli/
 
 ### Adding New Services
 
-1. Add the OpenAPI spec in the `api-specs` directory
+1. Add the OpenAPI spec in the `api/<service>` directory
 2. Run the code generator to create service client:
    ```
    make generate
