@@ -3,6 +3,7 @@ package migrate
 import (
 	"context"
 	"fmt"
+	"github.com/pterm/pterm"
 
 	"github.com/rs/zerolog/log"
 	"harness/internal/api/ar"
@@ -51,6 +52,7 @@ func (m *MigrationService) Run(ctx context.Context) error {
 
 	logger.Info().Msg("Starting migration process")
 
+	multi := pterm.DefaultMultiPrinter
 	var jobs []engine.Job
 
 	for _, mapping := range m.config.Mappings {
@@ -62,7 +64,7 @@ func (m *MigrationService) Run(ctx context.Context) error {
 		mappingLogger.Info().Msg("Processing registry migration")
 
 		job := migratable.NewRegistryJob(m.source, m.destination, mapping.SourceRegistry,
-			mapping.DestinationRegistry, mapping.ArtifactType)
+			mapping.DestinationRegistry, mapping.ArtifactType, multi)
 		jobs = append(jobs, job)
 
 	}

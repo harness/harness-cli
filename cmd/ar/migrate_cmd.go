@@ -40,7 +40,6 @@ func getMigrateCmd(*ar.ClientWithResponses) *cobra.Command {
 	migrateCmd.Flags().IntVar(&localConcurrency, "concurrency", 1, "Number of concurrent operations (overrides config)")
 
 	migrateCmd.MarkFlagRequired("config")
-	migrateCmd.MarkFlagRequired("pkg-url")
 
 	return migrateCmd
 }

@@ -3,6 +3,8 @@ package migratable
 import (
 	"context"
 	"fmt"
+	"github.com/pterm/pterm"
+	"harness/cmd/common/progress"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,6 +26,7 @@ type File struct {
 	version      types.Version
 	file         *types.File
 	node         *types.TreeNode
+	multi        pterm.MultiPrinter
 }
 
 func NewFileJob(
@@ -36,6 +39,7 @@ func NewFileJob(
 	version types.Version,
 	node *types.TreeNode,
 	file *types.File,
+	multi pterm.MultiPrinter,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -60,6 +64,7 @@ func NewFileJob(
 		node:         node,
 		version:      version,
 		file:         file,
+		multi:        multi,
 	}
 }
 
@@ -99,7 +104,10 @@ func (r File) Migrate(ctx context.Context) error {
 			logger.Error().Err(err).Msg("Failed to download file")
 			return fmt.Errorf("download file failed: %w", err)
 		}
-		err = r.destAdapter.UploadFile(r.destRegistry, downloadFile, r.file, header, r.pkg.Name, r.version.Name,
+
+		readCloser := progress.ReadCloser(int64(r.file.Size), downloadFile, r.file.Name, r.multi)
+
+		err = r.destAdapter.UploadFile(r.destRegistry, readCloser, r.file, header, r.pkg.Name, r.version.Name,
 			r.artifactType)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to upload file")

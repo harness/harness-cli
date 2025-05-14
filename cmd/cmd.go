@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -11,82 +13,8 @@ import (
 	"harness/cmd/ar"
 	"harness/cmd/auth"
 	"harness/config"
-	"harness/module/ar/migrate/tree"
-	"harness/module/ar/migrate/types"
 	"harness/util/templates"
 )
-
-func main_2() {
-	var files []types.File
-	files = append(files,
-		types.File{
-			Registry:     "r1",
-			Uri:          "/logs/1.log",
-			Folder:       false,
-			Size:         1,
-			LastModified: "abc",
-			SHA1:         "fsadf",
-			SHA2:         "Fsadf",
-		},
-		types.File{
-			Registry:     "r1",
-			Uri:          "1.out",
-			Folder:       false,
-			Size:         1,
-			LastModified: "abc",
-			SHA1:         "fsadf",
-			SHA2:         "Fsadf",
-		},
-		types.File{
-			Registry:     "r1",
-			Uri:          "happy/2.out",
-			Folder:       false,
-			Size:         1,
-			LastModified: "abc",
-			SHA1:         "fsadf",
-			SHA2:         "Fsadf",
-		},
-		types.File{
-			Registry:     "r1",
-			Uri:          "sad/3.out",
-			Folder:       false,
-			Size:         10,
-			LastModified: "abc",
-			SHA1:         "fsadf",
-			SHA2:         "Fsadf",
-		},
-		types.File{
-			Registry:     "r1",
-			Uri:          "sad/foo/11.out",
-			Folder:       false,
-			Size:         10,
-			LastModified: "abc",
-			SHA1:         "fsadf",
-			SHA2:         "Fsadf",
-		},
-		types.File{
-			Registry:     "r1",
-			Uri:          "sad/foo/bar/11.out",
-			Folder:       false,
-			Size:         10,
-			LastModified: "abc",
-			SHA1:         "fsadf",
-			SHA2:         "Fsadf",
-		},
-		types.File{
-			Registry:     "r1",
-			Uri:          "sad/1.out",
-			Folder:       false,
-			Size:         10,
-			LastModified: "abc",
-			SHA1:         "fsadf",
-			SHA2:         "Fsadf",
-		},
-	)
-
-	t := tree.TransformToTree(files)
-	fmt.Println(t)
-}
 
 func main() {
 	rootCmd := &cobra.Command{
@@ -136,6 +64,11 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&config.Global.ProjectID, "project", "", "Project (overrides saved config)")
 	rootCmd.PersistentFlags().StringVar(&config.Global.Format, "format", "table", "Format of the result")
 
+	// Add log file path flag
+	var logFilePath string
+	rootCmd.PersistentFlags().StringVar(&logFilePath, "log-file", "",
+		"Path to store logs (if not provided, logging is disabled)")
+
 	authConfig, err := loadAuthConfig()
 	if err == nil {
 		// Use config values if not overridden by flags
@@ -164,8 +97,33 @@ func main() {
 
 	addProfilingFlags(flags)
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
-	//zerolog.SetGlobalLevel(zerolog.InfoLevel)
+
+	// Configure logging based on flags
+	if logFilePath != "" {
+		// Ensure the directory exists
+		logDir := filepath.Dir(logFilePath)
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			fmt.Printf("Warning: Could not create log directory: %v\n", err)
+		}
+
+		// Open the log file
+		logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			fmt.Printf("Warning: Could not open log file: %v\n", err)
+		} else {
+			// Set up log writer with timestamp format
+			logWriter := zerolog.ConsoleWriter{
+				Out:        logFile,
+				TimeFormat: time.RFC3339,
+				NoColor:    true,
+			}
+			log.Logger = log.Output(logWriter)
+		}
+	} else {
+		// If no log file specified, disable logging
+		log.Logger = log.Output(io.Discard)
+		zerolog.SetGlobalLevel(zerolog.Disabled)
+	}
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
