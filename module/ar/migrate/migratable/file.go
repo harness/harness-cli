@@ -3,8 +3,7 @@ package migratable
 import (
 	"context"
 	"fmt"
-	"github.com/pterm/pterm"
-	"harness/cmd/common/progress"
+	"harness/util/common/progress"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,7 +25,7 @@ type File struct {
 	version      types.Version
 	file         *types.File
 	node         *types.TreeNode
-	multi        pterm.MultiPrinter
+	stats        *types.TransferStats
 }
 
 func NewFileJob(
@@ -39,7 +38,7 @@ func NewFileJob(
 	version types.Version,
 	node *types.TreeNode,
 	file *types.File,
-	multi pterm.MultiPrinter,
+	stats *types.TransferStats,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -64,7 +63,7 @@ func NewFileJob(
 		node:         node,
 		version:      version,
 		file:         file,
-		multi:        multi,
+		stats:        stats,
 	}
 }
 
@@ -105,13 +104,23 @@ func (r File) Migrate(ctx context.Context) error {
 			return fmt.Errorf("download file failed: %w", err)
 		}
 
-		readCloser := progress.ReadCloser(int64(r.file.Size), downloadFile, r.file.Name, r.multi)
+		readCloser := progress.ReadCloser(int64(r.file.Size), downloadFile, r.file.Name)
 
 		err = r.destAdapter.UploadFile(r.destRegistry, readCloser, r.file, header, r.pkg.Name, r.version.Name,
 			r.artifactType)
+		stat := types.FileStat{
+			Name:     r.file.Name,
+			Registry: r.srcRegistry,
+			Uri:      r.file.Uri,
+			Size:     int64(r.file.Size),
+			Status:   types.StatusSuccess,
+		}
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to upload file")
+			stat.Status = types.StatusFail
+			stat.Error = err.Error()
 		}
+		r.stats.FileStats = append(r.stats.FileStats, stat)
 	}
 
 	logger.Info().

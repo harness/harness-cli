@@ -3,14 +3,13 @@ package migrate
 import (
 	"context"
 	"fmt"
-	"github.com/pterm/pterm"
-
 	"github.com/rs/zerolog/log"
 	"harness/internal/api/ar"
 	"harness/module/ar/migrate/adapter"
 	"harness/module/ar/migrate/engine"
 	"harness/module/ar/migrate/migratable"
 	"harness/module/ar/migrate/types"
+	"harness/util/common/printer"
 
 	_ "harness/module/ar/migrate/adapter/har"
 	_ "harness/module/ar/migrate/adapter/jfrog"
@@ -52,8 +51,9 @@ func (m *MigrationService) Run(ctx context.Context) error {
 
 	logger.Info().Msg("Starting migration process")
 
-	multi := pterm.DefaultMultiPrinter
 	var jobs []engine.Job
+	var transferStats types.TransferStats
+	transferStats.FileStats = make([]types.FileStat, 0)
 
 	for _, mapping := range m.config.Mappings {
 		mappingLogger := logger.With().
@@ -64,7 +64,7 @@ func (m *MigrationService) Run(ctx context.Context) error {
 		mappingLogger.Info().Msg("Processing registry migration")
 
 		job := migratable.NewRegistryJob(m.source, m.destination, mapping.SourceRegistry,
-			mapping.DestinationRegistry, mapping.ArtifactType, multi)
+			mapping.DestinationRegistry, mapping.ArtifactType, &transferStats)
 		jobs = append(jobs, job)
 
 	}
@@ -76,5 +76,6 @@ func (m *MigrationService) Run(ctx context.Context) error {
 		return fmt.Errorf("engine execution failed: %w", err)
 	}
 	logger.Info().Msg("Migration process completed")
+	printer.Print(transferStats.FileStats, 0, 0, int64(len(transferStats.FileStats)), false, nil)
 	return nil
 }

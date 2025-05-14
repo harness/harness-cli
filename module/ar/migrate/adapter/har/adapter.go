@@ -84,7 +84,7 @@ func (a *adapter) UploadFile(
 	}
 	if err != nil {
 		a.logger.Error().Err(err).Msgf("Failed to upload file %s to registry: %s", f.Uri, registry)
-		return fmt.Errorf("failed to upload file %s to registry: %s", f.Uri, registry)
+		return fmt.Errorf("failed to upload file %s to registry: %s, %v", f.Uri, registry, err)
 	}
 	return nil
 }

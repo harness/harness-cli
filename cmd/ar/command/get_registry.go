@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
-	"harness/cmd/common/printer"
 	"harness/config"
 	ar "harness/internal/api/ar"
 	client2 "harness/util/client"
+	"harness/util/common/printer"
 )
 
 // newGetRegistryCmd wires up:

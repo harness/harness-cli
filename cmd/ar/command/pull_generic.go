@@ -11,13 +11,13 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"harness/cmd/common"
-	"harness/cmd/common/auth"
-	"harness/cmd/common/printer"
-	"harness/cmd/common/progress"
 	"harness/config"
 	client "harness/internal/api/ar"
 	pkgclient "harness/internal/api/ar_pkg"
+	"harness/util/common"
+	"harness/util/common/auth"
+	"harness/util/common/printer"
+	"harness/util/common/progress"
 )
 
 func printReadCloser(rc io.ReadCloser) {

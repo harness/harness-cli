@@ -4,9 +4,9 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	commands "harness/cmd/ar/command"
-	"harness/cmd/common/auth"
 	"harness/config"
 	"harness/internal/api/ar"
+	"harness/util/common/auth"
 )
 
 func GetRootCmd() *cobra.Command {

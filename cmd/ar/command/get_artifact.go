@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
-	"harness/cmd/common/printer"
 	client "harness/internal/api/ar"
 	client2 "harness/util/client"
+	"harness/util/common/printer"
 )
 
 // newGetArtifactCmd wires up:

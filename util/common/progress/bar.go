@@ -2,10 +2,10 @@ package progress
 
 import (
 	"fmt"
+	"harness/util/common"
 	"io"
 
 	"github.com/pterm/pterm"
-	"harness/cmd/common"
 )
 
 type BarWriter struct {
@@ -52,11 +52,10 @@ func (p *progressReadCloser) Close() error {
 }
 
 // Reader returns an io.ReadCloser that copies every byte read into a progress bar.
-func ReadCloser(contentLength int64, r io.Reader, saveFilename string, multi pterm.MultiPrinter) io.ReadCloser {
+func ReadCloser(contentLength int64, r io.Reader, saveFilename string) io.ReadCloser {
 	title := fmt.Sprintf("%s (%s)", saveFilename, common.GetSize(contentLength))
 	bar := pterm.DefaultProgressbar.
 		WithTitle(title).
-		WithWriter(multi.NewWriter()).
 		WithRemoveWhenDone(false)
 
 	if contentLength > 0 {

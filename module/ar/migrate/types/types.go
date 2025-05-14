@@ -54,3 +54,23 @@ type Artifact struct {
 	Size       int64
 	Properties map[string]string
 }
+
+type Status string
+
+const (
+	StatusSuccess Status = "Success"
+	StatusFail    Status = "Failed"
+)
+
+type FileStat struct {
+	Name     string
+	Registry string
+	Uri      string
+	Status   Status
+	Size     int64
+	Error    string
+}
+
+type TransferStats struct {
+	FileStats []FileStat
+}

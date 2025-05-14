@@ -3,7 +3,6 @@ package migratable
 import (
 	"context"
 	"fmt"
-	"github.com/pterm/pterm"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,7 +24,7 @@ type Version struct {
 	pkg          types.Package
 	version      types.Version
 	node         *types.TreeNode
-	multi        pterm.MultiPrinter
+	stats        *types.TransferStats
 }
 
 func NewVersionJob(
@@ -37,7 +36,7 @@ func NewVersionJob(
 	pkg types.Package,
 	version types.Version,
 	node *types.TreeNode,
-	multi pterm.MultiPrinter,
+	stats *types.TransferStats,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -60,7 +59,7 @@ func NewVersionJob(
 		pkg:          pkg,
 		version:      version,
 		node:         node,
-		multi:        multi,
+		stats:        stats,
 	}
 }
 
@@ -104,7 +103,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 		}
 		for _, file := range files {
 			job := NewFileJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, r.pkg,
-				r.version, r.node, file, r.multi)
+				r.version, r.node, file, r.stats)
 			jobs = append(jobs, job)
 		}
 	}

@@ -3,7 +3,6 @@ package migratable
 import (
 	"context"
 	"fmt"
-	"github.com/pterm/pterm"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,7 +21,7 @@ type Registry struct {
 	destAdapter  adapter.Adapter
 	artifactType types.ArtifactType
 	logger       zerolog.Logger
-	multi        pterm.MultiPrinter
+	stats        *types.TransferStats
 }
 
 func NewRegistryJob(
@@ -31,7 +30,7 @@ func NewRegistryJob(
 	srcRegistry string,
 	destRegistry string,
 	artifactType types.ArtifactType,
-	multi pterm.MultiPrinter,
+	stats *types.TransferStats,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -49,7 +48,7 @@ func NewRegistryJob(
 		destAdapter:  dest,
 		artifactType: artifactType,
 		logger:       jobLogger,
-		multi:        multi,
+		stats:        stats,
 	}
 }
 
@@ -118,7 +117,7 @@ func (r *Registry) Migrate(ctx context.Context) error {
 			return fmt.Errorf("get node for path %s failed: %w", pkg.Path, err2)
 		}
 		job := NewPackageJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, pkg, treeNode,
-			r.multi)
+			r.stats)
 		jobs = append(jobs, job)
 	}
 
