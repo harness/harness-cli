@@ -2,10 +2,10 @@ package progress
 
 import (
 	"fmt"
-	"harness/util/common"
 	"io"
 
 	"github.com/pterm/pterm"
+	"harness/util/common"
 )
 
 type BarWriter struct {

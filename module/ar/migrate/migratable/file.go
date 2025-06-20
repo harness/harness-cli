@@ -3,7 +3,6 @@ package migratable
 import (
 	"context"
 	"fmt"
-	"harness/util/common/progress"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,6 +11,7 @@ import (
 	"harness/module/ar/migrate/adapter"
 	"harness/module/ar/migrate/engine"
 	"harness/module/ar/migrate/types"
+	"harness/util/common/progress"
 )
 
 type File struct {

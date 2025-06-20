@@ -3,6 +3,7 @@ package migrate
 import (
 	"context"
 	"fmt"
+
 	"github.com/rs/zerolog/log"
 	"harness/internal/api/ar"
 	"harness/module/ar/migrate/adapter"
@@ -76,6 +77,13 @@ func (m *MigrationService) Run(ctx context.Context) error {
 		return fmt.Errorf("engine execution failed: %w", err)
 	}
 	logger.Info().Msg("Migration process completed")
-	printer.Print(transferStats.FileStats, 0, 0, int64(len(transferStats.FileStats)), false, nil)
+	printer.Print(transferStats.FileStats, 0, 0, int64(len(transferStats.FileStats)), false, [][]string{
+		{"Name", "Name"},
+		{"Registry", "Registry"},
+		{"Size", "Size"},
+		{"Status", "Status"},
+		{"Uri", "Uri"},
+		{"Error", "Error"},
+	})
 	return nil
 }

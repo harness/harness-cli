@@ -17,6 +17,7 @@ import (
 )
 
 func main() {
+	var logFilePath string
 	rootCmd := &cobra.Command{
 		Use:   "harness",
 		Short: "CLI tool for Harness",
@@ -43,6 +44,33 @@ func main() {
 				}
 			}
 
+			// Configure logging based on flags
+			if logFilePath != "" {
+				// Ensure the directory exists
+				logDir := filepath.Dir(logFilePath)
+				if err := os.MkdirAll(logDir, 0755); err != nil {
+					fmt.Printf("Warning: Could not create log directory: %v\n", err)
+				}
+
+				// Open the log file
+				logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+				if err != nil {
+					fmt.Printf("Warning: Could not open log file: %v\n", err)
+				} else {
+					// Set up log writer with timestamp format
+					logWriter := zerolog.ConsoleWriter{
+						Out:        logFile,
+						TimeFormat: time.RFC3339,
+						NoColor:    true,
+					}
+					log.Logger = log.Output(logWriter)
+				}
+			} else {
+				// If no log file specified, disable logging
+				log.Logger = log.Output(io.Discard)
+				zerolog.SetGlobalLevel(zerolog.Disabled)
+			}
+
 			return initProfiling()
 		},
 
@@ -65,7 +93,6 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&config.Global.Format, "format", "table", "Format of the result")
 
 	// Add log file path flag
-	var logFilePath string
 	rootCmd.PersistentFlags().StringVar(&logFilePath, "log-file", "",
 		"Path to store logs (if not provided, logging is disabled)")
 
@@ -97,33 +124,6 @@ func main() {
 
 	addProfilingFlags(flags)
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-
-	// Configure logging based on flags
-	if logFilePath != "" {
-		// Ensure the directory exists
-		logDir := filepath.Dir(logFilePath)
-		if err := os.MkdirAll(logDir, 0755); err != nil {
-			fmt.Printf("Warning: Could not create log directory: %v\n", err)
-		}
-
-		// Open the log file
-		logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			fmt.Printf("Warning: Could not open log file: %v\n", err)
-		} else {
-			// Set up log writer with timestamp format
-			logWriter := zerolog.ConsoleWriter{
-				Out:        logFile,
-				TimeFormat: time.RFC3339,
-				NoColor:    true,
-			}
-			log.Logger = log.Output(logWriter)
-		}
-	} else {
-		// If no log file specified, disable logging
-		log.Logger = log.Output(io.Discard)
-		zerolog.SetGlobalLevel(zerolog.Disabled)
-	}
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
