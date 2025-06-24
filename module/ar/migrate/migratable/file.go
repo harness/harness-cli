@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pterm/pterm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"harness/module/ar/migrate/adapter"
 	"harness/module/ar/migrate/engine"
 	"harness/module/ar/migrate/types"
-	"harness/util/common/progress"
+	"harness/util/common"
 )
 
 type File struct {
@@ -97,6 +98,11 @@ func (r File) Migrate(ctx context.Context) error {
 	logger.Info().Msg("Starting file migration step")
 	startTime := time.Now()
 
+	if r.artifactType == types.DOCKER || r.artifactType == types.HELM {
+		log.Error().Ctx(ctx).Msgf("OCI migrate file is not supported")
+		return fmt.Errorf("OCI migrate file is not supported")
+	}
+
 	if r.artifactType == types.GENERIC || r.artifactType == types.MAVEN {
 		downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.file.Uri)
 		if err != nil {
@@ -104,9 +110,9 @@ func (r File) Migrate(ctx context.Context) error {
 			return fmt.Errorf("download file failed: %w", err)
 		}
 
-		readCloser := progress.ReadCloser(int64(r.file.Size), downloadFile, r.file.Name)
-
-		err = r.destAdapter.UploadFile(r.destRegistry, readCloser, r.file, header, r.pkg.Name, r.version.Name,
+		//readCloser := progress.ReadCloser(int64(r.file.Size), downloadFile, r.file.Name)
+		title := fmt.Sprintf("%s (%s)", r.file.Name, common.GetSize(int64(r.file.Size)))
+		err = r.destAdapter.UploadFile(r.destRegistry, downloadFile, r.file, header, r.pkg.Name, r.version.Name,
 			r.artifactType)
 		stat := types.FileStat{
 			Name:     r.file.Name,
@@ -119,6 +125,9 @@ func (r File) Migrate(ctx context.Context) error {
 			logger.Error().Err(err).Msg("Failed to upload file")
 			stat.Status = types.StatusFail
 			stat.Error = err.Error()
+			pterm.Error.Println(title)
+		} else {
+			pterm.Success.Println(title)
 		}
 		r.stats.FileStats = append(r.stats.FileStats, stat)
 	}

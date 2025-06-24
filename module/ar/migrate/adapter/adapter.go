@@ -7,10 +7,13 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/google/go-containerregistry/pkg/authn"
 	"harness/module/ar/migrate/types"
 )
 
 type Adapter interface {
+	GetKeyChain(reg string) authn.Keychain
+	GetConfig() types.RegistryConfig
 	ValidateCredentials() (bool, error)
 	GetRegistry(registry string) (interface{}, error)
 	CreateRegistryIfDoesntExist(registry string) (bool, error)
@@ -30,6 +33,7 @@ type Adapter interface {
 		version string,
 		artifactType types.ArtifactType,
 	) error
+	GetOCIImagePath(registry string, image string) (string, error)
 }
 
 var registry = map[types.RegistryType]Factory{}

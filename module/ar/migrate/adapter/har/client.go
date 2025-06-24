@@ -1,4 +1,4 @@
-package jfrog
+package har
 
 import (
 	"fmt"
@@ -60,18 +60,6 @@ func (c *client) uploadGenericFile(registry, artifactName, version string, f *ty
 		defer pw.Close()
 		defer file.Close()
 
-		// Add filename field
-		if err := writer.WriteField("filename", f.Name); err != nil {
-			pw.CloseWithError(err)
-			return
-		}
-
-		// Add description field
-		if err := writer.WriteField("description", "Uploaded via harness-cli migration tool"); err != nil {
-			pw.CloseWithError(err)
-			return
-		}
-
 		// Add the file
 		part, err := writer.CreateFormFile("file", f.Name)
 		if err != nil {
@@ -81,6 +69,18 @@ func (c *client) uploadGenericFile(registry, artifactName, version string, f *ty
 
 		// Copy the file content
 		if _, err := io.Copy(part, file); err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+
+		// Add filename field
+		if err := writer.WriteField("filename", f.Name); err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+
+		// Add description field
+		if err := writer.WriteField("description", "Uploaded via harness-cli migration tool"); err != nil {
 			pw.CloseWithError(err)
 			return
 		}

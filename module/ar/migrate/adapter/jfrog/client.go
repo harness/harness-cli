@@ -1,6 +1,7 @@
 package jfrog
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	http2 "net/http"
@@ -8,6 +9,7 @@ import (
 
 	"harness/module/ar/migrate/http"
 	"harness/module/ar/migrate/http/auth/bearer"
+	"harness/module/ar/migrate/lib"
 	"harness/module/ar/migrate/types"
 )
 
@@ -186,4 +188,65 @@ func getFileName(uri string) string {
 
 	// Return the last part, which should be the filename
 	return parts[len(parts)-1]
+}
+
+func buildCatalogURL(endpoint, repo string) string {
+	return fmt.Sprintf("%s/artifactory/api/docker/%s/v2/_catalog?n=1000", endpoint, repo)
+}
+
+func (c *client) getCatalog(registry string) (repositories []string, err error) {
+	url := buildCatalogURL(c.url, registry)
+	for {
+		repos, next, err := c.catalog(url)
+		if err != nil {
+			return nil, err
+		}
+		repositories = append(repositories, repos...)
+
+		url = next
+		// no next page, end the loop
+		if len(url) == 0 {
+			break
+		}
+		// relative URL
+		if !strings.Contains(url, "://") {
+			url = c.url + url
+		}
+	}
+	return repositories, nil
+}
+
+func (c *client) catalog(url string) ([]string, string, error) {
+	req, err := http2.NewRequest(http2.MethodGet, url, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", err
+	}
+	repositories := struct {
+		Repositories []string `json:"repositories"`
+	}{}
+	if err := json.Unmarshal(body, &repositories); err != nil {
+		return nil, "", err
+	}
+	return repositories.Repositories, next(resp.Header.Get("Link")), nil
+}
+
+// parse the next page link from the link header
+func next(link string) string {
+	links := lib.ParseLinks(link)
+	for _, lk := range links {
+		if lk.Rel == "next" {
+			return lk.URL
+		}
+	}
+	return ""
 }

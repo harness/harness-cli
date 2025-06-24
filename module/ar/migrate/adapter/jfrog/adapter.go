@@ -6,10 +6,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/rs/zerolog/log"
 	adp "harness/module/ar/migrate/adapter"
 	"harness/module/ar/migrate/types"
+	"harness/module/ar/migrate/util"
 )
 
 const (
@@ -52,6 +56,15 @@ func newAdapter(config types.RegistryConfig) (adp.Adapter, error) {
 	}, nil
 }
 
+func (a *adapter) GetKeyChain(reg string) authn.Keychain {
+	host, _ := dockerHost(a.reg.Endpoint, reg)
+	return NewJfrogKeychain(a.reg.Credentials.Username, a.reg.Credentials.Token, host)
+}
+
+func (a *adapter) GetConfig() types.RegistryConfig {
+	return a.reg
+}
+
 func (a *adapter) ValidateCredentials() (bool, error)                        { return false, nil }
 func (a *adapter) GetRegistry(registry string) (interface{}, error)          { return nil, nil }
 func (a *adapter) CreateRegistryIfDoesntExist(registry string) (bool, error) { return false, nil }
@@ -75,6 +88,20 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			Name:     "",
 			Size:     -1,
 		})
+	} else if artifactType == types.DOCKER || artifactType == types.HELM {
+		catalog, err := a.client.getCatalog(registry)
+		if err != nil {
+			return nil, fmt.Errorf("get catalog: %w", err)
+		}
+
+		for _, repo := range catalog {
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     "/",
+				Name:     repo,
+				Size:     -1,
+			})
+		}
 	} else {
 		return []types.Package{}, errors.New("unknown artifact type")
 	}
@@ -121,6 +148,25 @@ func (a *adapter) GetFiles(registry string) ([]types.File, error) {
 
 func (a *adapter) DownloadFile(registry string, uri string) (io.ReadCloser, http.Header, error) {
 	return a.client.getFile(registry, uri)
+}
+
+func (a *adapter) GetOCIImagePath(registry string, image string) (string, error) {
+	host, err := dockerHost(a.reg.Endpoint, registry)
+	if err != nil {
+		return "", fmt.Errorf("failed to get OCI host: %w", err)
+	}
+	return util.GenOCIImagePath(host, image), nil
+}
+
+func dockerHost(artifactoryBase, repo string) (string, error) {
+	const suffix = ".jfrog.io"
+	if !strings.HasSuffix(artifactoryBase, suffix) {
+		return "", fmt.Errorf("not a jfrog.io host")
+	}
+	account := strings.TrimSuffix(artifactoryBase, suffix)
+	endpoint := fmt.Sprintf("%s-%s%s", account, repo, suffix)
+	parse, _ := url.Parse(endpoint)
+	return parse.Host, nil
 }
 
 func (a *adapter) UploadFile(

@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/uuid"
+	"github.com/pterm/pterm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"harness/module/ar/migrate/adapter"
 	"harness/module/ar/migrate/engine"
+	"harness/module/ar/migrate/lib"
 	"harness/module/ar/migrate/tree"
 	"harness/module/ar/migrate/types"
 )
@@ -92,31 +95,54 @@ func (r *Package) Migrate(ctx context.Context) error {
 
 	startTime := time.Now()
 
-	versions, err := r.srcAdapter.GetVersions(r.srcRegistry, r.pkg.Name, r.artifactType)
-	if err != nil {
-		logger.Error().Msg("Failed to get versions")
-		return fmt.Errorf("get versions failed: %w", err)
-	}
-
-	var jobs []engine.Job
-	for _, version := range versions {
-		versionNode, err := tree.GetNodeForPath(r.node, version.Path)
+	if r.artifactType == types.DOCKER || r.artifactType == types.HELM {
+		srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.pkg.Name)
+		dstImage, _ := r.destAdapter.GetOCIImagePath(r.destRegistry, r.pkg.Name)
+		pterm.Info.Println(fmt.Sprintf("Copying repository %s to %s", srcImage, dstImage))
+		logger.Info().Ctx(ctx).Msgf("Copying repository %s to %s", srcImage, dstImage)
+		err := crane.CopyRepository(
+			srcImage,
+			dstImage,
+			crane.WithUserAgent("harness-cli"),
+			crane.WithContext(ctx),
+			crane.WithJobs(4),
+			crane.WithNoClobber(true),
+			crane.WithAuthFromKeychain(lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.srcRegistry,
+				r.destRegistry)),
+		)
 		if err != nil {
-			logger.Error().Msg("Failed to get node for version")
-			return fmt.Errorf("get version failed: %w", err)
+			pterm.Error.Println(fmt.Sprintf("Failed to copy repository %s to %s", srcImage, dstImage))
+		} else {
+			pterm.Success.Println(fmt.Sprintf("Copy repository %s to %s completed", srcImage, dstImage))
 		}
-		job := NewVersionJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, r.pkg, version,
-			versionNode, r.stats)
-		jobs = append(jobs, job)
-	}
+	} else {
+		versions, err := r.srcAdapter.GetVersions(r.srcRegistry, r.pkg.Name, r.artifactType)
+		if err != nil {
+			logger.Error().Msg("Failed to get versions")
+			return fmt.Errorf("get versions failed: %w", err)
+		}
 
-	log.Info().Msgf("Jobs length: %d", len(jobs))
+		var jobs []engine.Job
+		for _, version := range versions {
+			versionNode, err := tree.GetNodeForPath(r.node, version.Path)
+			if err != nil {
+				logger.Error().Msg("Failed to get node for version")
+				return fmt.Errorf("get version failed: %w", err)
+			}
+			job := NewVersionJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, r.pkg,
+				version,
+				versionNode, r.stats)
+			jobs = append(jobs, job)
+		}
 
-	eng := engine.NewEngine(5, jobs)
-	err = eng.Execute(ctx)
-	if err != nil {
-		logger.Error().Err(err).Msg("Engine execution failed")
-		return fmt.Errorf("engine execution failed: %w", err)
+		log.Info().Msgf("Jobs length: %d", len(jobs))
+
+		eng := engine.NewEngine(5, jobs)
+		err = eng.Execute(ctx)
+		if err != nil {
+			logger.Error().Err(err).Msg("Engine execution failed")
+			return fmt.Errorf("engine execution failed: %w", err)
+		}
 	}
 
 	logger.Info().

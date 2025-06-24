@@ -108,6 +108,11 @@ func (r *Version) Migrate(ctx context.Context) error {
 		}
 	}
 
+	if r.artifactType == types.DOCKER || r.artifactType == types.HELM {
+		log.Error().Ctx(ctx).Msgf("OCI migrate version is not supported")
+		return fmt.Errorf("OCI migrate version is not supported")
+	}
+
 	log.Info().Msgf("Jobs length: %d", len(jobs))
 
 	eng := engine.NewEngine(10, jobs)

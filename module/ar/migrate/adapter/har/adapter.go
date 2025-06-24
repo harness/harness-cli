@@ -1,15 +1,22 @@
-package jfrog
+package har
 
 import (
 	"context"
 	"fmt"
+	//"harness/module/ar/migrate"
+	//client2 "harness/util/client"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"harness/config"
 	adp "harness/module/ar/migrate/adapter"
 	"harness/module/ar/migrate/types"
+	"harness/module/ar/migrate/util"
 )
 
 func init() {
@@ -46,6 +53,14 @@ func newAdapter(config types.RegistryConfig) (adp.Adapter, error) {
 	}, nil
 }
 
+func (a *adapter) GetKeyChain(reg string) authn.Keychain {
+	parseUrl, _ := url.Parse(a.reg.Endpoint)
+	return NewHarKeychain(a.reg.Credentials.Username, a.reg.Credentials.Token, parseUrl.Host)
+}
+
+func (a *adapter) GetConfig() types.RegistryConfig {
+	return a.reg
+}
 func (a *adapter) ValidateCredentials() (bool, error)               { return false, nil }
 func (a *adapter) GetRegistry(registry string) (interface{}, error) { return nil, nil }
 func (a *adapter) CreateRegistryIfDoesntExist(registryRef string) (bool, error) {
@@ -87,4 +102,9 @@ func (a *adapter) UploadFile(
 		return fmt.Errorf("failed to upload file %s to registry: %s, %v", f.Uri, registry, err)
 	}
 	return nil
+}
+
+func (a *adapter) GetOCIImagePath(registry string, image string) (string, error) {
+	parse, _ := url.Parse(a.reg.Endpoint)
+	return util.GenOCIImagePath(parse.Host, strings.ToLower(config.Global.AccountID), registry, image), nil
 }
