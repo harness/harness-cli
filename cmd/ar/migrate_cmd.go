@@ -9,10 +9,10 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"harness/config"
-	"harness/internal/api/ar"
-	ar2 "harness/module/ar/migrate"
-	"harness/module/ar/migrate/types"
+	"github.com/harness/harness-cli/config"
+	"github.com/harness/harness-cli/internal/api/ar"
+	ar2 "github.com/harness/harness-cli/module/ar/migrate"
+	"github.com/harness/harness-cli/module/ar/migrate/types"
 )
 
 func getMigrateCmd(*ar.ClientWithResponses) *cobra.Command {

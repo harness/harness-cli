@@ -5,8 +5,8 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	client "harness/internal/api/ar"
-	client2 "harness/util/client"
+	client "github.com/harness/harness-cli/internal/api/ar"
+	client2 "github.com/harness/harness-cli/util/client"
 )
 
 // newDeleteVersionCmd wires up:

@@ -11,7 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
-	"harness/config"
+	"github.com/harness/harness-cli/config"
 )
 
 // AuthConfig represents authentication configuration for saving to disk

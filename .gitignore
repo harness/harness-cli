@@ -5,4 +5,5 @@ harness-upgrade
 harness
 harnesscd-example-apps
 .vscode/
-hns
+/hns
+!/cmd/hns/

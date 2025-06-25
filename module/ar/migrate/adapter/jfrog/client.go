@@ -7,10 +7,10 @@ import (
 	http2 "net/http"
 	"strings"
 
-	"harness/module/ar/migrate/http"
-	"harness/module/ar/migrate/http/auth/bearer"
-	"harness/module/ar/migrate/lib"
-	"harness/module/ar/migrate/types"
+	"github.com/harness/harness-cli/module/ar/migrate/http"
+	"github.com/harness/harness-cli/module/ar/migrate/http/auth/bearer"
+	"github.com/harness/harness-cli/module/ar/migrate/lib"
+	"github.com/harness/harness-cli/module/ar/migrate/types"
 )
 
 // newClient constructs a jfrog client

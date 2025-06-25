@@ -7,11 +7,11 @@ import (
 	http2 "net/http"
 	"strings"
 
-	"harness/config"
-	"harness/internal/api/ar"
-	"harness/module/ar/migrate/http"
-	"harness/module/ar/migrate/http/auth/xApiKey"
-	"harness/module/ar/migrate/types"
+	"github.com/harness/harness-cli/config"
+	"github.com/harness/harness-cli/internal/api/ar"
+	"github.com/harness/harness-cli/module/ar/migrate/http"
+	"github.com/harness/harness-cli/module/ar/migrate/http/auth/xApiKey"
+	"github.com/harness/harness-cli/module/ar/migrate/types"
 )
 
 // newClient constructs a jfrog client

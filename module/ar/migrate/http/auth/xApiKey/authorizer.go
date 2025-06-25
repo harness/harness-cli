@@ -17,7 +17,7 @@ package xApiKey
 import (
 	"net/http"
 
-	"harness/module/ar/migrate/lib"
+	"github.com/harness/harness-cli/module/ar/migrate/lib"
 )
 
 // NewAuthorizer return a basic authorizer

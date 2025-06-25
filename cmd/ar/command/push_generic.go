@@ -11,12 +11,12 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"harness/config"
-	client "harness/internal/api/ar"
-	pkgclient "harness/internal/api/ar_pkg"
-	"harness/util/common/auth"
-	"harness/util/common/printer"
-	"harness/util/common/progress"
+	"github.com/harness/harness-cli/config"
+	client "github.com/harness/harness-cli/internal/api/ar"
+	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
+	"github.com/harness/harness-cli/util/common/auth"
+	"github.com/harness/harness-cli/util/common/printer"
+	"github.com/harness/harness-cli/util/common/progress"
 )
 
 // NewPushGenericCmd creates a new cobra.Command for pushing generic artifacts to the registry.

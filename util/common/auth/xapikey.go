@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
-	"harness/config"
-	"harness/internal/api/ar"
-	"harness/internal/api/ar_pkg"
+	"github.com/harness/harness-cli/config"
+	"github.com/harness/harness-cli/internal/api/ar"
+	"github.com/harness/harness-cli/internal/api/ar_pkg"
 )
 
 // GetXApiKeyOptionAR

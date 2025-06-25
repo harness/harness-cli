@@ -243,7 +243,7 @@ import (
 	"errors"
 
 	"github.com/spf13/cobra"
-	client "harness/internal/api/{{ .Pkg }}"
+	client "github.com/harness/harness-cli/internal/api/{{ .Pkg }}"
 )
 
 // new{{ .Act | title }}{{ .Res | title }}Cmd wires up:

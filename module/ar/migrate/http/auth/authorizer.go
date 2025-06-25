@@ -20,10 +20,10 @@ import (
 	"strings"
 	"sync"
 
-	commonhttp "harness/module/ar/migrate/http"
-	"harness/module/ar/migrate/http/auth/bearer"
-	"harness/module/ar/migrate/http/modifier"
-	"harness/module/ar/migrate/lib"
+	commonhttp "github.com/harness/harness-cli/module/ar/migrate/http"
+	"github.com/harness/harness-cli/module/ar/migrate/http/auth/bearer"
+	"github.com/harness/harness-cli/module/ar/migrate/http/modifier"
+	"github.com/harness/harness-cli/module/ar/migrate/lib"
 )
 
 // NewAuthorizer creates an authorizer that can handle different auth schemes

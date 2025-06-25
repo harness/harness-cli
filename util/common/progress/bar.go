@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/pterm/pterm"
-	"harness/util/common"
+	"github.com/harness/harness-cli/util/common"
 )
 
 type BarWriter struct {

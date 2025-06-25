@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"harness/config"
+	"github.com/harness/harness-cli/config"
 )
 
 func GetScopeRef() string {

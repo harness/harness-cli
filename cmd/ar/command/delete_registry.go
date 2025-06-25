@@ -6,9 +6,9 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"harness/config"
-	client "harness/internal/api/ar"
-	client2 "harness/util/client"
+	"github.com/harness/harness-cli/config"
+	client "github.com/harness/harness-cli/internal/api/ar"
+	client2 "github.com/harness/harness-cli/util/client"
 )
 
 func NewDeleteRegistryCmd(c *client.ClientWithResponses) *cobra.Command {

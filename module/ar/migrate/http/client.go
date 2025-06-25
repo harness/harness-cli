@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/http"
 
-	"harness/module/ar/migrate/http/modifier"
+	"github.com/harness/harness-cli/module/ar/migrate/http/modifier"
 )
 
 // Client is a util for common HTTP operations, such Get, Head, Post, Put and Delete.

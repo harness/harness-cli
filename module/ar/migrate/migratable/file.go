@@ -9,10 +9,10 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"harness/module/ar/migrate/adapter"
-	"harness/module/ar/migrate/engine"
-	"harness/module/ar/migrate/types"
-	"harness/util/common"
+	"github.com/harness/harness-cli/module/ar/migrate/adapter"
+	"github.com/harness/harness-cli/module/ar/migrate/engine"
+	"github.com/harness/harness-cli/module/ar/migrate/types"
+	"github.com/harness/harness-cli/util/common"
 )
 
 type File struct {

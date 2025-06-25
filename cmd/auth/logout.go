@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"harness/config"
+	"github.com/harness/harness-cli/config"
 )
 
 // getAuthConfigFilePath returns the path to the auth config file for logout

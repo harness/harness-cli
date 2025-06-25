@@ -15,7 +15,7 @@
 package lib
 
 import (
-	"harness/module/ar/migrate/http/modifier"
+	"github.com/harness/harness-cli/module/ar/migrate/http/modifier"
 )
 
 // Authorizer authorizes the request

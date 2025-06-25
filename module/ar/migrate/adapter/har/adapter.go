@@ -3,8 +3,8 @@ package har
 import (
 	"context"
 	"fmt"
-	//"harness/module/ar/migrate"
-	//client2 "harness/util/client"
+	//"github.com/harness/harness-cli/module/ar/migrate"
+	//client2 "github.com/harness/harness-cli/util/client"
 	"io"
 	"net/http"
 	"net/url"
@@ -13,10 +13,10 @@ import (
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"harness/config"
-	adp "harness/module/ar/migrate/adapter"
-	"harness/module/ar/migrate/types"
-	"harness/module/ar/migrate/util"
+	"github.com/harness/harness-cli/config"
+	adp "github.com/harness/harness-cli/module/ar/migrate/adapter"
+	"github.com/harness/harness-cli/module/ar/migrate/types"
+	"github.com/harness/harness-cli/module/ar/migrate/util"
 )
 
 func init() {

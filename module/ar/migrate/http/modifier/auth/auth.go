@@ -18,8 +18,8 @@ import (
 	"errors"
 	"net/http"
 
-	"harness/module/ar/migrate/http/modifier"
-	"harness/module/ar/migrate/secret"
+	"github.com/harness/harness-cli/module/ar/migrate/http/modifier"
+	"github.com/harness/harness-cli/module/ar/migrate/secret"
 )
 
 // Authorizer is a kind of Modifier used to authorize the requests

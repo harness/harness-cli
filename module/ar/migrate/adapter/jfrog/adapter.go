@@ -11,9 +11,9 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/rs/zerolog/log"
-	adp "harness/module/ar/migrate/adapter"
-	"harness/module/ar/migrate/types"
-	"harness/module/ar/migrate/util"
+	adp "github.com/harness/harness-cli/module/ar/migrate/adapter"
+	"github.com/harness/harness-cli/module/ar/migrate/types"
+	"github.com/harness/harness-cli/module/ar/migrate/util"
 )
 
 const (

@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"harness/module/ar/migrate/lib"
+	"github.com/harness/harness-cli/module/ar/migrate/lib"
 )
 
 const (

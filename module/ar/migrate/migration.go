@@ -5,15 +5,15 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog/log"
-	"harness/internal/api/ar"
-	"harness/module/ar/migrate/adapter"
-	"harness/module/ar/migrate/engine"
-	"harness/module/ar/migrate/migratable"
-	"harness/module/ar/migrate/types"
-	"harness/util/common/printer"
+	"github.com/harness/harness-cli/internal/api/ar"
+	"github.com/harness/harness-cli/module/ar/migrate/adapter"
+	"github.com/harness/harness-cli/module/ar/migrate/engine"
+	"github.com/harness/harness-cli/module/ar/migrate/migratable"
+	"github.com/harness/harness-cli/module/ar/migrate/types"
+	"github.com/harness/harness-cli/util/common/printer"
 
-	_ "harness/module/ar/migrate/adapter/har"
-	_ "harness/module/ar/migrate/adapter/jfrog"
+	_ "github.com/harness/harness-cli/module/ar/migrate/adapter/har"
+	_ "github.com/harness/harness-cli/module/ar/migrate/adapter/jfrog"
 )
 
 // MigrationService handles the migration process

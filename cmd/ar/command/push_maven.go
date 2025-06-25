@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
-	client "harness/internal/api/ar"
-	client2 "harness/util/client"
-	"harness/util/common/printer"
+	client "github.com/harness/harness-cli/internal/api/ar"
+	client2 "github.com/harness/harness-cli/util/client"
+	"github.com/harness/harness-cli/util/common/printer"
 )
 
 func NewPushMavenCmd(c *client.ClientWithResponses) *cobra.Command {

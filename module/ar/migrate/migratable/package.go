@@ -10,11 +10,11 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"harness/module/ar/migrate/adapter"
-	"harness/module/ar/migrate/engine"
-	"harness/module/ar/migrate/lib"
-	"harness/module/ar/migrate/tree"
-	"harness/module/ar/migrate/types"
+	"github.com/harness/harness-cli/module/ar/migrate/adapter"
+	"github.com/harness/harness-cli/module/ar/migrate/engine"
+	"github.com/harness/harness-cli/module/ar/migrate/lib"
+	"github.com/harness/harness-cli/module/ar/migrate/tree"
+	"github.com/harness/harness-cli/module/ar/migrate/types"
 )
 
 type Package struct {

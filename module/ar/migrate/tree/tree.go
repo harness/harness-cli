@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"harness/module/ar/migrate/types"
+	"github.com/harness/harness-cli/module/ar/migrate/types"
 )
 
 func TransformToTree(files []types.File) *types.TreeNode {

@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"harness/config"
+	"github.com/harness/harness-cli/config"
 )
 
 // PrintOptions combines options for both JSON and table output
