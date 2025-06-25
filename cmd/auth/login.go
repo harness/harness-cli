@@ -82,27 +82,27 @@ func readInput(prompt string) (string, error) {
 
 func getLoginCmd() *cobra.Command {
 	var (
-		apiURL    string
-		token     string
-		accountID string
-		orgID     string
-		projectID string
+		apiURL         string
+		token          string
+		accountID      string
+		orgID          string
+		projectID      string
 		nonInteractive bool
 	)
 
 	cmd := &cobra.Command{
-		Use:   "login",
-		Short: "Login to Harness",
-		Long:  `Authenticate with Harness services and save credentials for future use`,
+		Use:          "login",
+		Short:        "Login to Harness",
+		Long:         `Authenticate with Harness services and save credentials for future use`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Check if we need interactive mode
 			needInteractive := !nonInteractive && (token == "" || accountID == "")
-			
+
 			// Interactive mode for missing required inputs
 			if needInteractive {
 				fmt.Println("Entering interactive login mode. Press Ctrl+C to cancel.")
-				
+
 				// Get API URL
 				if apiURL == "" {
 					defaultURL := "https://app.harness.io"
@@ -116,7 +116,7 @@ func getLoginCmd() *cobra.Command {
 						apiURL = input
 					}
 				}
-				
+
 				// Get API Token
 				if token == "" {
 					input, err := readPassword("API Token: ")
@@ -128,7 +128,7 @@ func getLoginCmd() *cobra.Command {
 					}
 					token = input
 				}
-				
+
 				// Get Account ID
 				if accountID == "" {
 					input, err := readInput("Account ID: ")
@@ -140,7 +140,7 @@ func getLoginCmd() *cobra.Command {
 					}
 					accountID = input
 				}
-				
+
 				// Get optional Org ID
 				if orgID == "" {
 					input, err := readInput("Organization ID (optional): ")
@@ -149,7 +149,7 @@ func getLoginCmd() *cobra.Command {
 					}
 					orgID = input
 				}
-				
+
 				// Get optional Project ID
 				if projectID == "" {
 					input, err := readInput("Project ID (optional): ")
@@ -159,7 +159,7 @@ func getLoginCmd() *cobra.Command {
 					projectID = input
 				}
 			}
-			
+
 			// Use default API URL if not provided
 			if apiURL == "" {
 				apiURL = "https://app.harness.io"
@@ -172,7 +172,7 @@ func getLoginCmd() *cobra.Command {
 			if accountID == "" {
 				return fmt.Errorf("Account ID is required. Use --account flag or interactive mode")
 			}
-			
+
 			// Create auth config struct for saving to file
 			authConfig := AuthConfig{
 				BaseURL:   apiURL,
@@ -186,7 +186,7 @@ func getLoginCmd() *cobra.Command {
 			if err := saveAuthConfig(authConfig); err != nil {
 				return fmt.Errorf("failed to save authentication config: %w", err)
 			}
-			
+
 			// Update the global config for the current session as well
 			config.Global.APIBaseURL = apiURL
 			config.Global.AuthToken = token
@@ -204,7 +204,7 @@ func getLoginCmd() *cobra.Command {
 			if projectID != "" {
 				fmt.Println("Project ID:  ", projectID)
 			}
-			
+
 			return nil
 		},
 	}

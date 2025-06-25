@@ -22,9 +22,9 @@ type accountResponse struct {
 
 func getStatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "status",
-		Short: "Check authentication status",
-		Long:  `Display current authentication status and details by checking the authentication with Harness API`,
+		Use:          "status",
+		Short:        "Check authentication status",
+		Long:         `Display current authentication status and details by checking the authentication with Harness API`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Println("Checking authentication status...")

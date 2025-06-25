@@ -24,9 +24,9 @@ func getLogoutCmd() *cobra.Command {
 	var force bool
 
 	cmd := &cobra.Command{
-		Use:   "logout",
-		Short: "Logout from Harness",
-		Long:  `Remove saved Harness credentials by deleting the authentication configuration`,
+		Use:          "logout",
+		Short:        "Logout from Harness",
+		Long:         `Remove saved Harness credentials by deleting the authentication configuration`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath := getAuthConfigFilePath()
