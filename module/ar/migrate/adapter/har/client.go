@@ -19,7 +19,7 @@ func newClient(reg *types.RegistryConfig) *client {
 	username, token := "", ""
 
 	username = reg.Credentials.Username
-	token = reg.Credentials.Token
+	token = reg.Credentials.Password
 
 	arclient, _ := ar.NewClient(config.Global.APIBaseURL)
 	return &client{

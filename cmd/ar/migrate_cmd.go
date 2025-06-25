@@ -54,7 +54,7 @@ func runMigration(cmd *cobra.Command, args []string) {
 	if config.Global.Registry.Migrate.DryRun {
 		cfg.DryRun = true
 	}
-	if config.Global.Registry.Migrate.Concurrency > 0 {
+	if config.Global.Registry.Migrate.Concurrency > 1 {
 		cfg.Concurrency = config.Global.Registry.Migrate.Concurrency
 	}
 

@@ -55,7 +55,7 @@ func newAdapter(config types.RegistryConfig) (adp.Adapter, error) {
 
 func (a *adapter) GetKeyChain(reg string) authn.Keychain {
 	parseUrl, _ := url.Parse(a.reg.Endpoint)
-	return NewHarKeychain(a.reg.Credentials.Username, a.reg.Credentials.Token, parseUrl.Host)
+	return NewHarKeychain(a.reg.Credentials.Username, a.reg.Credentials.Password, parseUrl.Host)
 }
 
 func (a *adapter) GetConfig() types.RegistryConfig {

@@ -58,7 +58,7 @@ func newAdapter(config types.RegistryConfig) (adp.Adapter, error) {
 
 func (a *adapter) GetKeyChain(reg string) authn.Keychain {
 	host, _ := dockerHost(a.reg.Endpoint, reg)
-	return NewJfrogKeychain(a.reg.Credentials.Username, a.reg.Credentials.Token, host)
+	return NewJfrogKeychain(a.reg.Credentials.Username, a.reg.Credentials.Password, host)
 }
 
 func (a *adapter) GetConfig() types.RegistryConfig {

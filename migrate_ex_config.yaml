@@ -1,6 +1,6 @@
 version: 1.0.0
 dryRun: false
-concurrency: 1
+concurrency: 5
 failureMode: continue
 source:
   endpoint: ${SRC_ENDPOINT}
@@ -8,20 +8,22 @@ source:
   credentials:
     username: ${SRC_USER}
     password: ${SRC_PASS}
-    token: ${SRC_TOKEN}
 destination:
   endpoint: ${DST_ENDPOINT}
   type: HAR
   credentials:
     username: ${DST_USER}
     password: ${DST_PASS}
-    token: ${DST_TOKEN}
 mappings:
-  - artifactType: ${ARTIFACT_TYPE}
-    sourceRegistry: ${SRC_REG}
-    destinationRegistry: ${DST_REG}
-    includePatterns:
-      - '*'
-    excludePatterns:
-      - abc
-      - def
+  - artifactType: DOCKER
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: HELM
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: MAVEN
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: GENERIC
+    sourceRegistry: src
+    destinationRegistry: dst

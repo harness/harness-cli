@@ -18,7 +18,7 @@ func newClient(reg *types.RegistryConfig) *client {
 	username, password := "", ""
 
 	username = reg.Credentials.Username
-	password = reg.Credentials.Token
+	password = reg.Credentials.Password
 
 	return &client{
 		client: http.NewClient(

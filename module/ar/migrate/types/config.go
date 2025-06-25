@@ -63,7 +63,6 @@ type RegistryMapping struct {
 type CredentialsConfig struct {
 	Username string `yaml:"username,omitempty"`
 	Password string `yaml:"password,omitempty"`
-	Token    string `yaml:"token,omitempty"`
 }
 
 // LoadConfig loads the configuration from a file
@@ -161,7 +160,7 @@ func validateCredentials(registry RegistryConfig) error {
 	// Validate credentials
 	// Authentication must be provided via either token or username
 	hasUsername := registry.Credentials.Username != ""
-	hasToken := registry.Credentials.Token != ""
+	hasToken := registry.Credentials.Password != ""
 
 	if !hasToken && !hasUsername {
 		return fmt.Errorf("either token or username must be provided for authentication")

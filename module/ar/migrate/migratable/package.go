@@ -110,11 +110,21 @@ func (r *Package) Migrate(ctx context.Context) error {
 			crane.WithAuthFromKeychain(lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.srcRegistry,
 				r.destRegistry)),
 		)
+		stat := types.FileStat{
+			Name:     r.pkg.Name,
+			Registry: r.srcRegistry,
+			Uri:      srcImage,
+			Size:     0,
+			Status:   types.StatusSuccess,
+		}
 		if err != nil {
+			log.Error().Ctx(ctx).Err(err).Msgf("Failed to copy repository %s to %s %v", srcImage, dstImage, err)
 			pterm.Error.Println(fmt.Sprintf("Failed to copy repository %s to %s", srcImage, dstImage))
+			stat.Error = err.Error()
 		} else {
 			pterm.Success.Println(fmt.Sprintf("Copy repository %s to %s completed", srcImage, dstImage))
 		}
+		r.stats.FileStats = append(r.stats.FileStats, stat)
 	} else {
 		versions, err := r.srcAdapter.GetVersions(r.srcRegistry, r.pkg.Name, r.artifactType)
 		if err != nil {
