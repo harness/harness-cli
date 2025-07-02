@@ -2,19 +2,31 @@ package migratable
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/static"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/uuid"
-	"github.com/pterm/pterm"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/lib"
 	"github.com/harness/harness-cli/module/ar/migrate/tree"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+	"github.com/pterm/pterm"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"helm.sh/helm/v3/pkg/repo"
 )
 
 type Package struct {
@@ -110,6 +122,7 @@ func (r *Package) Migrate(ctx context.Context) error {
 			crane.WithAuthFromKeychain(lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.srcRegistry,
 				r.destRegistry)),
 		)
+
 		stat := types.FileStat{
 			Name:     r.pkg.Name,
 			Registry: r.srcRegistry,
@@ -121,10 +134,14 @@ func (r *Package) Migrate(ctx context.Context) error {
 			log.Error().Ctx(ctx).Err(err).Msgf("Failed to copy repository %s to %s %v", srcImage, dstImage, err)
 			pterm.Error.Println(fmt.Sprintf("Failed to copy repository %s to %s", srcImage, dstImage))
 			stat.Error = err.Error()
+			stat.Status = types.StatusFail
 		} else {
 			pterm.Success.Println(fmt.Sprintf("Copy repository %s to %s completed", srcImage, dstImage))
 		}
 		r.stats.FileStats = append(r.stats.FileStats, stat)
+
+	} else if r.artifactType == types.HELM_LEGACY {
+		r.migrateLegacyHelm(ctx)
 	} else {
 		versions, err := r.srcAdapter.GetVersions(r.srcRegistry, r.pkg.Name, r.artifactType)
 		if err != nil {
@@ -159,6 +176,103 @@ func (r *Package) Migrate(ctx context.Context) error {
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed package migration step")
 	return nil
+}
+
+func (r *Package) migrateLegacyHelm(ctx context.Context) error {
+	file, _, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.URL)
+	if err != nil {
+		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download helm chart %s", r.pkg.URL)
+		pterm.Error.Println(fmt.Sprintf("Failed to download helm chart %s", r.pkg.URL))
+		return err
+	}
+	defer file.Close()
+
+	tmp, err := os.CreateTemp("", "*.tgz")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+
+	_, err = io.Copy(tmp, file)
+	if err != nil {
+		return err
+	}
+
+	// Ensure the file is closed and flushed to disk
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+
+	// Create the reference for the destination chart
+	refStr := fmt.Sprintf("%s/%s:%s", r.destRegistry, r.pkg.Name, r.pkg.Version)
+
+	// Set up the keychain for authentication
+	kc := lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry)
+	// Register the keychain as the default for use by crane
+	crane.WithAuth(kc)
+
+	// Push the chart to destination
+	pterm.Info.Println(fmt.Sprintf("Pushing helm chart %s to %s", r.pkg.Name, refStr))
+	err = pushChart(tmp.Name(), refStr)
+
+	stat := types.FileStat{
+		Name:     r.pkg.Name,
+		Registry: r.srcRegistry,
+		Uri:      r.pkg.URL,
+		Size:     0,
+		Status:   types.StatusSuccess,
+	}
+
+	if err != nil {
+		log.Error().Ctx(ctx).Err(err).Msgf("Failed to push helm chart %s to %s", r.pkg.Name, refStr)
+		pterm.Error.Println(fmt.Sprintf("Failed to push helm chart %s to %s", r.pkg.Name, refStr))
+		stat.Error = err.Error()
+		stat.Status = types.StatusFail
+		r.stats.FileStats = append(r.stats.FileStats, stat)
+		return err
+	}
+
+	pterm.Success.Println(fmt.Sprintf("Successfully pushed helm chart %s to %s", r.pkg.Name, refStr))
+	r.stats.FileStats = append(r.stats.FileStats, stat)
+	return nil
+}
+
+// pushChart uploads chart.tar.gz --> oci://<dstRef>
+func pushChart(tgzPath, dstRef string, ropts ...remote.Option) error {
+	ref, err := name.ParseReference(dstRef)
+	if err != nil {
+		return err
+	}
+
+	chartData, err := os.ReadFile(tgzPath)
+	if err != nil {
+		return fmt.Errorf("read chart file: %w", err)
+	}
+
+	layer, err := static.NewLayer(chartData,
+		types.MediaType("application/vnd.cncf.helm.chart.layer.v1.tar+gzip"))
+	if err != nil {
+		return fmt.Errorf("create layer: %w", err)
+	}
+
+	img, err := mutate.AppendLayers(empty.Image, layer)
+	if err != nil {
+		return fmt.Errorf("append layer: %w", err)
+	}
+
+	annotations := map[string]string{
+		"org.opencontainers.image.title":       filepath.Base(tgzPath),
+		"org.opencontainers.image.created":     time.Now().Format(time.RFC3339),
+		"org.opencontainers.image.description": "Helm chart migrated by Harness CLI",
+		"org.opencontainers.artifactType":      "application/vnd.cncf.helm.chart.layer.v1.tar+gzip",
+	}
+	img = mutate.Annotations(img, annotations)
+	if err != nil {
+		return fmt.Errorf("set annotations: %w", err)
+	}
+
+	fmt.Printf("  → pushing %s …\n", ref.String())
+	return remote.Write(ref, img, ropts...)
 }
 
 // Post Any post processing work

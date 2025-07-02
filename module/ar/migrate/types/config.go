@@ -18,14 +18,15 @@ var (
 type ArtifactType string
 
 var (
-	DOCKER  ArtifactType = "DOCKER"
-	HELM    ArtifactType = "HELM"
-	GENERIC ArtifactType = "GENERIC"
-	PYTHON  ArtifactType = "PYTHON"
-	MAVEN   ArtifactType = "MAVEN"
-	NPM     ArtifactType = "NPM"
-	NUGET   ArtifactType = "NUGET"
-	RPM     ArtifactType = "RPM"
+	DOCKER      ArtifactType = "DOCKER"
+	HELM        ArtifactType = "HELM"
+	HELM_LEGACY ArtifactType = "HELM_LEGACY"
+	GENERIC     ArtifactType = "GENERIC"
+	PYTHON      ArtifactType = "PYTHON"
+	MAVEN       ArtifactType = "MAVEN"
+	NPM         ArtifactType = "NPM"
+	NUGET       ArtifactType = "NUGET"
+	RPM         ArtifactType = "RPM"
 )
 
 // Config represents the top-level configuration structure

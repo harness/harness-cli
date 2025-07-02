@@ -2,6 +2,7 @@ package types
 
 import (
 	"errors"
+	"time"
 )
 
 // Common errors
@@ -36,6 +37,8 @@ type Package struct {
 	Path     string
 	Name     string
 	Size     int
+	URL      string
+	Version  string
 }
 
 type Version struct {
@@ -73,4 +76,20 @@ type FileStat struct {
 
 type TransferStats struct {
 	FileStats []FileStat
+}
+
+type RegistryInfo struct {
+	Type string
+	URL  string
+}
+
+const (
+	ChartLayerMediaType = "application/vnd.cncf.helm.chart.layer.v1.tar+gzip"
+	ConfigMediaType     = "application/vnd.cncf.helm.config.v1+json"
+)
+
+type HelmOCIConfig struct {
+	APIVersion  string            `json:"apiVersion"`
+	Created     time.Time         `json:"created"`
+	Annotations map[string]string `json:"annotations"`
 }

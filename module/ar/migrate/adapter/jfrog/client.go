@@ -89,7 +89,13 @@ func (c *client) getRegistry(registry string) (JFrogRepository, error) {
 func (c *client) getFile(registry string, uri string) (io.ReadCloser, http2.Header, error) {
 	uri = strings.TrimPrefix(uri, "/")
 	uri = strings.TrimSuffix(uri, "/")
-	url := fmt.Sprintf("%s/artifactory/%s/%s", c.url, registry, uri)
+
+	var url string
+	if strings.HasPrefix(uri, "http://") || strings.HasPrefix(uri, "https://") {
+		url = uri
+	} else {
+		url = fmt.Sprintf("%s/artifactory/%s/%s", c.url, registry, uri)
+	}
 
 	// Create GET request
 	req, err := http2.NewRequest(http2.MethodGet, url, nil)
