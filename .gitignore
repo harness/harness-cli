@@ -7,3 +7,5 @@ harnesscd-example-apps
 .vscode/
 /hns
 !/cmd/hns/
+.DS_Store
+*/.DS_Store

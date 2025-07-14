@@ -11,12 +11,12 @@ import (
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/harness/harness-cli/config"
 	adp "github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/module/ar/migrate/util"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func init() {
@@ -61,8 +61,10 @@ func (a *adapter) GetKeyChain(reg string) authn.Keychain {
 func (a *adapter) GetConfig() types.RegistryConfig {
 	return a.reg
 }
-func (a *adapter) ValidateCredentials() (bool, error)               { return false, nil }
-func (a *adapter) GetRegistry(registry string) (interface{}, error) { return nil, nil }
+func (a *adapter) ValidateCredentials() (bool, error) { return false, nil }
+func (a *adapter) GetRegistry(registry string) (types.RegistryInfo, error) {
+	return types.RegistryInfo{}, nil
+}
 func (a *adapter) CreateRegistryIfDoesntExist(registryRef string) (bool, error) {
 	return false, nil
 }

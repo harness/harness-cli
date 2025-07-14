@@ -86,21 +86,27 @@ func (c *client) getRegistry(registry string) (JFrogRepository, error) {
 	return JFrogRepository{}, fmt.Errorf("registry %s not found", registry)
 }
 
-func (c *client) getFile(registry string, uri string) (io.ReadCloser, http2.Header, error) {
-	uri = strings.TrimPrefix(uri, "/")
-	uri = strings.TrimSuffix(uri, "/")
-	url := fmt.Sprintf("%s/artifactory/%s/%s", c.url, registry, uri)
+func (c *client) getFile(registry string, path string) (io.ReadCloser, http2.Header, error) {
+	path = strings.TrimPrefix(path, "/")
+	path = strings.TrimSuffix(path, "/")
+
+	var url string
+	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+		url = path
+	} else {
+		url = fmt.Sprintf("%s/artifactory/%s/%s", c.url, registry, path)
+	}
 
 	// Create GET request
 	req, err := http2.NewRequest(http2.MethodGet, url, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create request for file '%s': %w", uri, err)
+		return nil, nil, fmt.Errorf("failed to create request for file '%s': %w", path, err)
 	}
 
 	// Execute request with our client (which handles authentication)
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to download file '%s': %w", uri, err)
+		return nil, nil, fmt.Errorf("failed to download file '%s': %w", path, err)
 	}
 
 	// Check for successful response
@@ -109,7 +115,7 @@ func (c *client) getFile(registry string, uri string) (io.ReadCloser, http2.Head
 		if err != nil {
 			return nil, nil, err
 		} // Ensure we don't leak connection
-		return nil, nil, fmt.Errorf("failed to download file '%s', status code: %d", uri, resp.StatusCode)
+		return nil, nil, fmt.Errorf("failed to download file '%s', status code: %d", path, resp.StatusCode)
 	}
 
 	// Return the body and headers, the caller must close the body when done

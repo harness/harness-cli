@@ -15,6 +15,9 @@ destination:
     username: ${DST_USER}
     password: ${DST_PASS}
 mappings:
+  - artifactType: HELM_LEGACY
+    sourceRegistry: src
+    destinationRegistry: dst
   - artifactType: DOCKER
     sourceRegistry: src
     destinationRegistry: dst

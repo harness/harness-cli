@@ -140,6 +140,7 @@ func (c *client) uploadMavenFile(
 		return fmt.Errorf("failed to upload file '%s': %w", fileUri, err)
 	}
 	defer resp.Body.Close()
+	defer file.Close()
 
 	// Check for successful response
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {

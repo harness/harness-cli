@@ -4,16 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/harness/harness-cli/module/ar/migrate/tree"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/rs/zerolog/log"
 	adp "github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/module/ar/migrate/util"
+	"github.com/rs/zerolog/log"
+	"helm.sh/helm/v3/pkg/repo"
 )
 
 const (
@@ -65,8 +68,17 @@ func (a *adapter) GetConfig() types.RegistryConfig {
 	return a.reg
 }
 
-func (a *adapter) ValidateCredentials() (bool, error)                        { return false, nil }
-func (a *adapter) GetRegistry(registry string) (interface{}, error)          { return nil, nil }
+func (a *adapter) ValidateCredentials() (bool, error) { return false, nil }
+func (a *adapter) GetRegistry(registry string) (types.RegistryInfo, error) {
+	reg, err := a.client.getRegistry(registry)
+	if err != nil {
+		return types.RegistryInfo{}, fmt.Errorf("get registry: %w", err)
+	}
+	return types.RegistryInfo{
+		Type: reg.Type,
+		URL:  reg.Url,
+	}, nil
+}
 func (a *adapter) CreateRegistryIfDoesntExist(registry string) (bool, error) { return false, nil }
 
 func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, root *types.TreeNode) (
@@ -102,6 +114,29 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 				Size:     -1,
 			})
 		}
+	} else if artifactType == types.HELM_LEGACY {
+		node, err := tree.GetNodeForPath(root, "/index.yaml")
+		if err != nil {
+			return nil, fmt.Errorf("get node for path: %w", err)
+		}
+		file, _, err := a.DownloadFile(registry, node.File.Uri)
+		tmp, err := os.CreateTemp("", "index-*.yaml")
+		defer os.Remove(tmp.Name())
+		_, err = io.Copy(tmp, file)
+		index, err := repo.LoadIndexFile(tmp.Name())
+
+		for name, entries := range index.Entries {
+			for _, ver := range entries {
+				packages = append(packages, types.Package{
+					Registry: registry,
+					Path:     "/",
+					Name:     name,
+					Size:     -1,
+					URL:      ver.URLs[0],
+					Version:  ver.Version,
+				})
+			}
+		}
 	} else {
 		return []types.Package{}, errors.New("unknown artifact type")
 	}
@@ -123,6 +158,18 @@ func (a *adapter) GetVersions(registry, pkg string, artifactType types.ArtifactT
 	}
 
 	if artifactType == types.MAVEN {
+		return []types.Version{
+			{
+				Registry: registry,
+				Pkg:      pkg,
+				Path:     "/",
+				Name:     "",
+				Size:     -1,
+			},
+		}, nil
+	}
+
+	if artifactType == types.HELM_LEGACY {
 		return []types.Version{
 			{
 				Registry: registry,
