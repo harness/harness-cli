@@ -133,6 +133,7 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 					Name:     name,
 					Size:     -1,
 					URL:      ver.URLs[0],
+					Version:  ver.Version,
 				})
 			}
 		}

@@ -5,16 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/v1"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/static"
+	"helm.sh/helm/v3/pkg/chart"
+	"helm.sh/helm/v3/pkg/chart/loader"
 	"io"
-	"net/http"
 	"os"
-	"path/filepath"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/uuid"
@@ -26,7 +28,6 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"helm.sh/helm/v3/pkg/repo"
 )
 
 type Package struct {
@@ -141,6 +142,7 @@ func (r *Package) Migrate(ctx context.Context) error {
 		r.stats.FileStats = append(r.stats.FileStats, stat)
 
 	} else if r.artifactType == types.HELM_LEGACY {
+		// TODO: Replace by providing function to this migration job instead of complete implementation here.
 		r.migrateLegacyHelm(ctx)
 	} else {
 		versions, err := r.srcAdapter.GetVersions(r.srcRegistry, r.pkg.Name, r.artifactType)
@@ -198,22 +200,17 @@ func (r *Package) migrateLegacyHelm(ctx context.Context) error {
 		return err
 	}
 
-	// Ensure the file is closed and flushed to disk
 	if err := tmp.Close(); err != nil {
 		return err
 	}
 
-	// Create the reference for the destination chart
-	refStr := fmt.Sprintf("%s/%s:%s", r.destRegistry, r.pkg.Name, r.pkg.Version)
-
-	// Set up the keychain for authentication
-	kc := lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry)
-	// Register the keychain as the default for use by crane
-	crane.WithAuth(kc)
-
-	// Push the chart to destination
+	refStr, err := r.destAdapter.GetOCIImagePath(r.destRegistry, r.pkg.Name)
+	if err != nil {
+		return err
+	}
+	refStr += ":" + r.pkg.Version
 	pterm.Info.Println(fmt.Sprintf("Pushing helm chart %s to %s", r.pkg.Name, refStr))
-	err = pushChart(tmp.Name(), refStr)
+	err = r.pushChart(ctx, tmp.Name(), refStr)
 
 	stat := types.FileStat{
 		Name:     r.pkg.Name,
@@ -237,42 +234,110 @@ func (r *Package) migrateLegacyHelm(ctx context.Context) error {
 	return nil
 }
 
+const labelMaxBytes = 1024
+
+func readChartMeta(path string) (*chart.Metadata, error) {
+	ch, err := loader.Load(path) // understands .tgz & directories
+	if err != nil {
+		return nil, err
+	}
+	return ch.Metadata, nil
+}
+
+func truncate(s string) string {
+	_max := labelMaxBytes
+	if len(s) <= _max {
+		return s
+	}
+	// walk backwards until we’re on a rune boundary
+	for _max > 0 && !utf8.RuneStart(s[_max]) {
+		_max--
+	}
+	return s[:_max-1] + "…"
+}
+
+func chartLabels(meta *chart.Metadata) map[string]string {
+	lbl := map[string]string{
+		"helm.sh/chart":     truncate(meta.Name + "-" + meta.Version),
+		"chart.name":        truncate(meta.Name),
+		"chart.home":        truncate(meta.Home),
+		"chart.sources":     truncate(strings.Join(meta.Sources, ",")),
+		"chart.version":     truncate(meta.Version),
+		"chart.description": truncate(meta.Description),
+		"chart.keywords":    truncate(strings.Join(meta.Keywords, ",")),
+		"chart.icon":        truncate(meta.Icon),
+		"chart.apiVersion":  truncate(meta.APIVersion),
+		"chart.condition":   truncate(meta.Condition),
+		"chart.tags":        truncate(meta.Tags),
+		"chart.appVersion":  truncate(meta.AppVersion),
+		"chart.kubeVersion": truncate(meta.KubeVersion),
+		"chart.type":        truncate(meta.Type),
+	}
+	// objects & complex lists → JSON
+	if b, _ := json.Marshal(meta.Maintainers); len(b) > 0 {
+		lbl["chart.maintainers"] = truncate(string(b))
+	}
+	if b, _ := json.Marshal(meta.Dependencies); len(b) > 0 {
+		lbl["chart.dependencies"] = truncate(string(b))
+	}
+	if b, _ := json.Marshal(meta.Annotations); len(b) > 0 {
+		lbl["chart.annotations"] = truncate(string(b))
+	}
+	return lbl
+}
+
 // pushChart uploads chart.tar.gz --> oci://<dstRef>
-func pushChart(tgzPath, dstRef string, ropts ...remote.Option) error {
-	ref, err := name.ParseReference(dstRef)
-	if err != nil {
-		return err
-	}
+func (r *Package) pushChart(ctx context.Context, chartPath string, dstRef string) error {
+	meta, _ := readChartMeta(chartPath)
+	labels := chartLabels(meta)
+	ref, err := name.ParseReference(dstRef, name.WeakValidation)
+	//check(err, "parsing reference")
 
-	chartData, err := os.ReadFile(tgzPath)
-	if err != nil {
-		return fmt.Errorf("read chart file: %w", err)
-	}
+	chartData, err := os.ReadFile(chartPath)
+	check(err, "reading chart file")
 
-	layer, err := static.NewLayer(chartData,
-		types.MediaType("application/vnd.cncf.helm.chart.layer.v1.tar+gzip"))
-	if err != nil {
-		return fmt.Errorf("create layer: %w", err)
-	}
+	layer := static.NewLayer(chartData, "application/vnd.cncf.helm.chart.content.v1.tar+gzip")
 
 	img, err := mutate.AppendLayers(empty.Image, layer)
-	if err != nil {
-		return fmt.Errorf("append layer: %w", err)
-	}
+	check(err, "appending layer")
 
+	cfg := v1.Config{
+		Labels: labels,
+	}
+	cfg.Labels = map[string]string{}
+
+	img, err = mutate.Config(img, cfg)
+
+	check(err, "adding config JSON")
+
+	img = mutate.ConfigMediaType(img, "application/vnd.cncf.helm.config.v1+json")
 	annotations := map[string]string{
-		"org.opencontainers.image.title":       filepath.Base(tgzPath),
-		"org.opencontainers.image.created":     time.Now().Format(time.RFC3339),
-		"org.opencontainers.image.description": "Helm chart migrated by Harness CLI",
+		"org.opencontainers.image.title":       truncate(meta.Name),
+		"org.opencontainers.image.description": truncate(meta.Description),
+		"org.opencontainers.image.version":     truncate(meta.Version),
+		"org.opencontainers.image.created":     time.Now().UTC().Format(time.RFC3339),
 		"org.opencontainers.artifactType":      "application/vnd.cncf.helm.chart.layer.v1.tar+gzip",
 	}
-	img = mutate.Annotations(img, annotations)
-	if err != nil {
-		return fmt.Errorf("set annotations: %w", err)
+
+	for k, v := range meta.Annotations {
+		annotations[k] = truncate(v)
 	}
 
-	fmt.Printf("  → pushing %s …\n", ref.String())
-	return remote.Write(ref, img, ropts...)
+	img = mutate.Annotations(img, annotations).(v1.Image)
+
+	err = remote.Write(ref, img,
+		remote.WithContext(ctx),
+		remote.WithUserAgent("harness-cli"),
+		remote.WithAuthFromKeychain(lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.srcRegistry,
+			r.destRegistry)),
+	)
+	return err
+}
+
+func check(err error, context string) {
+	if err != nil {
+		log.Error().Msgf("❌  %s: %v", context, err)
+	}
 }
 
 // Post Any post processing work
