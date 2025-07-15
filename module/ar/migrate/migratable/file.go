@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/pterm/pterm"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/util/common"
+	"github.com/pterm/pterm"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 type File struct {
@@ -105,6 +105,7 @@ func (r File) Migrate(ctx context.Context) error {
 
 	if r.artifactType == types.GENERIC || r.artifactType == types.MAVEN {
 		downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.file.Uri)
+		defer downloadFile.Close()
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to download file")
 			return fmt.Errorf("download file failed: %w", err)

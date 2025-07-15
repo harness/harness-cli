@@ -21,6 +21,9 @@ mappings:
   - artifactType: DOCKER
     sourceRegistry: src
     destinationRegistry: dst
+  - artifactType: PYTHON
+    sourceRegistry: src
+    destinationRegistry: dst
   - artifactType: HELM
     sourceRegistry: src
     destinationRegistry: dst

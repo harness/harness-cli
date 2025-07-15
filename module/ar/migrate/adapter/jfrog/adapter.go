@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/harness/harness-cli/module/ar/migrate/tree"
+	"golang.org/x/net/html"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -137,11 +139,68 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 				})
 			}
 		}
+	} else if artifactType == types.PYTHON {
+		node, err := tree.GetNodeForPath(root, "/.pypi/simple.html")
+		if err != nil {
+			return nil, fmt.Errorf("get node for path: %w", err)
+		}
+		file, _, err := a.DownloadFile(registry, node.File.Uri)
+		if err != nil {
+			return nil, fmt.Errorf("download file: %w", err)
+		}
+		defer file.Close()
+		_packages, err := extractPythonPackageNames(file)
+		if err != nil {
+			return nil, fmt.Errorf("extract python package names: %w", err)
+		}
+		for _, p := range _packages {
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     "/",
+				Name:     p,
+				Size:     -1,
+			})
+		}
+
+		return packages, nil
 	} else {
 		return []types.Package{}, errors.New("unknown artifact type")
 	}
 
 	return packages, nil
+}
+
+func extractPythonPackageNames(r io.Reader) ([]string, error) {
+	var pkgs []string
+
+	z := html.NewTokenizer(r)
+	for {
+		switch z.Next() {
+
+		case html.ErrorToken:
+			if z.Err() == io.EOF {
+				return pkgs, nil // finished parsing
+			}
+			return nil, z.Err() // real error
+
+		case html.StartTagToken, html.SelfClosingTagToken:
+			tok := z.Token()
+			if tok.Data != "a" {
+				continue
+			}
+			for _, attr := range tok.Attr {
+				if attr.Key == "href" {
+					pkgs = append(pkgs, attr.Val)
+				}
+			}
+		}
+	}
+}
+
+func resolveHref(basePath, href string) string {
+	baseDir := path.Dir(basePath) // -> "start/foo/bar"
+	return path.Clean(path.Join(baseDir, href))
+	// Clean collapses ../, ./, and duplicate slashes.
 }
 
 func (a *adapter) GetVersions(registry, pkg string, artifactType types.ArtifactType) ([]types.Version, error) {
@@ -179,6 +238,36 @@ func (a *adapter) GetVersions(registry, pkg string, artifactType types.ArtifactT
 				Size:     -1,
 			},
 		}, nil
+	}
+
+	if artifactType == types.PYTHON {
+		var versions []types.Version
+		indexPath := fmt.Sprintf(".pypi/%s/%s.html", pkg, pkg)
+		file, _, err := a.client.getFile(registry, indexPath)
+		if err != nil {
+			return nil, fmt.Errorf("download file: %w", err)
+		}
+		defer file.Close()
+		_versions, err := extractPythonPackageNames(file)
+		if err != nil {
+			return nil, fmt.Errorf("extract python package names: %w", err)
+		}
+		for _, v := range _versions {
+			href := resolveHref(indexPath, v)
+			split := strings.Split(href, "#")
+			if len(split) > 1 {
+				href = split[0]
+			}
+			version := strings.Split(href, "/")[1]
+			versions = append(versions, types.Version{
+				Registry: registry,
+				Pkg:      pkg,
+				Path:     href,
+				Name:     version,
+				Size:     -1,
+			})
+		}
+		return versions, nil
 	}
 	return []types.Version{}, errors.New("unknown artifact type")
 
