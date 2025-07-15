@@ -58,8 +58,6 @@ func (c *client) uploadGenericFile(registry, artifactName, version string, f *ty
 	// Process multipart form asynchronously
 	go func() {
 		defer pw.Close()
-		defer file.Close()
-
 		// Add the file
 		part, err := writer.CreateFormFile("file", f.Name)
 		if err != nil {
@@ -140,7 +138,39 @@ func (c *client) uploadMavenFile(
 		return fmt.Errorf("failed to upload file '%s': %w", fileUri, err)
 	}
 	defer resp.Body.Close()
-	defer file.Close()
+
+	// Check for successful response
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to upload file '%s', status code: %d, response: %s",
+			fileUri, resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func (c *client) uploadPythonFile(
+	registry string,
+	name string,
+	version string,
+	f *types.File,
+	file io.ReadCloser,
+) error {
+	fileUri := strings.TrimPrefix(f.Uri, "/")
+	url := fmt.Sprintf("%s/pkg/%s/%s/python/%s", c.url, config.Global.AccountID, registry, fileUri)
+	// Create request
+	req, err := http2.NewRequest(http2.MethodPost, url, file)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to upload file '%s': %w", fileUri, err)
+	}
+	defer resp.Body.Close()
 
 	// Check for successful response
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
