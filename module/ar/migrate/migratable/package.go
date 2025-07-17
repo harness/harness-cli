@@ -3,6 +3,7 @@ package migratable
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -317,6 +318,10 @@ func (r *Package) pushChart(ctx context.Context, chartPath string, dstRef string
 		"org.opencontainers.image.version":     truncate(meta.Version),
 		"org.opencontainers.image.created":     time.Now().UTC().Format(time.RFC3339),
 		"org.opencontainers.artifactType":      "application/vnd.cncf.helm.chart.layer.v1.tar+gzip",
+	}
+
+	if strings.Contains(meta.Version, "+") {
+		return errors.New("chart version cannot contain +")
 	}
 
 	for k, v := range meta.Annotations {
