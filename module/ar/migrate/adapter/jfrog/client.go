@@ -67,7 +67,6 @@ func (c *client) getRegistries() ([]JFrogRepository, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repositories: %w", err)
 	}
-
 	return repositories, nil
 }
 

@@ -1,8 +1,20 @@
 package migratable
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"bytes"
+	"compress/gzip"
 	"context"
+	"crypto/md5"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
+	"net/mail"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +25,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/crypto/blake2b"
 )
 
 type File struct {
@@ -114,7 +127,86 @@ func (r File) Migrate(ctx context.Context) error {
 		//readCloser := progress.ReadCloser(int64(r.file.Size), downloadFile, r.file.Name)
 		title := fmt.Sprintf("%s (%s)", r.file.Name, common.GetSize(int64(r.file.Size)))
 		err = r.destAdapter.UploadFile(r.destRegistry, downloadFile, r.file, header, r.pkg.Name, r.version.Name,
-			r.artifactType)
+			r.artifactType, nil)
+		stat := types.FileStat{
+			Name:     r.file.Name,
+			Registry: r.srcRegistry,
+			Uri:      r.file.Uri,
+			Size:     int64(r.file.Size),
+			Status:   types.StatusSuccess,
+		}
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to upload file")
+			stat.Status = types.StatusFail
+			stat.Error = err.Error()
+			pterm.Error.Println(title)
+		} else {
+			pterm.Success.Println(title)
+		}
+		r.stats.FileStats = append(r.stats.FileStats, stat)
+	}
+
+	if r.artifactType == types.PYTHON {
+		downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.file.Uri)
+		tempFile, err := os.CreateTemp("", fmt.Sprintf("python-pkg-%s-*", r.file.Name))
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to create temporary file")
+			return fmt.Errorf("failed to create temporary file: %w", err)
+		}
+		defer os.Remove(tempFile.Name()) // Clean up the temp file when done
+
+		// Copy the downloaded content to the temp file
+		_, err = io.Copy(tempFile, downloadFile)
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to write to temporary file")
+			return fmt.Errorf("failed to write to temporary file: %w", err)
+		}
+		err = tempFile.Close()
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to close temporary file")
+			return fmt.Errorf("failed to close temporary file: %w", err)
+		}
+
+		// Check file extension to determine package type
+		fileName := r.file.Name
+		title := fmt.Sprintf("%s (%s)", fileName, common.GetSize(int64(r.file.Size)))
+
+		var metadata string
+		// Extract metadata based on file extension
+		if strings.HasSuffix(fileName, ".tar.gz") ||
+			strings.HasSuffix(fileName, ".tgz") ||
+			strings.HasSuffix(fileName, ".zip") {
+			metadata, err = r.extractTarGzMetadataFile(tempFile.Name())
+			if err != nil {
+				logger.Error().Err(err).Msg("Failed to extract metadata from tar.gz file")
+				return fmt.Errorf("failed to extract metadata from tar.gz file: %w", err)
+			}
+		} else if strings.HasSuffix(fileName, ".whl") {
+			metadata, err = r.extractWheelMetadataFile(tempFile.Name())
+			if err != nil {
+				logger.Error().Err(err).Msg("Failed to extract metadata from wheel file")
+				return fmt.Errorf("failed to extract metadata from wheel file: %w", err)
+			}
+		} else {
+			logger.Warn().Msg("Unsupported Python package format, uploading without metadata extraction")
+		}
+
+		metadataMap, err := generatePythonMetadataMap(metadata, tempFile.Name())
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to generate metadata map")
+			return fmt.Errorf("failed to generate metadata map: %w", err)
+		}
+
+		tempFileReader, err := os.Open(tempFile.Name())
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to open temporary file")
+			return fmt.Errorf("failed to open temporary file: %w", err)
+		}
+		defer tempFileReader.Close()
+
+		err = r.destAdapter.UploadFile(r.destRegistry, tempFileReader, r.file, header, r.pkg.Name, r.version.Name,
+			r.artifactType, metadataMap)
+
 		stat := types.FileStat{
 			Name:     r.file.Name,
 			Registry: r.srcRegistry,
@@ -139,6 +231,66 @@ func (r File) Migrate(ctx context.Context) error {
 	return nil
 }
 
+func generatePythonMetadataMap(metadata string, path string) (map[string]interface{}, error) {
+	mapData := make(map[string]interface{})
+	msg, err := mail.ReadMessage(bytes.NewReader([]byte(metadata)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read metadata: %w", err)
+	}
+	for key, h := range msg.Header {
+		lowerKey := strings.ToLower(key)
+		lowerKey = strings.ReplaceAll(lowerKey, "-", "_")
+		if lowerKey == "platform" || lowerKey == "supported_platform" || lowerKey == "classifier" || lowerKey == "provides_extra" {
+			lowerKey += "s"
+		}
+
+		if lowerKey == "project_url" || lowerKey == "project_urls" {
+			continue
+		}
+
+		if len(h) == 1 {
+			mapData[lowerKey] = h[0]
+		}
+		mapData[lowerKey] = h
+	}
+	all, err := io.ReadAll(msg.Body)
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to read metadata")
+	}
+	mapData["description"] = string(all)
+	mapData["description_content_type"] = "text/markdown"
+	
+	// Calculate file digests
+	file, err := os.Open(path)
+	if err != nil {
+		return mapData, fmt.Errorf("failed to open file for digest calculation: %w", err)
+	}
+	defer file.Close()
+	
+	// Create hash instances
+	md5Hash := md5.New()
+	sha256Hash := sha256.New()
+	blake2bHash, err := blake2b.New256(nil)
+	if err != nil {
+		return mapData, fmt.Errorf("failed to create blake2b hash: %w", err)
+	}
+	
+	// Create a multi-writer to write to all hash functions at once
+	multiWriter := io.MultiWriter(md5Hash, sha256Hash, blake2bHash)
+	
+	// Copy the file content to the hasher
+	if _, err := io.Copy(multiWriter, file); err != nil {
+		return mapData, fmt.Errorf("failed to calculate digests: %w", err)
+	}
+	
+	// Add the digests to the metadata map
+	mapData["md5_digest"] = hex.EncodeToString(md5Hash.Sum(nil))
+	mapData["sha256_digest"] = hex.EncodeToString(sha256Hash.Sum(nil))
+	mapData["blake2_256_digest"] = hex.EncodeToString(blake2bHash.Sum(nil))
+	
+	return mapData, nil
+}
+
 func (r File) Post(ctx context.Context) error {
 	traceID, _ := ctx.Value("trace_id").(string)
 	logger := r.logger.With().
@@ -155,4 +307,96 @@ func (r File) Post(ctx context.Context) error {
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed file post-migration step")
 	return nil
+}
+
+// extractTarGzMetadataFile extracts metadata from a tar.gz Python package
+func (r File) extractTarGzMetadataFile(path string) (string, error) {
+	file, err2 := os.Open(path)
+	defer file.Close()
+
+	if err2 != nil {
+		return "", fmt.Errorf("failed to read file: %w", err2)
+	}
+	var buf bytes.Buffer
+	tee := io.TeeReader(file, &buf)
+	// Create a new gzip reader
+	gzipReader, err := gzip.NewReader(tee)
+	if err != nil {
+		return "", fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+	defer gzipReader.Close()
+
+	// Create a new tar reader
+	tarReader := tar.NewReader(gzipReader)
+
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", fmt.Errorf("failed to read tar header: %w", err)
+		}
+
+		// Skip directories
+		if header.Typeflag == tar.TypeDir {
+			continue
+		}
+
+		fileName := filepath.Base(header.Name)
+
+		// Check if this file is a metadata file
+		if fileName == "PKG-INFO" || fileName == "METADATA" {
+			all, err := io.ReadAll(tarReader)
+			if err != nil {
+				return "", fmt.Errorf("failed to read metadata file: %w", err)
+			}
+			return string(all), nil
+		}
+	}
+	return "", fmt.Errorf("metadata file not found")
+}
+
+// extractWheelMetadataFile extracts metadata from a wheel Python package
+func (r File) extractWheelMetadataFile(path string) (string, error) {
+	file, err2 := os.Open(path)
+	if err2 != nil {
+		return "", fmt.Errorf("failed to read file: %w", err2)
+	}
+	defer file.Close()
+	var buf bytes.Buffer
+	tee := io.TeeReader(file, &buf)
+
+	// Create a new zip reader
+	data, err := io.ReadAll(tee)
+	if err != nil {
+		return "", fmt.Errorf("failed to read wheel file: %w", err)
+	}
+
+	zipReader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return "", fmt.Errorf("failed to create zip reader: %w", err)
+	}
+
+	// Look for metadata and README files in the zip archive
+	for _, file := range zipReader.File {
+		fileName := filepath.Base(file.Name)
+
+		// Check if this file is a metadata file
+		if fileName == "METADATA" || fileName == "PKG-INFO" {
+			metadataFile, err := file.Open()
+			if err != nil {
+				return "", fmt.Errorf("failed to open metadata file: %w", err)
+			}
+			defer metadataFile.Close()
+			all, err := io.ReadAll(metadataFile)
+			if err != nil {
+				return "", fmt.Errorf("failed to read metadata file: %w", err)
+			}
+			return string(all), nil
+		}
+		continue
+	}
+
+	return "", fmt.Errorf("no metadata file found in the package")
 }

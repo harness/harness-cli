@@ -91,6 +91,7 @@ func (a *adapter) UploadFile(
 	artifactName string,
 	version string,
 	artifactType types.ArtifactType,
+	metadata map[string]interface{},
 ) error {
 	a.logger.Debug().Msgf("Uploaded file %s to registry: %s", f.Uri, registry)
 	var err error
@@ -99,7 +100,7 @@ func (a *adapter) UploadFile(
 	} else if artifactType == types.MAVEN {
 		err = a.client.uploadMavenFile(registry, artifactName, version, f, file)
 	} else if artifactType == types.PYTHON {
-		err = a.client.uploadPythonFile(registry, artifactName, version, f, file)
+		err = a.client.uploadPythonFile(registry, artifactName, version, f, file, metadata)
 	}
 	if err != nil {
 		a.logger.Error().Err(err).Msgf("Failed to upload file %s to registry: %s", f.Uri, registry)
