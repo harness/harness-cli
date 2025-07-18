@@ -2,7 +2,7 @@ package har
 
 import (
 	"fmt"
-	"github.com/harness/harness-cli/module/ar/migrate/http/auth/basic"
+	"github.com/harness/harness-cli/module/ar/migrate/http/auth/xApiKey"
 	"io"
 	"mime/multipart"
 	http2 "net/http"
@@ -27,8 +27,7 @@ func newClient(reg *types.RegistryConfig) *client {
 			&http2.Client{
 				Transport: http.GetHTTPTransport(http.WithInsecure(true)),
 			},
-			//xApiKey.NewAuthorizer(token),
-			basic.NewAuthorizer(username, token),
+			xApiKey.NewAuthorizer(token),
 		),
 		url:       reg.Endpoint,
 		insecure:  true,

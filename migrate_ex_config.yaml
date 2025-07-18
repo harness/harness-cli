@@ -15,21 +15,21 @@ destination:
     username: ${DST_USER}
     password: ${DST_PASS}
 mappings:
-#  - artifactType: HELM_LEGACY
-#    sourceRegistry: src
-#    destinationRegistry: dst
-#  - artifactType: DOCKER
-#    sourceRegistry: src
-#    destinationRegistry: dst
+  - artifactType: HELM_LEGACY
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: DOCKER
+    sourceRegistry: src
+    destinationRegistry: dst
   - artifactType: PYTHON
-    sourceRegistry: ${SRC_REG}
-    destinationRegistry: ${DST_REG}
-#  - artifactType: HELM
-#    sourceRegistry: src
-#    destinationRegistry: dst
-#  - artifactType: MAVEN
-#    sourceRegistry: src
-#    destinationRegistry: dst
-#  - artifactType: GENERIC
-#    sourceRegistry: src
-#    destinationRegistry: dst
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: HELM
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: MAVEN
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: GENERIC
+    sourceRegistry: src
+    destinationRegistry: dst
