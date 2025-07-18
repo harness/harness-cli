@@ -258,7 +258,11 @@ func (a *adapter) GetVersions(registry, pkg string, artifactType types.ArtifactT
 			if len(split) > 1 {
 				href = split[0]
 			}
-			version := strings.Split(href, "/")[1]
+			hrefSplit := strings.Split(href, "/")
+			version := ""
+			if len(hrefSplit) > 1 {
+				version = hrefSplit[1]
+			}
 			versions = append(versions, types.Version{
 				Registry: registry,
 				Pkg:      pkg,
@@ -313,8 +317,9 @@ func (a *adapter) UploadFile(
 	artifactName string,
 	version string,
 	artifactType types.ArtifactType,
+	metadata map[string]interface{},
 ) error {
-	return fmt.Errorf("not yet implemented")
+	return fmt.Errorf("not implemented")
 }
 
 func isMavenMetadataFile(filename string) bool {

@@ -32,6 +32,7 @@ type Adapter interface {
 		artifactName string,
 		version string,
 		artifactType types.ArtifactType,
+		metadata map[string]interface{},
 	) error
 	GetOCIImagePath(registry string, image string) (string, error)
 }

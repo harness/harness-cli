@@ -2,6 +2,7 @@ package har
 
 import (
 	"fmt"
+	"github.com/harness/harness-cli/module/ar/migrate/http/auth/xApiKey"
 	"io"
 	"mime/multipart"
 	http2 "net/http"
@@ -10,7 +11,6 @@ import (
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/internal/api/ar"
 	"github.com/harness/harness-cli/module/ar/migrate/http"
-	"github.com/harness/harness-cli/module/ar/migrate/http/auth/xApiKey"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 )
 
@@ -155,17 +155,69 @@ func (c *client) uploadPythonFile(
 	version string,
 	f *types.File,
 	file io.ReadCloser,
+	metadata map[string]interface{},
 ) error {
 	fileUri := strings.TrimPrefix(f.Uri, "/")
 	url := fmt.Sprintf("%s/pkg/%s/%s/python/%s", c.url, config.Global.AccountID, registry, fileUri)
+
+	// Create a pipe to write the multipart form data
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+
+	// Process multipart form asynchronously
+	go func() {
+		defer pw.Close()
+		defer writer.Close()
+
+		// Add the file as "content" field
+		part, err := writer.CreateFormFile("content", f.Name)
+		if err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+
+		// Copy the file content
+		if _, err := io.Copy(part, file); err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+
+		// Add metadata fields
+		if metadata != nil {
+			// Iterate through all metadata and add as form fields
+			for key, val := range metadata {
+				switch v := val.(type) {
+				case []string:
+					// Handle array values
+					for _, item := range v {
+						if err := writer.WriteField(key, item); err != nil {
+							pw.CloseWithError(err)
+							return
+						}
+					}
+				default:
+					// Handle simple values
+					if val != nil && fmt.Sprintf("%v", val) != "" {
+						if err := writer.WriteField(key, fmt.Sprintf("%v", val)); err != nil {
+							pw.CloseWithError(err)
+							return
+						}
+					}
+				}
+			}
+		}
+	}()
+
 	// Create request
-	req, err := http2.NewRequest(http2.MethodPost, url, file)
+	req, err := http2.NewRequest(http2.MethodPost, url, pr)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("Content-Type", "application/octet-stream")
+	// Set headers
+	req.Header.Set("Content-Type", writer.FormDataContentType())
 
+	// Execute request with our client (which handles authentication)
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to upload file '%s': %w", fileUri, err)
