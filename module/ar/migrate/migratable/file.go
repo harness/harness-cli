@@ -116,7 +116,7 @@ func (r File) Migrate(ctx context.Context) error {
 		return fmt.Errorf("OCI migrate file is not supported")
 	}
 
-	if r.artifactType == types.GENERIC || r.artifactType == types.MAVEN {
+	if r.artifactType == types.GENERIC || r.artifactType == types.MAVEN || r.artifactType == types.NUGET {
 		downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.file.Uri)
 		defer downloadFile.Close()
 		if err != nil {
@@ -259,14 +259,14 @@ func generatePythonMetadataMap(metadata string, path string) (map[string]interfa
 	}
 	mapData["description"] = string(all)
 	mapData["description_content_type"] = "text/markdown"
-	
+
 	// Calculate file digests
 	file, err := os.Open(path)
 	if err != nil {
 		return mapData, fmt.Errorf("failed to open file for digest calculation: %w", err)
 	}
 	defer file.Close()
-	
+
 	// Create hash instances
 	md5Hash := md5.New()
 	sha256Hash := sha256.New()
@@ -274,20 +274,20 @@ func generatePythonMetadataMap(metadata string, path string) (map[string]interfa
 	if err != nil {
 		return mapData, fmt.Errorf("failed to create blake2b hash: %w", err)
 	}
-	
+
 	// Create a multi-writer to write to all hash functions at once
 	multiWriter := io.MultiWriter(md5Hash, sha256Hash, blake2bHash)
-	
+
 	// Copy the file content to the hasher
 	if _, err := io.Copy(multiWriter, file); err != nil {
 		return mapData, fmt.Errorf("failed to calculate digests: %w", err)
 	}
-	
+
 	// Add the digests to the metadata map
 	mapData["md5_digest"] = hex.EncodeToString(md5Hash.Sum(nil))
 	mapData["sha256_digest"] = hex.EncodeToString(sha256Hash.Sum(nil))
 	mapData["blake2_256_digest"] = hex.EncodeToString(blake2bHash.Sum(nil))
-	
+
 	return mapData, nil
 }
 

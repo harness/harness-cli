@@ -33,3 +33,6 @@ mappings:
   - artifactType: GENERIC
     sourceRegistry: src
     destinationRegistry: dst
+  - artifactType: NUGET
+    sourceRegistry: src
+    destinationRegistry: dst
