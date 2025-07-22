@@ -95,7 +95,7 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			Name:     "default",
 			Size:     -1,
 		})
-	} else if artifactType == types.MAVEN {
+	} else if artifactType == types.MAVEN || artifactType == types.NUGET {
 		packages = append(packages, types.Package{
 			Registry: registry,
 			Path:     "/",
@@ -216,7 +216,7 @@ func (a *adapter) GetVersions(registry, pkg string, artifactType types.ArtifactT
 		}, nil
 	}
 
-	if artifactType == types.MAVEN {
+	if artifactType == types.MAVEN || artifactType == types.NUGET {
 		return []types.Version{
 			{
 				Registry: registry,
