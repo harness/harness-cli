@@ -157,17 +157,44 @@ func (c *client) uploadNugetFile(
 	file io.ReadCloser,
 ) error {
 	fileUri := strings.TrimPrefix(f.Uri, "/")
-	fmt.Println(f.Uri)
-	fmt.Println(f.Name)
 	url := fmt.Sprintf("%s/pkg/%s/%s/nuget/", c.url, config.Global.AccountID, registry)
+	if strings.HasSuffix(url, ".snupkg") {
+		url = fmt.Sprintf("%s/pkg/%s/%s/nuget/symbolpackage/", c.url, config.Global.AccountID, registry)
+	}
+
+	// Create a pipe to write the multipart form data
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+
+	// Process multipart form asynchronously
+	go func() {
+		defer pw.Close()
+		defer writer.Close()
+
+		// Add the file as "content" field
+		part, err := writer.CreateFormFile("package", f.Name)
+		if err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+
+		// Copy the file content
+		if _, err := io.Copy(part, file); err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+	}()
+
 	// Create request
-	req, err := http2.NewRequest(http2.MethodPut, url, file)
+	req, err := http2.NewRequest(http2.MethodPut, url, pr)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("Content-Type", "application/octet-stream")
+	// Set headers
+	req.Header.Set("Content-Type", writer.FormDataContentType())
 
+	// Execute request with our client (which handles authentication)
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to upload file '%s': %w", fileUri, err)
