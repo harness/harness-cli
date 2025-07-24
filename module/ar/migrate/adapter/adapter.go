@@ -7,8 +7,9 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+
+	"github.com/google/go-containerregistry/pkg/authn"
 )
 
 type Adapter interface {
@@ -35,6 +36,7 @@ type Adapter interface {
 		metadata map[string]interface{},
 	) error
 	GetOCIImagePath(registry string, image string) (string, error)
+	AddNPMTag(version string, uri string) error
 }
 
 var registry = map[types.RegistryType]Factory{}

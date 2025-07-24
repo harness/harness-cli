@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/tree"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -96,7 +97,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 	var jobs []engine.Job
 
 	if r.artifactType == types.GENERIC || r.artifactType == types.MAVEN || r.artifactType == types.PYTHON ||
-		r.artifactType == types.NUGET {
+		r.artifactType == types.NUGET || r.artifactType == types.NPM {
 		files, err := tree.GetAllFiles(r.node)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to get files from tree")

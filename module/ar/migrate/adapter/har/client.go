@@ -1,8 +1,9 @@
 package har
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
-	"github.com/harness/harness-cli/module/ar/migrate/http/auth/xApiKey"
 	"io"
 	"mime/multipart"
 	http2 "net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/internal/api/ar"
 	"github.com/harness/harness-cli/module/ar/migrate/http"
+	"github.com/harness/harness-cli/module/ar/migrate/http/auth/xApiKey"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 )
 
@@ -206,6 +208,69 @@ func (c *client) uploadNugetFile(
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to upload file '%s', status code: %d, response: %s",
 			fileUri, resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func (c *client) uploadNPMFile(
+	registry string,
+	name string,
+	version string,
+	f *types.File,
+	file io.ReadCloser,
+) error {
+	fileUri := strings.TrimPrefix(f.Uri, "/")
+	url := fmt.Sprintf("%s/pkg/%s/%s/npm/%s", c.url, config.Global.AccountID, registry, fileUri)
+
+	// Create request
+	req, err := http2.NewRequest(http2.MethodPut, url, file)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to upload file '%s': %w", fileUri, err)
+	}
+	defer resp.Body.Close()
+
+	// Check for successful response
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to upload file '%s', status code: %d, response: %s",
+			fileUri, resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func (c *client) AddNPMTag(version string, uri string) error {
+	versionJSON, err := json.Marshal(version)
+	if err != nil {
+		return fmt.Errorf("failed to marshal version to json: %w", err)
+	}
+
+	req, err := http2.NewRequest(http2.MethodPut, uri, bytes.NewReader(versionJSON))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to upload file '%s': %w", uri, err)
+	}
+	defer resp.Body.Close()
+
+	// Check for successful response
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to upload file '%s', status code: %d, response: %s",
+			uri, resp.StatusCode, string(body))
 	}
 
 	return nil
