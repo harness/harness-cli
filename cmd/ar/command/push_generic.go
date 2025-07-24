@@ -5,23 +5,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/harness/harness-go-sdk/harness/har"
 	"io/ioutil"
 	"mime/multipart"
 	"os"
 	"path/filepath"
 
-	"github.com/spf13/cobra"
 	"github.com/harness/harness-cli/config"
 	client "github.com/harness/harness-cli/internal/api/ar"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/printer"
 	"github.com/harness/harness-cli/util/common/progress"
+
+	"github.com/spf13/cobra"
 )
 
 // NewPushGenericCmd creates a new cobra.Command for pushing generic artifacts to the registry.
 // command example: hns ar push generic <registry_name> <package_file_path>
-func NewPushGenericCmd(c *client.ClientWithResponses) *cobra.Command {
+func NewPushGenericCmd(c *har.APIClient) *cobra.Command {
 	var packageName, filename, packageVersion, description string
 	var pkgURL string
 	cmd := &cobra.Command{

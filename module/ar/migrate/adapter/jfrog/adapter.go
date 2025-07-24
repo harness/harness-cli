@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/harness/harness-cli/module/ar/migrate/tree"
-	"golang.org/x/net/html"
 	"io"
 	"net/http"
 	"net/url"
@@ -13,11 +11,14 @@ import (
 	"path"
 	"strings"
 
-	"github.com/google/go-containerregistry/pkg/authn"
 	adp "github.com/harness/harness-cli/module/ar/migrate/adapter"
+	"github.com/harness/harness-cli/module/ar/migrate/tree"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/module/ar/migrate/util"
+
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/net/html"
 	"helm.sh/helm/v3/pkg/repo"
 )
 

@@ -2,18 +2,20 @@ package command
 
 import (
 	"context"
+	"github.com/harness/harness-go-sdk/harness/har"
 
-	"github.com/spf13/cobra"
 	"github.com/harness/harness-cli/config"
 	ar "github.com/harness/harness-cli/internal/api/ar"
 	client2 "github.com/harness/harness-cli/util/client"
 	"github.com/harness/harness-cli/util/common/printer"
+
+	"github.com/spf13/cobra"
 )
 
 // newGetRegistryCmd wires up:
 //
 //	hns ar registry get <args>
-func NewGetRegistryCmd(client *ar.ClientWithResponses) *cobra.Command {
+func NewGetRegistryCmd(client *har.APIClient) *cobra.Command {
 	var name, packageType string
 	var pageSize int32
 	var pageIndex int32
@@ -43,14 +45,18 @@ func NewGetRegistryCmd(client *ar.ClientWithResponses) *cobra.Command {
 				params.PackageType = &[]string{packageType}
 			}
 
-			response, err := client.GetAllRegistriesWithResponse(context.Background(),
+			registries, _, _ := client.SpacesApi.GetAllRegistries(context.Background(),
+				client2.GetRef(config.Global.AccountID, config.Global.OrgID, config.Global.ProjectID), nil)
+			registries.Data.Registries
+
+			response, err := client.SpacesApi.GetAllRegistries(context.Background(),
 				client2.GetRef(config.Global.AccountID, config.Global.OrgID, config.Global.ProjectID),
 				params)
 			if err != nil {
 				return err
 			}
 
-			err = printer.Print(response.JSON200.Data.Registries, *response.JSON200.Data.PageIndex,
+			err = printer.Print(registries.Data.Registries, *response.JSON200.Data.PageIndex,
 				*response.JSON200.Data.PageCount, *response.JSON200.Data.ItemCount, true, [][]string{
 					{"identifier", "Registry"},
 					{"packageType", "Package Type"},

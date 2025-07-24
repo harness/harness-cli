@@ -3,15 +3,17 @@ package command
 import (
 	"context"
 	"fmt"
+	"github.com/harness/harness-go-sdk/harness/har"
 
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
 	"github.com/harness/harness-cli/config"
 	client "github.com/harness/harness-cli/internal/api/ar"
 	client2 "github.com/harness/harness-cli/util/client"
+
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
 )
 
-func NewDeleteRegistryCmd(c *client.ClientWithResponses) *cobra.Command {
+func NewDeleteRegistryCmd(c *har.APIClient) *cobra.Command {
 	var name string
 	cmd := &cobra.Command{
 		Use:   "registry [name]",

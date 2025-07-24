@@ -3,19 +3,21 @@ package ar
 import (
 	"context"
 	"fmt"
+	"github.com/harness/harness-go-sdk/harness/har"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/spf13/cobra"
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/internal/api/ar"
 	ar2 "github.com/harness/harness-cli/module/ar/migrate"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+
+	"github.com/spf13/cobra"
 )
 
-func getMigrateCmd(*ar.ClientWithResponses) *cobra.Command {
+func getMigrateCmd(*har.APIClient) *cobra.Command {
 	// Create local variables for flag binding
 	var localConfigPath string
 	var localPkgBaseURL string

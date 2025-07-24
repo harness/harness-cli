@@ -7,13 +7,14 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
 	"github.com/harness/harness-cli/cmd/ar"
 	"github.com/harness/harness-cli/cmd/auth"
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/util/templates"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
 )
 
 var rootCmd *cobra.Command

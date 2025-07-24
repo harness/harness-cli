@@ -2,17 +2,19 @@ package command
 
 import (
 	"context"
+	"github.com/harness/harness-go-sdk/harness/har"
 
-	"github.com/spf13/cobra"
 	client "github.com/harness/harness-cli/internal/api/ar"
 	client2 "github.com/harness/harness-cli/util/client"
 	"github.com/harness/harness-cli/util/common/printer"
+
+	"github.com/spf13/cobra"
 )
 
 // newGetArtifactCmd wires up:
 //
 //	hns ar artifact get <args>
-func NewGetArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
+func NewGetArtifactCmd(c *har.APIClient) *cobra.Command {
 	var name, registry string
 	var pageSize int32
 	var pageIndex int32

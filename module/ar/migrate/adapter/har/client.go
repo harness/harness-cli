@@ -2,7 +2,6 @@ package har
 
 import (
 	"fmt"
-	"github.com/harness/harness-cli/module/ar/migrate/http/auth/xApiKey"
 	"io"
 	"mime/multipart"
 	http2 "net/http"
@@ -11,6 +10,7 @@ import (
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/internal/api/ar"
 	"github.com/harness/harness-cli/module/ar/migrate/http"
+	"github.com/harness/harness-cli/module/ar/migrate/http/auth/xApiKey"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 )
 

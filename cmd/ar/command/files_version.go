@@ -2,17 +2,19 @@ package command
 
 import (
 	"context"
+	"github.com/harness/harness-go-sdk/harness/har"
 
-	"github.com/spf13/cobra"
 	client "github.com/harness/harness-cli/internal/api/ar"
 	client2 "github.com/harness/harness-cli/util/client"
 	"github.com/harness/harness-cli/util/common/printer"
+
+	"github.com/spf13/cobra"
 )
 
 // newFilesVersionCmd wires up:
 //
 //	hns ar version files <args>
-func NewFilesVersionCmd(c *client.ClientWithResponses) *cobra.Command {
+func NewFilesVersionCmd(c *har.APIClient) *cobra.Command {
 	var name string
 	var version, registry, artifact string
 	var pageSize int32

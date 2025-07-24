@@ -7,8 +7,9 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+
+	"github.com/google/go-containerregistry/pkg/authn"
 )
 
 type Adapter interface {

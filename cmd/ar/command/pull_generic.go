@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/harness/harness-go-sdk/harness/har"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/harness/harness-cli/config"
 	client "github.com/harness/harness-cli/internal/api/ar"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
@@ -18,6 +18,8 @@ import (
 	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/printer"
 	"github.com/harness/harness-cli/util/common/progress"
+
+	"github.com/spf13/cobra"
 )
 
 func printReadCloser(rc io.ReadCloser) {
@@ -34,7 +36,7 @@ func printReadCloser(rc io.ReadCloser) {
 
 // NewPullGenericCmd creates a new cobra.Command for pulling generic artifacts from the registry.
 // command example: hns ar pull generic <registry_name> <package_path> <destination_path>
-func NewPullGenericCmd(c *client.ClientWithResponses) *cobra.Command {
+func NewPullGenericCmd(c *har.APIClient) *cobra.Command {
 	var pkgURL string
 	cmd := &cobra.Command{
 		Use:   "generic <registry_name> <package_path> <destination_path>",
