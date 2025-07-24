@@ -3,12 +3,12 @@ package jfrog
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/harness/harness-cli/module/ar/migrate/http/auth/basic"
 	"io"
 	http2 "net/http"
 	"strings"
 
 	"github.com/harness/harness-cli/module/ar/migrate/http"
+	"github.com/harness/harness-cli/module/ar/migrate/http/auth/bearer"
 	"github.com/harness/harness-cli/module/ar/migrate/lib"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 )
@@ -25,7 +25,7 @@ func newClient(reg *types.RegistryConfig) *client {
 			&http2.Client{
 				Transport: http.GetHTTPTransport(http.WithInsecure(true)),
 			},
-			basic.NewAuthorizer(username, password),
+			bearer.NewAuthorizer(password),
 		),
 		url:      reg.Endpoint,
 		insecure: true,
@@ -95,10 +95,9 @@ func (c *client) getFile(registry string, path string) (io.ReadCloser, http2.Hea
 	} else {
 		url = fmt.Sprintf("%s/artifactory/%s/%s", c.url, registry, path)
 	}
-	url = "https://localhost:3000/pkg/test/npm1/simple-npm-package/27.0.3"
-	req, err := http2.NewRequest(http2.MethodGet, url, nil)
-	req.SetBasicAuth("admin@gitness.io", "changeit")
 
+	// Create GET request
+	req, err := http2.NewRequest(http2.MethodGet, url, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create request for file '%s': %w", path, err)
 	}
@@ -124,13 +123,13 @@ func (c *client) getFile(registry string, path string) (io.ReadCloser, http2.Hea
 
 // getFiles retrieves a list of files from the specified JFrog Artifactory registry
 func (c *client) getFiles(registry string) ([]types.File, error) {
-	_, err := c.getRegistry(registry)
+	repo, err := c.getRegistry(registry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get registry %s: %w", registry, err)
 	}
-	//if repo.Type == "VIRTUAL" {
-	//	return nil, fmt.Errorf("registry %s is a virtual repository", registry)
-	//}
+	if repo.Type == "VIRTUAL" {
+		return nil, fmt.Errorf("registry %s is a virtual repository", registry)
+	}
 
 	// Make GET request to fetch files
 	url := fmt.Sprintf("%s/artifactory/api/storage/%s?list&deep=1", c.url, registry)
