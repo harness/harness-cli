@@ -7,6 +7,7 @@ import (
 
 	"github.com/harness/harness-cli/util/common/errors"
 	"github.com/harness/harness-cli/util/common/fileutil"
+	"github.com/harness/harness-cli/util/common/progress"
 
 	"gopkg.in/ini.v1"
 )
@@ -58,7 +59,8 @@ func validateGitPath(path string) error {
 
 // GitRepository represents a Git repository
 type GitRepository struct {
-	path string
+	path     string
+	progress progress.Reporter
 }
 
 // NewGitRepository creates a new GitRepository instance.
@@ -68,8 +70,13 @@ func NewGitRepository(path string) *GitRepository {
 	if err := validateGitPath(path); err != nil {
 		return nil
 	}
+	// Create progress reporter
+	progress := progress.NewConsoleReporter()
+	defer progress.End()
+
 	return &GitRepository{
-		path: path,
+		path:     path,
+		progress: progress,
 	}
 }
 
@@ -107,11 +114,14 @@ func (g *GitRepository) GetInfo() (*GitInfo, error) {
 	headPath := filepath.Join(gitDir, "HEAD")
 	headBytes, err := fileutil.ReadFile(headPath)
 	if err != nil {
-		return nil, errors.NewVCSError("read_head", g.path, err)
+		g.progress.Error("Failed to read HEAD file")
 	}
-	head := strings.TrimSpace(string(headBytes))
-	if head == "" {
-		return nil, errors.NewVCSError("validate_head", g.path, errors.ErrInvalidOperation)
+	var head string
+	if headBytes != nil {
+		head = strings.TrimSpace(string(headBytes))
+		if head == "" {
+			g.progress.Error("Invalid HEAD file")
+		}
 	}
 
 	// Extract ref and hash
@@ -122,23 +132,23 @@ func (g *GitRepository) GetInfo() (*GitInfo, error) {
 		// Validate and read ref file
 		refPath := filepath.Join(gitDir, ref)
 		if _, err := os.Stat(refPath); err != nil {
-			return nil, errors.NewVCSError("validate_ref", g.path, err)
+			g.progress.Error("Failed to read ref file")
 		}
 
 		shaBytes, err := fileutil.ReadFile(refPath)
 		if err != nil {
-			return nil, errors.NewVCSError("read_ref", g.path, err)
+			g.progress.Error("Failed to read ref file")
 		}
 
 		hash := strings.TrimSpace(string(shaBytes))
 		if !isValidSHA(hash) {
-			return nil, errors.NewVCSError("validate_hash", g.path, errors.ErrInvalidOperation)
+			g.progress.Error("Invalid ref file")
 		}
 		info.Hash = hash
 	} else {
 		// Validate detached HEAD hash
 		if !isValidSHA(head) {
-			return nil, errors.NewVCSError("validate_hash", g.path, errors.ErrInvalidOperation)
+			g.progress.Error("Invalid detached HEAD hash")
 		}
 		info.Hash = head
 	}
@@ -146,7 +156,7 @@ func (g *GitRepository) GetInfo() (*GitInfo, error) {
 	// Get and validate remote URL
 	url, err := g.GetRemoteURL()
 	if err != nil {
-		return nil, err
+		g.progress.Error("Failed to get remote URL")
 	}
 	info.URL = url
 
@@ -250,6 +260,9 @@ func (g *GitRepository) GetRemoteURL() (string, error) {
 	}
 
 	url := section.Key("url").String()
+	if url == "" {
+		return "", errors.NewVCSError("validate_remote", g.path, errors.ErrNotFound)
+	}
 	return url, nil
 }
 
