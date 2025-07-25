@@ -36,3 +36,6 @@ mappings:
   - artifactType: NUGET
     sourceRegistry: src
     destinationRegistry: dst
+  - artifactType: NPM
+    sourceRegistry: testing-npm-remote
+    destinationRegistry: npm

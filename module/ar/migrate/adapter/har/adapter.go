@@ -10,11 +10,12 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/harness/harness-cli/config"
 	adp "github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/module/ar/migrate/util"
+
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -103,6 +104,8 @@ func (a *adapter) UploadFile(
 		err = a.client.uploadPythonFile(registry, artifactName, version, f, file, metadata)
 	} else if artifactType == types.NUGET {
 		err = a.client.uploadNugetFile(registry, artifactName, version, f, file)
+	} else if artifactType == types.NPM {
+		err = a.client.uploadNPMFile(registry, artifactName, version, f, file)
 	}
 	if err != nil {
 		a.logger.Error().Err(err).Msgf("Failed to upload file %s to registry: %s", f.Uri, registry)
@@ -114,4 +117,8 @@ func (a *adapter) UploadFile(
 func (a *adapter) GetOCIImagePath(registry string, image string) (string, error) {
 	parse, _ := url.Parse(a.reg.Endpoint)
 	return util.GenOCIImagePath(parse.Host, strings.ToLower(config.Global.AccountID), registry, image), nil
+}
+
+func (a *adapter) AddNPMTag(version string, uri string) error {
+	return a.client.AddNPMTag(version, uri)
 }

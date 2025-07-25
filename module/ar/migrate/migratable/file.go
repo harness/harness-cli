@@ -8,7 +8,9 @@ import (
 	"context"
 	"crypto/md5"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/mail"
@@ -17,11 +19,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+	"github.com/harness/harness-cli/module/ar/migrate/types/npm"
 	"github.com/harness/harness-cli/util/common"
+
+	"github.com/google/uuid"
 	"github.com/pterm/pterm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -223,12 +227,138 @@ func (r File) Migrate(ctx context.Context) error {
 			pterm.Success.Println(title)
 		}
 		r.stats.FileStats = append(r.stats.FileStats, stat)
+	} else if r.artifactType == types.NPM {
+		if !strings.Contains(r.file.Uri, "/-/") {
+			logger.Error().Msg("File Download url is not correct for NPM")
+			return fmt.Errorf("file Download url is not correct for NPM")
+		}
+
+		// Truncate everything after the last "/-/" segment
+		idx := strings.LastIndex(r.file.Uri, "/-/")
+		if idx == -1 {
+			return fmt.Errorf("file Download url is not correct for NPM")
+		}
+		metadataUrl := r.file.Uri[:idx]
+		pkgMetadata, _, err := r.srcAdapter.DownloadFile(r.srcRegistry, metadataUrl)
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to fetch metadata")
+			return fmt.Errorf("failed to fetch metadata: %w", err)
+		}
+		var metadata npm.PackageMetadata
+		if err := json.NewDecoder(pkgMetadata).Decode(&metadata); err != nil {
+			logger.Error().Err(err).Msg("Failed to parse NPM metadata")
+			return fmt.Errorf("fFailed to parse NPM metadata: %w", err)
+		}
+		var tarballURL string
+		for _, p := range metadata.Versions {
+			if p.Version == r.pkg.Version {
+				metadata.Versions = map[string]*npm.PackageMetadataVersion{p.Version: p}
+				tarballURL = p.Dist.Tarball
+				break
+			}
+		}
+
+		// Prepare package upload object
+		upload := &npm.PackageUpload{
+			PackageMetadata: metadata, // already filtered to 1 version
+			Attachments:     make(map[string]*npm.PackageAttachment),
+		}
+
+		file, _, err := r.srcAdapter.DownloadFile(r.srcRegistry, tarballURL)
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to download NPM tarball")
+			return fmt.Errorf("failed to download NPM tarball: %w", err)
+		}
+		defer file.Close()
+
+		uploadReader, err2 := r.ParseNPMetadata(err, file, logger, tarballURL, upload)
+		if err2 != nil {
+			return err2
+		}
+
+		err = r.destAdapter.UploadFile(r.destRegistry, uploadReader, r.file, nil, r.pkg.Name, r.version.Name,
+			r.artifactType, nil)
+
+		if err != nil {
+			return err
+		}
+
+		//// Add all dist-tags from metadata
+		//for tagName, tagVersion := range metadata.DistTags {
+		//	distTagsUri := r.file.Uri
+		//	if idx := strings.LastIndex(distTagsUri, "/-/"); idx != -1 {
+		//		distTagsUri = distTagsUri[:idx] + "/-/package/+ " + r.pkg.Name + "/dist-tags"
+		//	}
+		//
+		//	err = r.destAdapter.AddNPMTag(tagVersion, tagName)
+		//	if err != nil {
+		//		logger.Error().Err(err).Msgf("Failed to add NPM tag %s: %s", tagName, tagVersion)
+		//		// Continue with other tags even if one fails
+		//	} else {
+		//		logger.Info().Msgf("Successfully added NPM tag %s: %s", tagName, tagVersion)
+		//	}
+		//}
+
+		stat := types.FileStat{
+			Name:     r.file.Name,
+			Registry: r.srcRegistry,
+			Uri:      r.file.Uri,
+			Size:     int64(r.file.Size),
+			Status:   types.StatusSuccess,
+		}
+		title := fmt.Sprintf("%s (%s)", r.file.Name, common.GetSize(int64(r.file.Size)))
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to upload file")
+			stat.Status = types.StatusFail
+			stat.Error = err.Error()
+			pterm.Error.Println(title)
+		} else {
+			pterm.Success.Println(title)
+		}
+		r.stats.FileStats = append(r.stats.FileStats, stat)
 	}
 
 	logger.Info().
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed version migration step")
 	return nil
+}
+
+func (r File) ParseNPMetadata(err error, file io.ReadCloser, logger zerolog.Logger, tarballURL string, upload *npm.PackageUpload) (io.ReadCloser, error) {
+	var buf bytes.Buffer
+	size, err := io.Copy(&buf, file)
+	if err != nil {
+		logger.Error().Err(err).Msg("Failed to read tarball stream")
+		return nil, fmt.Errorf("failed to read tarball stream: %w", err)
+	}
+
+	// Step 4: Base64 encode
+	b64Data := base64.StdEncoding.EncodeToString(buf.Bytes())
+
+	// Step 5: Create PackageAttachment
+	tarballName := filepath.Base(tarballURL)
+	upload.Attachments[tarballName] = &npm.PackageAttachment{
+		ContentType: "application/octet-stream",
+		Data:        b64Data,
+		Length:      int(size),
+	}
+	uploadReader := io.NopCloser(StreamUploadAsJSON(upload))
+	return uploadReader, nil
+}
+
+func StreamUploadAsJSON(upload *npm.PackageUpload) io.Reader {
+	pr, pw := io.Pipe()
+
+	go func() {
+		defer pw.Close()
+		encoder := json.NewEncoder(pw)
+		encoder.SetEscapeHTML(false)
+		if err := encoder.Encode(upload); err != nil {
+			pw.CloseWithError(fmt.Errorf("failed to encode upload JSON: %w", err))
+		}
+	}()
+
+	return pr
 }
 
 func generatePythonMetadataMap(metadata string, path string) (map[string]interface{}, error) {
