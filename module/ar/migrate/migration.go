@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/rs/zerolog/log"
 	"github.com/harness/harness-cli/internal/api/ar"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/migratable"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/util/common/printer"
+
+	"github.com/rs/zerolog/log"
 
 	_ "github.com/harness/harness-cli/module/ar/migrate/adapter/har"
 	_ "github.com/harness/harness-cli/module/ar/migrate/adapter/jfrog"
@@ -65,7 +66,7 @@ func (m *MigrationService) Run(ctx context.Context) error {
 		mappingLogger.Info().Msg("Processing registry migration")
 
 		job := migratable.NewRegistryJob(m.source, m.destination, mapping.SourceRegistry,
-			mapping.DestinationRegistry, mapping.ArtifactType, &transferStats)
+			mapping.DestinationRegistry, mapping.ArtifactType, &transferStats, &mapping)
 		jobs = append(jobs, job)
 
 	}

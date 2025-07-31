@@ -26,6 +26,7 @@ type Version struct {
 	version      types.Version
 	node         *types.TreeNode
 	stats        *types.TransferStats
+	mapping      *types.RegistryMapping
 }
 
 func NewVersionJob(
@@ -38,6 +39,7 @@ func NewVersionJob(
 	version types.Version,
 	node *types.TreeNode,
 	stats *types.TransferStats,
+	mapping *types.RegistryMapping,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -61,6 +63,7 @@ func NewVersionJob(
 		version:      version,
 		node:         node,
 		stats:        stats,
+		mapping:      mapping,
 	}
 }
 
@@ -105,12 +108,12 @@ func (r *Version) Migrate(ctx context.Context) error {
 		}
 		for _, file := range files {
 			job := NewFileJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, r.pkg,
-				r.version, r.node, file, r.stats)
+				r.version, r.node, file, r.stats, r.mapping)
 			jobs = append(jobs, job)
 		}
 	}
 
-	if r.artifactType == types.DOCKER || r.artifactType == types.HELM {
+	if r.artifactType == types.DOCKER || r.artifactType == types.HELM || r.artifactType == types.HELM_LEGACY {
 		log.Error().Ctx(ctx).Msgf("OCI migrate version is not supported")
 		return fmt.Errorf("OCI migrate version is not supported")
 	}

@@ -19,10 +19,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/module/ar/migrate/types/npm"
+	"github.com/harness/harness-cli/module/ar/migrate/util"
 	"github.com/harness/harness-cli/util/common"
 
 	"github.com/google/uuid"
@@ -33,17 +35,19 @@ import (
 )
 
 type File struct {
-	srcRegistry  string
-	destRegistry string
-	srcAdapter   adapter.Adapter
-	destAdapter  adapter.Adapter
-	artifactType types.ArtifactType
-	logger       zerolog.Logger
-	pkg          types.Package
-	version      types.Version
-	file         *types.File
-	node         *types.TreeNode
-	stats        *types.TransferStats
+	srcRegistry   string
+	destRegistry  string
+	srcAdapter    adapter.Adapter
+	destAdapter   adapter.Adapter
+	artifactType  types.ArtifactType
+	logger        zerolog.Logger
+	pkg           types.Package
+	version       types.Version
+	file          *types.File
+	node          *types.TreeNode
+	stats         *types.TransferStats
+	skipMigration bool
+	mapping       *types.RegistryMapping
 }
 
 func NewFileJob(
@@ -57,6 +61,7 @@ func NewFileJob(
 	node *types.TreeNode,
 	file *types.File,
 	stats *types.TransferStats,
+	mapping *types.RegistryMapping,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -82,6 +87,7 @@ func NewFileJob(
 		version:      version,
 		file:         file,
 		stats:        stats,
+		mapping:      mapping,
 	}
 }
 
@@ -99,6 +105,22 @@ func (r File) Pre(ctx context.Context) error {
 	logger.Info().Msg("Starting version pre-migration step")
 	startTime := time.Now()
 
+	if r.artifactType != types.MAVEN && r.pkg.Name != "" && r.pkg.Version != "" && r.file.Name != "" {
+		exists, err := r.destAdapter.FileExists(ctx,
+			util.GetRegistryRef(config.Global.AccountID, r.mapping.Ref, r.destRegistry),
+			r.pkg.Name, r.pkg.Version, r.file.Name, r.artifactType)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to check if version exists")
+			return nil
+		}
+		if exists {
+			pterm.Info.Println(fmt.Sprintf("Skipping migration of file %s, uri: %s, version %s, registry: %s",
+				r.file.Name, r.file.Uri, r.pkg.Version, r.destRegistry))
+			r.skipMigration = true
+			return nil
+		}
+	}
+
 	logger.Info().
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed file pre-migration step")
@@ -114,6 +136,10 @@ func (r File) Migrate(ctx context.Context) error {
 
 	logger.Info().Msg("Starting file migration step")
 	startTime := time.Now()
+
+	if r.skipMigration {
+		return nil
+	}
 
 	if r.artifactType == types.DOCKER || r.artifactType == types.HELM {
 		log.Error().Ctx(ctx).Msgf("OCI migrate file is not supported")
@@ -324,7 +350,13 @@ func (r File) Migrate(ctx context.Context) error {
 	return nil
 }
 
-func (r File) ParseNPMetadata(err error, file io.ReadCloser, logger zerolog.Logger, tarballURL string, upload *npm.PackageUpload) (io.ReadCloser, error) {
+func (r File) ParseNPMetadata(
+	err error,
+	file io.ReadCloser,
+	logger zerolog.Logger,
+	tarballURL string,
+	upload *npm.PackageUpload,
+) (io.ReadCloser, error) {
 	var buf bytes.Buffer
 	size, err := io.Copy(&buf, file)
 	if err != nil {

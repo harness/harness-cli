@@ -3,10 +3,11 @@ package command
 import (
 	"context"
 
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
 	client "github.com/harness/harness-cli/internal/api/ar"
 	client2 "github.com/harness/harness-cli/util/client"
+
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
 )
 
 func NewDeleteArtifactCmd(c *client.ClientWithResponses) *cobra.Command {

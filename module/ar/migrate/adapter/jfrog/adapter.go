@@ -334,3 +334,19 @@ func isMavenMetadataFile(filename string) bool {
 func (a *adapter) AddNPMTag(version string, uri string) error {
 	return nil
 }
+
+func (a *adapter) VersionExists(
+	ctx context.Context,
+	registry, pkg, version string,
+	artifactType types.ArtifactType,
+) (bool, error) {
+	return false, fmt.Errorf("not implemented")
+}
+
+func (a *adapter) FileExists(
+	ctx context.Context,
+	registry, pkg, version, fileName string,
+	artifactType types.ArtifactType,
+) (bool, error) {
+	return false, fmt.Errorf("not implemented")
+}

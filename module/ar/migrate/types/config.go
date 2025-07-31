@@ -56,8 +56,11 @@ type RegistryMapping struct {
 	ArtifactType        ArtifactType `yaml:"artifactType"`
 	SourceRegistry      string       `yaml:"sourceRegistry"`
 	DestinationRegistry string       `yaml:"destinationRegistry"`
-	IncludePatterns     []string     `yaml:"includePatterns"`
-	ExcludePatterns     []string     `yaml:"excludePatterns"`
+	// TEMPORARY UNTIL WE HAVE API TO GET ALL REGISTRIES
+	Ref string `yaml:"ref"`
+	// NOT IMPLEMENTED YET
+	IncludePatterns []string `yaml:"includePatterns"`
+	ExcludePatterns []string `yaml:"excludePatterns"`
 }
 
 // CredentialsConfig defines the credential configuration

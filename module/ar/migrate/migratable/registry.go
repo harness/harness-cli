@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/tree"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+
+	"github.com/google/uuid"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 type Registry struct {
@@ -22,6 +23,7 @@ type Registry struct {
 	artifactType types.ArtifactType
 	logger       zerolog.Logger
 	stats        *types.TransferStats
+	mapping      *types.RegistryMapping
 }
 
 func NewRegistryJob(
@@ -31,6 +33,7 @@ func NewRegistryJob(
 	destRegistry string,
 	artifactType types.ArtifactType,
 	stats *types.TransferStats,
+	mapping *types.RegistryMapping,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -49,6 +52,7 @@ func NewRegistryJob(
 		artifactType: artifactType,
 		logger:       jobLogger,
 		stats:        stats,
+		mapping:      mapping,
 	}
 }
 
@@ -117,7 +121,7 @@ func (r *Registry) Migrate(ctx context.Context) error {
 			return fmt.Errorf("get node for path %s failed: %w", pkg.Path, err2)
 		}
 		job := NewPackageJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, pkg, treeNode,
-			r.stats)
+			r.stats, r.mapping)
 		jobs = append(jobs, job)
 	}
 

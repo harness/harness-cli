@@ -5,42 +5,47 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/go-containerregistry/pkg/name"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/empty"
-	"github.com/google/go-containerregistry/pkg/v1/mutate"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"github.com/google/go-containerregistry/pkg/v1/static"
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/chart/loader"
 	"io"
 	"os"
 	"strings"
 	"time"
 	"unicode/utf8"
 
-	"github.com/google/go-containerregistry/pkg/crane"
-	"github.com/google/uuid"
+	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/lib"
 	"github.com/harness/harness-cli/module/ar/migrate/tree"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+	"github.com/harness/harness-cli/module/ar/migrate/util"
+
+	"github.com/google/go-containerregistry/pkg/crane"
+	"github.com/google/go-containerregistry/pkg/name"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/static"
+	"github.com/google/uuid"
 	"github.com/pterm/pterm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"helm.sh/helm/v3/pkg/chart"
+	"helm.sh/helm/v3/pkg/chart/loader"
 )
 
 type Package struct {
-	srcRegistry  string
-	destRegistry string
-	srcAdapter   adapter.Adapter
-	destAdapter  adapter.Adapter
-	artifactType types.ArtifactType
-	logger       zerolog.Logger
-	pkg          types.Package
-	node         *types.TreeNode
-	stats        *types.TransferStats
+	srcRegistry   string
+	destRegistry  string
+	srcAdapter    adapter.Adapter
+	destAdapter   adapter.Adapter
+	artifactType  types.ArtifactType
+	logger        zerolog.Logger
+	pkg           types.Package
+	node          *types.TreeNode
+	stats         *types.TransferStats
+	skipMigration bool
+	mapping       *types.RegistryMapping
 }
 
 func NewPackageJob(
@@ -52,6 +57,7 @@ func NewPackageJob(
 	pkg types.Package,
 	node *types.TreeNode,
 	stats *types.TransferStats,
+	mapping *types.RegistryMapping,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -73,6 +79,7 @@ func NewPackageJob(
 		pkg:          pkg,
 		node:         node,
 		stats:        stats,
+		mapping:      mapping,
 	}
 }
 
@@ -91,6 +98,21 @@ func (r *Package) Pre(ctx context.Context) error {
 	logger.Info().Msg("Starting package pre-migration step")
 	startTime := time.Now()
 
+	if r.artifactType == types.HELM_LEGACY && r.pkg.Name != "" && r.pkg.Version != "" {
+		exists, err := r.destAdapter.VersionExists(ctx,
+			util.GetRegistryRef(config.Global.AccountID, r.mapping.Ref, r.destRegistry), r.pkg.Name, r.pkg.Version,
+			r.artifactType)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to check if version exists")
+			return nil
+		}
+		if exists {
+			pterm.Info.Println(fmt.Sprintf("Version %s already exists in registry %s", r.pkg.Version, r.destRegistry))
+			r.skipMigration = true
+			return nil
+		}
+	}
+
 	logger.Info().
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed registry pre-migration step")
@@ -108,6 +130,11 @@ func (r *Package) Migrate(ctx context.Context) error {
 	logger.Info().Msg("Starting registry migration step")
 
 	startTime := time.Now()
+
+	if r.skipMigration {
+		logger.Info().Msg("Skipping migration as version already exists in destination registry")
+		return nil
+	}
 
 	if r.artifactType == types.DOCKER || r.artifactType == types.HELM {
 		srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.pkg.Name)
@@ -161,7 +188,7 @@ func (r *Package) Migrate(ctx context.Context) error {
 			}
 			job := NewVersionJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, r.pkg,
 				version,
-				versionNode, r.stats)
+				versionNode, r.stats, r.mapping)
 			jobs = append(jobs, job)
 		}
 

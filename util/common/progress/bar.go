@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/pterm/pterm"
 	"github.com/harness/harness-cli/util/common"
+
+	"github.com/pterm/pterm"
 )
 
 type BarWriter struct {

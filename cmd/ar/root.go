@@ -1,12 +1,13 @@
 package ar
 
 import (
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
 	commands "github.com/harness/harness-cli/cmd/ar/command"
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/internal/api/ar"
 	"github.com/harness/harness-cli/util/common/auth"
+
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
 )
 
 func GetRootCmd() *cobra.Command {

@@ -1,8 +1,9 @@
 package lib
 
 import (
-	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
+
+	"github.com/google/go-containerregistry/pkg/authn"
 )
 
 func CreateCraneKeychain(

@@ -37,6 +37,12 @@ type Adapter interface {
 	) error
 	GetOCIImagePath(registry string, image string) (string, error)
 	AddNPMTag(version string, uri string) error
+	VersionExists(ctx context.Context, registryRef, pkg, version string, artifactType types.ArtifactType) (bool, error)
+	FileExists(
+		ctx context.Context,
+		registryRef, pkg, version, fileName string,
+		artifactType types.ArtifactType,
+	) (bool, error)
 }
 
 var registry = map[types.RegistryType]Factory{}

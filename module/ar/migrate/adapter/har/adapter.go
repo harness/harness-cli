@@ -122,3 +122,19 @@ func (a *adapter) GetOCIImagePath(registry string, image string) (string, error)
 func (a *adapter) AddNPMTag(version string, uri string) error {
 	return a.client.AddNPMTag(version, uri)
 }
+
+func (a *adapter) VersionExists(
+	ctx context.Context,
+	registryRef, pkg, version string,
+	artifactType types.ArtifactType,
+) (bool, error) {
+	return a.client.artifactVersionExists(ctx, registryRef, pkg, version, artifactType)
+}
+
+func (a *adapter) FileExists(
+	ctx context.Context,
+	registryRef, pkg, version, fileName string,
+	artifactType types.ArtifactType,
+) (bool, error) {
+	return a.client.artifactFileExists(ctx, registryRef, pkg, version, fileName, artifactType)
+}
