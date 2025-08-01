@@ -23,7 +23,7 @@ import (
 
 func NewPushGoCmd(c *client.ClientWithResponses) *cobra.Command {
 	var dir = "."
-	var output = "tmp/go-package"
+	var output = "/tmp/go-package"
 	var pkgURL string
 	cmd := &cobra.Command{
 		Use:   "go <registry_name> <version>",
@@ -31,7 +31,11 @@ func NewPushGoCmd(c *client.ClientWithResponses) *cobra.Command {
 		Long:  "Push Go Artifacts to Harness Artifact Registry",
 		Args:  cobra.ExactArgs(2),
 		PreRun: func(cmd *cobra.Command, args []string) {
-			config.Global.Registry.PkgURL = pkgURL
+			if pkgURL != "" {
+				config.Global.Registry.PkgURL = pkgURL
+			} else {
+				config.Global.Registry.PkgURL = config.Global.APIBaseURL
+			}
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]
@@ -140,7 +144,5 @@ func NewPushGoCmd(c *client.ClientWithResponses) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
-
-	cmd.MarkFlagRequired("pkg-url")
 	return cmd
 }
