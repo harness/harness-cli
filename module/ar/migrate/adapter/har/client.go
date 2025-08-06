@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/harness/harness-cli/util/common/auth"
 	"io"
 	"mime/multipart"
 	http2 "net/http"
@@ -16,6 +15,7 @@ import (
 	"github.com/harness/harness-cli/module/ar/migrate/http"
 	"github.com/harness/harness-cli/module/ar/migrate/http/auth/xApiKey"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+	"github.com/harness/harness-cli/util/common/auth"
 )
 
 // newClient constructs a jfrog client

@@ -2,9 +2,10 @@ package util
 
 import (
 	"fmt"
-	"github.com/pterm/pterm"
 	"os"
 	"strings"
+
+	"github.com/pterm/pterm"
 )
 
 func GenOCIImagePath(host string, pathParams ...string) string {
