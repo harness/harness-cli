@@ -91,11 +91,11 @@ func NewFileJob(
 	}
 }
 
-func (r File) Info() string {
+func (r *File) Info() string {
 	return r.srcRegistry + ":" + r.destRegistry + ":" + r.file.Uri
 }
 
-func (r File) Pre(ctx context.Context) error {
+func (r *File) Pre(ctx context.Context) error {
 	// Extract trace ID from context if available
 	traceID, _ := ctx.Value("trace_id").(string)
 	logger := r.logger.With().
@@ -105,18 +105,27 @@ func (r File) Pre(ctx context.Context) error {
 	logger.Info().Msg("Starting version pre-migration step")
 	startTime := time.Now()
 
-	if r.artifactType != types.MAVEN && r.pkg.Name != "" && r.pkg.Version != "" && r.file.Name != "" {
+	if r.artifactType != types.MAVEN && r.pkg.Name != "" && r.version.Name != "" && r.file.Name != "" {
 		exists, err := r.destAdapter.FileExists(ctx,
 			util.GetRegistryRef(config.Global.AccountID, r.mapping.Ref, r.destRegistry),
-			r.pkg.Name, r.pkg.Version, r.file.Name, r.artifactType)
+			r.pkg.Name, r.version.Name, r.file.Name, r.artifactType)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to check if version exists")
 			return nil
 		}
 		if exists {
-			pterm.Info.Println(fmt.Sprintf("Skipping migration of file %s, uri: %s, version %s, registry: %s",
-				r.file.Name, r.file.Uri, r.pkg.Version, r.destRegistry))
+			util.GetSkipPrinter().Println(fmt.Sprintf("Registry [%s], Package [%s/%s], File [%s] already exists",
+				r.destRegistry,
+				r.pkg.Name, r.version.Name, r.file.Name))
 			r.skipMigration = true
+			stat := types.FileStat{
+				Name:     r.file.Name,
+				Registry: r.srcRegistry,
+				Uri:      r.file.Uri,
+				Size:     int64(r.file.Size),
+				Status:   types.StatusSkip,
+			}
+			r.stats.FileStats = append(r.stats.FileStats, stat)
 			return nil
 		}
 	}
@@ -127,7 +136,7 @@ func (r File) Pre(ctx context.Context) error {
 	return nil
 }
 
-func (r File) Migrate(ctx context.Context) error {
+func (r *File) Migrate(ctx context.Context) error {
 	traceID, _ := ctx.Value("trace_id").(string)
 	logger := r.logger.With().
 		Str("step", "migrate").
@@ -350,7 +359,7 @@ func (r File) Migrate(ctx context.Context) error {
 	return nil
 }
 
-func (r File) ParseNPMetadata(
+func (r *File) ParseNPMetadata(
 	err error,
 	file io.ReadCloser,
 	logger zerolog.Logger,
@@ -453,7 +462,7 @@ func generatePythonMetadataMap(metadata string, path string) (map[string]interfa
 	return mapData, nil
 }
 
-func (r File) Post(ctx context.Context) error {
+func (r *File) Post(ctx context.Context) error {
 	traceID, _ := ctx.Value("trace_id").(string)
 	logger := r.logger.With().
 		Str("step", "post").
@@ -472,7 +481,7 @@ func (r File) Post(ctx context.Context) error {
 }
 
 // extractTarGzMetadataFile extracts metadata from a tar.gz Python package
-func (r File) extractTarGzMetadataFile(path string) (string, error) {
+func (r *File) extractTarGzMetadataFile(path string) (string, error) {
 	file, err2 := os.Open(path)
 	defer file.Close()
 
@@ -520,7 +529,7 @@ func (r File) extractTarGzMetadataFile(path string) (string, error) {
 }
 
 // extractWheelMetadataFile extracts metadata from a wheel Python package
-func (r File) extractWheelMetadataFile(path string) (string, error) {
+func (r *File) extractWheelMetadataFile(path string) (string, error) {
 	file, err2 := os.Open(path)
 	if err2 != nil {
 		return "", fmt.Errorf("failed to read file: %w", err2)

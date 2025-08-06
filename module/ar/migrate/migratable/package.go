@@ -107,10 +107,58 @@ func (r *Package) Pre(ctx context.Context) error {
 			return nil
 		}
 		if exists {
-			pterm.Info.Println(fmt.Sprintf("Version %s already exists in registry %s", r.pkg.Version, r.destRegistry))
+			util.GetSkipPrinter().Println(fmt.Sprintf("Registry [%s], Package [%s/%s] already exists", r.destRegistry,
+				r.pkg.Name, r.pkg.Version))
 			r.skipMigration = true
+			stat := types.FileStat{
+				Name:     r.pkg.Name,
+				Registry: r.srcRegistry,
+				Uri:      r.pkg.Version,
+				Size:     int64(r.pkg.Size),
+				Status:   types.StatusSkip,
+			}
+			r.stats.FileStats = append(r.stats.FileStats, stat)
 			return nil
 		}
+	}
+
+	if r.artifactType == types.DOCKER || r.artifactType == types.HELM {
+		srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.pkg.Name)
+		dstImage, _ := r.destAdapter.GetOCIImagePath(r.destRegistry, r.pkg.Name)
+		logger.Info().Ctx(ctx).Msgf("Checking if should be skipped -- repository %s to %s", srcImage, dstImage)
+
+		craneOpts := []crane.Option{
+			crane.WithContext(ctx),
+			crane.WithJobs(4),
+			crane.WithNoClobber(true),
+			crane.WithAuthFromKeychain(lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.srcRegistry,
+				r.destRegistry)),
+		}
+		tags, err := crane.ListTags(srcImage, craneOpts...)
+		co := crane.GetOptions(craneOpts...)
+		remoteOpts := co.Remote
+		if err != nil {
+			return err
+		}
+		for _, tag := range tags {
+			dst := fmt.Sprintf("%s:%s", dstImage, tag)
+			// HEAD the destination tag – 200 ⇒ already present.
+			reference, _ := name.ParseReference(dst)
+			if _, err := remote.Head(reference, remoteOpts...); err == nil {
+				util.GetSkipPrinter().Println(fmt.Sprintf("Registry [%s], Package [%s:%s] already exists",
+					r.destRegistry,
+					r.pkg.Name, tag))
+				stat := types.FileStat{
+					Name:     r.pkg.Name,
+					Registry: r.srcRegistry,
+					Uri:      r.pkg.Name + ":" + tag,
+					Size:     0,
+					Status:   types.StatusSkip,
+				}
+				r.stats.FileStats = append(r.stats.FileStats, stat)
+			}
+		}
+
 	}
 
 	logger.Info().

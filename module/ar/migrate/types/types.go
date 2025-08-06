@@ -62,6 +62,7 @@ type Status string
 
 const (
 	StatusSuccess Status = "Success"
+	StatusSkip    Status = "Skipped"
 	StatusFail    Status = "Failed"
 )
 

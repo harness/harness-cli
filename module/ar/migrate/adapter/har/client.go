@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/harness/harness-cli/util/common/auth"
 	"io"
 	"mime/multipart"
 	http2 "net/http"
@@ -24,7 +25,7 @@ func newClient(reg *types.RegistryConfig) *client {
 	username = reg.Credentials.Username
 	token = reg.Credentials.Password
 
-	arclient, _ := ar.NewClientWithResponses(config.Global.APIBaseURL)
+	arClient, _ := ar.NewClientWithResponses(config.Global.APIBaseURL+"/gateway/har/api/v1", auth.GetXApiKeyOptionAR())
 	return &client{
 		client: http.NewClient(
 			&http2.Client{
@@ -36,7 +37,7 @@ func newClient(reg *types.RegistryConfig) *client {
 		insecure:  true,
 		username:  username,
 		password:  token,
-		apiClient: arclient,
+		apiClient: arClient,
 		//config.Global.AuthToken, config.Global.AccountID,
 		//	config.Global.OrgID, config.Global.ProjectID),
 	}
@@ -374,11 +375,10 @@ func (c *client) artifactFileExists(
 	for {
 		response, err := c.apiClient.GetArtifactFilesWithResponse(ctx, registryRef, pkg, version,
 			&ar.GetArtifactFilesParams{
-				Page:       &page,
-				Size:       &size,
-				SortOrder:  nil,
-				SortField:  nil,
-				SearchTerm: &fileURI,
+				Page:      &page,
+				Size:      &size,
+				SortOrder: nil,
+				SortField: nil,
 			})
 		if err != nil {
 			return false, fmt.Errorf("failed to get artifact files: %w", err)

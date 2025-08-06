@@ -2,6 +2,8 @@ package util
 
 import (
 	"fmt"
+	"github.com/pterm/pterm"
+	"os"
 	"strings"
 )
 
@@ -21,4 +23,15 @@ func GetRegistryRef(account string, ref string, registry string) string {
 	}
 	result = append(result, registry)
 	return strings.Join(result, "/")
+}
+
+func GetSkipPrinter() *pterm.PrefixPrinter {
+	return &pterm.PrefixPrinter{
+		MessageStyle: &pterm.ThemeDefault.WarningMessageStyle,
+		Prefix: pterm.Prefix{
+			Style: &pterm.ThemeDefault.WarningPrefixStyle,
+			Text:  "SKIPPED",
+		},
+		Writer: os.Stdout,
+	}
 }

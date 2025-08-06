@@ -44,6 +44,6 @@ mappings:
     destinationRegistry: dst
     ref: /org/project
   - artifactType: NPM
-    sourceRegistry: testing-npm-remote
+    sourceRegistry: src
     destinationRegistry: npm
     ref: /org/project
