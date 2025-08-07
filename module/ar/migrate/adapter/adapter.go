@@ -22,7 +22,7 @@ type Adapter interface {
 		packages []types.Package,
 		err error,
 	)
-	GetVersions(registry, pkg string, artifactType types.ArtifactType) (versions []types.Version, err error)
+	GetVersions(p types.Package, node *types.TreeNode, registry, pkg string, artifactType types.ArtifactType) (versions []types.Version, err error)
 	GetFiles(registry string) ([]types.File, error)
 	DownloadFile(registry string, uri string) (io.ReadCloser, http.Header, error)
 	UploadFile(
@@ -43,6 +43,14 @@ type Adapter interface {
 		registryRef, pkg, version, fileName string,
 		artifactType types.ArtifactType,
 	) (bool, error)
+	CreateVersion(
+		registry string,
+		artifactName string,
+		version string,
+		artifactType types.ArtifactType,
+		files []*types.PackageFiles,
+		metadata map[string]interface{},
+	) error
 }
 
 var registry = map[types.RegistryType]Factory{}

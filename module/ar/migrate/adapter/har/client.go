@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	http2 "net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/harness/harness-cli/config"
@@ -435,4 +436,67 @@ func (c *client) artifactVersionExists(
 		page++
 	}
 	return false, nil
+}
+
+func (c *client) createGoVersion(
+	registry string,
+	artifactName string,
+	version string,
+	files []*types.PackageFiles,
+) error {
+	// Create a pipe to write the file contents
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+
+	// Process multipart form asynchronously
+	go func() {
+		defer pw.Close()
+		for _, file := range files {
+			// Add the file
+			extension := filepath.Ext(file.File.Name)
+			formFieldName := strings.TrimPrefix(extension, ".")
+			part, err := writer.CreateFormFile(formFieldName, file.File.Name)
+			if err != nil {
+				pw.CloseWithError(err)
+				return
+			}
+
+			// Copy the file content
+			if _, err := io.Copy(part, file.DownloadFile); err != nil {
+				pw.CloseWithError(err)
+				return
+			}
+		}
+		// Close the writer
+		if err := writer.Close(); err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+	}()
+
+	url := fmt.Sprintf("%s/pkg/%s/%s/go/upload", c.url, config.Global.AccountID, registry)
+	// Create request
+	req, err := http2.NewRequest(http2.MethodPut, url, pr)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Set headers
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	// Execute request with our client (which handles authentication)
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to upload file '%s/%s': %w", artifactName, version, err)
+	}
+	defer resp.Body.Close()
+
+	// Check for successful response
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to upload file '%s/%s', status code: %d, response: %s",
+			artifactName, version, resp.StatusCode, string(body))
+	}
+
+	return nil
 }

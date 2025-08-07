@@ -237,7 +237,7 @@ func (r *Package) Migrate(ctx context.Context) error {
 		// TODO: Replace by providing function to this migration job instead of complete implementation here.
 		r.migrateLegacyHelm(ctx)
 	} else {
-		versions, err := r.srcAdapter.GetVersions(r.srcRegistry, r.pkg.Name, r.artifactType)
+		versions, err := r.srcAdapter.GetVersions(r.pkg, r.node, r.srcRegistry, r.pkg.Name, r.artifactType)
 		if err != nil {
 			logger.Error().Msg("Failed to get versions")
 			return fmt.Errorf("get versions failed: %w", err)

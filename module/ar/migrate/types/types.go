@@ -2,6 +2,8 @@ package types
 
 import (
 	"errors"
+	"io"
+	"net/http"
 	"time"
 )
 
@@ -93,4 +95,10 @@ type HelmOCIConfig struct {
 	APIVersion  string            `json:"apiVersion"`
 	Created     time.Time         `json:"created"`
 	Annotations map[string]string `json:"annotations"`
+}
+
+type PackageFiles struct {
+	File         *File
+	DownloadFile io.ReadCloser
+	Header       *http.Header
 }

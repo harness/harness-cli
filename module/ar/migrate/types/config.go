@@ -28,6 +28,7 @@ var (
 	NPM         ArtifactType = "NPM"
 	NUGET       ArtifactType = "NUGET"
 	RPM         ArtifactType = "RPM"
+	GO          ArtifactType = "GO"
 )
 
 // Config represents the top-level configuration structure
