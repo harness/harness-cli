@@ -14,6 +14,7 @@ import (
 	client "github.com/harness/harness-cli/internal/api/ar"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/module/ar/packages/gopkg"
+	"github.com/harness/harness-cli/util"
 	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	p "github.com/harness/harness-cli/util/common/progress"
@@ -32,9 +33,9 @@ func NewPushGoCmd(c *client.ClientWithResponses) *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		PreRun: func(cmd *cobra.Command, args []string) {
 			if pkgURL != "" {
-				config.Global.Registry.PkgURL = pkgURL
+				config.Global.Registry.PkgURL = util.GetPkgUrl(pkgURL)
 			} else {
-				config.Global.Registry.PkgURL = config.Global.APIBaseURL
+				config.Global.Registry.PkgURL = util.GetPkgUrl(config.Global.APIBaseURL)
 			}
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
