@@ -9,9 +9,10 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/harness/harness-cli/config"
+
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
-	"github.com/harness/harness-cli/config"
 )
 
 // AuthConfig represents authentication configuration for saving to disk

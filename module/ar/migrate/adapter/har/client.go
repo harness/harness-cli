@@ -2,6 +2,7 @@ package har
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"github.com/harness/harness-cli/module/ar/migrate/http"
 	"github.com/harness/harness-cli/module/ar/migrate/http/auth/xApiKey"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+	"github.com/harness/harness-cli/util/common/auth"
 )
 
 // newClient constructs a jfrog client
@@ -23,7 +25,7 @@ func newClient(reg *types.RegistryConfig) *client {
 	username = reg.Credentials.Username
 	token = reg.Credentials.Password
 
-	arclient, _ := ar.NewClient(config.Global.APIBaseURL)
+	arClient, _ := ar.NewClientWithResponses(config.Global.APIBaseURL+"/gateway/har/api/v1", auth.GetXApiKeyOptionAR())
 	return &client{
 		client: http.NewClient(
 			&http2.Client{
@@ -35,14 +37,14 @@ func newClient(reg *types.RegistryConfig) *client {
 		insecure:  true,
 		username:  username,
 		password:  token,
-		apiClient: arclient,
+		apiClient: arClient,
 		//config.Global.AuthToken, config.Global.AccountID,
 		//	config.Global.OrgID, config.Global.ProjectID),
 	}
 }
 
 type client struct {
-	apiClient *ar.Client
+	apiClient *ar.ClientWithResponses
 	client    *http.Client
 	url       string
 	insecure  bool
@@ -359,4 +361,78 @@ func (c *client) uploadPythonFile(
 	}
 
 	return nil
+}
+
+func (c *client) artifactFileExists(
+	ctx context.Context,
+	registryRef, pkg, version, fileURI string,
+	artifactType types.ArtifactType,
+) (bool, error) {
+	page := int64(0)
+	size := int64(100)
+	fileURI = strings.TrimPrefix(fileURI, "/")
+
+	for {
+		response, err := c.apiClient.GetArtifactFilesWithResponse(ctx, registryRef, pkg, version,
+			&ar.GetArtifactFilesParams{
+				Page:      &page,
+				Size:      &size,
+				SortOrder: nil,
+				SortField: nil,
+			})
+		if err != nil {
+			return false, fmt.Errorf("failed to get artifact files: %w", err)
+		}
+		if response.StatusCode() != http2.StatusOK {
+			return false, fmt.Errorf("failed to get artifact files: %s", response.Status())
+		}
+		data := response.JSON200
+		for _, v := range data.Files {
+			if v.Name == fileURI {
+				return true, nil
+			}
+		}
+		if len(data.Files) < int(size) || (nil != data.PageCount && nil != data.PageIndex && (*data.PageIndex+1 >= *data.PageCount)) {
+			break
+		}
+		page++
+	}
+	return false, nil
+}
+
+func (c *client) artifactVersionExists(
+	ctx context.Context,
+	registryRef, pkg, version string,
+	artifactType types.ArtifactType,
+) (bool, error) {
+	page := int64(0)
+	size := int64(100)
+
+	for {
+		response, err := c.apiClient.GetAllArtifactVersionsWithResponse(ctx, registryRef, pkg,
+			&ar.GetAllArtifactVersionsParams{
+				Page:       &page,
+				Size:       &size,
+				SortOrder:  nil,
+				SortField:  nil,
+				SearchTerm: &version,
+			})
+		if err != nil {
+			return false, fmt.Errorf("failed to get artifact versions: %w", err)
+		}
+		if response.StatusCode() != http2.StatusOK {
+			return false, fmt.Errorf("failed to get artifact versions: %s", response.Status())
+		}
+		data := response.JSON200.Data
+		for _, v := range *data.ArtifactVersions {
+			if v.Name == version {
+				return true, nil
+			}
+		}
+		if len(*data.ArtifactVersions) < int(size) || (nil != data.PageCount && nil != data.PageIndex && (*data.PageIndex+1 >= *data.PageCount)) {
+			break
+		}
+		page++
+	}
+	return false, nil
 }

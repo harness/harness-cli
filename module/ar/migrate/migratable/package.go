@@ -5,42 +5,47 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/go-containerregistry/pkg/name"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/empty"
-	"github.com/google/go-containerregistry/pkg/v1/mutate"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"github.com/google/go-containerregistry/pkg/v1/static"
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/chart/loader"
 	"io"
 	"os"
 	"strings"
 	"time"
 	"unicode/utf8"
 
-	"github.com/google/go-containerregistry/pkg/crane"
-	"github.com/google/uuid"
+	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/lib"
 	"github.com/harness/harness-cli/module/ar/migrate/tree"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+	"github.com/harness/harness-cli/module/ar/migrate/util"
+
+	"github.com/google/go-containerregistry/pkg/crane"
+	"github.com/google/go-containerregistry/pkg/name"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/static"
+	"github.com/google/uuid"
 	"github.com/pterm/pterm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"helm.sh/helm/v3/pkg/chart"
+	"helm.sh/helm/v3/pkg/chart/loader"
 )
 
 type Package struct {
-	srcRegistry  string
-	destRegistry string
-	srcAdapter   adapter.Adapter
-	destAdapter  adapter.Adapter
-	artifactType types.ArtifactType
-	logger       zerolog.Logger
-	pkg          types.Package
-	node         *types.TreeNode
-	stats        *types.TransferStats
+	srcRegistry   string
+	destRegistry  string
+	srcAdapter    adapter.Adapter
+	destAdapter   adapter.Adapter
+	artifactType  types.ArtifactType
+	logger        zerolog.Logger
+	pkg           types.Package
+	node          *types.TreeNode
+	stats         *types.TransferStats
+	skipMigration bool
+	mapping       *types.RegistryMapping
 }
 
 func NewPackageJob(
@@ -52,6 +57,7 @@ func NewPackageJob(
 	pkg types.Package,
 	node *types.TreeNode,
 	stats *types.TransferStats,
+	mapping *types.RegistryMapping,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -73,6 +79,7 @@ func NewPackageJob(
 		pkg:          pkg,
 		node:         node,
 		stats:        stats,
+		mapping:      mapping,
 	}
 }
 
@@ -91,6 +98,69 @@ func (r *Package) Pre(ctx context.Context) error {
 	logger.Info().Msg("Starting package pre-migration step")
 	startTime := time.Now()
 
+	if r.artifactType == types.HELM_LEGACY && r.pkg.Name != "" && r.pkg.Version != "" {
+		exists, err := r.destAdapter.VersionExists(ctx,
+			util.GetRegistryRef(config.Global.AccountID, r.mapping.Ref, r.destRegistry), r.pkg.Name, r.pkg.Version,
+			r.artifactType)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to check if version exists")
+			return nil
+		}
+		if exists {
+			util.GetSkipPrinter().Println(fmt.Sprintf("Registry [%s], Package [%s/%s] already exists", r.destRegistry,
+				r.pkg.Name, r.pkg.Version))
+			r.skipMigration = true
+			stat := types.FileStat{
+				Name:     r.pkg.Name,
+				Registry: r.srcRegistry,
+				Uri:      r.pkg.Version,
+				Size:     int64(r.pkg.Size),
+				Status:   types.StatusSkip,
+			}
+			r.stats.FileStats = append(r.stats.FileStats, stat)
+			return nil
+		}
+	}
+
+	if r.artifactType == types.DOCKER || r.artifactType == types.HELM {
+		srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.pkg.Name)
+		dstImage, _ := r.destAdapter.GetOCIImagePath(r.destRegistry, r.pkg.Name)
+		logger.Info().Ctx(ctx).Msgf("Checking if should be skipped -- repository %s to %s", srcImage, dstImage)
+
+		craneOpts := []crane.Option{
+			crane.WithContext(ctx),
+			crane.WithJobs(4),
+			crane.WithNoClobber(true),
+			crane.WithAuthFromKeychain(lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.srcRegistry,
+				r.destRegistry)),
+		}
+		tags, err := crane.ListTags(srcImage, craneOpts...)
+		co := crane.GetOptions(craneOpts...)
+		remoteOpts := co.Remote
+		if err != nil {
+			return err
+		}
+		for _, tag := range tags {
+			dst := fmt.Sprintf("%s:%s", dstImage, tag)
+			// HEAD the destination tag – 200 ⇒ already present.
+			reference, _ := name.ParseReference(dst)
+			if _, err := remote.Head(reference, remoteOpts...); err == nil {
+				util.GetSkipPrinter().Println(fmt.Sprintf("Registry [%s], Package [%s:%s] already exists",
+					r.destRegistry,
+					r.pkg.Name, tag))
+				stat := types.FileStat{
+					Name:     r.pkg.Name,
+					Registry: r.srcRegistry,
+					Uri:      r.pkg.Name + ":" + tag,
+					Size:     0,
+					Status:   types.StatusSkip,
+				}
+				r.stats.FileStats = append(r.stats.FileStats, stat)
+			}
+		}
+
+	}
+
 	logger.Info().
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed registry pre-migration step")
@@ -108,6 +178,11 @@ func (r *Package) Migrate(ctx context.Context) error {
 	logger.Info().Msg("Starting registry migration step")
 
 	startTime := time.Now()
+
+	if r.skipMigration {
+		logger.Info().Msg("Skipping migration as version already exists in destination registry")
+		return nil
+	}
 
 	if r.artifactType == types.DOCKER || r.artifactType == types.HELM {
 		srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.pkg.Name)
@@ -161,7 +236,7 @@ func (r *Package) Migrate(ctx context.Context) error {
 			}
 			job := NewVersionJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, r.pkg,
 				version,
-				versionNode, r.stats)
+				versionNode, r.stats, r.mapping)
 			jobs = append(jobs, job)
 		}
 

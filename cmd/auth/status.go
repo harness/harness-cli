@@ -7,8 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/harness/harness-cli/config"
+
+	"github.com/spf13/cobra"
 )
 
 // accountResponse represents the response from the account API

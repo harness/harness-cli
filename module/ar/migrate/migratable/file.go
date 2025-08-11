@@ -19,10 +19,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/module/ar/migrate/types/npm"
+	"github.com/harness/harness-cli/module/ar/migrate/util"
 	"github.com/harness/harness-cli/util/common"
 
 	"github.com/google/uuid"
@@ -33,17 +35,19 @@ import (
 )
 
 type File struct {
-	srcRegistry  string
-	destRegistry string
-	srcAdapter   adapter.Adapter
-	destAdapter  adapter.Adapter
-	artifactType types.ArtifactType
-	logger       zerolog.Logger
-	pkg          types.Package
-	version      types.Version
-	file         *types.File
-	node         *types.TreeNode
-	stats        *types.TransferStats
+	srcRegistry   string
+	destRegistry  string
+	srcAdapter    adapter.Adapter
+	destAdapter   adapter.Adapter
+	artifactType  types.ArtifactType
+	logger        zerolog.Logger
+	pkg           types.Package
+	version       types.Version
+	file          *types.File
+	node          *types.TreeNode
+	stats         *types.TransferStats
+	skipMigration bool
+	mapping       *types.RegistryMapping
 }
 
 func NewFileJob(
@@ -57,6 +61,7 @@ func NewFileJob(
 	node *types.TreeNode,
 	file *types.File,
 	stats *types.TransferStats,
+	mapping *types.RegistryMapping,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -82,14 +87,15 @@ func NewFileJob(
 		version:      version,
 		file:         file,
 		stats:        stats,
+		mapping:      mapping,
 	}
 }
 
-func (r File) Info() string {
+func (r *File) Info() string {
 	return r.srcRegistry + ":" + r.destRegistry + ":" + r.file.Uri
 }
 
-func (r File) Pre(ctx context.Context) error {
+func (r *File) Pre(ctx context.Context) error {
 	// Extract trace ID from context if available
 	traceID, _ := ctx.Value("trace_id").(string)
 	logger := r.logger.With().
@@ -99,13 +105,38 @@ func (r File) Pre(ctx context.Context) error {
 	logger.Info().Msg("Starting version pre-migration step")
 	startTime := time.Now()
 
+	if r.artifactType != types.MAVEN && r.pkg.Name != "" && r.version.Name != "" && r.file.Name != "" {
+		exists, err := r.destAdapter.FileExists(ctx,
+			util.GetRegistryRef(config.Global.AccountID, r.mapping.Ref, r.destRegistry),
+			r.pkg.Name, r.version.Name, r.file.Name, r.artifactType)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to check if version exists")
+			return nil
+		}
+		if exists {
+			util.GetSkipPrinter().Println(fmt.Sprintf("Registry [%s], Package [%s/%s], File [%s] already exists",
+				r.destRegistry,
+				r.pkg.Name, r.version.Name, r.file.Name))
+			r.skipMigration = true
+			stat := types.FileStat{
+				Name:     r.file.Name,
+				Registry: r.srcRegistry,
+				Uri:      r.file.Uri,
+				Size:     int64(r.file.Size),
+				Status:   types.StatusSkip,
+			}
+			r.stats.FileStats = append(r.stats.FileStats, stat)
+			return nil
+		}
+	}
+
 	logger.Info().
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed file pre-migration step")
 	return nil
 }
 
-func (r File) Migrate(ctx context.Context) error {
+func (r *File) Migrate(ctx context.Context) error {
 	traceID, _ := ctx.Value("trace_id").(string)
 	logger := r.logger.With().
 		Str("step", "migrate").
@@ -114,6 +145,10 @@ func (r File) Migrate(ctx context.Context) error {
 
 	logger.Info().Msg("Starting file migration step")
 	startTime := time.Now()
+
+	if r.skipMigration {
+		return nil
+	}
 
 	if r.artifactType == types.DOCKER || r.artifactType == types.HELM {
 		log.Error().Ctx(ctx).Msgf("OCI migrate file is not supported")
@@ -324,7 +359,13 @@ func (r File) Migrate(ctx context.Context) error {
 	return nil
 }
 
-func (r File) ParseNPMetadata(err error, file io.ReadCloser, logger zerolog.Logger, tarballURL string, upload *npm.PackageUpload) (io.ReadCloser, error) {
+func (r *File) ParseNPMetadata(
+	err error,
+	file io.ReadCloser,
+	logger zerolog.Logger,
+	tarballURL string,
+	upload *npm.PackageUpload,
+) (io.ReadCloser, error) {
 	var buf bytes.Buffer
 	size, err := io.Copy(&buf, file)
 	if err != nil {
@@ -421,7 +462,7 @@ func generatePythonMetadataMap(metadata string, path string) (map[string]interfa
 	return mapData, nil
 }
 
-func (r File) Post(ctx context.Context) error {
+func (r *File) Post(ctx context.Context) error {
 	traceID, _ := ctx.Value("trace_id").(string)
 	logger := r.logger.With().
 		Str("step", "post").
@@ -440,7 +481,7 @@ func (r File) Post(ctx context.Context) error {
 }
 
 // extractTarGzMetadataFile extracts metadata from a tar.gz Python package
-func (r File) extractTarGzMetadataFile(path string) (string, error) {
+func (r *File) extractTarGzMetadataFile(path string) (string, error) {
 	file, err2 := os.Open(path)
 	defer file.Close()
 
@@ -488,7 +529,7 @@ func (r File) extractTarGzMetadataFile(path string) (string, error) {
 }
 
 // extractWheelMetadataFile extracts metadata from a wheel Python package
-func (r File) extractWheelMetadataFile(path string) (string, error) {
+func (r *File) extractWheelMetadataFile(path string) (string, error) {
 	file, err2 := os.Open(path)
 	if err2 != nil {
 		return "", fmt.Errorf("failed to read file: %w", err2)
