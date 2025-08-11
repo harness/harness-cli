@@ -16,39 +16,35 @@ destination:
     username: ${DST_USER}
     password: ${DST_PASS}
 mappings:
-#  - artifactType: HELM_LEGACY
-#    sourceRegistry: src
-#    destinationRegistry: dst
-#    ref: /
   - artifactType: HELM_LEGACY
-    sourceRegistry: tathagat-test
-    destinationRegistry: helm-nexus
-#  - artifactType: MAVEN
-#    sourceRegistry: maven-internal-prod
-#    destinationRegistry: maven-nexus
-
-#    ref: /org
-#  - artifactType: PYTHON
-#    sourceRegistry: test_python
-#    destinationRegistry: mypythonnexus
-#    ref: /org/project
-#  - artifactType: HELM
-#    sourceRegistry: src
-#    destinationRegistry: dst
-#    ref: /org/project
-#  - artifactType: MAVEN
-#    sourceRegistry: src
-#    destinationRegistry: dst
-#    ref: /org/project
-#  - artifactType: GENERIC
-#    sourceRegistry: src
-#    destinationRegistry: dst
-#    ref: /org/project
-#  - artifactType: NUGET
-#    sourceRegistry: src
-#    destinationRegistry: dst
-#    ref: /org/project
-#  - artifactType: NPM
-#    sourceRegistry: src
-#    destinationRegistry: npm
-#    ref: /org/project
+    sourceRegistry: src
+    destinationRegistry: dst
+    ref: /
+  - artifactType: MAVEN
+    sourceRegistry: src
+    destinationRegistry: dst
+    ref: /org
+  - artifactType: PYTHON
+    sourceRegistry: src
+    destinationRegistry: dst
+    ref: /org/project
+  - artifactType: HELM
+    sourceRegistry: src
+    destinationRegistry: dst
+    ref: /org/project
+  - artifactType: MAVEN
+    sourceRegistry: src
+    destinationRegistry: dst
+    ref: /org/project
+  - artifactType: GENERIC
+    sourceRegistry: src
+    destinationRegistry: dst
+    ref: /org/project
+  - artifactType: NUGET
+    sourceRegistry: src
+    destinationRegistry: dst
+    ref: /org/project
+  - artifactType: NPM
+    sourceRegistry: src
+    destinationRegistry: npm
+    ref: /org/project
