@@ -276,8 +276,8 @@ func (a *adapter) GetVersions(registry, pkg string, artifactType types.ArtifactT
 		return versions, nil
 	}
 	return []types.Version{}, errors.New("unknown artifact type")
-
 }
+
 func (a *adapter) GetFiles(registry string) ([]types.File, error) {
 	files, err := a.client.getFiles(registry)
 	if err != nil {

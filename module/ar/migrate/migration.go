@@ -15,6 +15,7 @@ import (
 
 	_ "github.com/harness/harness-cli/module/ar/migrate/adapter/har"
 	_ "github.com/harness/harness-cli/module/ar/migrate/adapter/jfrog"
+	_ "github.com/harness/harness-cli/module/ar/migrate/adapter/nexus"
 )
 
 // MigrationService handles the migration process
@@ -66,7 +67,7 @@ func (m *MigrationService) Run(ctx context.Context) error {
 		mappingLogger.Info().Msg("Processing registry migration")
 
 		job := migratable.NewRegistryJob(m.source, m.destination, mapping.SourceRegistry,
-			mapping.DestinationRegistry, mapping.ArtifactType, &transferStats, &mapping)
+			mapping.DestinationRegistry, mapping.ArtifactType, &transferStats, &mapping, m.config.Concurrency)
 		jobs = append(jobs, job)
 
 	}

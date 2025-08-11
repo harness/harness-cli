@@ -46,6 +46,7 @@ type Package struct {
 	stats         *types.TransferStats
 	skipMigration bool
 	mapping       *types.RegistryMapping
+	concurrency   int
 }
 
 func NewPackageJob(
@@ -58,6 +59,7 @@ func NewPackageJob(
 	node *types.TreeNode,
 	stats *types.TransferStats,
 	mapping *types.RegistryMapping,
+	concurrency int,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -80,6 +82,7 @@ func NewPackageJob(
 		node:         node,
 		stats:        stats,
 		mapping:      mapping,
+		concurrency:  concurrency,
 	}
 }
 
@@ -129,11 +132,15 @@ func (r *Package) Pre(ctx context.Context) error {
 
 		craneOpts := []crane.Option{
 			crane.WithContext(ctx),
-			crane.WithJobs(4),
+			crane.WithJobs(r.concurrency),
 			crane.WithNoClobber(true),
 			crane.WithAuthFromKeychain(lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.srcRegistry,
 				r.destRegistry)),
 		}
+		if r.srcAdapter.GetConfig().Insecure {
+			craneOpts = append(craneOpts, crane.Insecure)
+		}
+
 		tags, err := crane.ListTags(srcImage, craneOpts...)
 		co := crane.GetOptions(craneOpts...)
 		remoteOpts := co.Remote
@@ -189,15 +196,24 @@ func (r *Package) Migrate(ctx context.Context) error {
 		dstImage, _ := r.destAdapter.GetOCIImagePath(r.destRegistry, r.pkg.Name)
 		pterm.Info.Println(fmt.Sprintf("Copying repository %s to %s", srcImage, dstImage))
 		logger.Info().Ctx(ctx).Msgf("Copying repository %s to %s", srcImage, dstImage)
-		err := crane.CopyRepository(
-			srcImage,
-			dstImage,
+
+		craneOpts := []crane.Option{
 			crane.WithUserAgent("harness-cli"),
 			crane.WithContext(ctx),
-			crane.WithJobs(4),
+			crane.WithJobs(r.concurrency),
 			crane.WithNoClobber(true),
 			crane.WithAuthFromKeychain(lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.srcRegistry,
 				r.destRegistry)),
+		}
+
+		if r.srcAdapter.GetConfig().Insecure {
+			craneOpts = append(craneOpts, crane.Insecure)
+		}
+
+		err := crane.CopyRepository(
+			srcImage,
+			dstImage,
+			craneOpts...,
 		)
 
 		stat := types.FileStat{
@@ -235,14 +251,13 @@ func (r *Package) Migrate(ctx context.Context) error {
 				return fmt.Errorf("get version failed: %w", err)
 			}
 			job := NewVersionJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, r.pkg,
-				version,
-				versionNode, r.stats, r.mapping)
+				version, versionNode, r.stats, r.mapping, r.concurrency)
 			jobs = append(jobs, job)
 		}
 
 		log.Info().Msgf("Jobs length: %d", len(jobs))
 
-		eng := engine.NewEngine(5, jobs)
+		eng := engine.NewEngine(r.concurrency, jobs)
 		err = eng.Execute(ctx)
 		if err != nil {
 			logger.Error().Err(err).Msg("Engine execution failed")
@@ -405,11 +420,15 @@ func (r *Package) pushChart(ctx context.Context, chartPath string, dstRef string
 
 	img = mutate.Annotations(img, annotations).(v1.Image)
 
-	err = remote.Write(ref, img,
+	craneOpts := []remote.Option{
 		remote.WithContext(ctx),
 		remote.WithUserAgent("harness-cli"),
 		remote.WithAuthFromKeychain(lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.srcRegistry,
 			r.destRegistry)),
+	}
+
+	err = remote.Write(ref, img,
+		craneOpts...,
 	)
 	return err
 }

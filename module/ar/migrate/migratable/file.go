@@ -48,6 +48,7 @@ type File struct {
 	stats         *types.TransferStats
 	skipMigration bool
 	mapping       *types.RegistryMapping
+	concurrency   int
 }
 
 func NewFileJob(
@@ -62,6 +63,7 @@ func NewFileJob(
 	file *types.File,
 	stats *types.TransferStats,
 	mapping *types.RegistryMapping,
+	concurrency int,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -88,6 +90,7 @@ func NewFileJob(
 		file:         file,
 		stats:        stats,
 		mapping:      mapping,
+		concurrency:  concurrency,
 	}
 }
 
@@ -165,6 +168,7 @@ func (r *File) Migrate(ctx context.Context) error {
 
 		//readCloser := progress.ReadCloser(int64(r.file.Size), downloadFile, r.file.Name)
 		title := fmt.Sprintf("%s (%s)", r.file.Name, common.GetSize(int64(r.file.Size)))
+		pterm.Info.Println(fmt.Sprintf("Copying file %s from %s to %s", r.file.Name, r.srcRegistry, r.destRegistry))
 		err = r.destAdapter.UploadFile(r.destRegistry, downloadFile, r.file, header, r.pkg.Name, r.version.Name,
 			r.artifactType, nil)
 		stat := types.FileStat{
