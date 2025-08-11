@@ -13,6 +13,7 @@ type RegistryType string
 var (
 	HAR   RegistryType = "HAR"
 	JFROG RegistryType = "JFROG"
+	NEXUS RegistryType = "NEXUS"
 )
 
 type ArtifactType string
@@ -45,6 +46,7 @@ type RegistryConfig struct {
 	Endpoint    string            `yaml:"endpoint"`
 	Type        RegistryType      `yaml:"type"`
 	Credentials CredentialsConfig `yaml:"credentials,omitempty"`
+	Insecure    bool              `yaml:"insecure" default:"false"`
 }
 
 // RegistryMapping defines the mapping between source and destination registries
@@ -155,7 +157,7 @@ func validateCredentials(registry RegistryConfig) error {
 
 	// Check supported registry types
 	switch registry.Type {
-	case HAR, JFROG:
+	case HAR, JFROG, NEXUS:
 		// These are supported
 	default:
 		return fmt.Errorf("unsupported registry type: %s", registry.Type)

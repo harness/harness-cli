@@ -24,6 +24,7 @@ type Registry struct {
 	logger       zerolog.Logger
 	stats        *types.TransferStats
 	mapping      *types.RegistryMapping
+	concurrency  int
 }
 
 func NewRegistryJob(
@@ -34,6 +35,7 @@ func NewRegistryJob(
 	artifactType types.ArtifactType,
 	stats *types.TransferStats,
 	mapping *types.RegistryMapping,
+	concurrency int,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -53,6 +55,7 @@ func NewRegistryJob(
 		logger:       jobLogger,
 		stats:        stats,
 		mapping:      mapping,
+		concurrency:  concurrency,
 	}
 }
 
@@ -121,11 +124,11 @@ func (r *Registry) Migrate(ctx context.Context) error {
 			return fmt.Errorf("get node for path %s failed: %w", pkg.Path, err2)
 		}
 		job := NewPackageJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, pkg, treeNode,
-			r.stats, r.mapping)
+			r.stats, r.mapping, r.concurrency)
 		jobs = append(jobs, job)
 	}
 
-	eng := engine.NewEngine(5, jobs)
+	eng := engine.NewEngine(r.concurrency, jobs)
 	err = eng.Execute(ctx)
 	if err != nil {
 		logger.Error().Err(err).Msg("Engine execution failed")

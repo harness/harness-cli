@@ -4,10 +4,11 @@ concurrency: 5
 failureMode: continue
 source:
   endpoint: ${SRC_ENDPOINT}
-  type: JFROG
+  type: NEXUS
   credentials:
     username: ${SRC_USER}
     password: ${SRC_PASS}
+  insecure: true
 destination:
   endpoint: ${DST_ENDPOINT}
   type: HAR
@@ -19,7 +20,7 @@ mappings:
     sourceRegistry: src
     destinationRegistry: dst
     ref: /
-  - artifactType: DOCKER
+  - artifactType: MAVEN
     sourceRegistry: src
     destinationRegistry: dst
     ref: /org
