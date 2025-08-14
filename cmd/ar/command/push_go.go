@@ -136,7 +136,7 @@ func NewPushGoCmd(c *client.ClientWithResponses) *cobra.Command {
 			// Check response
 			if resp.StatusCode() != http.StatusOK && resp.StatusCode() != http.StatusCreated {
 				progress.Error("Upload failed")
-				return fmt.Errorf("failed to push package: %s", resp.Status())
+				return fmt.Errorf("failed to push package: %s \n response: %s", resp.Status(), resp.Body)
 			}
 
 			progress.Success(fmt.Sprintf("Successfully uploaded package %s", packageName))

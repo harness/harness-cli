@@ -17,6 +17,10 @@ import (
 	"github.com/harness/harness-cli/util/common/vcs"
 )
 
+const (
+	ModulePathRegex = `^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+(?:/[a-z0-9][a-z0-9._-]*)*$`
+)
+
 // DefaultGenerator provides the default implementation of package generation interfaces.
 // It combines the default implementations of ModuleValidator, FileGenerator, and
 // VCSMetadataProvider to provide a complete package generation solution.
@@ -64,6 +68,10 @@ func (v *defaultModuleValidator) ValidateModulePath(modulePath, version string) 
 	major, err := v.extractMajor(version)
 	if err != nil {
 		return errors.NewValidationError("version", err.Error())
+	}
+
+	if !regexp.MustCompile(ModulePathRegex).MatchString(modulePath) {
+		return errors.NewValidationError("module_path", "module path must match regex "+ModulePathRegex)
 	}
 
 	if major <= 1 {
