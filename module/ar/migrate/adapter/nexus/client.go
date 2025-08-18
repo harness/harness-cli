@@ -3,13 +3,13 @@ package nexus
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/harness/harness-cli/module/ar/migrate/http/auth/basic"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"strings"
 
 	httputil "github.com/harness/harness-cli/module/ar/migrate/http"
+	"github.com/harness/harness-cli/module/ar/migrate/http/auth/basic"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 )
 

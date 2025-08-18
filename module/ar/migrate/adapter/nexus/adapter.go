@@ -3,7 +3,6 @@ package nexus
 import (
 	"context"
 	"fmt"
-	"github.com/harness/harness-cli/module/ar/migrate/util"
 	"io"
 	"net/http"
 	"net/url"
@@ -11,6 +10,7 @@ import (
 
 	adp "github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+	"github.com/harness/harness-cli/module/ar/migrate/util"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/rs/zerolog/log"

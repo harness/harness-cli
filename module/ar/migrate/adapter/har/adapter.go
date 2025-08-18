@@ -106,7 +106,10 @@ func (a *adapter) UploadFile(
 		err = a.client.uploadNugetFile(registry, artifactName, version, f, file)
 	} else if artifactType == types.NPM {
 		err = a.client.uploadNPMFile(registry, artifactName, version, f, file)
+	} else if artifactType == types.RPM {
+		err = a.client.uploadRPMFile(registry, f.Name, file)
 	}
+
 	if err != nil {
 		a.logger.Error().Err(err).Msgf("Failed to upload file %s to registry: %s", f.Uri, registry)
 		return fmt.Errorf("failed to upload file %s to registry: %s, %v", f.Uri, registry, err)
