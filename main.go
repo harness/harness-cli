@@ -671,6 +671,77 @@ func main() {
 				},
 			},
 			{
+				Name:    "discovery-agent",
+				Aliases: []string{"disc-agent"},
+				Usage:   "Discovery agent specific commands, eg: apply (create/update), delete, list",
+				Flags: append(globalFlags,
+					&cli.StringFlag{
+						Name:  "file",
+						Usage: "`YAML` file path for the discovery agent",
+					},
+				),
+				Before: func(ctx *cli.Context) error {
+					auth.HydrateCredsFromPersistence(ctx)
+					return nil
+				},
+				Subcommands: []*cli.Command{
+					{
+						Name:  "delete",
+						Usage: "Delete a discovery agent.",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:     "identifier",
+								Usage:    "Discovery agent identifier to delete",
+								Required: true,
+							},
+							&cli.StringFlag{
+								Name:     "environment-id",
+								Usage:    "Environment Identifier where the discovery agent is deployed",
+								Required: true,
+							},
+							&cli.BoolFlag{
+								Name:  "delete-network-maps",
+								Usage: "Delete associated network maps before deleting the agent",
+								Value: false,
+							},
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "org-id",
+								Usage: "provide an Organization Identifier",
+							}),
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "project-id",
+								Usage: "provide a Project Identifier",
+							}),
+						},
+						Action: func(context *cli.Context) error {
+							return cliWrapper(deleteDiscoveryAgent, context)
+						},
+					},
+					{
+						Name:  "list",
+						Usage: "List discovery agents.",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:     "environment-id",
+								Usage:    "Environment Identifier where discovery agents are deployed",
+								Required: true,
+							},
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "org-id",
+								Usage: "provide an Organization Identifier",
+							}),
+							altsrc.NewStringFlag(&cli.StringFlag{
+								Name:  "project-id",
+								Usage: "provide a Project Identifier",
+							}),
+						},
+						Action: func(context *cli.Context) error {
+							return cliWrapper(listDiscoveryAgents, context)
+						},
+					},
+				},
+			},
+			{
 				Name:    "login",
 				Aliases: []string{"login"},
 				Usage:   "Login with account identifier and api key.",

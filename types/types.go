@@ -408,6 +408,18 @@ type WinRMSecretAuth struct {
 	Spec WinRMSecretSpec `json:"spec"`
 }
 
+// Discovery Agent structs
+type HarnessDiscoveryAgent struct {
+	Identifier        string `json:"identifier"`
+	Name              string `json:"name"`
+	ProjectIdentifier string `json:"projectIdentifier,omitempty"`
+	OrgIdentifier     string `json:"orgIdentifier,omitempty"`
+	Description       string `json:"description,omitempty"`
+	Tags              struct {
+	} `json:"tags,omitempty"`
+	Yaml string `json:"yaml"`
+}
+
 type WinRMSecretSpec struct {
 	Username       string `json:"username"`
 	Password       string `json:"password"`
