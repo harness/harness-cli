@@ -423,7 +423,12 @@ func (c *client) artifactVersionExists(
 		if response.StatusCode() != http2.StatusOK {
 			return false, fmt.Errorf("failed to get artifact versions: %s", response.Status())
 		}
-		data := response.JSON200.Data
+		var data ar.ListArtifactVersion
+
+		if response.JSON200 == nil {
+			return false, fmt.Errorf("failed to get artifact versions: %s", response.Status())
+		}
+		data = response.JSON200.Data
 		for _, v := range *data.ArtifactVersions {
 			if v.Name == version {
 				return true, nil

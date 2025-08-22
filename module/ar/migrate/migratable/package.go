@@ -101,7 +101,7 @@ func (r *Package) Pre(ctx context.Context) error {
 	logger.Info().Msg("Starting package pre-migration step")
 	startTime := time.Now()
 
-	if r.artifactType == types.HELM_LEGACY && r.pkg.Name != "" && r.pkg.Version != "" {
+	if r.artifactType == types.HELM_LEGACY && r.pkg.Name != "" && r.pkg.Version != "" && r.mapping.Ref != "" {
 		exists, err := r.destAdapter.VersionExists(ctx,
 			util.GetRegistryRef(config.Global.AccountID, r.mapping.Ref, r.destRegistry), r.pkg.Name, r.pkg.Version,
 			r.artifactType)
