@@ -31,7 +31,7 @@ generate-%:
 
 # Build the CLI (runs `generate` first so everything is up to date)
 build: generate format
-	$(GOCMD) build -o hns ./cmd/ 
+	$(GOCMD) build -o hns ./cmd/hns 
 
 # Remove generated artifacts
 clean:
