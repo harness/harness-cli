@@ -4,7 +4,7 @@ concurrency: 5
 failureMode: continue
 source:
   endpoint: ${SRC_ENDPOINT}
-  type: NEXUS
+  type: MOCK_JFROG
   credentials:
     username: ${SRC_USER}
     password: ${SRC_PASS}

@@ -477,9 +477,13 @@ func (c *client) artifactVersionExists(
 		var data ar.ListArtifactVersion
 
 		if response.JSON200 == nil {
-			return false, fmt.Errorf("failed to get artifact versions: %s", response.Status())
+			return false, fmt.Errorf("failed to get artifact 200 response: %s", response.Status())
 		}
 		data = response.JSON200.Data
+		if data.ArtifactVersions == nil {
+			return false, fmt.Errorf("failed to get artifact versions: %s", response.Status())
+		}
+
 		for _, v := range *data.ArtifactVersions {
 			if v.Name == version {
 				return true, nil

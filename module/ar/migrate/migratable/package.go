@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	types2 "github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/harness/harness-cli/util/common"
 
 	"github.com/harness/harness-cli/config"
@@ -438,6 +439,8 @@ func (r *Package) pushChart(ctx context.Context, chartPath string, dstRef string
 	check(err, "adding config JSON")
 
 	img = mutate.ConfigMediaType(img, "application/vnd.cncf.helm.config.v1+json")
+	img = mutate.MediaType(img, types2.OCIManifestSchema1)
+
 	annotations := map[string]string{
 		"org.opencontainers.image.title":       truncate(meta.Name),
 		"org.opencontainers.image.description": truncate(meta.Description),

@@ -138,6 +138,9 @@ func (a *adapter) VersionExists(
 	registryRef, pkg, version string,
 	artifactType types.ArtifactType,
 ) (bool, error) {
+	if artifactType == types.HELM_LEGACY {
+		artifactType = types.HELM
+	}
 	return a.client.artifactVersionExists(ctx, registryRef, pkg, version, artifactType)
 }
 
