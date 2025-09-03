@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/harness/harness-cli/util/common"
 	"io"
 	"os"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/harness/harness-cli/util/common"
 
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
@@ -103,7 +104,7 @@ func (r *Package) Pre(ctx context.Context) error {
 	startTime := time.Now()
 
 	if r.artifactType == types.HELM_LEGACY && r.pkg.Name != "" && r.pkg.Version != "" && r.mapping.Ref != "" {
-		exists, err := r.destAdapter.VersionExists(ctx,
+		exists, err := r.destAdapter.VersionExists(ctx, r.pkg,
 			util.GetRegistryRef(config.Global.AccountID, r.mapping.Ref, r.destRegistry), r.pkg.Name, r.pkg.Version,
 			r.artifactType)
 		if err != nil {

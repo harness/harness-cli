@@ -495,7 +495,8 @@ func (a *adapter) AddNPMTag(version string, uri string) error {
 
 func (a *adapter) VersionExists(
 	ctx context.Context,
-	registry, pkg, version string,
+	p types.Package,
+	registryRef, pkg, version string,
 	artifactType types.ArtifactType,
 ) (bool, error) {
 	return false, fmt.Errorf("not implemented")

@@ -202,7 +202,10 @@ func (a *adapter) addToTree(root *types.TreeNode, pkg types.Package, artifactTyp
 	}
 }
 
-func (a *adapter) GetVersions(registry, pkg string, artifactType types.ArtifactType) ([]types.Version, error) {
+func (a *adapter) GetVersions(
+	p types.Package,
+	node *types.TreeNode, registry, pkg string, artifactType types.ArtifactType,
+) ([]types.Version, error) {
 	var versions []types.Version
 	continuationToken := ""
 
@@ -364,10 +367,11 @@ func (a *adapter) AddNPMTag(version string, uri string) error {
 
 func (a *adapter) VersionExists(
 	ctx context.Context,
+	p types.Package,
 	registry, pkg, version string,
 	artifactType types.ArtifactType,
 ) (bool, error) {
-	versions, err := a.GetVersions(registry, pkg, artifactType)
+	versions, err := a.GetVersions(p, nil, registry, pkg, artifactType)
 	if err != nil {
 		return false, fmt.Errorf("failed to get versions: %w", err)
 	}
@@ -413,4 +417,15 @@ func (a *adapter) constructFilePath(pkg, version, fileName string, artifactType 
 	default:
 		return fmt.Sprintf("%s/%s/%s", pkg, version, fileName)
 	}
+}
+
+func (a *adapter) CreateVersion(
+	registry string,
+	artifactName string,
+	version string,
+	artifactType types.ArtifactType,
+	files []*types.PackageFiles,
+	metadata map[string]interface{},
+) error {
+	return nil
 }
