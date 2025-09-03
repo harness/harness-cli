@@ -22,7 +22,12 @@ type Adapter interface {
 		packages []types.Package,
 		err error,
 	)
-	GetVersions(p types.Package, node *types.TreeNode, registry, pkg string, artifactType types.ArtifactType) (versions []types.Version, err error)
+	GetVersions(
+		p types.Package,
+		node *types.TreeNode,
+		registry, pkg string,
+		artifactType types.ArtifactType,
+	) (versions []types.Version, err error)
 	GetFiles(registry string) ([]types.File, error)
 	DownloadFile(registry string, uri string) (io.ReadCloser, http.Header, error)
 	UploadFile(
@@ -37,7 +42,12 @@ type Adapter interface {
 	) error
 	GetOCIImagePath(registry string, image string) (string, error)
 	AddNPMTag(version string, uri string) error
-	VersionExists(ctx context.Context, registryRef, pkg, version string, artifactType types.ArtifactType) (bool, error)
+	VersionExists(
+		ctx context.Context,
+		p types.Package,
+		registryRef, pkg, version string,
+		artifactType types.ArtifactType,
+	) (bool, error)
 	FileExists(
 		ctx context.Context,
 		registryRef, pkg, version, fileName string,

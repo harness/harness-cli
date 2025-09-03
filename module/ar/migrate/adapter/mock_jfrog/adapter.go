@@ -1,6 +1,7 @@
-package jfrog
+package mock_jfrog
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/xml"
@@ -38,7 +39,7 @@ const (
 )
 
 func init() {
-	adapterType := types.JFROG
+	adapterType := types.MOCK_JFROG
 	if err := adp.RegisterFactory(adapterType, new(factory)); err != nil {
 		return
 	}
@@ -74,7 +75,10 @@ func (a *adapter) GetConfig() types.RegistryConfig {
 	return a.reg
 }
 
-func (a *adapter) ValidateCredentials() (bool, error) { return false, nil }
+func (a *adapter) ValidateCredentials() (bool, error) {
+	// Mock always returns true for valid credentials
+	return true, nil
+}
 func (a *adapter) GetRegistry(registry string) (types.RegistryInfo, error) {
 	reg, err := a.client.getRegistry(registry)
 	if err != nil {
@@ -85,7 +89,10 @@ func (a *adapter) GetRegistry(registry string) (types.RegistryInfo, error) {
 		URL:  reg.Url,
 	}, nil
 }
-func (a *adapter) CreateRegistryIfDoesntExist(registry string) (bool, error) { return false, nil }
+func (a *adapter) CreateRegistryIfDoesntExist(registry string) (bool, error) {
+	// Mock always returns true (registry "created")
+	return true, nil
+}
 
 func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, root *types.TreeNode) (
 	[]types.Package,
@@ -121,15 +128,32 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			})
 		}
 	} else if artifactType == types.HELM_LEGACY {
-		node, err := tree.GetNodeForPath(root, "/index.yaml")
+		_, err := tree.GetNodeForPath(root, "/index.yaml")
 		if err != nil {
 			return nil, fmt.Errorf("get node for path: %w", err)
 		}
-		file, _, err := a.DownloadFile(registry, node.File.Uri)
+		// Use mock data for HELM_LEGACY instead of downloading
+		mockIndexContent := `apiVersion: v1
+entries:
+  nginx:
+    - name: nginx
+      version: 8.2.0
+      urls:
+        - tmp/nginx-8.2.0.tgz`
 		tmp, err := os.CreateTemp("", "index-*.yaml")
+		if err != nil {
+			return nil, fmt.Errorf("create temp file: %w", err)
+		}
 		defer os.Remove(tmp.Name())
-		_, err = io.Copy(tmp, file)
+		_, err = tmp.WriteString(mockIndexContent)
+		if err != nil {
+			return nil, fmt.Errorf("write mock content: %w", err)
+		}
+		tmp.Close()
 		index, err := repo.LoadIndexFile(tmp.Name())
+		if err != nil {
+			return nil, fmt.Errorf("load index file: %w", err)
+		}
 
 		for name, entries := range index.Entries {
 			for _, ver := range entries {
@@ -144,14 +168,13 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			}
 		}
 	} else if artifactType == types.PYTHON {
-		node, err := tree.GetNodeForPath(root, "/.pypi/simple.html")
+		_, err := tree.GetNodeForPath(root, "/.pypi/simple.html")
 		if err != nil {
 			return nil, fmt.Errorf("get node for path: %w", err)
 		}
-		file, _, err := a.DownloadFile(registry, node.File.Uri)
-		if err != nil {
-			return nil, fmt.Errorf("download file: %w", err)
-		}
+		// Use mock data for Python packages instead of downloading
+		mockPythonHTML := `<html><body><a href="requests/">requests</a><br/><a href="flask/">flask</a><br/><a href="django/">django</a><br/></body></html>`
+		file := io.NopCloser(strings.NewReader(mockPythonHTML))
 		defer file.Close()
 		_packages, err := extractPythonPackageNames(file)
 		if err != nil {
@@ -168,25 +191,52 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 
 		return packages, nil
 	} else if artifactType == types.RPM {
-		node, err := tree.GetNodeForPath(root, "/repodata/repomd.xml")
+		_, err := tree.GetNodeForPath(root, "/repodata/repomd.xml")
 		if err != nil {
 			return nil, fmt.Errorf("get node for path: %w", err)
 		}
-		file, _, err := a.DownloadFile(registry, node.File.Uri)
-		if err != nil {
-			return nil, fmt.Errorf("download repomd.xml: %w", err)
-		}
+		// Use mock data for RPM repomd.xml instead of downloading
+		mockRepomdXML := `<?xml version="1.0" encoding="UTF-8"?>
+<repomd xmlns="http://linux.duke.edu/metadata/repo" xmlns:rpm="http://linux.duke.edu/metadata/rpm">
+  <data type="primary">
+    <location href="repodata/primary.xml.gz"/>
+  </data>
+</repomd>`
+		file := io.NopCloser(strings.NewReader(mockRepomdXML))
 		defer file.Close()
 
-		primaryLocation, err := extractPrimaryLocation(file)
+		_, err = extractPrimaryLocation(file)
 		if err != nil {
 			return nil, fmt.Errorf("extract primary location: %w", err)
 		}
 
-		primaryFile, _, err := a.DownloadFile(registry, primaryLocation)
+		// Use mock data for RPM primary.xml.gz instead of downloading
+		mockPrimaryXML := `<?xml version="1.0" encoding="UTF-8"?>
+<metadata xmlns="http://linux.duke.edu/metadata/common" xmlns:rpm="http://linux.duke.edu/metadata/rpm" packages="2">
+  <package type="rpm">
+    <name>sample-package</name>
+    <arch>x86_64</arch>
+    <version epoch="0" ver="1.0.0" rel="1"/>
+    <size package="1024" installed="2048" archive="512"/>
+    <location href="sample-package-1.0.0-1.x86_64.rpm"/>
+  </package>
+  <package type="rpm">
+    <name>another-package</name>
+    <arch>x86_64</arch>
+    <version epoch="0" ver="2.0.0" rel="1"/>
+    <size package="2048" installed="4096" archive="1024"/>
+    <location href="another-package-2.0.0-1.x86_64.rpm"/>
+  </package>
+</metadata>`
+		// Create a mock gzipped content
+		var buf bytes.Buffer
+		gzWriter := gzip.NewWriter(&buf)
+		_, err = gzWriter.Write([]byte(mockPrimaryXML))
 		if err != nil {
-			return nil, fmt.Errorf("download primary file: %w", err)
+			return nil, fmt.Errorf("write gzip content: %w", err)
 		}
+		gzWriter.Close()
+		primaryFile := io.NopCloser(bytes.NewReader(buf.Bytes()))
 		defer primaryFile.Close()
 
 		// Extract package URLs from primary.xml.gz
@@ -363,10 +413,10 @@ func (a *adapter) GetVersions(
 	if artifactType == types.PYTHON {
 		var versions []types.Version
 		indexPath := fmt.Sprintf(".pypi/%s/%s.html", pkg, pkg)
-		file, _, err := a.client.getFile(registry, indexPath)
-		if err != nil {
-			return nil, fmt.Errorf("download file: %w", err)
-		}
+		// Use mock data for Python package versions instead of downloading
+		mockPackageHTML := fmt.Sprintf(`<html><body><a href="%s-1.0.0.tar.gz">%s-1.0.0.tar.gz</a><br/><a href="%s-1.1.0.tar.gz">%s-1.1.0.tar.gz</a><br/></body></html>`,
+			pkg, pkg, pkg, pkg)
+		file := io.NopCloser(strings.NewReader(mockPackageHTML))
 		defer file.Close()
 		_versions, err := extractPythonPackageNames(file)
 		if err != nil {
@@ -499,7 +549,14 @@ func (a *adapter) VersionExists(
 	registryRef, pkg, version string,
 	artifactType types.ArtifactType,
 ) (bool, error) {
-	return false, fmt.Errorf("not implemented")
+	// Mock implementation - return true for common versions
+	commonVersions := []string{"1.0.0", "1.1.0", "2.0.0", "latest"}
+	for _, v := range commonVersions {
+		if version == v {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (a *adapter) FileExists(
@@ -507,7 +564,14 @@ func (a *adapter) FileExists(
 	registry, pkg, version, fileName string,
 	artifactType types.ArtifactType,
 ) (bool, error) {
-	return false, fmt.Errorf("not implemented")
+	// Mock implementation - return true for common file types
+	commonExtensions := []string{".jar", ".pom", ".tgz", ".tar.gz", ".zip", ".rpm", ".deb"}
+	for _, ext := range commonExtensions {
+		if strings.HasSuffix(fileName, ext) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 type repomdData struct {

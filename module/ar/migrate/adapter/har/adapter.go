@@ -76,7 +76,12 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 ) {
 	return nil, nil
 }
-func (a *adapter) GetVersions(p types.Package, node *types.TreeNode, registry, pkg string, artifactType types.ArtifactType) ([]types.Version, error) {
+func (a *adapter) GetVersions(
+	p types.Package,
+	node *types.TreeNode,
+	registry, pkg string,
+	artifactType types.ArtifactType,
+) ([]types.Version, error) {
 	return nil, nil
 }
 func (a *adapter) GetFiles(registry string) ([]types.File, error) { return nil, nil }
@@ -129,9 +134,13 @@ func (a *adapter) AddNPMTag(version string, uri string) error {
 
 func (a *adapter) VersionExists(
 	ctx context.Context,
+	p types.Package,
 	registryRef, pkg, version string,
 	artifactType types.ArtifactType,
 ) (bool, error) {
+	if artifactType == types.HELM_LEGACY {
+		artifactType = types.HELM
+	}
 	return a.client.artifactVersionExists(ctx, registryRef, pkg, version, artifactType)
 }
 

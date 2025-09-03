@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/harness/harness-cli/util/common"
 	"io"
 	"os"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	types2 "github.com/google/go-containerregistry/pkg/v1/types"
+	"github.com/harness/harness-cli/util/common"
 
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
@@ -103,7 +105,7 @@ func (r *Package) Pre(ctx context.Context) error {
 	startTime := time.Now()
 
 	if r.artifactType == types.HELM_LEGACY && r.pkg.Name != "" && r.pkg.Version != "" && r.mapping.Ref != "" {
-		exists, err := r.destAdapter.VersionExists(ctx,
+		exists, err := r.destAdapter.VersionExists(ctx, r.pkg,
 			util.GetRegistryRef(config.Global.AccountID, r.mapping.Ref, r.destRegistry), r.pkg.Name, r.pkg.Version,
 			r.artifactType)
 		if err != nil {
@@ -437,6 +439,8 @@ func (r *Package) pushChart(ctx context.Context, chartPath string, dstRef string
 	check(err, "adding config JSON")
 
 	img = mutate.ConfigMediaType(img, "application/vnd.cncf.helm.config.v1+json")
+	img = mutate.MediaType(img, types2.OCIManifestSchema1)
+
 	annotations := map[string]string{
 		"org.opencontainers.image.title":       truncate(meta.Name),
 		"org.opencontainers.image.description": truncate(meta.Description),
