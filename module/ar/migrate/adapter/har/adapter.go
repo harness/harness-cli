@@ -3,6 +3,7 @@ package har
 import (
 	"context"
 	"fmt"
+
 	//"github.com/harness/harness-cli/module/ar/migrate"
 	//client2 "github.com/harness/harness-cli/util/client"
 	"io"
@@ -75,7 +76,7 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 ) {
 	return nil, nil
 }
-func (a *adapter) GetVersions(registry, pkg string, artifactType types.ArtifactType) ([]types.Version, error) {
+func (a *adapter) GetVersions(p types.Package, node *types.TreeNode, registry, pkg string, artifactType types.ArtifactType) ([]types.Version, error) {
 	return nil, nil
 }
 func (a *adapter) GetFiles(registry string) ([]types.File, error) { return nil, nil }
@@ -140,4 +141,20 @@ func (a *adapter) FileExists(
 	artifactType types.ArtifactType,
 ) (bool, error) {
 	return a.client.artifactFileExists(ctx, registryRef, pkg, version, fileName, artifactType)
+}
+
+func (a *adapter) CreateVersion(
+	registry string,
+	artifactName string,
+	version string,
+	artifactType types.ArtifactType,
+	files []*types.PackageFiles,
+	_ map[string]interface{},
+) error {
+	switch artifactType {
+	case types.GO:
+		return a.client.createGoVersion(registry, artifactName, version, files)
+	default:
+		return fmt.Errorf("not implemented")
+	}
 }

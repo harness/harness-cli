@@ -108,7 +108,7 @@ func (r *File) Pre(ctx context.Context) error {
 	logger.Info().Msg("Starting version pre-migration step")
 	startTime := time.Now()
 
-	if r.artifactType != types.MAVEN && r.pkg.Name != "" && r.version.Name != "" && r.file.Name != "" {
+	if r.artifactType != types.MAVEN && r.pkg.Name != "" && r.version.Name != "" && r.file.Name != "" && r.mapping.Ref != "" {
 		exists, err := r.destAdapter.FileExists(ctx,
 			util.GetRegistryRef(config.Global.AccountID, r.mapping.Ref, r.destRegistry),
 			r.pkg.Name, r.version.Name, r.file.Name, r.artifactType)

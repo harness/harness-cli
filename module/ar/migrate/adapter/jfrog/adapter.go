@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	adp "github.com/harness/harness-cli/module/ar/migrate/adapter"
@@ -193,7 +194,30 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 		if err != nil {
 			return nil, fmt.Errorf("extract RPM package URLs: %w", err)
 		}
-
+		return packages, nil
+	} else if artifactType == types.GO {
+		leaves, _ := tree.GetAllFiles(root)
+		packageMap := make(map[string]bool)
+		for _, leaf := range leaves {
+			if leaf.Folder {
+				continue
+			}
+			if !strings.Contains(leaf.Uri, "/@v/") {
+				continue
+			}
+			pkgName := strings.Split(leaf.Uri, "/@v/")[0]
+			path := "/"
+			if _, ok := packageMap[pkgName]; ok {
+				continue
+			}
+			packageMap[pkgName] = true
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     path,
+				Name:     strings.TrimPrefix(pkgName, path),
+				Size:     leaf.Size,
+			})
+		}
 		return packages, nil
 	} else {
 		return []types.Package{}, errors.New("unknown artifact type")
@@ -294,7 +318,12 @@ func extractRPMPackages(file io.Reader, registry string) ([]types.Package, error
 	return packages, nil
 }
 
-func (a *adapter) GetVersions(registry, pkg string, artifactType types.ArtifactType) ([]types.Version, error) {
+func (a *adapter) GetVersions(
+	p types.Package,
+	node *types.TreeNode,
+	registry, pkg string,
+	artifactType types.ArtifactType,
+) ([]types.Version, error) {
 	if artifactType == types.GENERIC {
 		return []types.Version{
 			{
@@ -361,6 +390,44 @@ func (a *adapter) GetVersions(registry, pkg string, artifactType types.ArtifactT
 				Path:     href,
 				Name:     version,
 				Size:     -1,
+			})
+		}
+		return versions, nil
+	}
+	if artifactType == types.GO {
+		var versions []types.Version
+		if node == nil {
+			return nil, errors.New("node is nil")
+		}
+		versionPath := p.Path + p.Name + "/@v"
+		packageNode, err := tree.GetNodeForPath(node, versionPath)
+		if err != nil {
+			return nil, fmt.Errorf("get node for path: %w", err)
+		}
+		leaves, err := tree.GetAllFiles(packageNode)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+		versionMap := make(map[string]bool)
+		for _, leaf := range leaves {
+			if leaf.Folder {
+				continue
+			}
+			extension := filepath.Ext(leaf.Name)
+			if extension != ".zip" {
+				continue
+			}
+			versionName := strings.TrimSuffix(leaf.Name, extension)
+			if _, ok := versionMap[versionName]; ok {
+				continue
+			}
+			versionMap[versionName] = true
+			versions = append(versions, types.Version{
+				Registry: registry,
+				Pkg:      pkg,
+				Path:     versionPath,
+				Name:     versionName,
+				Size:     leaf.Size,
 			})
 		}
 		return versions, nil
@@ -460,4 +527,15 @@ type primaryPackage struct {
 	Size struct {
 		Package int `xml:"package,attr"`
 	} `xml:"size"`
+}
+
+func (a *adapter) CreateVersion(
+	registry string,
+	artifactName string,
+	version string,
+	artifactType types.ArtifactType,
+	files []*types.PackageFiles,
+	metadata map[string]interface{},
+) error {
+	return nil
 }

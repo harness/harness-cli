@@ -48,3 +48,7 @@ mappings:
     sourceRegistry: src
     destinationRegistry: npm
     ref: /org/project
+  - artifactType: GO
+    sourceRegistry: src
+    destinationRegistry: dst
+    ref: /org/project

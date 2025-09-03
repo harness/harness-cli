@@ -102,7 +102,7 @@ func (r *Package) Pre(ctx context.Context) error {
 	logger.Info().Msg("Starting package pre-migration step")
 	startTime := time.Now()
 
-	if r.artifactType == types.HELM_LEGACY && r.pkg.Name != "" && r.pkg.Version != "" {
+	if r.artifactType == types.HELM_LEGACY && r.pkg.Name != "" && r.pkg.Version != "" && r.mapping.Ref != "" {
 		exists, err := r.destAdapter.VersionExists(ctx,
 			util.GetRegistryRef(config.Global.AccountID, r.mapping.Ref, r.destRegistry), r.pkg.Name, r.pkg.Version,
 			r.artifactType)
@@ -126,7 +126,7 @@ func (r *Package) Pre(ctx context.Context) error {
 		}
 	}
 
-	if r.artifactType == types.DOCKER || r.artifactType == types.HELM {
+	if (r.artifactType == types.DOCKER || r.artifactType == types.HELM) && (r.mapping.Ref != "") {
 		srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.pkg.Name)
 		dstImage, _ := r.destAdapter.GetOCIImagePath(r.destRegistry, r.pkg.Name)
 		logger.Info().Ctx(ctx).Msgf("Checking if should be skipped -- repository %s to %s", srcImage, dstImage)
@@ -240,7 +240,7 @@ func (r *Package) Migrate(ctx context.Context) error {
 	} else if r.artifactType == types.RPM {
 		r.migrateRPM(ctx)
 	} else {
-		versions, err := r.srcAdapter.GetVersions(r.srcRegistry, r.pkg.Name, r.artifactType)
+		versions, err := r.srcAdapter.GetVersions(r.pkg, r.node, r.srcRegistry, r.pkg.Name, r.artifactType)
 		if err != nil {
 			logger.Error().Msg("Failed to get versions")
 			return fmt.Errorf("get versions failed: %w", err)

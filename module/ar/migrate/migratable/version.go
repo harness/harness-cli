@@ -3,6 +3,8 @@ package migratable
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
@@ -113,6 +115,49 @@ func (r *Version) Migrate(ctx context.Context) error {
 			job := NewFileJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, r.pkg,
 				r.version, r.node, file, r.stats, r.mapping, r.concurrency)
 			jobs = append(jobs, job)
+		}
+	}
+	if r.artifactType == types.GO {
+		// 1. get all files .mod, .zip, .info
+		// 2. download all files
+		// 3. pass it to create version
+		files, err := tree.GetAllFiles(r.node)
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to get files from tree")
+			return fmt.Errorf("get files from tree failed: %w", err)
+		}
+		versionFiles := []*types.File{}
+		for _, file := range files {
+			if file.Folder {
+				continue
+			}
+			extension := filepath.Ext(file.Name)
+			if extension != ".zip" && extension != ".mod" && extension != ".info" {
+				continue
+			}
+			fileVersion := strings.TrimSuffix(file.Name, extension)
+			if fileVersion == r.version.Name {
+				versionFiles = append(versionFiles, file)
+			}
+		}
+		downloadedFiles := []*types.PackageFiles{}
+		for _, file := range versionFiles {
+			downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, file.Uri)
+			if err != nil {
+				logger.Error().Err(err).Msgf("Failed to download file %s", file.Name)
+				return fmt.Errorf("download file %s failed: %w", file.Name, err)
+			}
+			downloadedFiles = append(downloadedFiles, &types.PackageFiles{
+				File:         file,
+				DownloadFile: downloadFile,
+				Header:       &header,
+			})
+		}
+
+		err = r.destAdapter.CreateVersion(r.destRegistry, r.pkg.Name, r.version.Name, r.artifactType, downloadedFiles, nil)
+
+		if err != nil {
+			return err
 		}
 	}
 
