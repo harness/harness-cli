@@ -250,6 +250,56 @@ func (c *client) uploadNPMFile(
 	return nil
 }
 
+func (c *client) uploadRPMFile(
+	registry string,
+	filename string,
+	file io.ReadCloser,
+) error {
+	fileUri := strings.TrimPrefix(filename, "/")
+	url := fmt.Sprintf("%s/pkg/%s/%s/rpm/%s", c.url, config.Global.AccountID, registry, fileUri)
+
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+
+	// Process multipart form asynchronously
+	go func() {
+		defer pw.Close()
+		defer writer.Close()
+
+		part, err := writer.CreateFormFile("file", filename)
+		if err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+
+		if _, err := io.Copy(part, file); err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+	}()
+
+	req, err := http2.NewRequest(http2.MethodPut, url, pr)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to upload file '%s': %w", fileUri, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to upload file '%s', status code: %d, response: %s",
+			fileUri, resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
 func (c *client) AddNPMTag(version string, uri string) error {
 	versionJSON, err := json.Marshal(version)
 	if err != nil {

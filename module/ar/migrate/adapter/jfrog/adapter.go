@@ -1,7 +1,9 @@
 package jfrog
 
 import (
+	"compress/gzip"
 	"context"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -165,6 +167,34 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 		}
 
 		return packages, nil
+	} else if artifactType == types.RPM {
+		node, err := tree.GetNodeForPath(root, "/repodata/repomd.xml")
+		if err != nil {
+			return nil, fmt.Errorf("get node for path: %w", err)
+		}
+		file, _, err := a.DownloadFile(registry, node.File.Uri)
+		if err != nil {
+			return nil, fmt.Errorf("download repomd.xml: %w", err)
+		}
+		defer file.Close()
+
+		primaryLocation, err := extractPrimaryLocation(file)
+		if err != nil {
+			return nil, fmt.Errorf("extract primary location: %w", err)
+		}
+
+		primaryFile, _, err := a.DownloadFile(registry, primaryLocation)
+		if err != nil {
+			return nil, fmt.Errorf("download primary file: %w", err)
+		}
+		defer primaryFile.Close()
+
+		// Extract package URLs from primary.xml.gz
+		packages, err := extractRPMPackages(primaryFile, registry)
+		if err != nil {
+			return nil, fmt.Errorf("extract RPM package URLs: %w", err)
+		}
+		return packages, nil
 	} else if artifactType == types.GO {
 		leaves, _ := tree.GetAllFiles(root)
 		packageMap := make(map[string]bool)
@@ -229,7 +259,71 @@ func resolveHref(basePath, href string) string {
 	// Clean collapses ../, ./, and duplicate slashes.
 }
 
-func (a *adapter) GetVersions(p types.Package, node *types.TreeNode, registry, pkg string, artifactType types.ArtifactType) ([]types.Version, error) {
+func extractPrimaryLocation(file io.Reader) (string, error) {
+	var repomd repomdData
+	if err := xml.NewDecoder(file).Decode(&repomd); err != nil {
+		return "", fmt.Errorf("parse repomd.xml: %w", err)
+	}
+
+	// Find the data element with type="primary"
+	for _, data := range repomd.Data {
+		if data.Type == "primary" {
+			return data.Location.Href, nil
+		}
+	}
+
+	return "", fmt.Errorf("primary.xml.gz location not found in repomd.xml")
+}
+
+func extractRPMPackages(file io.Reader, registry string) ([]types.Package, error) {
+	gz, err := gzip.NewReader(file)
+	if err != nil {
+		return nil, fmt.Errorf("create gzip reader: %w", err)
+	}
+	defer gz.Close()
+
+	decoder := xml.NewDecoder(gz)
+	var packages []types.Package
+
+	for {
+		token, err := decoder.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("parse XML: %w", err)
+		}
+
+		start, ok := token.(xml.StartElement)
+		if !ok {
+			continue
+		}
+
+		if start.Name.Local == "package" {
+			var pkg primaryPackage
+			if err := decoder.DecodeElement(&pkg, &start); err != nil {
+				return nil, fmt.Errorf("decode package: %w", err)
+			}
+
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     "/",
+				Name:     path.Base(pkg.Location.Href),
+				URL:      pkg.Location.Href,
+				Size:     pkg.Size.Package,
+			})
+		}
+	}
+
+	return packages, nil
+}
+
+func (a *adapter) GetVersions(
+	p types.Package,
+	node *types.TreeNode,
+	registry, pkg string,
+	artifactType types.ArtifactType,
+) ([]types.Version, error) {
 	if artifactType == types.GENERIC {
 		return []types.Version{
 			{
@@ -413,6 +507,26 @@ func (a *adapter) FileExists(
 	artifactType types.ArtifactType,
 ) (bool, error) {
 	return false, fmt.Errorf("not implemented")
+}
+
+type repomdData struct {
+	XMLName xml.Name `xml:"repomd"`
+	Data    []struct {
+		Type     string `xml:"type,attr"`
+		Location struct {
+			Href string `xml:"href,attr"`
+		} `xml:"location"`
+	} `xml:"data"`
+}
+
+type primaryPackage struct {
+	XMLName  xml.Name `xml:"package"`
+	Location struct {
+		Href string `xml:"href,attr"`
+	} `xml:"location"`
+	Size struct {
+		Package int `xml:"package,attr"`
+	} `xml:"size"`
 }
 
 func (a *adapter) CreateVersion(

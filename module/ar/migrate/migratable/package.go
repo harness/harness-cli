@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/harness/harness-cli/util/common"
 	"io"
 	"os"
 	"strings"
@@ -236,6 +237,8 @@ func (r *Package) Migrate(ctx context.Context) error {
 	} else if r.artifactType == types.HELM_LEGACY {
 		// TODO: Replace by providing function to this migration job instead of complete implementation here.
 		r.migrateLegacyHelm(ctx)
+	} else if r.artifactType == types.RPM {
+		r.migrateRPM(ctx)
 	} else {
 		versions, err := r.srcAdapter.GetVersions(r.pkg, r.node, r.srcRegistry, r.pkg.Name, r.artifactType)
 		if err != nil {
@@ -321,6 +324,38 @@ func (r *Package) migrateLegacyHelm(ctx context.Context) error {
 	}
 
 	pterm.Success.Println(fmt.Sprintf("Successfully pushed helm chart %s to %s", r.pkg.Name, refStr))
+	r.stats.FileStats = append(r.stats.FileStats, stat)
+	return nil
+}
+
+func (r *Package) migrateRPM(ctx context.Context) error {
+	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.URL)
+	if err != nil {
+		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download RPM package %s", r.pkg.URL)
+		pterm.Error.Println(fmt.Sprintf("Failed to download RPM package %s", r.pkg.URL))
+		return err
+	}
+	defer file.Close()
+
+	title := fmt.Sprintf("%s (%s)", r.pkg.Name, common.GetSize(int64(r.pkg.Size)))
+	pterm.Info.Println(fmt.Sprintf("Copying file %s from %s to %s", r.pkg.Name, r.srcRegistry, r.destRegistry))
+	err = r.destAdapter.UploadFile(r.destRegistry, file, &types.File{Uri: r.pkg.URL}, header, r.pkg.Name, r.pkg.Name,
+		r.artifactType, nil)
+	stat := types.FileStat{
+		Name:     r.pkg.Name,
+		Registry: r.srcRegistry,
+		Uri:      r.pkg.URL,
+		Size:     int64(r.pkg.Size),
+		Status:   types.StatusSuccess,
+	}
+	if err != nil {
+		r.logger.Error().Err(err).Msg("Failed to upload file")
+		stat.Status = types.StatusFail
+		stat.Error = err.Error()
+		pterm.Error.Println(title)
+	} else {
+		pterm.Success.Println(title)
+	}
 	r.stats.FileStats = append(r.stats.FileStats, stat)
 	return nil
 }
