@@ -367,7 +367,10 @@ const labelMaxBytes = 1024
 func readChartMeta(path string) (*chart.Metadata, error) {
 	ch, err := loader.Load(path) // understands .tgz & directories
 	if err != nil {
-		return nil, err
+		log.Error().Msgf("Failed to load chart metadata from %s", path)
+	}
+	if ch == nil || ch.Metadata == nil {
+		return &chart.Metadata{}, err
 	}
 	return ch.Metadata, nil
 }
@@ -402,21 +405,32 @@ func chartLabels(meta *chart.Metadata) map[string]string {
 		"chart.type":        truncate(meta.Type),
 	}
 	// objects & complex lists → JSON
-	if b, _ := json.Marshal(meta.Maintainers); len(b) > 0 {
-		lbl["chart.maintainers"] = truncate(string(b))
+	if meta.Maintainers != nil {
+		if b, _ := json.Marshal(meta.Maintainers); len(b) > 0 {
+			lbl["chart.maintainers"] = truncate(string(b))
+		}
 	}
-	if b, _ := json.Marshal(meta.Dependencies); len(b) > 0 {
-		lbl["chart.dependencies"] = truncate(string(b))
+
+	if meta.Dependencies != nil {
+		if b, _ := json.Marshal(meta.Dependencies); len(b) > 0 {
+			lbl["chart.dependencies"] = truncate(string(b))
+		}
 	}
-	if b, _ := json.Marshal(meta.Annotations); len(b) > 0 {
-		lbl["chart.annotations"] = truncate(string(b))
+
+	if meta.Annotations != nil {
+		if b, _ := json.Marshal(meta.Annotations); len(b) > 0 {
+			lbl["chart.annotations"] = truncate(string(b))
+		}
 	}
 	return lbl
 }
 
 // pushChart uploads chart.tar.gz --> oci://<dstRef>
 func (r *Package) pushChart(ctx context.Context, chartPath string, dstRef string) error {
-	meta, _ := readChartMeta(chartPath)
+	meta, err := readChartMeta(chartPath)
+	if err != nil {
+		log.Error().Msgf("Failed to read chart metadata from %s", chartPath)
+	}
 	labels := chartLabels(meta)
 	ref, err := name.ParseReference(dstRef, name.WeakValidation)
 	//check(err, "parsing reference")
