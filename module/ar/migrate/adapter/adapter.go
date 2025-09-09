@@ -41,7 +41,7 @@ type Adapter interface {
 		metadata map[string]interface{},
 	) error
 	GetOCIImagePath(registry string, image string) (string, error)
-	AddNPMTag(version string, uri string) error
+	AddNPMTag(registry string, name string, version string, uri string) error
 	VersionExists(
 		ctx context.Context,
 		p types.Package,

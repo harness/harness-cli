@@ -128,8 +128,8 @@ func (a *adapter) GetOCIImagePath(registry string, image string) (string, error)
 	return util.GenOCIImagePath(parse.Host, strings.ToLower(config.Global.AccountID), registry, image), nil
 }
 
-func (a *adapter) AddNPMTag(version string, uri string) error {
-	return a.client.AddNPMTag(version, uri)
+func (a *adapter) AddNPMTag(registry string, name string, version string, uri string) error {
+	return a.client.AddNPMTag(registry, name, version, uri)
 }
 
 func (a *adapter) VersionExists(

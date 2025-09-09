@@ -358,7 +358,7 @@ func (a *adapter) constructUploadPath(
 	return fmt.Sprintf("%s/%s", artifactName, version)
 }
 
-func (a *adapter) AddNPMTag(version string, uri string) error {
+func (a *adapter) AddNPMTag(registry string, name string, version string, uri string) error {
 	// Nexus V3 doesn't have a direct API for adding NPM tags
 	// This would typically be handled through the NPM client or Nexus UI
 	log.Warn().Msg("NPM tag addition not directly supported in Nexus V3 adapter")

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+
 	"github.com/rs/zerolog/log"
 )
 
@@ -213,7 +214,7 @@ func initMockData() *mockData {
 			"npm-local": {
 				{
 					Registry:     "npm-local",
-					Name:         "package.tgz",
+					Name:         "sample-package-1.0.0.tgz",
 					Uri:          "/sample-package/-/sample-package-1.0.0.tgz",
 					Folder:       false,
 					Size:         2048,
@@ -249,6 +250,71 @@ func initMockData() *mockData {
 			"maven-local/.pypi/simple.html":   `<html><body><a href="requests/">requests</a><br/><a href="flask/">flask</a><br/></body></html>`,
 			"maven-local/repodata/repomd.xml": `<?xml version="1.0" encoding="UTF-8"?><repomd><data type="primary"><location href="repodata/primary.xml.gz"/></data></repomd>`,
 			"maven-local/index.yaml":          `apiVersion: v1\nentries:\n  nginx:\n    - name: nginx\n      version: 1.0.0\n      urls:\n        - charts/nginx-1.0.0.tgz`,
+			"npm-local/sample-package": `{
+  "name": "sample-package",
+  "description": "A sample NPM package for testing migration",
+  "dist-tags": {
+    "latest": "2.0.0",
+    "beta" : "2.0.0"
+  },
+  "versions": {
+    "1.0.0": {
+      "name": "sample-package",
+      "version": "1.0.0",
+      "description": "A sample NPM package for testing migration",
+      "main": "index.js",
+      "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+      },
+      "keywords": ["sample", "testing", "migration"],
+      "author": "Test Author",
+      "license": "MIT",
+      "dist": {
+        "tarball": "http://localhost:8081/artifactory/npm-local/sample-package/-/sample-package-1.0.0.tgz",
+        "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80707"
+      }
+    },
+    "1.1.0": {
+      "name": "sample-package",
+      "version": "1.1.0",
+      "description": "A sample NPM package for testing migration",
+      "main": "index.js",
+      "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+      },
+      "keywords": ["sample", "testing", "migration"],
+      "author": "Test Author",
+      "license": "MIT",
+      "dist": {
+        "tarball": "http://localhost:8081/artifactory/npm-local/sample-package/-/sample-package-1.1.0.tgz",
+        "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80711"
+      }
+    },
+    "2.0.0": {
+      "name": "sample-package",
+      "version": "2.0.0",
+      "description": "A sample NPM package for testing migration",
+      "main": "index.js",
+      "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+      },
+      "keywords": ["sample", "testing", "migration"],
+      "author": "Test Author",
+      "license": "MIT",
+      "dist": {
+        "tarball": "http://localhost:8081/artifactory/npm-local/sample-package/-/sample-package-2.0.0.tgz",
+        "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80712"
+      }
+    }
+  },
+  "time": {
+    "created": "2023-01-01T00:00:00.000Z",
+    "modified": "2023-03-01T00:00:00.000Z",
+    "1.0.0": "2023-01-01T00:00:00.000Z",
+    "1.1.0": "2023-02-01T00:00:00.000Z",
+    "2.0.0": "2023-03-01T00:00:00.000Z"
+  }
+}`,
 		},
 	}
 }
@@ -268,6 +334,64 @@ func (c *client) getDefaultFileContent(path string) string {
 		return `{"mock": "data", "version": "1.0.0"}`
 	}
 	return "mock file content"
+}
+
+// extractPackageNameFromPath extracts the package name from a .tgz file path
+func extractPackageNameFromPath(path string) string {
+	// Extract filename from path
+	parts := strings.Split(path, "/")
+	filename := parts[len(parts)-1]
+
+	// Remove .tgz extension
+	if strings.HasSuffix(filename, ".tgz") {
+		filename = strings.TrimSuffix(filename, ".tgz")
+	}
+
+	// Extract package name based on pattern
+	if strings.HasPrefix(filename, "@") {
+		// For scoped packages like @angular-core-15.2.1
+		parts := strings.Split(filename, "-")
+		if len(parts) >= 3 {
+			return strings.Join(parts[:len(parts)-1], "-")
+		}
+	} else {
+		// For regular packages like lodash-4.17.21
+		lastHyphenIndex := strings.LastIndex(filename, "-")
+		if lastHyphenIndex > 0 {
+			return filename[:lastHyphenIndex]
+		}
+	}
+
+	return filename
+}
+
+// extractVersionFromPath extracts the version from a .tgz file path
+func extractVersionFromPath(path string) string {
+	// Extract filename from path
+	parts := strings.Split(path, "/")
+	filename := parts[len(parts)-1]
+
+	// Remove .tgz extension
+	if strings.HasSuffix(filename, ".tgz") {
+		filename = strings.TrimSuffix(filename, ".tgz")
+	}
+
+	// Extract version based on pattern
+	if strings.HasPrefix(filename, "@") {
+		// For scoped packages like @angular-core-15.2.1
+		parts := strings.Split(filename, "-")
+		if len(parts) >= 3 {
+			return parts[len(parts)-1]
+		}
+	} else {
+		// For regular packages like lodash-4.17.21
+		lastHyphenIndex := strings.LastIndex(filename, "-")
+		if lastHyphenIndex > 0 {
+			return filename[lastHyphenIndex+1:]
+		}
+	}
+
+	return "1.0.0" // default version
 }
 
 // getDefaultFiles returns default mock files for a registry

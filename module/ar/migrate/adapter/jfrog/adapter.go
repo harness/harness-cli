@@ -219,6 +219,66 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			})
 		}
 		return packages, nil
+	} else if artifactType == types.NPM {
+		leaves, _ := tree.GetAllFiles(root)
+		packageMap := make(map[string]bool)
+		for _, leaf := range leaves {
+			if leaf.Folder {
+				continue
+			}
+			if !strings.Contains(leaf.Uri, ".tgz") {
+				continue
+			}
+			filename := leaf.Name
+			if !strings.HasSuffix(filename, ".tgz") {
+				continue
+			}
+
+			// Extract package name from URI path before "/-/" delimiter
+			var pkgName string
+			uri := leaf.Uri
+			if idx := strings.Index(uri, "/-/"); idx != -1 {
+				// Get the path before "/-/"
+				pathBeforeDelimiter := uri[:idx]
+				// Remove leading slash if present
+				if strings.HasPrefix(pathBeforeDelimiter, "/") {
+					pathBeforeDelimiter = pathBeforeDelimiter[1:]
+				}
+				pkgName = pathBeforeDelimiter
+			} else {
+				// Fallback to extracting from filename if URI doesn't contain "/-/"
+				nameWithVersion := strings.TrimSuffix(filename, ".tgz")
+				if strings.HasPrefix(nameWithVersion, "@") {
+					// For scoped packages like @scope-package-name-version
+					parts := strings.Split(nameWithVersion, "-")
+					if len(parts) >= 3 {
+						pkgName = strings.Join(parts[:len(parts)-1], "-")
+					} else {
+						pkgName = nameWithVersion
+					}
+				} else {
+					// For regular packages like package-name-version
+					lastHyphenIndex := strings.LastIndex(nameWithVersion, "-")
+					if lastHyphenIndex > 0 {
+						pkgName = nameWithVersion[:lastHyphenIndex]
+					} else {
+						pkgName = nameWithVersion
+					}
+				}
+			}
+			path := "/"
+			if _, ok := packageMap[pkgName]; ok {
+				continue
+			}
+			packageMap[pkgName] = true
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     path,
+				Name:     pkgName,
+				Size:     leaf.Size,
+			})
+		}
+		return packages, nil
 	} else {
 		return []types.Package{}, errors.New("unknown artifact type")
 	}
@@ -432,6 +492,72 @@ func (a *adapter) GetVersions(
 		}
 		return versions, nil
 	}
+	if artifactType == types.NPM {
+		var versions []types.Version
+		if node == nil {
+			return nil, errors.New("node is nil")
+		}
+
+		// For NPM, we need to find all .tgz files for the specific package
+		leaves, err := tree.GetAllFiles(node)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+
+		versionMap := make(map[string]bool)
+		for _, leaf := range leaves {
+			if leaf.Folder {
+				continue
+			}
+			if !strings.Contains(leaf.Uri, ".tgz") {
+				continue
+			}
+
+			// Extract package name and version from .tgz filename
+			filename := leaf.Name
+			if !strings.HasSuffix(filename, ".tgz") {
+				continue
+			}
+
+			// Remove .tgz extension
+			nameWithVersion := strings.TrimSuffix(filename, ".tgz")
+
+			// Extract version from filename based on package type
+			var version string
+			if strings.HasPrefix(nameWithVersion, "@") {
+				// For scoped packages like @angular-core-15.2.1
+				parts := strings.Split(nameWithVersion, "-")
+				if len(parts) >= 3 {
+					// Check if this file belongs to the current package
+					packagePart := strings.Join(parts[:len(parts)-1], "-")
+					if packagePart == pkg {
+						version = parts[len(parts)-1] // Last part is the version
+					}
+				}
+			} else {
+				// For regular packages like lodash-4.17.21
+				lastHyphenIndex := strings.LastIndex(nameWithVersion, "-")
+				if lastHyphenIndex > 0 {
+					version = nameWithVersion[lastHyphenIndex+1:] // Everything after last hyphen is version
+				}
+			}
+
+			// Skip if version is empty or already processed
+			if version == "" || versionMap[version] {
+				continue
+			}
+
+			versionMap[version] = true
+			versions = append(versions, types.Version{
+				Registry: registry,
+				Pkg:      pkg,
+				Path:     leaf.Uri,
+				Name:     version,
+				Size:     leaf.Size,
+			})
+		}
+		return versions, nil
+	}
 	return []types.Version{}, errors.New("unknown artifact type")
 }
 
@@ -489,7 +615,7 @@ func isMavenMetadataFile(filename string) bool {
 		filename == mavenMetadataFile+extensionSHA512
 }
 
-func (a *adapter) AddNPMTag(version string, uri string) error {
+func (a *adapter) AddNPMTag(registry string, name string, version string, uri string) error {
 	return nil
 }
 

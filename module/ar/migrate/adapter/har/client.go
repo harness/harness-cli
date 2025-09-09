@@ -223,8 +223,7 @@ func (c *client) uploadNPMFile(
 	f *types.File,
 	file io.ReadCloser,
 ) error {
-	fileUri := strings.TrimPrefix(f.Uri, "/")
-	url := fmt.Sprintf("%s/pkg/%s/%s/npm/%s", c.url, config.Global.AccountID, registry, fileUri)
+	url := fmt.Sprintf("%s/pkg/%s/%s/npm/%s", c.url, config.Global.AccountID, registry, name)
 
 	// Create request
 	req, err := http2.NewRequest(http2.MethodPut, url, file)
@@ -236,7 +235,7 @@ func (c *client) uploadNPMFile(
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to upload file '%s': %w", fileUri, err)
+		return fmt.Errorf("failed to upload file '%s': %w", url, err)
 	}
 	defer resp.Body.Close()
 
@@ -244,7 +243,7 @@ func (c *client) uploadNPMFile(
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to upload file '%s', status code: %d, response: %s",
-			fileUri, resp.StatusCode, string(body))
+			url, resp.StatusCode, string(body))
 	}
 
 	return nil
@@ -300,13 +299,15 @@ func (c *client) uploadRPMFile(
 	return nil
 }
 
-func (c *client) AddNPMTag(version string, uri string) error {
+func (c *client) AddNPMTag(registry string, name string, version string, tagUri string) error {
+	url := fmt.Sprintf("%s/pkg/%s/%s/npm", c.url, config.Global.AccountID, registry)
+	url = url + tagUri
 	versionJSON, err := json.Marshal(version)
 	if err != nil {
 		return fmt.Errorf("failed to marshal version to json: %w", err)
 	}
 
-	req, err := http2.NewRequest(http2.MethodPut, uri, bytes.NewReader(versionJSON))
+	req, err := http2.NewRequest(http2.MethodPut, url, bytes.NewReader(versionJSON))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -315,7 +316,7 @@ func (c *client) AddNPMTag(version string, uri string) error {
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to upload file '%s': %w", uri, err)
+		return fmt.Errorf("failed to upload file '%s': %w", url, err)
 	}
 	defer resp.Body.Close()
 
@@ -323,7 +324,7 @@ func (c *client) AddNPMTag(version string, uri string) error {
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to upload file '%s', status code: %d, response: %s",
-			uri, resp.StatusCode, string(body))
+			url, resp.StatusCode, string(body))
 	}
 
 	return nil
