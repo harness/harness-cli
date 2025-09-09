@@ -322,21 +322,22 @@ func (r *File) Migrate(ctx context.Context) error {
 			return err
 		}
 
-		//// Add all dist-tags from metadata
-		//for tagName, tagVersion := range metadata.DistTags {
-		//	distTagsUri := r.file.Uri
-		//	if idx := strings.LastIndex(distTagsUri, "/-/"); idx != -1 {
-		//		distTagsUri = distTagsUri[:idx] + "/-/package/+ " + r.pkg.Name + "/dist-tags"
-		//	}
-		//
-		//	err = r.destAdapter.AddNPMTag(tagVersion, tagName)
-		//	if err != nil {
-		//		logger.Error().Err(err).Msgf("Failed to add NPM tag %s: %s", tagName, tagVersion)
-		//		// Continue with other tags even if one fails
-		//	} else {
-		//		logger.Info().Msgf("Successfully added NPM tag %s: %s", tagName, tagVersion)
-		//	}
-		//}
+		// Add all dist-tags from metadata
+		for tagName, tagVersion := range metadata.DistTags {
+			distTagsUri := r.file.Uri
+			if idx := strings.LastIndex(distTagsUri, "/-/"); idx != -1 {
+				distTagsUri = "/-/package/" + r.pkg.Name + "/dist-tags"
+			}
+
+			distTagsUri = distTagsUri + "/" + tagName
+			err = r.destAdapter.AddNPMTag(r.destRegistry, r.pkg.Name, tagVersion, distTagsUri)
+			if err != nil {
+				logger.Error().Err(err).Msgf("Failed to add NPM tag %s: %s", tagName, tagVersion)
+				// Continue with other tags even if one fails
+			} else {
+				logger.Info().Msgf("Successfully added NPM tag %s: %s", tagName, tagVersion)
+			}
+		}
 
 		stat := types.FileStat{
 			Name:     r.file.Name,
