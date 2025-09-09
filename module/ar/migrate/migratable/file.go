@@ -290,7 +290,7 @@ func (r *File) Migrate(ctx context.Context) error {
 		}
 		var tarballURL string
 		for _, p := range metadata.Versions {
-			if p.Version == r.pkg.Version {
+			if p.Version == r.version.Name {
 				metadata.Versions = map[string]*npm.PackageMetadataVersion{p.Version: p}
 				tarballURL = p.Dist.Tarball
 				break
@@ -324,18 +324,21 @@ func (r *File) Migrate(ctx context.Context) error {
 
 		// Add all dist-tags from metadata
 		for tagName, tagVersion := range metadata.DistTags {
-			distTagsUri := r.file.Uri
-			if idx := strings.LastIndex(distTagsUri, "/-/"); idx != -1 {
-				distTagsUri = "/-/package/" + r.pkg.Name + "/dist-tags"
-			}
+			if tagVersion == r.version.Name {
+				distTagsUri := r.file.Uri
+				if idx := strings.LastIndex(distTagsUri, "/-/"); idx != -1 {
+					distTagsUri = "/-/package/" + r.pkg.Name + "/dist-tags"
+				}
 
-			distTagsUri = distTagsUri + "/" + tagName
-			err = r.destAdapter.AddNPMTag(r.destRegistry, r.pkg.Name, tagVersion, distTagsUri)
-			if err != nil {
-				logger.Error().Err(err).Msgf("Failed to add NPM tag %s: %s", tagName, tagVersion)
-				// Continue with other tags even if one fails
-			} else {
-				logger.Info().Msgf("Successfully added NPM tag %s: %s", tagName, tagVersion)
+				distTagsUri = distTagsUri + "/" + tagName
+				err = r.destAdapter.AddNPMTag(r.destRegistry, r.pkg.Name, tagVersion, distTagsUri)
+				if err != nil {
+					logger.Error().Err(err).Msgf("Failed to add NPM tag %s: %s", tagName, tagVersion)
+					// Continue with other tags even if one fails
+				} else {
+					logger.Info().Msgf("Successfully added NPM tag %s: %s", tagName, tagVersion)
+				}
+				break
 			}
 		}
 

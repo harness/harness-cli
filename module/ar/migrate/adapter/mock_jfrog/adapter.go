@@ -279,34 +279,43 @@ entries:
 			if !strings.Contains(leaf.Uri, ".tgz") {
 				continue
 			}
-			// For NPM packages, extract package name from .tgz filename
-			// NPM .tgz files are typically named: package-name-version.tgz or @scope-package-name-version.tgz
+			// For NPM packages, extract package name from URI path instead of filename
+			// URI structure: /@harness/sample-package/-/@harness/sample-package-1.0.0.tgz
 			filename := leaf.Name
 			if !strings.HasSuffix(filename, ".tgz") {
 				continue
 			}
-			// Remove .tgz extension
-			nameWithVersion := strings.TrimSuffix(filename, ".tgz")
 
-			// Extract package name by removing version (last part after final hyphen)
-			// Handle scoped packages that start with @
+			// Extract package name from URI path before "/-/" delimiter
 			var pkgName string
-			if strings.HasPrefix(nameWithVersion, "@") {
-				// For scoped packages like @scope-package-name-version
-				parts := strings.Split(nameWithVersion, "-")
-				if len(parts) >= 3 {
-					// Rejoin all parts except the last one (version)
-					pkgName = strings.Join(parts[:len(parts)-1], "-")
-				} else {
-					pkgName = nameWithVersion
+			uri := leaf.Uri
+			if idx := strings.Index(uri, "/-/"); idx != -1 {
+				// Get the path before "/-/"
+				pathBeforeDelimiter := uri[:idx]
+				// Remove leading slash if present
+				if strings.HasPrefix(pathBeforeDelimiter, "/") {
+					pathBeforeDelimiter = pathBeforeDelimiter[1:]
 				}
+				pkgName = pathBeforeDelimiter
 			} else {
-				// For regular packages like package-name-version
-				lastHyphenIndex := strings.LastIndex(nameWithVersion, "-")
-				if lastHyphenIndex > 0 {
-					pkgName = nameWithVersion[:lastHyphenIndex]
+				// Fallback to extracting from filename if URI doesn't contain "/-/"
+				nameWithVersion := strings.TrimSuffix(filename, ".tgz")
+				if strings.HasPrefix(nameWithVersion, "@") {
+					// For scoped packages like @scope-package-name-version
+					parts := strings.Split(nameWithVersion, "-")
+					if len(parts) >= 3 {
+						pkgName = strings.Join(parts[:len(parts)-1], "-")
+					} else {
+						pkgName = nameWithVersion
+					}
 				} else {
-					pkgName = nameWithVersion
+					// For regular packages like package-name-version
+					lastHyphenIndex := strings.LastIndex(nameWithVersion, "-")
+					if lastHyphenIndex > 0 {
+						pkgName = nameWithVersion[:lastHyphenIndex]
+					} else {
+						pkgName = nameWithVersion
+					}
 				}
 			}
 			path := "/"
@@ -581,10 +590,7 @@ func (a *adapter) GetVersions(
 				// For regular packages like lodash-4.17.21
 				lastHyphenIndex := strings.LastIndex(nameWithVersion, "-")
 				if lastHyphenIndex > 0 {
-					packagePart := nameWithVersion[:lastHyphenIndex]
-					if packagePart == pkg {
-						version = nameWithVersion[lastHyphenIndex+1:] // Everything after last hyphen is version
-					}
+					version = nameWithVersion[lastHyphenIndex+1:] // Everything after last hyphen is version
 				}
 			}
 
