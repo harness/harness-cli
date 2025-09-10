@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/harness/harness-cli/internal/api/ar"
@@ -68,7 +69,10 @@ func (m *MigrationService) Run(ctx context.Context) error {
 		mappingLogger.Info().Msg("Processing registry migration")
 
 		job := migratable.NewRegistryJob(m.source, m.destination, mapping.SourceRegistry,
-			mapping.DestinationRegistry, mapping.ArtifactType, &transferStats, &mapping, m.config.Concurrency)
+			mapping.DestinationRegistry, mapping.ArtifactType, &transferStats, &mapping, m.config)
+
+		log.Info().Msgf("concurrency: %d, mapping: %+v", m.config.Concurrency, mapping)
+
 		jobs = append(jobs, job)
 
 	}
@@ -88,5 +92,16 @@ func (m *MigrationService) Run(ctx context.Context) error {
 		{"Uri", "Uri"},
 		{"Error", "Error"},
 	})
+
+	// Log the same data as JSON
+	if jsonData, err := json.MarshalIndent(transferStats.FileStats, "", "  "); err == nil {
+		logger.Info().
+			RawJSON("file_stats", jsonData).
+			Int("total_files", len(transferStats.FileStats)).
+			Msg("Migration file statistics")
+	} else {
+		logger.Error().Err(err).Msg("Failed to marshal file stats to JSON")
+	}
+
 	return nil
 }

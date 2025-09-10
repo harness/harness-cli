@@ -75,7 +75,7 @@ func (a *adapter) GetConfig() types.RegistryConfig {
 }
 
 func (a *adapter) ValidateCredentials() (bool, error) { return false, nil }
-func (a *adapter) GetRegistry(registry string) (types.RegistryInfo, error) {
+func (a *adapter) GetRegistry(ctx context.Context, registry string) (types.RegistryInfo, error) {
 	reg, err := a.client.getRegistry(registry)
 	if err != nil {
 		return types.RegistryInfo{}, fmt.Errorf("get registry: %w", err)
@@ -130,20 +130,25 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 		defer os.Remove(tmp.Name())
 		_, err = io.Copy(tmp, file)
 		index, err := repo.LoadIndexFile(tmp.Name())
+		if err != nil {
+			return nil, fmt.Errorf("load index file: %w", err)
+		}
 
 		for name, entries := range index.Entries {
 			for _, ver := range entries {
-				packages = append(packages, types.Package{
+				pkg := types.Package{
 					Registry: registry,
 					Path:     "/",
 					Name:     name,
 					Size:     -1,
 					URL:      ver.URLs[0],
 					Version:  ver.Version,
-				})
+				}
+				packages = append(packages, pkg)
 			}
 		}
 	} else if artifactType == types.PYTHON {
+
 		node, err := tree.GetNodeForPath(root, "/.pypi/simple.html")
 		if err != nil {
 			return nil, fmt.Errorf("get node for path: %w", err)

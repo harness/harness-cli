@@ -29,7 +29,8 @@ type Version struct {
 	node         *types.TreeNode
 	stats        *types.TransferStats
 	mapping      *types.RegistryMapping
-	concurrency  int
+	config       *types.Config
+	registry     types.RegistryInfo
 }
 
 func NewVersionJob(
@@ -43,7 +44,8 @@ func NewVersionJob(
 	node *types.TreeNode,
 	stats *types.TransferStats,
 	mapping *types.RegistryMapping,
-	concurrency int,
+	config *types.Config,
+	registry types.RegistryInfo,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -68,7 +70,8 @@ func NewVersionJob(
 		node:         node,
 		stats:        stats,
 		mapping:      mapping,
-		concurrency:  concurrency,
+		config:       config,
+		registry:     registry,
 	}
 }
 
@@ -113,7 +116,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 		}
 		for _, file := range files {
 			job := NewFileJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, r.pkg,
-				r.version, r.node, file, r.stats, r.mapping, r.concurrency)
+				r.version, r.node, file, r.stats, r.mapping, r.config, r.registry)
 			jobs = append(jobs, job)
 		}
 	}
@@ -154,7 +157,8 @@ func (r *Version) Migrate(ctx context.Context) error {
 			})
 		}
 
-		err = r.destAdapter.CreateVersion(r.destRegistry, r.pkg.Name, r.version.Name, r.artifactType, downloadedFiles, nil)
+		err = r.destAdapter.CreateVersion(r.destRegistry, r.pkg.Name, r.version.Name, r.artifactType, downloadedFiles,
+			nil)
 
 		if err != nil {
 			return err
@@ -168,7 +172,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 
 	log.Info().Msgf("Jobs length: %d", len(jobs))
 
-	eng := engine.NewEngine(r.concurrency, jobs)
+	eng := engine.NewEngine(r.config.Concurrency, jobs)
 	err := eng.Execute(ctx)
 	if err != nil {
 		logger.Error().Err(err).Msg("Engine execution failed")

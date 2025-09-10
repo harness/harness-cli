@@ -30,8 +30,8 @@ type RegistryConfig struct {
 
 // MigrateConfig holds migrate command specific configurations
 type MigrateConfig struct {
-	DryRun      bool
 	Concurrency int
+	Overwrite   bool
 }
 
 // StatusConfig holds status command specific configurations

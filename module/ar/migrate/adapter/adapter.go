@@ -16,7 +16,7 @@ type Adapter interface {
 	GetKeyChain(reg string) authn.Keychain
 	GetConfig() types.RegistryConfig
 	ValidateCredentials() (bool, error)
-	GetRegistry(registry string) (types.RegistryInfo, error)
+	GetRegistry(ctx context.Context, registry string) (types.RegistryInfo, error)
 	CreateRegistryIfDoesntExist(registry string) (bool, error)
 	GetPackages(registry string, artifactType types.ArtifactType, root *types.TreeNode) (
 		packages []types.Package,

@@ -20,8 +20,8 @@ func getMigrateCmd(*ar.ClientWithResponses) *cobra.Command {
 	// Create local variables for flag binding
 	var localConfigPath string
 	var localPkgBaseURL string
-	var localDryRun bool
 	var localConcurrency int
+	var overwrite bool
 
 	migrateCmd := &cobra.Command{
 		Use:   "migrate",
@@ -31,14 +31,14 @@ func getMigrateCmd(*ar.ClientWithResponses) *cobra.Command {
 			// Sync local flags to global config
 			config.Global.ConfigPath = localConfigPath
 			config.Global.Registry.PkgURL = localPkgBaseURL
-			config.Global.Registry.Migrate.DryRun = localDryRun
 			config.Global.Registry.Migrate.Concurrency = localConcurrency
+			config.Global.Registry.Migrate.Overwrite = overwrite
 		},
 	}
 	migrateCmd.Flags().StringVarP(&localConfigPath, "config", "c", "config.yaml", "Path to configuration file")
 	migrateCmd.Flags().StringVar(&localPkgBaseURL, "pkg-url", "", "Base URL for the API (overrides config)")
-	migrateCmd.Flags().BoolVar(&localDryRun, "dry-run", false, "Perform a dry run (overrides config)")
 	migrateCmd.Flags().IntVar(&localConcurrency, "concurrency", 1, "Number of concurrent operations (overrides config)")
+	migrateCmd.Flags().BoolVar(&overwrite, "overwrite", false, "Allow overwriting artifacts")
 
 	migrateCmd.MarkFlagRequired("config")
 
@@ -52,11 +52,12 @@ func runMigration(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	if config.Global.Registry.Migrate.DryRun {
-		cfg.DryRun = true
-	}
 	if config.Global.Registry.Migrate.Concurrency > 1 {
 		cfg.Concurrency = config.Global.Registry.Migrate.Concurrency
+	}
+
+	if config.Global.Registry.Migrate.Overwrite {
+		cfg.Overwrite = true
 	}
 
 	// Create an API client for orchestration purpose. The registry clients will be initiated separately

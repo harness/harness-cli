@@ -1,6 +1,7 @@
 package mock_jfrog
 
 import (
+	"archive/tar"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -23,6 +24,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/html"
+	"gopkg.in/yaml.v3"
 	"helm.sh/helm/v3/pkg/repo"
 )
 
@@ -79,7 +81,7 @@ func (a *adapter) ValidateCredentials() (bool, error) {
 	// Mock always returns true for valid credentials
 	return true, nil
 }
-func (a *adapter) GetRegistry(registry string) (types.RegistryInfo, error) {
+func (a *adapter) GetRegistry(ctx context.Context, registry string) (types.RegistryInfo, error) {
 	reg, err := a.client.getRegistry(registry)
 	if err != nil {
 		return types.RegistryInfo{}, fmt.Errorf("get registry: %w", err)
@@ -132,22 +134,47 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 		if err != nil {
 			return nil, fmt.Errorf("get node for path: %w", err)
 		}
-		// Use mock data for HELM_LEGACY instead of downloading
-		mockIndexContent := `apiVersion: v1
+
+		// Generate dynamic index content from charts path
+		// You can set the charts path here or make it configurable
+		chartsPath := "/Users/arvindchoudary/Work/helm-charts/mysql_all/charts" // Default path, can be made configurable
+
+		var indexContent string
+		if _, err := os.Stat(chartsPath); os.IsNotExist(err) {
+			// Fallback to static mock data if charts path doesn't exist
+			log.Warn().Msgf("Charts path %s does not exist, using static mock data", chartsPath)
+			indexContent = `apiVersion: v1
 entries:
   nginx:
     - name: nginx
       version: 8.2.0
       urls:
         - tmp/nginx-8.2.0.tgz`
+		} else {
+			// Use dynamic generation from charts path
+			generatedContent, err := GenerateHelmIndexFromPath(chartsPath)
+			if err != nil {
+				log.Warn().Msgf("Failed to generate dynamic index content: %v, using static mock data", err)
+				indexContent = `apiVersion: v1
+entries:
+  nginx:
+    - name: nginx
+      version: 8.2.0
+      urls:
+        - tmp/nginx-8.2.0.tgz`
+			} else {
+				indexContent = generatedContent
+			}
+		}
+
 		tmp, err := os.CreateTemp("", "index-*.yaml")
 		if err != nil {
 			return nil, fmt.Errorf("create temp file: %w", err)
 		}
 		defer os.Remove(tmp.Name())
-		_, err = tmp.WriteString(mockIndexContent)
+		_, err = tmp.WriteString(indexContent)
 		if err != nil {
-			return nil, fmt.Errorf("write mock content: %w", err)
+			return nil, fmt.Errorf("write index content: %w", err)
 		}
 		tmp.Close()
 		index, err := repo.LoadIndexFile(tmp.Name())
@@ -731,4 +758,132 @@ func (a *adapter) CreateVersion(
 	metadata map[string]interface{},
 ) error {
 	return nil
+}
+
+// ChartMetadata represents the metadata extracted from a Helm chart
+type ChartMetadata struct {
+	Name        string `yaml:"name"`
+	Version     string `yaml:"version"`
+	Description string `yaml:"description,omitempty"`
+	AppVersion  string `yaml:"appVersion,omitempty"`
+}
+
+// HelmIndexEntry represents a minimal chart entry with only essential fields
+type HelmIndexEntry struct {
+	Name    string   `yaml:"name"`
+	Version string   `yaml:"version"`
+	URLs    []string `yaml:"urls"`
+}
+
+// HelmIndex represents a minimal Helm index structure
+type HelmIndex struct {
+	APIVersion string                      `yaml:"apiVersion"`
+	Entries    map[string][]HelmIndexEntry `yaml:"entries"`
+}
+
+// GenerateHelmIndexFromPath dynamically generates Helm index.yaml content from a directory path containing .tgz files
+func GenerateHelmIndexFromPath(chartsPath string) (string, error) {
+	if chartsPath == "" {
+		return "", fmt.Errorf("charts path cannot be empty")
+	}
+
+	// Check if the path exists
+	if _, err := os.Stat(chartsPath); os.IsNotExist(err) {
+		return "", fmt.Errorf("charts path does not exist: %s", chartsPath)
+	}
+
+	// Find all .tgz files in the directory
+	tgzFiles, err := filepath.Glob(filepath.Join(chartsPath, "*.tgz"))
+	if err != nil {
+		return "", fmt.Errorf("failed to find .tgz files: %w", err)
+	}
+
+	if len(tgzFiles) == 0 {
+		return "", fmt.Errorf("no .tgz files found in directory: %s", chartsPath)
+	}
+
+	// Create the minimal index structure
+	index := HelmIndex{
+		APIVersion: "v1",
+		Entries:    make(map[string][]HelmIndexEntry),
+	}
+
+	// Process each .tgz file
+	for _, tgzFile := range tgzFiles {
+		chartMetadata, err := extractChartMetadata(tgzFile)
+		if err != nil {
+			log.Warn().Msgf("Failed to extract metadata from %s: %v", tgzFile, err)
+			continue
+		}
+
+		// Create minimal chart entry
+		chartEntry := HelmIndexEntry{
+			Name:    chartMetadata.Name,
+			Version: chartMetadata.Version,
+			URLs:    []string{filepath.Join(tgzFile)},
+		}
+
+		// Add to entries
+		if index.Entries[chartMetadata.Name] == nil {
+			index.Entries[chartMetadata.Name] = make([]HelmIndexEntry, 0)
+		}
+		index.Entries[chartMetadata.Name] = append(index.Entries[chartMetadata.Name], chartEntry)
+	}
+
+	// Convert to YAML
+	yamlData, err := yaml.Marshal(&index)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal index to YAML: %w", err)
+	}
+
+	return string(yamlData), nil
+}
+
+// extractChartMetadata extracts metadata from a Helm chart .tgz file
+func extractChartMetadata(tgzPath string) (*ChartMetadata, error) {
+	file, err := os.Open(tgzPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open .tgz file: %w", err)
+	}
+	defer file.Close()
+
+	// Create gzip reader
+	gzReader, err := gzip.NewReader(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+	defer gzReader.Close()
+
+	// Create tar reader
+	tarReader := tar.NewReader(gzReader)
+
+	// Look for Chart.yaml file
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to read tar entry: %w", err)
+		}
+
+		// Check if this is the Chart.yaml file
+		if strings.HasSuffix(header.Name, "/Chart.yaml") || header.Name == "Chart.yaml" {
+			// Read the Chart.yaml content
+			chartYamlContent, err := io.ReadAll(tarReader)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read Chart.yaml content: %w", err)
+			}
+
+			// Parse the Chart.yaml
+			var metadata ChartMetadata
+			if err := yaml.Unmarshal(chartYamlContent, &metadata); err != nil {
+				return nil, fmt.Errorf("failed to parse Chart.yaml: %w", err)
+			}
+
+			return &metadata, nil
+		}
+	}
+
+	return nil, fmt.Errorf("Chart.yaml not found in .tgz file")
 }

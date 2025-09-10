@@ -3,7 +3,6 @@ package har
 import (
 	"context"
 	"fmt"
-
 	//"github.com/harness/harness-cli/module/ar/migrate"
 	//client2 "github.com/harness/harness-cli/util/client"
 	"io"
@@ -64,8 +63,8 @@ func (a *adapter) GetConfig() types.RegistryConfig {
 	return a.reg
 }
 func (a *adapter) ValidateCredentials() (bool, error) { return false, nil }
-func (a *adapter) GetRegistry(registry string) (types.RegistryInfo, error) {
-	return types.RegistryInfo{}, nil
+func (a *adapter) GetRegistry(ctx context.Context, registry string) (types.RegistryInfo, error) {
+	return a.client.getRegistry(ctx, registry)
 }
 func (a *adapter) CreateRegistryIfDoesntExist(registryRef string) (bool, error) {
 	return false, nil

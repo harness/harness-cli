@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -14,6 +13,7 @@ import (
 	"github.com/harness/harness-cli/cmd/ar"
 	"github.com/harness/harness-cli/cmd/auth"
 	"github.com/harness/harness-cli/config"
+	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/util/templates"
 
 	"github.com/rs/zerolog"
@@ -50,31 +50,29 @@ func main() {
 				}
 			}
 
-			// Configure logging based on flags
-			if logFilePath != "" {
-				// Ensure the directory exists
-				logDir := filepath.Dir(logFilePath)
-				if err := os.MkdirAll(logDir, 0755); err != nil {
-					fmt.Printf("Warning: Could not create log directory: %v\n", err)
-				}
+			logFileDefaultOutputPath := fmt.Sprintf("registry_migration_%s.txt", time.Now().Format("20060102_150405"))
+			if logFilePath == "" {
+				logFilePath = logFileDefaultOutputPath
+			}
 
-				// Open the log file
-				logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-				if err != nil {
-					fmt.Printf("Warning: Could not open log file: %v\n", err)
-				} else {
-					// Set up log writer with timestamp format
-					logWriter := zerolog.ConsoleWriter{
-						Out:        logFile,
-						TimeFormat: time.RFC3339,
-						NoColor:    true,
-					}
-					log.Logger = log.Output(logWriter)
-				}
+			// Ensure the directory exists
+			logDir := filepath.Dir(logFilePath)
+			if err := os.MkdirAll(logDir, 0755); err != nil {
+				fmt.Printf("Warning: Could not create log directory: %v\n", err)
+			}
+
+			// Open the log file
+			logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+			if err != nil {
+				fmt.Printf("Warning: Could not open log file: %v\n", err)
 			} else {
-				// If no log file specified, disable logging
-				log.Logger = log.Output(io.Discard)
-				zerolog.SetGlobalLevel(zerolog.Disabled)
+				// Set up log writer with timestamp format
+				logWriter := zerolog.ConsoleWriter{
+					Out:        logFile,
+					TimeFormat: time.RFC3339,
+					NoColor:    true,
+				}
+				log.Logger = log.Output(logWriter).Hook(types.ErrorHook{})
 			}
 
 			return initProfiling()

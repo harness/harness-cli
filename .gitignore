@@ -9,3 +9,4 @@ harnesscd-example-apps
 !/cmd/hns/
 .DS_Store
 */.DS_Store
+registry_migration_*
