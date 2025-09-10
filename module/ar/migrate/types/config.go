@@ -3,7 +3,6 @@ package types
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -37,7 +36,6 @@ type Config struct {
 	Version     string            `yaml:"version"`
 	Concurrency int               `yaml:"concurrency"`
 	Overwrite   bool              `yaml:"overwrite"`
-	FailureMode string            `yaml:"failureMode"`
 	Source      RegistryConfig    `yaml:"source"`
 	Dest        RegistryConfig    `yaml:"destination"`
 	Mappings    []RegistryMapping `yaml:"mappings"`
@@ -109,13 +107,6 @@ func validateConfig(config *Config) error {
 	// Check migration configuration
 	if config.Concurrency <= 0 {
 		return fmt.Errorf("concurrency must be greater than 0")
-	}
-
-	switch strings.ToLower(config.FailureMode) {
-	case "continue", "stop":
-		// Valid values
-	default:
-		return fmt.Errorf("invalid failure mode: %s, must be 'continue' or 'stop'", config.FailureMode)
 	}
 
 	// Validate source and destination registry configurations
