@@ -68,7 +68,7 @@ func (a *adapter) ValidateCredentials() (bool, error) {
 	return true, nil
 }
 
-func (a *adapter) GetRegistry(registry string) (types.RegistryInfo, error) {
+func (a *adapter) GetRegistry(ctx context.Context, registry string) (types.RegistryInfo, error) {
 	repo, err := a.client.getRepository(registry)
 	if err != nil {
 		return types.RegistryInfo{}, fmt.Errorf("failed to get repository %s: %w", registry, err)

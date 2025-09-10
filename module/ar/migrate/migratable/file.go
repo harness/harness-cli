@@ -75,7 +75,7 @@ func NewFileJob(
 		Str("package", pkg.Name).
 		Str("version", version.Name).
 		Str("file", file.Uri).
-		Logger()
+		Logger().Hook(types.ErrorHook{})
 
 	return &File{
 		srcRegistry:  srcRegistry,

@@ -11,9 +11,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	types2 "github.com/google/go-containerregistry/pkg/v1/types"
-	"github.com/harness/harness-cli/util/common"
-
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
@@ -21,6 +18,7 @@ import (
 	"github.com/harness/harness-cli/module/ar/migrate/tree"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/module/ar/migrate/util"
+	"github.com/harness/harness-cli/util/common"
 
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -29,6 +27,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/static"
+	types2 "github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/google/uuid"
 	"github.com/pterm/pterm"
 	"github.com/rs/zerolog"
@@ -72,7 +71,7 @@ func NewPackageJob(
 		Str("source_registry", srcRegistry).
 		Str("dest_registry", destRegistry).
 		Str("package", pkg.Name).
-		Logger()
+		Logger().Hook(types.ErrorHook{})
 
 	return &Package{
 		srcRegistry:  srcRegistry,
@@ -153,7 +152,13 @@ func (r *Package) Pre(ctx context.Context) error {
 		for _, tag := range tags {
 			dst := fmt.Sprintf("%s:%s", dstImage, tag)
 			// HEAD the destination tag – 200 ⇒ already present.
-			reference, _ := name.ParseReference(dst)
+			logger.Info().Ctx(ctx).Msgf("Checking if dst %s already exists", dst)
+			reference, err := name.ParseReference(dst)
+			if err != nil {
+				logger.Warn().Err(err).Str("dst", dst).Msgf("Failed to parse destination reference %q, skipping tag",
+					dst)
+				continue
+			}
 			if _, err := remote.Head(reference, remoteOpts...); err == nil {
 				util.GetSkipPrinter().Println(fmt.Sprintf("Registry [%s], Package [%s:%s] already exists",
 					r.destRegistry,
@@ -430,6 +435,7 @@ func (r *Package) pushChart(ctx context.Context, chartPath string, dstRef string
 	meta, err := readChartMeta(chartPath)
 	if err != nil {
 		log.Error().Msgf("Failed to read chart metadata from %s", chartPath)
+		return errors.New("failed to read chart metadata from chartPath")
 	}
 	labels := chartLabels(meta)
 	ref, err := name.ParseReference(dstRef, name.WeakValidation)

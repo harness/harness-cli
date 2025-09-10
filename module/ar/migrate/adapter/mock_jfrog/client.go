@@ -85,7 +85,7 @@ func (c *client) getFile(registry string, path string) (io.ReadCloser, http2.Hea
 		return io.NopCloser(bytes.NewReader([]byte(content))), header, nil
 	}
 
-	if strings.HasPrefix(path, "tmp/") {
+	if strings.HasPrefix(path, "tmp/") || strings.HasPrefix(path, "Users/") {
 		file, err := os.Open("/" + path)
 		if err == nil {
 			header := make(http2.Header)

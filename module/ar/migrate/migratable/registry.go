@@ -44,7 +44,7 @@ func NewRegistryJob(
 		Str("job_id", jobID).
 		Str("source_registry", srcRegistry).
 		Str("dest_registry", destRegistry).
-		Logger()
+		Logger().Hook(types.ErrorHook{})
 
 	return &Registry{
 		srcRegistry:  srcRegistry,
@@ -76,14 +76,14 @@ func (r *Registry) Pre(ctx context.Context) error {
 
 	startTime := time.Now()
 
-	_, err := r.destAdapter.CreateRegistryIfDoesntExist(r.destRegistry)
+	registry, err := r.destAdapter.GetRegistry(ctx, r.destRegistry)
 	if err != nil {
-		logger.Error().
-			Err(err).
-			Dur("duration", time.Since(startTime)).
-			Msg("Failed to create registry")
-		return fmt.Errorf("create registry failed: %w", err)
+		log.Error().Err(err).Msgf("Failed to get registry %q", r.destRegistry)
+		return fmt.Errorf("failed to get registry %q", r.destRegistry)
 	}
+
+	log.Info().Ctx(ctx).Msgf("Found registry %+v", registry)
+	r.mapping.Ref = registry.Path
 
 	logger.Info().
 		Dur("duration", time.Since(startTime)).

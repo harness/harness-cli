@@ -452,6 +452,48 @@ func (c *client) artifactFileExists(
 	return false, nil
 }
 
+func (c *client) getRegistry(
+	ctx context.Context,
+	registry string,
+) (types.RegistryInfo, error) {
+	page := int64(0)
+	size := int64(100)
+	for {
+		descendants := ar.GetAllRegistriesParamsScopeDescendants
+		response, err := c.apiClient.GetAllRegistriesWithResponse(ctx, config.Global.AccountID,
+			&ar.GetAllRegistriesParams{
+				Page:       &page,
+				Size:       &size,
+				SearchTerm: &registry,
+				Scope:      &descendants,
+			})
+		if err != nil || response.StatusCode() != http2.StatusOK {
+			return types.RegistryInfo{}, fmt.Errorf("failed to get registry: %w", err)
+		}
+		data := response.JSON200
+		if data == nil {
+			return types.RegistryInfo{}, fmt.Errorf("failed to get data for registry: %s", response.Status())
+		}
+		registries := data.Data.Registries
+
+		for _, v := range registries {
+			if v.Identifier != registry {
+				continue
+			}
+			return types.RegistryInfo{
+				Type: string(v.Type),
+				URL:  v.Url,
+				Path: *v.Path,
+			}, nil
+		}
+		if len(registries) < int(size) || (nil != data.Data.PageCount && nil != data.Data.PageIndex && (*data.Data.PageIndex+1 >= *data.Data.PageCount)) {
+			break
+		}
+		page++
+	}
+	return types.RegistryInfo{}, fmt.Errorf("failed to find registry '%s'", registry)
+}
+
 func (c *client) artifactVersionExists(
 	ctx context.Context,
 	registryRef, pkg, version string,

@@ -84,6 +84,7 @@ type TransferStats struct {
 type RegistryInfo struct {
 	Type string
 	URL  string
+	Path string
 }
 
 const (

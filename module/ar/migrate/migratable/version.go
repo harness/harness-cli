@@ -54,7 +54,7 @@ func NewVersionJob(
 		Str("dest_registry", destRegistry).
 		Str("package", pkg.Name).
 		Str("version", version.Name).
-		Logger()
+		Logger().Hook(types.ErrorHook{})
 
 	return &Version{
 		srcRegistry:  srcRegistry,
@@ -154,7 +154,8 @@ func (r *Version) Migrate(ctx context.Context) error {
 			})
 		}
 
-		err = r.destAdapter.CreateVersion(r.destRegistry, r.pkg.Name, r.version.Name, r.artifactType, downloadedFiles, nil)
+		err = r.destAdapter.CreateVersion(r.destRegistry, r.pkg.Name, r.version.Name, r.artifactType, downloadedFiles,
+			nil)
 
 		if err != nil {
 			return err

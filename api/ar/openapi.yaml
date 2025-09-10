@@ -129,6 +129,19 @@ components:
       schema:
         default: false
         type: boolean
+    scopeParam:
+      description: "**Scope of registries to list**\n* **none** – current space only
+            (default)   * **ancestors** – current space **plus** all parent spaces   *
+            **descendants** – current space **plus** all child spaces  \nIf omitted, `none`
+            is assumed.\n"
+      in: query
+      name: scope
+      schema:
+        enum:
+          - ancestors
+          - descendants
+          - none
+        type: string
     registryRefPathParam:
       description: Unique registry path.
       in: path
@@ -3425,6 +3438,7 @@ paths:
         - $ref: '#/components/parameters/sortField'
         - $ref: '#/components/parameters/searchTerm'
         - $ref: '#/components/parameters/recursiveParam'
+        - $ref: '#/components/parameters/scopeParam'
       responses:
         "200":
           $ref: '#/components/responses/ListRegistryResponse'
