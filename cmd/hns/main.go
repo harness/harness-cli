@@ -13,6 +13,7 @@ import (
 	"github.com/harness/harness-cli/cmd/ar"
 	"github.com/harness/harness-cli/cmd/auth"
 	"github.com/harness/harness-cli/config"
+	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/util/templates"
 
 	"github.com/rs/zerolog"
@@ -71,7 +72,7 @@ func main() {
 					TimeFormat: time.RFC3339,
 					NoColor:    true,
 				}
-				log.Logger = log.Output(logWriter)
+				log.Logger = log.Output(logWriter).Hook(types.ErrorHook{})
 			}
 
 			return initProfiling()

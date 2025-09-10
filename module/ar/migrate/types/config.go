@@ -35,8 +35,8 @@ var (
 // Config represents the top-level configuration structure
 type Config struct {
 	Version     string            `yaml:"version"`
-	DryRun      bool              `yaml:"dryRun"`
 	Concurrency int               `yaml:"concurrency"`
+	Overwrite   bool              `yaml:"overwrite"`
 	FailureMode string            `yaml:"failureMode"`
 	Source      RegistryConfig    `yaml:"source"`
 	Dest        RegistryConfig    `yaml:"destination"`
@@ -60,8 +60,6 @@ type RegistryMapping struct {
 	ArtifactType        ArtifactType `yaml:"artifactType"`
 	SourceRegistry      string       `yaml:"sourceRegistry"`
 	DestinationRegistry string       `yaml:"destinationRegistry"`
-	// TEMPORARY UNTIL WE HAVE API TO GET ALL REGISTRIES
-	Ref string `yaml:"ref"`
 	// NOT IMPLEMENTED YET
 	IncludePatterns []string `yaml:"includePatterns"`
 	ExcludePatterns []string `yaml:"excludePatterns"`

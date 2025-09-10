@@ -52,7 +52,7 @@ func (m *MigrationService) Run(ctx context.Context) error {
 	logger := log.With().
 		Str("source_type", string(m.config.Source.Type)).
 		Str("destination_type", string(m.config.Dest.Type)).
-		Logger().Hook(types.ErrorHook{})
+		Logger()
 
 	logger.Info().Msg("Starting migration process")
 
@@ -69,7 +69,7 @@ func (m *MigrationService) Run(ctx context.Context) error {
 		mappingLogger.Info().Msg("Processing registry migration")
 
 		job := migratable.NewRegistryJob(m.source, m.destination, mapping.SourceRegistry,
-			mapping.DestinationRegistry, mapping.ArtifactType, &transferStats, &mapping, m.config.Concurrency)
+			mapping.DestinationRegistry, mapping.ArtifactType, &transferStats, &mapping, m.config)
 
 		log.Info().Msgf("concurrency: %d, mapping: %+v", m.config.Concurrency, mapping)
 

@@ -1,7 +1,6 @@
 version: 1.0.0
-dryRun: false
 concurrency: 5
-failureMode: continue
+overwrite: false
 source:
   endpoint: ${SRC_ENDPOINT}
   type: MOCK_JFROG
@@ -17,38 +16,29 @@ destination:
     password: ${DST_PASS}
 mappings:
   - artifactType: HELM_LEGACY
-    sourceRegistry: helm-legacy-local
-    destinationRegistry: ${DST_REG}
-    ref: /
-#  - artifactType: MAVEN
-#    sourceRegistry: src
-#    destinationRegistry: dst
-#    ref: /org
-#  - artifactType: PYTHON
-#    sourceRegistry: src
-#    destinationRegistry: dst
-#    ref: /org/project
-#  - artifactType: HELM
-#    sourceRegistry: src
-#    destinationRegistry: dst
-#    ref: /org/project
-#  - artifactType: MAVEN
-#    sourceRegistry: src
-#    destinationRegistry: dst
-#    ref: /org/project
-#  - artifactType: GENERIC
-#    sourceRegistry: src
-#    destinationRegistry: dst
-#    ref: /org/project
-#  - artifactType: NUGET
-#    sourceRegistry: src
-#    destinationRegistry: dst
-#    ref: /org/project
-#  - artifactType: NPM
-#    sourceRegistry: src
-#    destinationRegistry: npm
-#    ref: /org/project
-#  - artifactType: GO
-#    sourceRegistry: src
-#    destinationRegistry: dst
-#    ref: /org/project
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: MAVEN
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: PYTHON
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: HELM
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: MAVEN
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: GENERIC
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: NUGET
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: NPM
+    sourceRegistry: src
+    destinationRegistry: npm
+  - artifactType: GO
+    sourceRegistry: src
+    destinationRegistry: dst

@@ -19,7 +19,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
@@ -48,7 +47,8 @@ type File struct {
 	stats         *types.TransferStats
 	skipMigration bool
 	mapping       *types.RegistryMapping
-	concurrency   int
+	config        *types.Config
+	registry      types.RegistryInfo
 }
 
 func NewFileJob(
@@ -63,7 +63,8 @@ func NewFileJob(
 	file *types.File,
 	stats *types.TransferStats,
 	mapping *types.RegistryMapping,
-	concurrency int,
+	config *types.Config,
+	registry types.RegistryInfo,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -75,7 +76,7 @@ func NewFileJob(
 		Str("package", pkg.Name).
 		Str("version", version.Name).
 		Str("file", file.Uri).
-		Logger().Hook(types.ErrorHook{})
+		Logger()
 
 	return &File{
 		srcRegistry:  srcRegistry,
@@ -90,7 +91,8 @@ func NewFileJob(
 		file:         file,
 		stats:        stats,
 		mapping:      mapping,
-		concurrency:  concurrency,
+		config:       config,
+		registry:     registry,
 	}
 }
 
@@ -108,9 +110,9 @@ func (r *File) Pre(ctx context.Context) error {
 	logger.Info().Msg("Starting version pre-migration step")
 	startTime := time.Now()
 
-	if r.artifactType != types.MAVEN && r.pkg.Name != "" && r.version.Name != "" && r.file.Name != "" && r.mapping.Ref != "" {
+	if !r.config.Overwrite && (r.artifactType != types.MAVEN && r.pkg.Name != "" && r.version.Name != "" && r.file.Name != "") {
 		exists, err := r.destAdapter.FileExists(ctx,
-			util.GetRegistryRef(config.Global.AccountID, r.mapping.Ref, r.destRegistry),
+			r.registry.Path,
 			r.pkg.Name, r.version.Name, r.file.Name, r.artifactType)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to check if version exists")

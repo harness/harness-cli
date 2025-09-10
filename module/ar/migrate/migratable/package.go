@@ -11,7 +11,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/lib"
@@ -48,7 +47,8 @@ type Package struct {
 	stats         *types.TransferStats
 	skipMigration bool
 	mapping       *types.RegistryMapping
-	concurrency   int
+	config        *types.Config
+	registry      types.RegistryInfo
 }
 
 func NewPackageJob(
@@ -61,7 +61,8 @@ func NewPackageJob(
 	node *types.TreeNode,
 	stats *types.TransferStats,
 	mapping *types.RegistryMapping,
-	concurrency int,
+	config *types.Config,
+	registry types.RegistryInfo,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -71,7 +72,7 @@ func NewPackageJob(
 		Str("source_registry", srcRegistry).
 		Str("dest_registry", destRegistry).
 		Str("package", pkg.Name).
-		Logger().Hook(types.ErrorHook{})
+		Logger()
 
 	return &Package{
 		srcRegistry:  srcRegistry,
@@ -84,7 +85,8 @@ func NewPackageJob(
 		node:         node,
 		stats:        stats,
 		mapping:      mapping,
-		concurrency:  concurrency,
+		config:       config,
+		registry:     registry,
 	}
 }
 
@@ -103,9 +105,9 @@ func (r *Package) Pre(ctx context.Context) error {
 	logger.Info().Msg("Starting package pre-migration step")
 	startTime := time.Now()
 
-	if r.artifactType == types.HELM_LEGACY && r.pkg.Name != "" && r.pkg.Version != "" && r.mapping.Ref != "" {
+	if !r.config.Overwrite && (r.artifactType == types.HELM_LEGACY && r.pkg.Name != "" && r.pkg.Version != "") {
 		exists, err := r.destAdapter.VersionExists(ctx, r.pkg,
-			util.GetRegistryRef(config.Global.AccountID, r.mapping.Ref, r.destRegistry), r.pkg.Name, r.pkg.Version,
+			r.registry.Path, r.pkg.Name, r.pkg.Version,
 			r.artifactType)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to check if version exists")
@@ -127,14 +129,14 @@ func (r *Package) Pre(ctx context.Context) error {
 		}
 	}
 
-	if (r.artifactType == types.DOCKER || r.artifactType == types.HELM) && (r.mapping.Ref != "") {
+	if !r.config.Overwrite && (r.artifactType == types.DOCKER || r.artifactType == types.HELM) {
 		srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.pkg.Name)
 		dstImage, _ := r.destAdapter.GetOCIImagePath(r.destRegistry, r.pkg.Name)
 		logger.Info().Ctx(ctx).Msgf("Checking if should be skipped -- repository %s to %s", srcImage, dstImage)
 
 		craneOpts := []crane.Option{
 			crane.WithContext(ctx),
-			crane.WithJobs(r.concurrency),
+			crane.WithJobs(r.config.Concurrency),
 			crane.WithNoClobber(true),
 			crane.WithAuthFromKeychain(lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.srcRegistry,
 				r.destRegistry)),
@@ -208,7 +210,7 @@ func (r *Package) Migrate(ctx context.Context) error {
 		craneOpts := []crane.Option{
 			crane.WithUserAgent("harness-cli"),
 			crane.WithContext(ctx),
-			crane.WithJobs(r.concurrency),
+			crane.WithJobs(r.config.Concurrency),
 			crane.WithNoClobber(true),
 			crane.WithAuthFromKeychain(lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.srcRegistry,
 				r.destRegistry)),
@@ -261,13 +263,13 @@ func (r *Package) Migrate(ctx context.Context) error {
 				return fmt.Errorf("get version failed: %w", err)
 			}
 			job := NewVersionJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, r.pkg,
-				version, versionNode, r.stats, r.mapping, r.concurrency)
+				version, versionNode, r.stats, r.mapping, r.config, r.registry)
 			jobs = append(jobs, job)
 		}
 
 		log.Info().Msgf("Jobs length: %d", len(jobs))
 
-		eng := engine.NewEngine(r.concurrency, jobs)
+		eng := engine.NewEngine(r.config.Concurrency, jobs)
 		err = eng.Execute(ctx)
 		if err != nil {
 			logger.Error().Err(err).Msg("Engine execution failed")

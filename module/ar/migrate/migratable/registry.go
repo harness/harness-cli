@@ -24,7 +24,10 @@ type Registry struct {
 	logger       zerolog.Logger
 	stats        *types.TransferStats
 	mapping      *types.RegistryMapping
-	concurrency  int
+	config       *types.Config
+
+	// Transient
+	registry types.RegistryInfo
 }
 
 func NewRegistryJob(
@@ -35,7 +38,7 @@ func NewRegistryJob(
 	artifactType types.ArtifactType,
 	stats *types.TransferStats,
 	mapping *types.RegistryMapping,
-	concurrency int,
+	config *types.Config,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -44,7 +47,7 @@ func NewRegistryJob(
 		Str("job_id", jobID).
 		Str("source_registry", srcRegistry).
 		Str("dest_registry", destRegistry).
-		Logger().Hook(types.ErrorHook{})
+		Logger()
 
 	return &Registry{
 		srcRegistry:  srcRegistry,
@@ -55,7 +58,7 @@ func NewRegistryJob(
 		logger:       jobLogger,
 		stats:        stats,
 		mapping:      mapping,
-		concurrency:  concurrency,
+		config:       config,
 	}
 }
 
@@ -83,7 +86,7 @@ func (r *Registry) Pre(ctx context.Context) error {
 	}
 
 	log.Info().Ctx(ctx).Msgf("Found registry %+v", registry)
-	r.mapping.Ref = registry.Path
+	r.registry = registry
 
 	logger.Info().
 		Dur("duration", time.Since(startTime)).
@@ -124,11 +127,11 @@ func (r *Registry) Migrate(ctx context.Context) error {
 			return fmt.Errorf("get node for path %s failed: %w", pkg.Path, err2)
 		}
 		job := NewPackageJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, pkg, treeNode,
-			r.stats, r.mapping, r.concurrency)
+			r.stats, r.mapping, r.config, r.registry)
 		jobs = append(jobs, job)
 	}
 
-	eng := engine.NewEngine(r.concurrency, jobs)
+	eng := engine.NewEngine(r.config.Concurrency, jobs)
 	err = eng.Execute(ctx)
 	if err != nil {
 		logger.Error().Err(err).Msg("Engine execution failed")
