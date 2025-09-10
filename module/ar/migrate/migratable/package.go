@@ -157,7 +157,7 @@ func (r *Package) Pre(ctx context.Context) error {
 			logger.Info().Ctx(ctx).Msgf("Checking if dst %s already exists", dst)
 			reference, err := name.ParseReference(dst)
 			if err != nil {
-				logger.Warn().Err(err).Str("dst", dst).Msgf("Failed to parse destination reference %q, skipping tag",
+				logger.Error().Err(err).Str("dst", dst).Msgf("Failed to parse destination reference %q, skipping tag",
 					dst)
 				continue
 			}

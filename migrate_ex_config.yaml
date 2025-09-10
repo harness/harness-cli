@@ -3,7 +3,7 @@ concurrency: 5
 overwrite: false
 source:
   endpoint: ${SRC_ENDPOINT}
-  type: MOCK_JFROG
+  type: ${SRC_TYPE}
   credentials:
     username: ${SRC_USER}
     password: ${SRC_PASS}
