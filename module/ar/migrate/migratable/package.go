@@ -110,7 +110,9 @@ func (r *Package) Pre(ctx context.Context) error {
 			r.registry.Path, r.pkg.Name, r.pkg.Version,
 			r.artifactType)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to check if version exists")
+			log.Error().Err(err).Msgf("Failed to check if version exists Registry [%s], Package [%s/%s]",
+				r.destRegistry,
+				r.pkg.Name, r.pkg.Version)
 			return nil
 		}
 		if exists {
