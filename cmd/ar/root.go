@@ -47,6 +47,7 @@ func GetRootCmd() *cobra.Command {
 		getPushCommand(
 			commands.NewPushGenericCmd(client),
 			commands.NewPushMavenCmd(client),
+			commands.NewPushGoCmd(client),
 		),
 	)
 

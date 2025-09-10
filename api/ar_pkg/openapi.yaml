@@ -105,7 +105,55 @@ paths:
           description: Missing or invalid `x-api-key`
         '5XX':
           description: Server-side error
-
+  /pkg/{accountId}/{registry}/go/upload:
+    put:
+      summary: Upload a go package
+      operationId: uploadGoPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - zip
+                - mod
+                - info
+              properties:
+                info:
+                  type: string
+                  format: binary
+                  description: Package .info file to upload
+                mod:
+                  type: string
+                  format: binary
+                  description: Package .mod file to upload
+                zip:
+                  type: string
+                  format: binary
+                  description: Package .zip file to upload
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
 components:
   securitySchemes:
     ApiKeyAuth:
