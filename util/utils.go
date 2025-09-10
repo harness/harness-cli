@@ -111,3 +111,11 @@ func ProgressBar(current, total int, width int) string {
 
 	return fmt.Sprintf("%s %.1f%%", bar, percentage*100)
 }
+
+// GetPkgUrl returns the URL for the packages
+func GetPkgUrl(url string) string {
+	if !strings.Contains(url, "://") {
+		url = "https://" + url
+	}
+	return url
+}

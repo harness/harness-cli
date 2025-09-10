@@ -36,8 +36,23 @@ type UploadGenericPackageMultipartBody struct {
 	Filename string `json:"filename"`
 }
 
+// UploadGoPackageMultipartBody defines parameters for UploadGoPackage.
+type UploadGoPackageMultipartBody struct {
+	// Info Package .info file to upload
+	Info openapi_types.File `json:"info"`
+
+	// Mod Package .mod file to upload
+	Mod openapi_types.File `json:"mod"`
+
+	// Zip Package .zip file to upload
+	Zip openapi_types.File `json:"zip"`
+}
+
 // UploadGenericPackageMultipartRequestBody defines body for UploadGenericPackage for multipart/form-data ContentType.
 type UploadGenericPackageMultipartRequestBody UploadGenericPackageMultipartBody
+
+// UploadGoPackageMultipartRequestBody defines body for UploadGoPackage for multipart/form-data ContentType.
+type UploadGoPackageMultipartRequestBody UploadGoPackageMultipartBody
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -117,6 +132,9 @@ type ClientInterface interface {
 
 	// UploadGenericPackageWithBody request with any body
 	UploadGenericPackageWithBody(ctx context.Context, accountId string, registry string, pPackage string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadGoPackageWithBody request with any body
+	UploadGoPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) DownloadGenericPackage(ctx context.Context, accountId string, registry string, pPackage string, version string, params *DownloadGenericPackageParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -133,6 +151,18 @@ func (c *Client) DownloadGenericPackage(ctx context.Context, accountId string, r
 
 func (c *Client) UploadGenericPackageWithBody(ctx context.Context, accountId string, registry string, pPackage string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadGenericPackageRequestWithBody(c.Server, accountId, registry, pPackage, version, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadGoPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadGoPackageRequestWithBody(c.Server, accountId, registry, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -273,6 +303,49 @@ func NewUploadGenericPackageRequestWithBody(server string, accountId string, reg
 	return req, nil
 }
 
+// NewUploadGoPackageRequestWithBody generates requests for UploadGoPackage with any type of body
+func NewUploadGoPackageRequestWithBody(server string, accountId string, registry string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "registry", runtime.ParamLocationPath, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pkg/%s/%s/go/upload", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -321,6 +394,9 @@ type ClientWithResponsesInterface interface {
 
 	// UploadGenericPackageWithBodyWithResponse request with any body
 	UploadGenericPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, pPackage string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadGenericPackageResp, error)
+
+	// UploadGoPackageWithBodyWithResponse request with any body
+	UploadGoPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadGoPackageResp, error)
 }
 
 type DownloadGenericPackageResp struct {
@@ -365,6 +441,27 @@ func (r UploadGenericPackageResp) StatusCode() int {
 	return 0
 }
 
+type UploadGoPackageResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadGoPackageResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadGoPackageResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // DownloadGenericPackageWithResponse request returning *DownloadGenericPackageResp
 func (c *ClientWithResponses) DownloadGenericPackageWithResponse(ctx context.Context, accountId string, registry string, pPackage string, version string, params *DownloadGenericPackageParams, reqEditors ...RequestEditorFn) (*DownloadGenericPackageResp, error) {
 	rsp, err := c.DownloadGenericPackage(ctx, accountId, registry, pPackage, version, params, reqEditors...)
@@ -381,6 +478,15 @@ func (c *ClientWithResponses) UploadGenericPackageWithBodyWithResponse(ctx conte
 		return nil, err
 	}
 	return ParseUploadGenericPackageResp(rsp)
+}
+
+// UploadGoPackageWithBodyWithResponse request with arbitrary body returning *UploadGoPackageResp
+func (c *ClientWithResponses) UploadGoPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadGoPackageResp, error) {
+	rsp, err := c.UploadGoPackageWithBody(ctx, accountId, registry, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadGoPackageResp(rsp)
 }
 
 // ParseDownloadGenericPackageResp parses an HTTP response from a DownloadGenericPackageWithResponse call
@@ -408,6 +514,22 @@ func ParseUploadGenericPackageResp(rsp *http.Response) (*UploadGenericPackageRes
 	}
 
 	response := &UploadGenericPackageResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseUploadGoPackageResp parses an HTTP response from a UploadGoPackageWithResponse call
+func ParseUploadGoPackageResp(rsp *http.Response) (*UploadGoPackageResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadGoPackageResp{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
