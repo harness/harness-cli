@@ -97,7 +97,12 @@ func NewFileJob(
 }
 
 func (r *File) Info() string {
-	return r.srcRegistry + ":" + r.destRegistry + ":" + r.file.Uri
+	info := r.srcRegistry + ":" + r.destRegistry + ":" + r.pkg.Name + ":" + r.version.Name
+	if r.file != nil {
+		info += ":" + r.file.Name
+	}
+
+	return info
 }
 
 func (r *File) Pre(ctx context.Context) error {

@@ -10,6 +10,7 @@ import (
 	http2 "net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/internal/api/ar"
@@ -17,7 +18,21 @@ import (
 	"github.com/harness/harness-cli/module/ar/migrate/http/auth/xApiKey"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/util/common/auth"
+	retryablehttp "github.com/hashicorp/go-retryablehttp"
 )
+
+func retryingHTTPClient() *http2.Client {
+	rc := retryablehttp.NewClient()
+	rc.RetryMax = 5
+	rc.RetryWaitMin = 200 * time.Millisecond
+	rc.RetryWaitMax = 1 * time.Minute
+	rc.Backoff = retryablehttp.RateLimitLinearJitterBackoff
+	rc.Logger = nil
+
+	std := rc.StandardClient() // returns *http.Client using a retrying RoundTripper
+	std.Timeout = 20 * time.Second
+	return std
+}
 
 // newClient constructs a jfrog client
 func newClient(reg *types.RegistryConfig) *client {
@@ -26,7 +41,9 @@ func newClient(reg *types.RegistryConfig) *client {
 	username = reg.Credentials.Username
 	token = reg.Credentials.Password
 
-	arClient, _ := ar.NewClientWithResponses(config.Global.APIBaseURL+"/gateway/har/api/v1", auth.GetXApiKeyOptionAR())
+	arClient, _ := ar.NewClientWithResponses(config.Global.APIBaseURL+"/gateway/har/api/v1",
+		ar.WithHTTPClient(retryingHTTPClient()),
+		auth.GetXApiKeyOptionAR())
 	return &client{
 		client: http.NewClient(
 			&http2.Client{
@@ -39,8 +56,6 @@ func newClient(reg *types.RegistryConfig) *client {
 		username:  username,
 		password:  token,
 		apiClient: arClient,
-		//config.Global.AuthToken, config.Global.AccountID,
-		//	config.Global.OrgID, config.Global.ProjectID),
 	}
 }
 

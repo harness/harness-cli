@@ -73,12 +73,21 @@ func (e *Engine) Execute(ctx context.Context) error {
 				stepLogger.Debug().Msg("Starting step")
 				stepStartTime := time.Now()
 
-				if err := fn(ctx); err != nil {
-					stepLogger.Error().
-						Err(err).
-						Dur("duration", time.Since(stepStartTime)).
-						Msg("Step failed")
+				var err error
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							stepLogger.Error().
+								Interface("panic", r).
+								Dur("duration", time.Since(stepStartTime)).
+								Msgf("panic in %s step: %v, info: %s", name, r, jb.Info())
+							err = fmt.Errorf("panic in %s step: %v, info: %s", name, r, jb.Info())
+						}
+					}()
+					err = fn(ctx)
+				}()
 
+				if err != nil {
 					errCh <- fmt.Errorf("job %d|%s: %s-step: %w", i, info, name, err)
 					return false
 				}

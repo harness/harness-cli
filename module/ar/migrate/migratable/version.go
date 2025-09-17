@@ -76,7 +76,7 @@ func NewVersionJob(
 }
 
 func (r *Version) Info() string {
-	return r.pkg.Name
+	return r.srcRegistry + " " + r.pkg.Name + " " + r.version.Name
 }
 
 func (r *Version) Pre(ctx context.Context) error {
@@ -175,8 +175,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 	eng := engine.NewEngine(r.config.Concurrency, jobs)
 	err := eng.Execute(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("Engine execution failed")
-		return fmt.Errorf("engine execution failed: %w", err)
+		logger.Error().Err(err).Msg("Engine execution saw following errors")
 	}
 
 	logger.Info().
