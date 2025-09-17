@@ -7,6 +7,7 @@ require (
 	github.com/getkin/kin-openapi v0.132.0
 	github.com/google/go-containerregistry v0.20.6
 	github.com/google/uuid v1.6.0
+	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/pterm/pterm v0.12.80
@@ -46,6 +47,7 @@ require (
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
+	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
@@ -119,7 +121,6 @@ require (
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/vbatts/tar-split v0.12.1 // indirect
-	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/mod v0.26.0
 	golang.org/x/sync v0.15.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect

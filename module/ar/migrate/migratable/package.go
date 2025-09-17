@@ -91,7 +91,7 @@ func NewPackageJob(
 }
 
 func (r *Package) Info() string {
-	return r.pkg.Name
+	return r.srcRegistry + " " + r.pkg.Name + " " + r.pkg.Version
 }
 
 // Pre Create package at destination if it doesn't exist
@@ -274,8 +274,7 @@ func (r *Package) Migrate(ctx context.Context) error {
 		eng := engine.NewEngine(r.config.Concurrency, jobs)
 		err = eng.Execute(ctx)
 		if err != nil {
-			logger.Error().Err(err).Msg("Engine execution failed")
-			return fmt.Errorf("engine execution failed: %w", err)
+			logger.Error().Err(err).Msg("Engine execution saw following errors")
 		}
 	}
 

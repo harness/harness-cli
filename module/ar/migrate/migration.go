@@ -80,8 +80,7 @@ func (m *MigrationService) Run(ctx context.Context) error {
 	eng := engine.NewEngine(m.config.Concurrency, jobs)
 	err := eng.Execute(ctx)
 	if err != nil {
-		logger.Error().Err(err).Msg("Engine execution failed")
-		return fmt.Errorf("engine execution failed: %w", err)
+		logger.Error().Err(err).Msgf("Engine execution saw following errors: %v", err)
 	}
 	logger.Info().Msg("Migration process completed")
 	printer.Print(transferStats.FileStats, 0, 0, int64(len(transferStats.FileStats)), false, [][]string{
