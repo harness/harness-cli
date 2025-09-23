@@ -136,10 +136,17 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 
 		for name, entries := range index.Entries {
 			for _, ver := range entries {
+				nestedName, err2 := getNestedName(name, ver.URLs)
+				if err2 != nil {
+					log.Error().Err(err2).Msgf("Failed to get package name for registry: %s, name: %s, version: %s",
+						registry, name, ver.Version)
+					continue
+				}
+
 				pkg := types.Package{
 					Registry: registry,
 					Path:     "/",
-					Name:     name,
+					Name:     nestedName,
 					Size:     -1,
 					URL:      ver.URLs[0],
 					Version:  ver.Version,
@@ -289,6 +296,22 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 	}
 
 	return packages, nil
+}
+
+func getNestedName(packageName string, urls []string) (string, error) {
+	if urls == nil || len(urls) == 0 {
+		return "", fmt.Errorf("url is invalid")
+	}
+
+	parsedURL, err := url.Parse(urls[0])
+	if err != nil {
+		return "", fmt.Errorf("parse url: %w", err)
+	}
+	splits := strings.Split(parsedURL.Path, "/")
+	if len(splits) < 5 {
+		return packageName, nil
+	}
+	return strings.Join(splits[3:len(splits)-1], "/") + "/" + packageName, nil
 }
 
 func extractPythonPackageNames(r io.Reader) ([]string, error) {
