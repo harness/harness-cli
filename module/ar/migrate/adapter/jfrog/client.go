@@ -199,6 +199,10 @@ func buildCatalogURL(endpoint, repo string) string {
 	return fmt.Sprintf("%s/artifactory/api/docker/%s/v2/_catalog?n=1000", endpoint, repo)
 }
 
+func buildCatalogURLRelative(endpoint, repo, relativePath string) string {
+	return fmt.Sprintf("%s/artifactory/api/docker/%s%s", endpoint, repo, relativePath)
+}
+
 func (c *client) getCatalog(registry string) (repositories []string, err error) {
 	url := buildCatalogURL(c.url, registry)
 	for {
@@ -215,7 +219,7 @@ func (c *client) getCatalog(registry string) (repositories []string, err error) 
 		}
 		// relative URL
 		if !strings.Contains(url, "://") {
-			url = c.url + url
+			url = buildCatalogURLRelative(c.url, registry, url)
 		}
 	}
 	return repositories, nil

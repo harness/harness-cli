@@ -112,6 +112,7 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			return nil, fmt.Errorf("get catalog: %w", err)
 		}
 
+		log.Info().Msgf("OCI catalog: %v", catalog)
 		for _, repo := range catalog {
 			packages = append(packages, types.Package{
 				Registry: registry,
