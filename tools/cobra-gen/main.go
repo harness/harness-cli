@@ -247,7 +247,7 @@ import (
 )
 
 // new{{ .Act | title }}{{ .Res | title }}Cmd wires up:
-//   hns {{ .Pkg }} {{ .Res }} {{ .Act }}{{ if hasArgs .RequiredArgs }} <args>{{ end }}
+//   hc {{ .Pkg }} {{ .Res }} {{ .Act }}{{ if hasArgs .RequiredArgs }} <args>{{ end }}
 func New{{ .Act | title }}{{ .Res | title }}Cmd() *cobra.Command {
 	var host string
 	var format string

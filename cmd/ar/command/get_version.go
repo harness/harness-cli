@@ -12,7 +12,7 @@ import (
 
 // newGetVersionCmd wires up:
 //
-//	hns ar version get <args>
+//	hc ar version get <args>
 func NewGetVersionCmd(c *client.ClientWithResponses) *cobra.Command {
 	var name, registry, artifact string
 	var pageSize int32

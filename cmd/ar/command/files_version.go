@@ -12,7 +12,7 @@ import (
 
 // newFilesVersionCmd wires up:
 //
-//	hns ar version files <args>
+//	hc ar version files <args>
 func NewFilesVersionCmd(c *client.ClientWithResponses) *cobra.Command {
 	var name string
 	var version, registry, artifact string

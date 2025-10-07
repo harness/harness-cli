@@ -12,7 +12,7 @@ import (
 
 // newGetArtifactCmd wires up:
 //
-//	hns ar artifact get <args>
+//	hc ar artifact get <args>
 func NewGetArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
 	var name, registry string
 	var pageSize int32

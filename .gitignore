@@ -5,8 +5,8 @@ harness-upgrade
 harness
 harnesscd-example-apps
 .vscode/
-/hns
-!/cmd/hns/
+/hc
+!/cmd/hc/
 .DS_Store
 */.DS_Store
 registry_migration_*

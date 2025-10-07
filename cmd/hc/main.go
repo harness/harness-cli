@@ -25,7 +25,7 @@ import (
 func main() {
 	var logFilePath string
 	rootCmd := &cobra.Command{
-		Use:   "hns",
+		Use:   "hc",
 		Short: "CLI tool for Harness",
 		Long: templates.LongDesc(`
       Harness CLI is a tool to interact with Harness Resources.
@@ -34,10 +34,10 @@ func main() {
             https://developer.harness.io/docs/`),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Skip loading config for auth commands
-			if cmd.CommandPath() == "hns auth" ||
-				cmd.CommandPath() == "hns auth login" ||
-				cmd.CommandPath() == "hns auth logout" ||
-				cmd.CommandPath() == "hns auth status" {
+			if cmd.CommandPath() == "hc auth" ||
+				cmd.CommandPath() == "hc auth login" ||
+				cmd.CommandPath() == "hc auth logout" ||
+				cmd.CommandPath() == "hc auth status" {
 				return nil
 			}
 
@@ -45,7 +45,7 @@ func main() {
 			if config.Global.APIBaseURL == "" || config.Global.AuthToken == "" || config.Global.AccountID == "" {
 				// Only show auth error if we're not displaying help or completion
 				if cmd.Name() != "help" && !cmd.IsAdditionalHelpTopicCommand() && cmd.Name() != "completion" {
-					fmt.Println("Not logged in. Please run 'hns auth login' first.")
+					fmt.Println("Not logged in. Please run 'hc auth login' first.")
 					os.Exit(1)
 				}
 			}
