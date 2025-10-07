@@ -21,7 +21,7 @@ import (
 )
 
 // NewPushGenericCmd creates a new cobra.Command for pushing generic artifacts to the registry.
-// command example: hns ar push generic <registry_name> <package_file_path>
+// command example: hc ar push generic <registry_name> <package_file_path>
 func NewPushGenericCmd(c *client.ClientWithResponses) *cobra.Command {
 	var packageName, filename, packageVersion, description string
 	var pkgURL string

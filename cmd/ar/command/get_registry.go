@@ -13,7 +13,7 @@ import (
 
 // newGetRegistryCmd wires up:
 //
-//	hns ar registry get <args>
+//	hc ar registry get <args>
 func NewGetRegistryCmd(client *ar.ClientWithResponses) *cobra.Command {
 	var name, packageType string
 	var pageSize int32

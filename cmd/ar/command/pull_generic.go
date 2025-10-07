@@ -34,7 +34,7 @@ func printReadCloser(rc io.ReadCloser) {
 }
 
 // NewPullGenericCmd creates a new cobra.Command for pulling generic artifacts from the registry.
-// command example: hns ar pull generic <registry_name> <package_path> <destination_path>
+// command example: hc ar pull generic <registry_name> <package_path> <destination_path>
 func NewPullGenericCmd(c *client.ClientWithResponses) *cobra.Command {
 	var pkgURL string
 	cmd := &cobra.Command{

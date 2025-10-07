@@ -12,7 +12,7 @@ import (
 
 // newDeleteVersionCmd wires up:
 //
-//	hns ar version delete <args>
+//	hc ar version delete <args>
 func NewDeleteVersionCmd(c *client.ClientWithResponses) *cobra.Command {
 	var name, registry, artifact string
 	var pageSize int32
