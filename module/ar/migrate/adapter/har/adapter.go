@@ -10,12 +10,13 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/harness/harness-cli/config"
+	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	adp "github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/module/ar/migrate/util"
-
-	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -32,9 +33,10 @@ type factory struct {
 }
 
 type adapter struct {
-	client *client
-	reg    types.RegistryConfig
-	logger zerolog.Logger
+	client    *client
+	reg       types.RegistryConfig
+	logger    zerolog.Logger
+	pkgClient *pkgclient.ClientWithResponses
 }
 
 // Create an adapter section
@@ -42,15 +44,21 @@ func (f factory) Create(ctx context.Context, config types.RegistryConfig) (adp.A
 	return newAdapter(config)
 }
 
-func newAdapter(config types.RegistryConfig) (adp.Adapter, error) {
-	c := newClient(&config)
+func newAdapter(config2 types.RegistryConfig) (adp.Adapter, error) {
+	c := newClient(&config2)
+	pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
+		auth.GetXApiKeyOptionARPKG())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pkg client: %v", err)
+	}
 	logger := log.With().
 		Str("adapter", "HAR").
 		Logger()
 	return &adapter{
-		client: c,
-		reg:    config,
-		logger: logger,
+		client:    c,
+		pkgClient: pkgClient,
+		reg:       config2,
+		logger:    logger,
 	}, nil
 }
 

@@ -14,6 +14,7 @@ import (
 
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/internal/api/ar"
+	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/module/ar/migrate/http"
 	"github.com/harness/harness-cli/module/ar/migrate/http/auth/xApiKey"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
@@ -45,6 +46,10 @@ func newClient(reg *types.RegistryConfig) *client {
 	arClient, _ := ar.NewClientWithResponses(config.Global.APIBaseURL+"/gateway/har/api/v1",
 		ar.WithHTTPClient(retryingHTTPClient()),
 		auth.GetXApiKeyOptionAR())
+
+	pkgClient, _ := pkgclient.NewClientWithResponses(reg.Endpoint,
+		auth.GetXApiKeyOptionARPKG())
+
 	return &client{
 		client: http.NewClient(
 			&http2.Client{
@@ -52,6 +57,7 @@ func newClient(reg *types.RegistryConfig) *client {
 			},
 			xApiKey.NewAuthorizer(token),
 		),
+		pkgClient: pkgClient,
 		url:       reg.Endpoint,
 		insecure:  true,
 		username:  username,
@@ -67,71 +73,22 @@ type client struct {
 	insecure  bool
 	username  string
 	password  string
+	pkgClient *pkgclient.ClientWithResponses
 }
 
 func (c *client) uploadGenericFile(registry, artifactName, version string, f *types.File, file io.ReadCloser) error {
-	url := fmt.Sprintf("%s/generic/%s/%s/%s/%s", c.url, config.Global.AccountID, registry, artifactName, version)
+	fileUri := strings.TrimPrefix(f.Uri, "/")
+	defer file.Close()
 
-	// Create a pipe to write the file contents
-	pr, pw := io.Pipe()
-	writer := multipart.NewWriter(pw)
+	_, err2 := c.pkgClient.UploadGenericFileToPathWithBodyWithResponse(
+		context.Background(),
+		config.Global.AccountID,
+		registry,
+		artifactName,
+		version, fileUri, "application/octet-stream", file)
 
-	// Process multipart form asynchronously
-	go func() {
-		defer pw.Close()
-		// Add the file
-		part, err := writer.CreateFormFile("file", f.Name)
-		if err != nil {
-			pw.CloseWithError(err)
-			return
-		}
-
-		// Copy the file content
-		if _, err := io.Copy(part, file); err != nil {
-			pw.CloseWithError(err)
-			return
-		}
-
-		// Add filename field
-		if err := writer.WriteField("filename", f.Name); err != nil {
-			pw.CloseWithError(err)
-			return
-		}
-
-		// Add description field
-		if err := writer.WriteField("description", "Uploaded via harness-cli migration tool"); err != nil {
-			pw.CloseWithError(err)
-			return
-		}
-
-		// Close the writer
-		if err := writer.Close(); err != nil {
-			pw.CloseWithError(err)
-			return
-		}
-	}()
-
-	// Create request
-	req, err := http2.NewRequest(http2.MethodPut, url, pr)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Set headers
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-
-	// Execute request with our client (which handles authentication)
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to upload file '%s/%s': %w", artifactName, version, err)
-	}
-	defer resp.Body.Close()
-
-	// Check for successful response
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to upload file '%s/%s', status code: %d, response: %s",
-			artifactName, version, resp.StatusCode, string(body))
+	if err2 != nil {
+		return fmt.Errorf("failed to upload file '%s/%s': %w", artifactName, version, err2)
 	}
 
 	return nil
