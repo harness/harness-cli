@@ -19,14 +19,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/module/ar/migrate/types/npm"
 	"github.com/harness/harness-cli/module/ar/migrate/util"
 	"github.com/harness/harness-cli/util/common"
-
-	"github.com/google/uuid"
 	"github.com/pterm/pterm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
