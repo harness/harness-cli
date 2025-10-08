@@ -105,6 +105,199 @@ paths:
           description: Missing or invalid `x-api-key`
         '5XX':
           description: Server-side error
+  /pkg/{accountId}/{registry}/files/{package}/{version}/{filepath}:
+    put:
+      summary: Upload (or replace) a file at a specific nested path within a package version
+      operationId: uploadGenericFileToPath
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: registry
+          in: path
+          required: true
+          schema: { type: string }
+        - name: package
+          in: path
+          required: true
+          schema: { type: string }
+        - name: version
+          in: path
+          required: true
+          schema: { type: string }
+        - name: filepath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: >
+            Nested path of the file within the package version (e.g. "dist/app.tar.gz").
+            If any path segment contains reserved characters, URL-encode them.
+      security:
+        - ApiKeyAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '201':
+          description: File created successfully
+        '200':
+          description: File replaced successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '404':
+          description: Package/version not found
+        '5XX':
+          description: Server-side error
+
+    get:
+      summary: Download a file from a specific nested path within a package version
+      operationId: downloadGenericFileFromPath
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: registry
+          in: path
+          required: true
+          schema: { type: string }
+        - name: package
+          in: path
+          required: true
+          schema: { type: string }
+        - name: version
+          in: path
+          required: true
+          schema: { type: string }
+        - name: filepath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Nested path of the file within the package version.
+      security:
+        - ApiKeyAuth: [ ]
+      responses:
+        '200':
+          description: File downloaded successfully
+          headers:
+            Content-Disposition:
+              description: Suggested filename for download
+              schema: { type: string }
+            ETag:
+              description: Entity tag for the file
+              schema: { type: string }
+            Last-Modified:
+              description: Last modified timestamp
+              schema: { type: string, format: date-time }
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Missing or invalid `x-api-key`
+        '404':
+          description: File not found
+        '5XX':
+          description: Server-side error
+
+    head:
+      summary: Get file metadata (headers only) for a specific nested path
+      operationId: headGenericFileAtPath
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: registry
+          in: path
+          required: true
+          schema: { type: string }
+        - name: package
+          in: path
+          required: true
+          schema: { type: string }
+        - name: version
+          in: path
+          required: true
+          schema: { type: string }
+        - name: filepath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Nested path of the file within the package version.
+      security:
+        - ApiKeyAuth: [ ]
+      responses:
+        '200':
+          description: Metadata returned in headers
+          headers:
+            Content-Length:
+              description: Size of the file in bytes
+              schema: { type: integer, format: int64 }
+            Content-Type:
+              description: MIME type of the file
+              schema: { type: string }
+            ETag:
+              description: Entity tag for the file
+              schema: { type: string }
+            Last-Modified:
+              description: Last modified timestamp
+              schema: { type: string, format: date-time }
+        '401':
+          description: Missing or invalid `x-api-key`
+        '404':
+          description: File not found
+        '5XX':
+          description: Server-side error
+
+    delete:
+      summary: Delete a file from a specific nested path within a package version
+      operationId: deleteGenericFileFromPath
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: registry
+          in: path
+          required: true
+          schema: { type: string }
+        - name: package
+          in: path
+          required: true
+          schema: { type: string }
+        - name: version
+          in: path
+          required: true
+          schema: { type: string }
+        - name: filepath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Nested path of the file within the package version.
+      security:
+        - ApiKeyAuth: [ ]
+      responses:
+        '204':
+          description: File deleted successfully
+        '401':
+          description: Missing or invalid `x-api-key`
+        '404':
+          description: File not found
+        '5XX':
+          description: Server-side error
   /pkg/{accountId}/{registry}/go/upload:
     put:
       summary: Upload a go package

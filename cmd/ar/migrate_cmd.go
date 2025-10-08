@@ -30,7 +30,9 @@ func getMigrateCmd(*ar.ClientWithResponses) *cobra.Command {
 		PreRun: func(cmd *cobra.Command, args []string) {
 			// Sync local flags to global config
 			config.Global.ConfigPath = localConfigPath
-			config.Global.Registry.PkgURL = localPkgBaseURL
+			if localPkgBaseURL != "" {
+				config.Global.Registry.PkgURL = localPkgBaseURL
+			}
 			config.Global.Registry.Migrate.Concurrency = localConcurrency
 			config.Global.Registry.Migrate.Overwrite = overwrite
 		},
