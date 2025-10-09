@@ -20,7 +20,7 @@ endif
 generate: $(SERVICES:%=generate-%)
 
 
-tools = $(addprefix $(GOBIN)/, golangci-lint goimports govulncheck protoc-gen-go protoc-gen-go-grpc gci)
+tools = $(addprefix $(GOBIN)/, golangci-lint goimports govulncheck protoc-gen-go protoc-gen-go-grpc gci oapi-codegen)
 tools: $(tools) ## Install tools required for the build
 	@echo "Installed tools"
 
@@ -31,7 +31,7 @@ generate-%:
 
 # Build the CLI (runs `generate` first so everything is up to date)
 build: generate format
-	$(GOCMD) build -o hc ./cmd/hc
+	CGO_ENABLED=0 $(GOCMD) build -ldflags="-s -w" -o hc ./cmd/hc
 
 # Remove generated artifacts
 clean:
@@ -43,3 +43,8 @@ format: tools # Format go code and error if any changes are made
 	@goimports -w .
 	@gci write --skip-generated --custom-order -s standard -s "prefix(github.com/harness/)" -s default -s blank -s dot .
 	@echo "Formatting complete"
+
+# Install oapi-codegen
+$(GOBIN)/oapi-codegen:
+	@echo "🔘 Installing oapi-codegen... (`date '+%H:%M:%S'`)"
+	@go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
