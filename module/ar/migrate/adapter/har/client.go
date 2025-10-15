@@ -390,12 +390,18 @@ func (c *client) uploadPythonFile(
 
 func (c *client) artifactFileExists(
 	ctx context.Context,
-	registryRef, pkg, version, fileURI string,
+	registryRef, pkg, version string,
+	file *types.File,
 	artifactType types.ArtifactType,
 ) (bool, error) {
 	page := int64(0)
 	size := int64(100)
-	fileURI = strings.TrimPrefix(fileURI, "/")
+	fileURI := file.Name
+	if artifactType == types.GENERIC {
+		fileURI = strings.TrimPrefix(file.Uri, "/")
+	} else {
+		fileURI = strings.TrimPrefix(fileURI, "/")
+	}
 
 	for {
 		response, err := c.apiClient.GetArtifactFilesWithResponse(ctx, registryRef, pkg, version,
