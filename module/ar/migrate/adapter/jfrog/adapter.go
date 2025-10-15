@@ -659,7 +659,8 @@ func (a *adapter) VersionExists(
 
 func (a *adapter) FileExists(
 	ctx context.Context,
-	registry, pkg, version, fileName string,
+	registryRef, pkg, version string,
+	fileName *types.File,
 	artifactType types.ArtifactType,
 ) (bool, error) {
 	return false, fmt.Errorf("not implemented")

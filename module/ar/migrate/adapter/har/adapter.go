@@ -153,10 +153,11 @@ func (a *adapter) VersionExists(
 
 func (a *adapter) FileExists(
 	ctx context.Context,
-	registryRef, pkg, version, fileName string,
+	registryRef, pkg, version string,
+	file *types.File,
 	artifactType types.ArtifactType,
 ) (bool, error) {
-	return a.client.artifactFileExists(ctx, registryRef, pkg, version, fileName, artifactType)
+	return a.client.artifactFileExists(ctx, registryRef, pkg, version, file, artifactType)
 }
 
 func (a *adapter) CreateVersion(

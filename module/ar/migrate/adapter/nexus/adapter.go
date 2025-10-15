@@ -387,7 +387,8 @@ func (a *adapter) VersionExists(
 
 func (a *adapter) FileExists(
 	ctx context.Context,
-	registry, pkg, version, fileName string,
+	registry, pkg, version string,
+	fileName *types.File,
 	artifactType types.ArtifactType,
 ) (bool, error) {
 	files, err := a.GetFiles(registry)
@@ -395,10 +396,10 @@ func (a *adapter) FileExists(
 		return false, fmt.Errorf("failed to get files: %w", err)
 	}
 
-	expectedPath := a.constructFilePath(pkg, version, fileName, artifactType)
+	expectedPath := a.constructFilePath(pkg, version, fileName.Name, artifactType)
 
 	for _, file := range files {
-		if strings.Contains(file.Uri, expectedPath) || file.Name == fileName {
+		if strings.Contains(file.Uri, expectedPath) || file.Name == fileName.Name {
 			return true, nil
 		}
 	}

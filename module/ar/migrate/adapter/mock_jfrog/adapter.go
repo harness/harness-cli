@@ -716,13 +716,14 @@ func (a *adapter) VersionExists(
 
 func (a *adapter) FileExists(
 	ctx context.Context,
-	registry, pkg, version, fileName string,
+	registryRef, pkg, version string,
+	fileName *types.File,
 	artifactType types.ArtifactType,
 ) (bool, error) {
 	// Mock implementation - return true for common file types
 	commonExtensions := []string{".jar", ".pom", ".tgz", ".tar.gz", ".zip", ".rpm", ".deb"}
 	for _, ext := range commonExtensions {
-		if strings.HasSuffix(fileName, ext) {
+		if strings.HasSuffix(fileName.Name, ext) {
 			return true, nil
 		}
 	}

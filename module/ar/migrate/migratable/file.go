@@ -117,7 +117,7 @@ func (r *File) Pre(ctx context.Context) error {
 	if !r.config.Overwrite && (r.artifactType != types.MAVEN && r.pkg.Name != "" && r.version.Name != "" && r.file.Name != "") {
 		exists, err := r.destAdapter.FileExists(ctx,
 			r.registry.Path,
-			r.pkg.Name, r.version.Name, r.file.Name, r.artifactType)
+			r.pkg.Name, r.version.Name, r.file, r.artifactType)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to check if version exists")
 			return nil
