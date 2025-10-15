@@ -50,7 +50,8 @@ type Adapter interface {
 	) (bool, error)
 	FileExists(
 		ctx context.Context,
-		registryRef, pkg, version, fileName string,
+		registryRef, pkg, version string,
+		fileName *types.File,
 		artifactType types.ArtifactType,
 	) (bool, error)
 	CreateVersion(
