@@ -609,17 +609,17 @@ func (a *adapter) GetOCIImagePath(registry string, image string) (string, error)
 	if err != nil {
 		return "", fmt.Errorf("failed to get OCI host: %w", err)
 	}
-	return util.GenOCIImagePath(host, image), nil
+	return util.GenOCIImagePath(host, registry, image), nil
 }
 
 func dockerHost(artifactoryBase, repo string) (string, error) {
-	const suffix = ".jfrog.io"
+	/*const suffix = ".jfrog.io"
 	if !strings.HasSuffix(artifactoryBase, suffix) {
 		return "", fmt.Errorf("not a jfrog.io host")
 	}
 	account := strings.TrimSuffix(artifactoryBase, suffix)
-	endpoint := fmt.Sprintf("%s-%s%s", account, repo, suffix)
-	parse, _ := url.Parse(endpoint)
+	endpoint := fmt.Sprintf("%s-%s%s", account, repo, suffix)*/
+	parse, _ := url.Parse(artifactoryBase)
 	return parse.Host, nil
 }
 
