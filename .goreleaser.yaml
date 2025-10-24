@@ -31,10 +31,7 @@ builds:
       - -s -w -X main.version={{.Version}}
 
 archives:
-  - id: hc
-    format_overrides:
-      - goos: windows
-        format: zip
+  - id: default
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_
       {{- if eq .Os "darwin" }}mac-os
@@ -67,14 +64,8 @@ nfpms:
     bindir: /usr/local/bin
 
 checksum:
-  name_template: >-
-    {{ .ProjectName }}-
-    {{- if eq .Os "darwin" }}mac
-    {{- else if eq .Os "linux" }}linux
-    {{- else if eq .Os "windows" }}windows
-    {{- end }}-checksums.txt
+  name_template: "checksums.txt"
   algorithm: sha256
-  split: true
 
 release:
   github:
@@ -126,10 +117,10 @@ release:
 
     ### Verification
     
-    Verify the checksums using the appropriate checksum file:
-    - `hc-linux-checksums.txt`
-    - `hc-mac-checksums.txt`
-    - `hc-windows-checksums.txt`
+    Verify the checksums using the `checksums.txt` file:
+    ```bash
+    sha256sum -c checksums.txt --ignore-missing
+    ```
 
 changelog:
   use: github
