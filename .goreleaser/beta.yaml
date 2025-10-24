@@ -48,8 +48,8 @@ nfpms:
   - id: hc
     package_name: hc
     vendor: Harness
-    homepage: https://github.com/iarvind/harness-cli
-    maintainer: Arvind Choudary <arvind@harness.io>
+    homepage: https://github.com/harness/harness-cli
+    maintainer: Arvind Choudhary <arvind.choudhary@harness.io>
     description: CLI tool for Harness
     license: Apache 2.0
     formats:
