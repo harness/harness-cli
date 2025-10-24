@@ -1,33 +1,37 @@
+name: Release
+
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - 'v2*'
 
 permissions:
   contents: write
-  packages: write
+
+env:
+  GO_VERSION: '1.24'
 
 jobs:
-  releases-matrix:
-    name: Release Go Binary
+  release:
+    name: Release
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        # build and publish in parallel: linux/386, linux/amd64, linux/arm64, windows/386, windows/amd64, darwin/amd64, darwin/arm64
-        goos: [linux, windows, darwin]
-        goarch: [amd64, arm64]
-        exclude:
-          - goarch: arm64
-            goos: darwin
-          - goarch: arm64
-            goos: windows
     steps:
-      - uses: actions/checkout@v3
-      - uses: wangyoucao577/go-release-action@v1.34
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          goos: ${{ matrix.goos }}
-          goarch: ${{ matrix.goarch }}
-          goversion: 1.19
-          project_path: "."
-          binary_name: "harness"
-          ldflags: ${{ format('-X "main.Version={0}"', github.ref_name) }}
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
