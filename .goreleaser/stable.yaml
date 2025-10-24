@@ -74,12 +74,8 @@ release:
   draft: false
   prerelease: auto
   mode: replace
-  name_template: "{{.Version}} (Beta)"
+  name_template: "Release {{.Version}}"
   header: |
-    ## ⚠️ Beta Release
-    
-    This is a beta release for testing purposes. Use with caution in production environments.
-    
     ## What's Changed
   footer: |
     ## Installation

@@ -1,9 +1,10 @@
-name: Beta Release
+name: Stable Release
 
 on:
   push:
     tags:
-      - 'v2*-beta.*'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+'
 
 permissions:
   contents: write
@@ -13,7 +14,7 @@ env:
 
 jobs:
   release:
-    name: Beta Release
+    name: Stable Release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -32,6 +33,7 @@ jobs:
         with:
           distribution: goreleaser
           version: '~> v2'
-          args: release --clean --config .goreleaser/beta.yaml
+          args: release --clean --config .goreleaser/stable.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
