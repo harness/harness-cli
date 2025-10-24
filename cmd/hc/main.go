@@ -46,12 +46,13 @@ func main() {
 			cmd.Help()
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// Skip loading config for auth commands and version
+			// Skip loading config for auth commands, version, and upgrade
 			if cmd.CommandPath() == "hc auth" ||
 				cmd.CommandPath() == "hc auth login" ||
 				cmd.CommandPath() == "hc auth logout" ||
 				cmd.CommandPath() == "hc auth status" ||
-				cmd.CommandPath() == "hc version" {
+				cmd.CommandPath() == "hc version" ||
+				cmd.CommandPath() == "hc upgrade" {
 				return nil
 			}
 
@@ -142,6 +143,7 @@ func main() {
 	rootCmd.AddCommand(auth.GetRootCmd())
 	rootCmd.AddCommand(ar.GetRootCmd())
 	rootCmd.AddCommand(versionCmd())
+	rootCmd.AddCommand(upgradeCmd())
 
 	flags := rootCmd.PersistentFlags()
 
