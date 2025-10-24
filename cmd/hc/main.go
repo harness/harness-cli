@@ -22,8 +22,13 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// version is set via ldflags during build
+var version = "dev"
+
 func main() {
 	var logFilePath string
+	var showVersion bool
+
 	rootCmd := &cobra.Command{
 		Use:   "hc",
 		Short: "CLI tool for Harness",
@@ -32,12 +37,21 @@ func main() {
 
       Find more information at:
             https://developer.harness.io/docs/`),
+		Run: func(cmd *cobra.Command, args []string) {
+			if showVersion {
+				fmt.Printf("hc version %s\n", version)
+				fmt.Printf("Built with %s\n", runtime.Version())
+				return
+			}
+			cmd.Help()
+		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// Skip loading config for auth commands
+			// Skip loading config for auth commands and version
 			if cmd.CommandPath() == "hc auth" ||
 				cmd.CommandPath() == "hc auth login" ||
 				cmd.CommandPath() == "hc auth logout" ||
-				cmd.CommandPath() == "hc auth status" {
+				cmd.CommandPath() == "hc auth status" ||
+				cmd.CommandPath() == "hc version" {
 				return nil
 			}
 
@@ -100,6 +114,9 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&logFilePath, "log-file", "",
 		"Path to store logs (if not provided, logging is disabled)")
 
+	// Add version flag
+	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Print version information")
+
 	// Load auth config
 	authConfig, err := loadAuthConfig()
 	if err == nil {
@@ -124,6 +141,7 @@ func main() {
 	// Add main command groups
 	rootCmd.AddCommand(auth.GetRootCmd())
 	rootCmd.AddCommand(ar.GetRootCmd())
+	rootCmd.AddCommand(versionCmd())
 
 	flags := rootCmd.PersistentFlags()
 
@@ -133,6 +151,19 @@ func main() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+}
+
+// versionCmd returns the version command
+func versionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print the version number of hc",
+		Long:  "Print the version number of the Harness CLI (hc)",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("hc version %s\n", version)
+			fmt.Printf("Built with %s\n", runtime.Version())
+		},
 	}
 }
 
