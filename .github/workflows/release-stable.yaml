@@ -36,4 +36,3 @@ jobs:
           args: release --clean --config .goreleaser/stable.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
