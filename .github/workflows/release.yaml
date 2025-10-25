@@ -1,9 +1,9 @@
-name: Beta Release
+name: Beta Release for v1
 
 on:
   push:
     tags:
-      - 'v2*-beta.*'
+      - 'v1*-beta.*'
 
 permissions:
   contents: write
