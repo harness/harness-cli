@@ -69,7 +69,7 @@ checksum:
 
 release:
   github:
-    owner: iarvind
+    owner: harness
     name: harness-cli
   draft: false
   prerelease: auto

@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	githubAPIURL = "https://api.github.com/repos/iarvind/harness-cli/releases/latest"
-	githubOwner  = "iarvind"
+	githubAPIURL = "https://api.github.com/repos/harness/harness-cli/releases/latest"
+	githubOwner  = "harness"
 	githubRepo   = "harness-cli"
 )
 
