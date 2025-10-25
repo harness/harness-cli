@@ -104,7 +104,6 @@ func runUpgrade(includePreRelease bool) error {
 
 	fmt.Printf("\nDownloading %s...\n", asset.Name)
 
-	// Download the asset
 	tmpDir, err := os.MkdirTemp("", "hc-upgrade-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
