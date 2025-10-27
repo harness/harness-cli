@@ -4,10 +4,13 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/harness/harness-cli/config"
 
@@ -59,8 +62,8 @@ func saveAuthConfig(authConfig AuthConfig) error {
 	return nil
 }
 
-// readPassword reads a password from stdin without echoing it
-func readPassword(prompt string) (string, error) {
+// readToken reads a password from stdin without echoing it
+func readToken(prompt string) (string, error) {
 	fmt.Print(prompt)
 	password, err := term.ReadPassword(int(syscall.Stdin))
 	fmt.Println() // Add a newline after the password input
@@ -79,6 +82,68 @@ func readInput(prompt string) (string, error) {
 		return "", fmt.Errorf("error reading input: %w", err)
 	}
 	return strings.TrimSpace(input), nil
+}
+
+// getAccountIDFromToken gets the account ID from the token
+// Token format: pat.AccountID.Random.Random
+func getAccountIDFromToken(token string) (string, error) {
+	splitN := strings.SplitN(token, ".", 3)
+	return splitN[1], nil
+}
+
+// accountResponse represents the response from the account API
+type accountResponse struct {
+	Account struct {
+		Identifier string `json:"identifier"`
+		Name       string `json:"name"`
+		CreatedAt  int64  `json:"createdAt"`
+	} `json:"data"`
+}
+
+// validateCredentials validates the provided credentials by making an API call
+func validateCredentials(apiURL, token, accountID string) error {
+	// Create HTTP client with reasonable timeout
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	// Build the request URL
+	url := fmt.Sprintf("%s/ng/api/accounts/%s", apiURL, accountID)
+
+	// Create the request
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("error creating request: %w", err)
+	}
+
+	// Add headers
+	req.Header.Add("x-api-key", token)
+
+	// Execute the request
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("error connecting to Harness API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("error reading response body: %w", err)
+	}
+
+	// Check status code
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("authentication failed with status %s. Please check your credentials", resp.Status)
+	}
+
+	// Parse the response to ensure it's valid
+	var accountResp accountResponse
+	if err := json.Unmarshal(body, &accountResp); err != nil {
+		return fmt.Errorf("error parsing response: %w", err)
+	}
+
+	return nil
 }
 
 func getLoginCmd() *cobra.Command {
@@ -120,7 +185,7 @@ func getLoginCmd() *cobra.Command {
 
 				// Get API Token
 				if token == "" {
-					input, err := readPassword("API Token: ")
+					input, err := readToken("API Token: ")
 					if err != nil {
 						return err
 					}
@@ -132,14 +197,15 @@ func getLoginCmd() *cobra.Command {
 
 				// Get Account ID
 				if accountID == "" {
-					input, err := readInput("Account ID: ")
+					var err error
+					accountID, err = getAccountIDFromToken(token)
 					if err != nil {
 						return err
 					}
-					if input == "" {
-						return fmt.Errorf("Account ID is required")
+					if accountID == "" {
+						return fmt.Errorf("token does not contains accountID")
 					}
-					accountID = input
+					fmt.Println("AccountID from token:", accountID)
 				}
 
 				// Get optional Org ID
@@ -173,6 +239,13 @@ func getLoginCmd() *cobra.Command {
 			if accountID == "" {
 				return fmt.Errorf("Account ID is required. Use --account flag or interactive mode")
 			}
+
+			// Validate credentials by making an API call
+			fmt.Println("Validating credentials...")
+			if err := validateCredentials(apiURL, token, accountID); err != nil {
+				return fmt.Errorf("credential validation failed: %w", err)
+			}
+			fmt.Println("✓ Credentials validated successfully")
 
 			// Create auth config struct for saving to file
 			authConfig := AuthConfig{
@@ -216,7 +289,8 @@ func getLoginCmd() *cobra.Command {
 	cmd.Flags().StringVar(&accountID, "account", "", "Account ID")
 	cmd.Flags().StringVar(&orgID, "org", "", "Organization ID")
 	cmd.Flags().StringVar(&projectID, "project", "", "Project ID")
-	cmd.Flags().BoolVar(&nonInteractive, "non-interactive", false, "Disable interactive prompts (requires all mandatory flags)")
+	cmd.Flags().BoolVar(&nonInteractive, "non-interactive", false,
+		"Disable interactive prompts (requires all mandatory flags)")
 
 	// Don't mark flags as required as we'll handle missing flags in interactive mode
 	// We'll validate the values in the RunE function instead

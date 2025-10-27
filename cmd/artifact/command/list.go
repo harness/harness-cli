@@ -10,28 +10,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newGetArtifactCmd wires up:
+// NewListArtifactCmd wires up:
 //
-//	hc ar artifact get <args>
-func NewGetArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
-	var name, registry string
+//	hc artifact list
+func NewListArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
+	var registry string
 	var pageSize int32
 	var pageIndex int32
 	cmd := &cobra.Command{
-		Use:   "artifact [?artifact-name]",
-		Short: "Get artifact details",
-		Long:  "Retrieves detailed information about a specific artifact in the Harness Artifact Registry",
-		Args:  cobra.MaximumNArgs(1),
+		Use:   "list",
+		Short: "List all artifacts",
+		Long:  "Lists all artifacts in the Harness Artifact Registry",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 1 {
-				name = args[0]
-			}
 			params := client.GetAllHarnessArtifactsParams{}
 			if len(registry) > 0 {
 				params.RegIdentifier = &[]string{registry}
-			}
-			if len(name) > 0 {
-				params.SearchTerm = &name
 			}
 
 			if pageSize > 0 {

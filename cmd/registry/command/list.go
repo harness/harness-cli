@@ -11,24 +11,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newGetRegistryCmd wires up:
+// NewListRegistryCmd wires up:
 //
-//	hc ar registry get <args>
-func NewGetRegistryCmd(client *ar.ClientWithResponses) *cobra.Command {
-	var name, packageType string
+//	hc registry list
+func NewListRegistryCmd(client *ar.ClientWithResponses) *cobra.Command {
+	var packageType string
 	var pageSize int32
 	var pageIndex int32
 	cmd := &cobra.Command{
-		Use:   "registry [?name]",
-		Short: "Get registry details",
-		Args:  cobra.MaximumNArgs(1),
-		Long:  "Retrieves detailed information about a specific Harness Artifact Registry",
+		Use:   "list",
+		Short: "List all registries",
+		Long:  "Lists all Harness Artifact Registries",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Create params for pagination if needed
 			params := &ar.GetAllRegistriesParams{}
-			if len(args) == 1 {
-				name = args[0]
-			}
 			if pageSize > 0 {
 				size := int64(pageSize)
 				params.Size = &size
@@ -36,9 +32,6 @@ func NewGetRegistryCmd(client *ar.ClientWithResponses) *cobra.Command {
 			if pageIndex > 0 {
 				page := int64(pageIndex)
 				params.Page = &page
-			}
-			if len(name) > 0 {
-				params.SearchTerm = &name
 			}
 			if len(packageType) > 0 {
 				params.PackageType = &[]string{packageType}

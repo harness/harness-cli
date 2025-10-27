@@ -13,7 +13,7 @@ import (
 func NewDeleteArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
 	var name, registry string
 	cmd := &cobra.Command{
-		Use:   "artifact [name]",
+		Use:   "delete [name]",
 		Short: "Delete an artifact from a registry",
 		Long:  "Deletes a specific artifact and all its versions from the Harness Artifact Registry",
 		Args:  cobra.ExactArgs(1),

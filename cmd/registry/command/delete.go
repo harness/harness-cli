@@ -15,7 +15,7 @@ import (
 func NewDeleteRegistryCmd(c *client.ClientWithResponses) *cobra.Command {
 	var name string
 	cmd := &cobra.Command{
-		Use:   "registry [name]",
+		Use:   "delete [name]",
 		Short: "Delete registry",
 		Long:  "Delete a registry from Harness Artifact Registry",
 		Args:  cobra.ExactArgs(1),

@@ -30,8 +30,12 @@ generate-%:
 	$(GOCMD) run $(GEN) --service=$* --in=$(API_DIR)/$*/openapi.yaml --out=cmd/$* --cmd=$(API_DIR)/$*/command.yaml
 
 # Build the CLI (runs `generate` first so everything is up to date)
-build: generate format
+build-all: generate format
 	CGO_ENABLED=0 $(GOCMD) build -ldflags="-s -w" -o hc ./cmd/hc
+
+build: 
+	CGO_ENABLED=0 $(GOCMD) build -ldflags="-s -w" -o hc ./cmd/hc
+
 
 # Remove generated artifacts
 clean:

@@ -10,8 +10,12 @@ import (
 	"runtime/pprof"
 	"time"
 
-	"github.com/harness/harness-cli/cmd/ar"
+	"github.com/harness/harness-cli/cmd/api"
+	"github.com/harness/harness-cli/cmd/artifact"
 	"github.com/harness/harness-cli/cmd/auth"
+	"github.com/harness/harness-cli/cmd/organisation"
+	"github.com/harness/harness-cli/cmd/project"
+	"github.com/harness/harness-cli/cmd/registry"
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/util/templates"
@@ -65,7 +69,7 @@ func main() {
 				}
 			}
 
-			logFileDefaultOutputPath := fmt.Sprintf("registry_migration_%s.txt", time.Now().Format("20060102_150405"))
+			logFileDefaultOutputPath := fmt.Sprintf("logs_%s.txt", time.Now().Format("20060102_150405"))
 			if logFilePath == "" {
 				logFilePath = logFileDefaultOutputPath
 			}
@@ -141,7 +145,11 @@ func main() {
 
 	// Add main command groups
 	rootCmd.AddCommand(auth.GetRootCmd())
-	rootCmd.AddCommand(ar.GetRootCmd())
+	rootCmd.AddCommand(registry.GetRootCmd())
+	rootCmd.AddCommand(artifact.GetRootCmd())
+	rootCmd.AddCommand(project.GetRootCmd())
+	rootCmd.AddCommand(organisation.GetRootCmd())
+	rootCmd.AddCommand(api.GetRootCmd())
 	rootCmd.AddCommand(versionCmd())
 	rootCmd.AddCommand(upgradeCmd())
 
