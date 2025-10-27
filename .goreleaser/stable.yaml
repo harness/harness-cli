@@ -74,7 +74,7 @@ release:
   draft: false
   prerelease: auto
   mode: replace
-  name_template: "Release {{.Version}}"
+  name_template: "Release {{.Tag}}"
   header: |
     ## What's Changed
   footer: |
