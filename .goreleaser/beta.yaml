@@ -72,7 +72,7 @@ release:
     owner: harness
     name: harness-cli
   draft: false
-  prerelease: auto
+  prerelease: false
   mode: replace
   name_template: "{{.Tag}} (Beta)"
   header: |
