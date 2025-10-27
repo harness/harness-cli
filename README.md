@@ -7,7 +7,7 @@ A powerful command-line interface tool for interacting with Harness services
 The Harness CLI (hc) provides a unified command-line interface for interacting with various Harness services. It follows a consistent, resource-based command structure:
 
 ```
-hc <resource> <action> <args> <flags>
+hc [<global-flags>] <command> <subcommand> [<positional-args>…] [<flags>]
 ```
 
 ### Available Commands
@@ -40,9 +40,6 @@ mv hc /usr/local/bin/
 ```bash
 # Install go if you haven't
 
-# Install go tools:
-go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && go install golang.org/x/tools/cmd/goimports@latest && go install golang.org/x/vuln/cmd/govulncheck@latest && go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && go install github.com/daixiang0/gci@latest
-
 # Clone the repository
 git clone https://github.com/harness/harness-cli.git
 cd harness-cli
@@ -56,7 +53,7 @@ make build
 The CLI can be configured using:
 
 1. Configuration file at `$HOME/.harness/auth.json`
-2. Environment variables
+2. Environment variables (coming soon)
 3. Command-line flags
 
 ### Authentication
@@ -133,22 +130,18 @@ hc art list  # Using alias
 # List artifacts in a specific registry
 hc artifact list --registry <registry-name>
 
-# Get artifact details
-hc artifact get <artifact-name> --registry <registry-name>
-
 # Delete an artifact
 hc artifact delete <artifact-name> --registry <registry-name>
 
 # Push artifacts
 hc artifact push generic <registry-name> <file-path> --name <artifact-name> --version <version>
-hc artifact push maven <registry-name> <file-path>
 hc artifact push go <registry-name> <module-path>
 
 # Pull artifacts
 hc artifact pull generic <registry-name> <package-path> <destination>
 ```
 
-### Project Management (`hc project` or `hc proj`)
+### Project Management (`hc project` or `hc proj`) (coming soon)
 
 Manage Harness Projects.
 
@@ -166,7 +159,7 @@ hc project create <project-id>
 hc project delete <project-id>
 ```
 
-### Organisation Management (`hc organisation` or `hc org`)
+### Organisation Management (`hc organisation` or `hc org`) (coming soon)
 
 Manage Harness Organisations.
 
@@ -185,7 +178,7 @@ hc org create <org-id>
 hc org delete <org-id>
 ```
 
-### API Passthrough (`hc api`)
+### API Passthrough (`hc api`) (coming soon)
 
 Make raw REST API calls to Harness (for power users).
 
@@ -217,7 +210,7 @@ The following flags are available for all commands:
 --log-file string         Path to store logs
 ```
 
-## Output Formatting
+## Output Formatting 
 
 The CLI supports different output formats using the `--format` flag:
 
@@ -259,25 +252,14 @@ harness-cli/
 └── util/             # Utility functions
 ```
 
-### Adding New Commands
-
-1. Add the OpenAPI spec in the `api/<service>` directory
-2. Run the code generator to create service client:
-   ```bash
-   make generate
-   ```
-3. Create a new command package under `cmd/<resource-name>/`
-4. Implement commands in `cmd/<resource-name>/command/`
-5. Register the command in `cmd/hc/main.go`
+### Adding New Commands (coming soon)
+TODO
 
 ### Building
 
 ```bash
 # Build the binary
 make build
-
-# Build for all platforms
-make build-all
 
 # Run tests
 make test
@@ -286,66 +268,6 @@ make test
 make lint
 ```
 
-## Examples
-
-### Complete Workflow Example
-
-```bash
-# 1. Authenticate
-hc auth login
-
-# 2. List registries
-hc registry list
-
-# 3. Push an artifact
-hc artifact push generic my-registry ./my-file.tar.gz \
-  --name my-app \
-  --version 1.0.0
-
-# 4. List artifacts in the registry
-hc artifact list --registry my-registry
-
-# 5. Pull the artifact
-hc artifact pull generic my-registry my-app/1.0.0/my-file.tar.gz ./downloads/
-
-# 6. Check authentication status
-hc auth status
-```
-
-### Using Aliases
-
-```bash
-# Registry commands
-hc reg list
-hc reg get my-registry
-
-# Artifact commands
-hc art list --registry my-registry
-hc art push generic my-registry ./file.tar.gz --name app --version 1.0.0
-
-# Project/Organisation commands
-hc proj list
-hc org list
-```
-
-## Migration from v1
-
-If you're upgrading from v1 of the CLI, note the following command changes:
-
-| Old Command (v1) | New Command (v2) |
-|-----------------|------------------|
-| `hc ar get registry` | `hc registry list` or `hc registry get <name>` |
-| `hc ar get artifact` | `hc artifact list` or `hc artifact get <name>` |
-| `hc ar push generic` | `hc artifact push generic` |
-| `hc ar pull generic` | `hc artifact pull generic` |
-| `hc ar delete registry` | `hc registry delete` |
-| `hc ar delete artifact` | `hc artifact delete` |
-| `hc ar migrate` | `hc registry migrate` |
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
 ## License
 
-Apache 2.0
+MIT License
