@@ -10,13 +10,14 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	adp "github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/module/ar/migrate/util"
 	"github.com/harness/harness-cli/util/common/auth"
+
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
