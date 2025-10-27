@@ -418,12 +418,12 @@ func (c *client) artifactFileExists(
 			return false, fmt.Errorf("failed to get artifact files: %s", response.Status())
 		}
 		data := response.JSON200
-		for _, v := range data.Files {
+		for _, v := range data.Data.Files {
 			if v.Name == fileURI {
 				return true, nil
 			}
 		}
-		if len(data.Files) < int(size) || (nil != data.PageCount && nil != data.PageIndex && (*data.PageIndex+1 >= *data.PageCount)) {
+		if len(data.Data.Files) < int(size) || (nil != data.Data.PageCount && nil != data.Data.PageIndex && (*data.Data.PageIndex+1 >= *data.Data.PageCount)) {
 			break
 		}
 		page++
