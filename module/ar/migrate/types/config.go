@@ -61,6 +61,8 @@ type RegistryMapping struct {
 	// NOT IMPLEMENTED YET
 	IncludePatterns []string `yaml:"includePatterns"`
 	ExcludePatterns []string `yaml:"excludePatterns"`
+	//Optional
+	SourcePackageHostname string `yaml:"sourcePackageHostname"`
 }
 
 // CredentialsConfig defines the credential configuration

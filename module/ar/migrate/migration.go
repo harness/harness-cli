@@ -68,7 +68,7 @@ func (m *MigrationService) Run(ctx context.Context) error {
 
 		mappingLogger.Info().Msg("Processing registry migration")
 
-		job := migratable.NewRegistryJob(m.source, m.destination, mapping.SourceRegistry,
+		job := migratable.NewRegistryJob(m.source, m.destination, mapping.SourceRegistry, mapping.SourcePackageHostname,
 			mapping.DestinationRegistry, mapping.ArtifactType, &transferStats, &mapping, m.config)
 
 		log.Info().Msgf("concurrency: %d, mapping: %+v", m.config.Concurrency, mapping)

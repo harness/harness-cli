@@ -9,16 +9,21 @@ import (
 func CreateCraneKeychain(
 	srcAdapter adapter.Adapter,
 	destAdapter adapter.Adapter,
-	srcRegistry string,
-	destRegistry string,
-) authn.Keychain {
-	srcKeychain := srcAdapter.GetKeyChain(srcRegistry)
-	dstKeychain := destAdapter.GetKeyChain(destRegistry)
+	sourcePackageHostname string,
+) (authn.Keychain, error) {
+	srcKeychain, err := srcAdapter.GetKeyChain(sourcePackageHostname)
+	if err != nil {
+		return nil, err
+	}
+	dstKeychain, err := destAdapter.GetKeyChain("")
+	if err != nil {
+		return nil, err
+	}
 
 	customKeychain := authn.NewMultiKeychain(
 		srcKeychain,
 		dstKeychain,
 	)
 
-	return customKeychain
+	return customKeychain, nil
 }

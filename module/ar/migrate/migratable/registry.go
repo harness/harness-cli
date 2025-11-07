@@ -16,15 +16,16 @@ import (
 )
 
 type Registry struct {
-	srcRegistry  string
-	destRegistry string
-	srcAdapter   adapter.Adapter
-	destAdapter  adapter.Adapter
-	artifactType types.ArtifactType
-	logger       zerolog.Logger
-	stats        *types.TransferStats
-	mapping      *types.RegistryMapping
-	config       *types.Config
+	srcRegistry           string
+	sourcePackageHostname string
+	destRegistry          string
+	srcAdapter            adapter.Adapter
+	destAdapter           adapter.Adapter
+	artifactType          types.ArtifactType
+	logger                zerolog.Logger
+	stats                 *types.TransferStats
+	mapping               *types.RegistryMapping
+	config                *types.Config
 
 	// Transient
 	registry types.RegistryInfo
@@ -34,6 +35,7 @@ func NewRegistryJob(
 	src adapter.Adapter,
 	dest adapter.Adapter,
 	srcRegistry string,
+	sourcePackageHostname string,
 	destRegistry string,
 	artifactType types.ArtifactType,
 	stats *types.TransferStats,
@@ -50,15 +52,16 @@ func NewRegistryJob(
 		Logger()
 
 	return &Registry{
-		srcRegistry:  srcRegistry,
-		destRegistry: destRegistry,
-		srcAdapter:   src,
-		destAdapter:  dest,
-		artifactType: artifactType,
-		logger:       jobLogger,
-		stats:        stats,
-		mapping:      mapping,
-		config:       config,
+		srcRegistry:           srcRegistry,
+		sourcePackageHostname: sourcePackageHostname,
+		destRegistry:          destRegistry,
+		srcAdapter:            src,
+		destAdapter:           dest,
+		artifactType:          artifactType,
+		logger:                jobLogger,
+		stats:                 stats,
+		mapping:               mapping,
+		config:                config,
 	}
 }
 
@@ -126,7 +129,7 @@ func (r *Registry) Migrate(ctx context.Context) error {
 			logger.Error().Msgf("Failed to get node for path %s", pkg.Path)
 			return fmt.Errorf("get node for path %s failed: %w", pkg.Path, err2)
 		}
-		job := NewPackageJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, pkg, treeNode,
+		job := NewPackageJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.sourcePackageHostname, r.destRegistry, r.artifactType, pkg, treeNode,
 			r.stats, r.mapping, r.config, r.registry)
 		jobs = append(jobs, job)
 	}

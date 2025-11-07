@@ -62,9 +62,12 @@ func newAdapter(config2 types.RegistryConfig) (adp.Adapter, error) {
 	}, nil
 }
 
-func (a *adapter) GetKeyChain(reg string) authn.Keychain {
-	parseUrl, _ := url.Parse(a.reg.Endpoint)
-	return NewHarKeychain(a.reg.Credentials.Username, a.reg.Credentials.Password, parseUrl.Host)
+func (a *adapter) GetKeyChain(_ string) (authn.Keychain, error) {
+	parseUrl, err := url.Parse(a.reg.Endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse [%s], err: %w", a.reg.Endpoint, err)
+	}
+	return NewHarKeychain(a.reg.Credentials.Username, a.reg.Credentials.Password, parseUrl.Host), nil
 }
 
 func (a *adapter) GetConfig() types.RegistryConfig {
@@ -130,7 +133,7 @@ func (a *adapter) UploadFile(
 	return nil
 }
 
-func (a *adapter) GetOCIImagePath(registry string, image string) (string, error) {
+func (a *adapter) GetOCIImagePath(registry string, _ string, image string) (string, error) {
 	parse, _ := url.Parse(a.reg.Endpoint)
 	return util.GenOCIImagePath(parse.Host, strings.ToLower(config.Global.AccountID), registry, image), nil
 }

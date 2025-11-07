@@ -65,9 +65,18 @@ func newAdapter(config types.RegistryConfig) (adp.Adapter, error) {
 	}, nil
 }
 
-func (a *adapter) GetKeyChain(reg string) authn.Keychain {
-	host, _ := dockerHost(a.reg.Endpoint, reg)
-	return NewJfrogKeychain(a.reg.Credentials.Username, a.reg.Credentials.Password, host)
+func (a *adapter) GetKeyChain(sourcePackageHostname string) (authn.Keychain, error) {
+	var host string
+	if sourcePackageHostname != "" {
+		host = sourcePackageHostname
+	} else {
+		parse, err := url.Parse(a.reg.Endpoint)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse [%s], err: %w", a.reg.Endpoint, err)
+		}
+		host = parse.Host
+	}
+	return NewJfrogKeychain(a.reg.Credentials.Username, a.reg.Credentials.Password, host), nil
 }
 
 func (a *adapter) GetConfig() types.RegistryConfig {
@@ -604,23 +613,18 @@ func (a *adapter) DownloadFile(registry string, uri string) (io.ReadCloser, http
 	return a.client.getFile(registry, uri)
 }
 
-func (a *adapter) GetOCIImagePath(registry string, image string) (string, error) {
-	host, err := dockerHost(a.reg.Endpoint, registry)
-	if err != nil {
-		return "", fmt.Errorf("failed to get OCI host: %w", err)
+func (a *adapter) GetOCIImagePath(registry string, packageHostname string, image string) (string, error) {
+	var host string
+	if packageHostname != "" {
+		host = packageHostname
+	} else {
+		parse, err := url.Parse(a.reg.Endpoint)
+		if err != nil {
+			return "", fmt.Errorf("failed to get OCI host: %w", err)
+		}
+		host = parse.Host
 	}
-	return util.GenOCIImagePath(host, image), nil
-}
-
-func dockerHost(artifactoryBase, repo string) (string, error) {
-	const suffix = ".jfrog.io"
-	if !strings.HasSuffix(artifactoryBase, suffix) {
-		return "", fmt.Errorf("not a jfrog.io host")
-	}
-	account := strings.TrimSuffix(artifactoryBase, suffix)
-	endpoint := fmt.Sprintf("%s-%s%s", account, repo, suffix)
-	parse, _ := url.Parse(endpoint)
-	return parse.Host, nil
+	return util.GenOCIImagePath(host, registry, image), nil
 }
 
 func (a *adapter) UploadFile(

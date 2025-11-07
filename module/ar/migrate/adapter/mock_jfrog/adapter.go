@@ -68,9 +68,12 @@ func newAdapter(config types.RegistryConfig) (adp.Adapter, error) {
 	}, nil
 }
 
-func (a *adapter) GetKeyChain(reg string) authn.Keychain {
-	host, _ := dockerHost(a.reg.Endpoint, reg)
-	return NewJfrogKeychain(a.reg.Credentials.Username, a.reg.Credentials.Password, host)
+func (a *adapter) GetKeyChain(reg string) (authn.Keychain, error) {
+	host, err := dockerHost(a.reg.Endpoint, reg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse [%s], err: %w", a.reg.Endpoint, err)
+	}
+	return NewJfrogKeychain(a.reg.Credentials.Username, a.reg.Credentials.Password, host), nil
 }
 
 func (a *adapter) GetConfig() types.RegistryConfig {
@@ -654,7 +657,7 @@ func (a *adapter) DownloadFile(registry string, uri string) (io.ReadCloser, http
 	return a.client.getFile(registry, uri)
 }
 
-func (a *adapter) GetOCIImagePath(registry string, image string) (string, error) {
+func (a *adapter) GetOCIImagePath(registry string, _ string, image string) (string, error) {
 	host, err := dockerHost(a.reg.Endpoint, registry)
 	if err != nil {
 		return "", fmt.Errorf("failed to get OCI host: %w", err)

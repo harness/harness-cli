@@ -36,25 +36,27 @@ import (
 )
 
 type Package struct {
-	srcRegistry   string
-	destRegistry  string
-	srcAdapter    adapter.Adapter
-	destAdapter   adapter.Adapter
-	artifactType  types.ArtifactType
-	logger        zerolog.Logger
-	pkg           types.Package
-	node          *types.TreeNode
-	stats         *types.TransferStats
-	skipMigration bool
-	mapping       *types.RegistryMapping
-	config        *types.Config
-	registry      types.RegistryInfo
+	srcRegistry           string
+	sourcePackageHostname string
+	destRegistry          string
+	srcAdapter            adapter.Adapter
+	destAdapter           adapter.Adapter
+	artifactType          types.ArtifactType
+	logger                zerolog.Logger
+	pkg                   types.Package
+	node                  *types.TreeNode
+	stats                 *types.TransferStats
+	skipMigration         bool
+	mapping               *types.RegistryMapping
+	config                *types.Config
+	registry              types.RegistryInfo
 }
 
 func NewPackageJob(
 	src adapter.Adapter,
 	dest adapter.Adapter,
 	srcRegistry string,
+	sourcePackageHostname string,
 	destRegistry string,
 	artifactType types.ArtifactType,
 	pkg types.Package,
@@ -75,18 +77,19 @@ func NewPackageJob(
 		Logger()
 
 	return &Package{
-		srcRegistry:  srcRegistry,
-		destRegistry: destRegistry,
-		srcAdapter:   src,
-		destAdapter:  dest,
-		artifactType: artifactType,
-		logger:       jobLogger,
-		pkg:          pkg,
-		node:         node,
-		stats:        stats,
-		mapping:      mapping,
-		config:       config,
-		registry:     registry,
+		srcRegistry:           srcRegistry,
+		sourcePackageHostname: sourcePackageHostname,
+		destRegistry:          destRegistry,
+		srcAdapter:            src,
+		destAdapter:           dest,
+		artifactType:          artifactType,
+		logger:                jobLogger,
+		pkg:                   pkg,
+		node:                  node,
+		stats:                 stats,
+		mapping:               mapping,
+		config:                config,
+		registry:              registry,
 	}
 }
 
@@ -132,16 +135,22 @@ func (r *Package) Pre(ctx context.Context) error {
 	}
 
 	if !r.config.Overwrite && (r.artifactType == types.DOCKER || r.artifactType == types.HELM) {
-		srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.pkg.Name)
-		dstImage, _ := r.destAdapter.GetOCIImagePath(r.destRegistry, r.pkg.Name)
+		srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.sourcePackageHostname, r.pkg.Name)
+		dstImage, _ := r.destAdapter.GetOCIImagePath(r.destRegistry, "", r.pkg.Name)
 		logger.Info().Ctx(ctx).Msgf("Checking if should be skipped -- repository %s to %s", srcImage, dstImage)
+
+		keyChain, err := lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.sourcePackageHostname)
+		if err != nil {
+			log.Error().Ctx(ctx).Err(err).Msgf("Failed to create keyChain: %v", err)
+			pterm.Error.Println(fmt.Sprintf("Failed to create keyChain: %v", err))
+			return err
+		}
 
 		craneOpts := []crane.Option{
 			crane.WithContext(ctx),
 			crane.WithJobs(r.config.Concurrency),
 			crane.WithNoClobber(true),
-			crane.WithAuthFromKeychain(lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.srcRegistry,
-				r.destRegistry)),
+			crane.WithAuthFromKeychain(keyChain),
 		}
 		if r.srcAdapter.GetConfig().Insecure {
 			craneOpts = append(craneOpts, crane.Insecure)
@@ -204,29 +213,10 @@ func (r *Package) Migrate(ctx context.Context) error {
 	}
 
 	if r.artifactType == types.DOCKER || r.artifactType == types.HELM {
-		srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.pkg.Name)
-		dstImage, _ := r.destAdapter.GetOCIImagePath(r.destRegistry, r.pkg.Name)
+		srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.sourcePackageHostname, r.pkg.Name)
+		dstImage, _ := r.destAdapter.GetOCIImagePath(r.destRegistry, "", r.pkg.Name)
 		pterm.Info.Println(fmt.Sprintf("Copying repository %s to %s", srcImage, dstImage))
 		logger.Info().Ctx(ctx).Msgf("Copying repository %s to %s", srcImage, dstImage)
-
-		craneOpts := []crane.Option{
-			crane.WithUserAgent("harness-cli"),
-			crane.WithContext(ctx),
-			crane.WithJobs(r.config.Concurrency),
-			crane.WithNoClobber(true),
-			crane.WithAuthFromKeychain(lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.srcRegistry,
-				r.destRegistry)),
-		}
-
-		if r.srcAdapter.GetConfig().Insecure {
-			craneOpts = append(craneOpts, crane.Insecure)
-		}
-
-		err := crane.CopyRepository(
-			srcImage,
-			dstImage,
-			craneOpts...,
-		)
 
 		stat := types.FileStat{
 			Name:     r.pkg.Name,
@@ -235,6 +225,33 @@ func (r *Package) Migrate(ctx context.Context) error {
 			Size:     0,
 			Status:   types.StatusSuccess,
 		}
+
+		keyChain, err := lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.sourcePackageHostname)
+		if err != nil {
+			log.Error().Ctx(ctx).Err(err).Msgf("Failed to create keyChain: %v", err)
+			pterm.Error.Println(fmt.Sprintf("Failed to create keyChain: %v", err))
+			stat.Error = err.Error()
+			stat.Status = types.StatusFail
+		}
+
+		craneOpts := []crane.Option{
+			crane.WithUserAgent("harness-cli"),
+			crane.WithContext(ctx),
+			crane.WithJobs(r.config.Concurrency),
+			crane.WithNoClobber(true),
+			crane.WithAuthFromKeychain(keyChain),
+		}
+
+		if r.srcAdapter.GetConfig().Insecure {
+			craneOpts = append(craneOpts, crane.Insecure)
+		}
+
+		err = crane.CopyRepository(
+			srcImage,
+			dstImage,
+			craneOpts...,
+		)
+
 		if err != nil {
 			log.Error().Ctx(ctx).Err(err).Msgf("Failed to copy repository %s to %s %v", srcImage, dstImage, err)
 			pterm.Error.Println(fmt.Sprintf("Failed to copy repository %s to %s", srcImage, dstImage))
@@ -308,7 +325,7 @@ func (r *Package) migrateLegacyHelm(ctx context.Context) error {
 		return err
 	}
 
-	refStr, err := r.destAdapter.GetOCIImagePath(r.destRegistry, r.pkg.Name)
+	refStr, err := r.destAdapter.GetOCIImagePath(r.destRegistry, r.sourcePackageHostname, r.pkg.Name)
 	if err != nil {
 		return err
 	}
@@ -481,12 +498,17 @@ func (r *Package) pushChart(ctx context.Context, chartPath string, dstRef string
 	}
 
 	img = mutate.Annotations(img, annotations).(v1.Image)
+	keyChain, err := lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.sourcePackageHostname)
+	if err != nil {
+		log.Error().Ctx(ctx).Err(err).Msgf("Failed to create keyChain: %v", err)
+		pterm.Error.Println(fmt.Sprintf("Failed to create keyChain: %v", err))
+		return err
+	}
 
 	craneOpts := []remote.Option{
 		remote.WithContext(ctx),
 		remote.WithUserAgent("harness-cli"),
-		remote.WithAuthFromKeychain(lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.srcRegistry,
-			r.destRegistry)),
+		remote.WithAuthFromKeychain(keyChain),
 	}
 
 	err = remote.Write(ref, img,

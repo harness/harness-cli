@@ -13,7 +13,7 @@ import (
 )
 
 type Adapter interface {
-	GetKeyChain(reg string) authn.Keychain
+	GetKeyChain(sourcePackageHostname string) (authn.Keychain, error)
 	GetConfig() types.RegistryConfig
 	ValidateCredentials() (bool, error)
 	GetRegistry(ctx context.Context, registry string) (types.RegistryInfo, error)
@@ -40,7 +40,7 @@ type Adapter interface {
 		artifactType types.ArtifactType,
 		metadata map[string]interface{},
 	) error
-	GetOCIImagePath(registry string, image string) (string, error)
+	GetOCIImagePath(registry string, packageHostname string, image string) (string, error)
 	AddNPMTag(registry string, name string, version string, uri string) error
 	VersionExists(
 		ctx context.Context,
