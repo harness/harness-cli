@@ -127,6 +127,9 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// UploadCondaPackageWithBody request with any body
+	UploadCondaPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteGenericFileFromPath request
 	DeleteGenericFileFromPath(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -147,6 +150,18 @@ type ClientInterface interface {
 
 	// UploadGoPackageWithBody request with any body
 	UploadGoPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) UploadCondaPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadCondaPackageRequestWithBody(c.Server, accountId, registry, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) DeleteGenericFileFromPath(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -231,6 +246,49 @@ func (c *Client) UploadGoPackageWithBody(ctx context.Context, accountId string, 
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewUploadCondaPackageRequestWithBody generates requests for UploadCondaPackage with any type of body
+func NewUploadCondaPackageRequestWithBody(server string, accountId string, registry string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "registry", runtime.ParamLocationPath, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pkg/%s/%s/conda/upload", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
 }
 
 // NewDeleteGenericFileFromPathRequest generates requests for DeleteGenericFileFromPath
@@ -699,6 +757,9 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// UploadCondaPackageWithBodyWithResponse request with any body
+	UploadCondaPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadCondaPackageResp, error)
+
 	// DeleteGenericFileFromPathWithResponse request
 	DeleteGenericFileFromPathWithResponse(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, reqEditors ...RequestEditorFn) (*DeleteGenericFileFromPathResp, error)
 
@@ -719,6 +780,27 @@ type ClientWithResponsesInterface interface {
 
 	// UploadGoPackageWithBodyWithResponse request with any body
 	UploadGoPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadGoPackageResp, error)
+}
+
+type UploadCondaPackageResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadCondaPackageResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadCondaPackageResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type DeleteGenericFileFromPathResp struct {
@@ -868,6 +950,15 @@ func (r UploadGoPackageResp) StatusCode() int {
 	return 0
 }
 
+// UploadCondaPackageWithBodyWithResponse request with arbitrary body returning *UploadCondaPackageResp
+func (c *ClientWithResponses) UploadCondaPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadCondaPackageResp, error) {
+	rsp, err := c.UploadCondaPackageWithBody(ctx, accountId, registry, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadCondaPackageResp(rsp)
+}
+
 // DeleteGenericFileFromPathWithResponse request returning *DeleteGenericFileFromPathResp
 func (c *ClientWithResponses) DeleteGenericFileFromPathWithResponse(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, reqEditors ...RequestEditorFn) (*DeleteGenericFileFromPathResp, error) {
 	rsp, err := c.DeleteGenericFileFromPath(ctx, accountId, registry, pPackage, version, filepath, reqEditors...)
@@ -929,6 +1020,22 @@ func (c *ClientWithResponses) UploadGoPackageWithBodyWithResponse(ctx context.Co
 		return nil, err
 	}
 	return ParseUploadGoPackageResp(rsp)
+}
+
+// ParseUploadCondaPackageResp parses an HTTP response from a UploadCondaPackageWithResponse call
+func ParseUploadCondaPackageResp(rsp *http.Response) (*UploadCondaPackageResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadCondaPackageResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
 }
 
 // ParseDeleteGenericFileFromPathResp parses an HTTP response from a DeleteGenericFileFromPathWithResponse call

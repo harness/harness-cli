@@ -18,6 +18,7 @@ func NewPushArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
 	cmd.AddCommand(NewPushGenericCmd(c))
 	cmd.AddCommand(NewPushMavenCmd(c))
 	cmd.AddCommand(NewPushGoCmd(c))
+	cmd.AddCommand(NewPushCondaCmd(c))
 
 	return cmd
 }
