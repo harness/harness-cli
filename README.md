@@ -23,9 +23,33 @@ hc [<global-flags>] <command> <subcommand> [<positional-args>…] [<flags>]
 
 ## Installation
 
-### Binary Installation
+### Quick Install (Recommended)
 
-Download the latest binary from the releases page:
+Install the latest version with a single command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/harness/harness-cli/v2/install | sh
+```
+
+Or with sudo if you need elevated privileges:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/harness/harness-cli/v2/install | sudo sh
+```
+
+This script automatically detects your OS and architecture, downloads the appropriate binary, and installs it to `/usr/local/bin`.
+
+### Custom Installation Directory
+
+You can install to a custom directory by setting the `INSTALL_DIR` environment variable:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/harness/harness-cli/v2/install | INSTALL_DIR=$HOME/.local/bin sh
+```
+
+### Manual Binary Installation
+
+Download the latest binary from the [releases page](https://github.com/harness/harness-cli/releases):
 
 ```bash
 # Download the latest release for your platform
