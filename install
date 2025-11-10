@@ -95,6 +95,57 @@ download_file() {
     fi
 }
 
+# Verify checksum of downloaded file
+verify_checksum() {
+    file="$1"
+    checksums_file="$2"
+    filename=$(basename "$file")
+
+    # Check if sha256sum or shasum is available
+    if command -v sha256sum >/dev/null 2>&1; then
+        expected_checksum=$(grep "$filename" "$checksums_file" | awk '{print $1}')
+        if [ -z "$expected_checksum" ]; then
+            warn "Checksum for $filename not found in checksums.txt"
+            return 1
+        fi
+        actual_checksum=$(sha256sum "$file" | awk '{print $1}')
+    elif command -v shasum >/dev/null 2>&1; then
+        expected_checksum=$(grep "$filename" "$checksums_file" | awk '{print $1}')
+        if [ -z "$expected_checksum" ]; then
+            warn "Checksum for $filename not found in checksums.txt"
+            return 1
+        fi
+        actual_checksum=$(shasum -a 256 "$file" | awk '{print $1}')
+    else
+        warn "Neither sha256sum nor shasum found, skipping checksum verification"
+        return 0
+    fi
+
+    if [ "$expected_checksum" = "$actual_checksum" ]; then
+        return 0
+    else
+        error "Checksum mismatch!"
+        error "Expected: $expected_checksum"
+        error "Got: $actual_checksum"
+        return 1
+    fi
+}
+
+# Validate version tag
+validate_version() {
+    version="$1"
+
+    # Check if version starts with "v1"
+    case "$version" in
+        v1*)
+            return 0
+            ;;
+        *)
+            error "Invalid version: $version. This installer only supports v1.x releases."
+            ;;
+    esac
+}
+
 # Check if running with sufficient privileges
 check_privileges() {
     if [ ! -w "$INSTALL_DIR" ]; then
@@ -121,6 +172,10 @@ main() {
     if [ -z "$VERSION" ]; then
         VERSION="$DEFAULT_VERSION"
     fi
+
+    # Validate version starts with v1
+    validate_version "$VERSION"
+
     info "Installing version: $VERSION"
     
     # Construct download URL and filename
@@ -145,6 +200,20 @@ main() {
         error "Failed to download from $DOWNLOAD_URL"
     fi
     
+    # Download checksums file
+    CHECKSUMS_URL="https://github.com/${REPO}/releases/download/${VERSION}/checksums.txt"
+    info "Downloading checksums.txt for verification..."
+    if ! download_file "$CHECKSUMS_URL" "$TMP_DIR/checksums.txt"; then
+        warn "Failed to download checksums.txt, skipping verification"
+    else
+        # Verify checksum
+        info "Verifying checksum..."
+        if ! verify_checksum "$TMP_DIR/$FILENAME" "$TMP_DIR/checksums.txt"; then
+            error "Checksum verification failed! The downloaded file may be corrupted or tampered with."
+        fi
+        info "✓ Checksum verified successfully"
+    fi
+
     # Extract archive
     info "Extracting archive..."
     cd "$TMP_DIR"

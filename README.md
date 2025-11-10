@@ -37,7 +37,7 @@ Or with sudo if you need elevated privileges:
 curl -fsSL https://raw.githubusercontent.com/harness/harness-cli/v2/install | sudo sh
 ```
 
-This script automatically detects your OS and architecture, downloads the appropriate binary, and installs it to `/usr/local/bin`.
+This script automatically detects your OS and architecture, downloads the appropriate binary, verifies its checksum for security, and installs it to `/usr/local/bin`.
 
 ### Custom Installation Directory
 
