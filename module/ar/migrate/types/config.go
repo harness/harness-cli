@@ -29,6 +29,7 @@ var (
 	NUGET       ArtifactType = "NUGET"
 	RPM         ArtifactType = "RPM"
 	GO          ArtifactType = "GO"
+	CONDA       ArtifactType = "CONDA"
 )
 
 // Config represents the top-level configuration structure

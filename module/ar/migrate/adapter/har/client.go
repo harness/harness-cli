@@ -272,6 +272,46 @@ func (c *client) uploadRPMFile(
 	return nil
 }
 
+func (c *client) uploadCondaFile(
+	registry string,
+	filename string,
+	file io.ReadCloser,
+	metadata map[string]interface{},
+) error {
+	fileUri := strings.TrimPrefix(filename, "/")
+	url := fmt.Sprintf("%s/pkg/%s/%s/conda/upload", c.url, config.Global.AccountID, registry)
+	// Create request
+	req, err := http2.NewRequest(http2.MethodPut, url, file)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/octet-stream")
+	// Add headers from metadata
+	for key, val := range metadata {
+		switch v := val.(type) {
+		case string:
+			if v != "" {
+				req.Header.Set(key, v)
+			}
+		}
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to upload file '%s': %w", fileUri, err)
+	}
+	defer resp.Body.Close()
+
+	// Check for successful response
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to upload file '%s', status code: %d, response: %s",
+			fileUri, resp.StatusCode, string(body))
+	}
+	return nil
+}
+
 func (c *client) AddNPMTag(registry string, name string, version string, tagUri string) error {
 	url := fmt.Sprintf("%s/pkg/%s/%s/npm", c.url, config.Global.AccountID, registry)
 	url = url + tagUri

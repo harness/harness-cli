@@ -241,6 +241,12 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			})
 		}
 		return packages, nil
+	} else if artifactType == types.CONDA {
+		packages, err := GetCondaPackagesFromTreeNode(a, root, registry)
+		if err != nil {
+			return nil, fmt.Errorf("get packages from tree node: %w", err)
+		}
+		return packages, nil
 	} else if artifactType == types.NPM {
 		leaves, _ := tree.GetAllFiles(root)
 		packageMap := make(map[string]bool)

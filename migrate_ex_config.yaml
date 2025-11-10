@@ -42,3 +42,6 @@ mappings:
   - artifactType: GO
     sourceRegistry: src
     destinationRegistry: dst
+  - artifactType: CONDA
+    sourceRegistry: src
+    destinationRegistry: dst

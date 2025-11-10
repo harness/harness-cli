@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -267,6 +268,8 @@ func (r *Package) Migrate(ctx context.Context) error {
 		r.migrateLegacyHelm(ctx)
 	} else if r.artifactType == types.RPM {
 		r.migrateRPM(ctx)
+	} else if r.artifactType == types.CONDA {
+		r.migrateConda(ctx)
 	} else {
 		versions, err := r.srcAdapter.GetVersions(r.pkg, r.node, r.srcRegistry, r.pkg.Name, r.artifactType)
 		if err != nil {
@@ -351,6 +354,50 @@ func (r *Package) migrateLegacyHelm(ctx context.Context) error {
 	}
 
 	pterm.Success.Println(fmt.Sprintf("Successfully pushed helm chart %s to %s", r.pkg.Name, refStr))
+	r.stats.FileStats = append(r.stats.FileStats, stat)
+	return nil
+}
+
+func (r *Package) migrateConda(ctx context.Context) error {
+	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.Path)
+	if err != nil {
+		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download conda package %s", r.pkg.Path)
+		pterm.Error.Println(fmt.Sprintf("Failed to download conda package %s", r.pkg.Path))
+		return err
+	}
+	defer file.Close()
+
+	metadata := make(map[string]interface{})
+	metadata["X-File-Name"] = path.Base(r.pkg.Path)
+	metadata["X-Subdir"] = strings.Split(r.pkg.Version, "/")[0]
+
+	title := fmt.Sprintf("%s (%s)", r.pkg.Name, common.GetSize(int64(r.pkg.Size)))
+	pterm.Info.Println(fmt.Sprintf("Copying file %s from %s to %s", r.pkg.Name, r.srcRegistry, r.destRegistry))
+	err = r.destAdapter.UploadFile(
+		r.destRegistry,
+		file,
+		&types.File{Uri: r.pkg.Path},
+		header,
+		r.pkg.Name,
+		r.pkg.Version,
+		r.artifactType,
+		metadata,
+	)
+	stat := types.FileStat{
+		Name:     r.pkg.Name,
+		Registry: r.srcRegistry,
+		Uri:      r.pkg.URL,
+		Size:     int64(r.pkg.Size),
+		Status:   types.StatusSuccess,
+	}
+	if err != nil {
+		r.logger.Error().Err(err).Msg("Failed to upload file")
+		stat.Status = types.StatusFail
+		stat.Error = err.Error()
+		pterm.Error.Println(title)
+	} else {
+		pterm.Success.Println(title)
+	}
 	r.stats.FileStats = append(r.stats.FileStats, stat)
 	return nil
 }

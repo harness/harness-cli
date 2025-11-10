@@ -3,6 +3,7 @@ package har
 import (
 	"context"
 	"fmt"
+
 	//"github.com/harness/harness-cli/module/ar/migrate"
 	//client2 "github.com/harness/harness-cli/util/client"
 	"io"
@@ -124,6 +125,8 @@ func (a *adapter) UploadFile(
 		err = a.client.uploadNPMFile(registry, artifactName, version, f, file)
 	} else if artifactType == types.RPM {
 		err = a.client.uploadRPMFile(registry, f.Name, file)
+	} else if artifactType == types.CONDA {
+		err = a.client.uploadCondaFile(registry, f.Name, file, metadata)
 	}
 
 	if err != nil {
