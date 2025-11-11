@@ -256,7 +256,7 @@ main() {
     
     # Verify installation
     if command -v "$BINARY_NAME" >/dev/null 2>&1; then
-        INSTALLED_VERSION=$("$BINARY_NAME" --version 2>&1 || echo "unknown")
+        INSTALLED_VERSION=$("$BINARY_NAME" version 2>&1 || echo "unknown")
         info "✓ Installation successful!"
         info "Installed version: $INSTALLED_VERSION"
         info "Binary location: $INSTALL_DIR/$BINARY_NAME"
