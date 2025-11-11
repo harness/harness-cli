@@ -26,7 +26,6 @@ import (
 var version = "dev"
 
 func main() {
-	var showVersion bool
 	var verbose bool
 
 	rootCmd := &cobra.Command{
@@ -38,14 +37,6 @@ func main() {
 
       Find more information at:
             https://developer.harness.io/docs/`),
-		Run: func(cmd *cobra.Command, args []string) {
-			if showVersion {
-				fmt.Printf("hc version %s\n", version)
-				fmt.Printf("Built with %s\n", runtime.Version())
-				return
-			}
-			cmd.Help()
-		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Skip loading config for auth commands, version, and upgrade
 			if cmd.CommandPath() == "hc auth" ||
@@ -102,9 +93,6 @@ func main() {
 
 	// Add verbose flag
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging to console")
-
-	// Add version flag
-	rootCmd.Flags().BoolVar(&showVersion, "version", false, "Print version information")
 
 	// Load auth config
 	authConfig, err := loadAuthConfig()
