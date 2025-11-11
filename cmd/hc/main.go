@@ -30,8 +30,8 @@ import (
 var version = "dev"
 
 func main() {
-	var logFilePath string
 	var showVersion bool
+	var verbose bool
 
 	rootCmd := &cobra.Command{
 		Use:   "hc",
@@ -69,27 +69,12 @@ func main() {
 				}
 			}
 
-			logFileDefaultOutputPath := fmt.Sprintf("logs_%s.txt", time.Now().Format("20060102_150405"))
-			if logFilePath == "" {
-				logFilePath = logFileDefaultOutputPath
-			}
-
-			// Ensure the directory exists
-			logDir := filepath.Dir(logFilePath)
-			if err := os.MkdirAll(logDir, 0755); err != nil {
-				fmt.Printf("Warning: Could not create log directory: %v\n", err)
-			}
-
-			// Open the log file
-			logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-			if err != nil {
-				fmt.Printf("Warning: Could not open log file: %v\n", err)
-			} else {
-				// Set up log writer with timestamp format
+			// Set up logging if verbose mode is enabled
+			if verbose {
 				logWriter := zerolog.ConsoleWriter{
-					Out:        logFile,
+					Out:        os.Stderr,
 					TimeFormat: time.RFC3339,
-					NoColor:    true,
+					NoColor:    false,
 				}
 				log.Logger = log.Output(logWriter).Hook(types.ErrorHook{})
 			}
@@ -115,12 +100,11 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&config.Global.ProjectID, "project", "", "Project (overrides saved config)")
 	rootCmd.PersistentFlags().StringVar(&config.Global.Format, "format", "table", "Format of the result")
 
-	// Add log file path flag
-	rootCmd.PersistentFlags().StringVar(&logFilePath, "log-file", "",
-		"Path to store logs (if not provided, logging is disabled)")
+	// Add verbose flag
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging to console")
 
 	// Add version flag
-	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Print version information")
+	rootCmd.Flags().BoolVar(&showVersion, "version", false, "Print version information")
 
 	// Load auth config
 	authConfig, err := loadAuthConfig()
