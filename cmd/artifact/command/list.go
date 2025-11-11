@@ -2,10 +2,12 @@ package command
 
 import (
 	"context"
+	"fmt"
 
 	client "github.com/harness/harness-cli/internal/api/ar"
 	client2 "github.com/harness/harness-cli/util/client"
 	"github.com/harness/harness-cli/util/common/printer"
+	"github.com/rs/zerolog/log"
 
 	"github.com/spf13/cobra"
 )
@@ -39,6 +41,11 @@ func NewListArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
 			response, err := c.GetAllHarnessArtifactsWithResponse(context.Background(), client2.GetScopeRef(), &params)
 			if err != nil {
 				return err
+			}
+
+			if response.JSON200 == nil || response.JSON200.Data.Artifacts == nil {
+				log.Debug().Msgf("Unable to list artifacts")
+				return fmt.Errorf("unable to list artifacts")
 			}
 
 			err = printer.Print(response.JSON200.Data.Artifacts, *response.JSON200.Data.PageIndex,

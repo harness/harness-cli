@@ -35,7 +35,7 @@ func DefaultJsonOptions() JsonOptions {
 		Indent:         true,
 		IndentPrefix:   "",
 		IndentSize:     2,
-		ShowPagination: true,
+		ShowPagination: false,
 	}
 }
 

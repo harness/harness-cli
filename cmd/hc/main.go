@@ -10,14 +10,10 @@ import (
 	"runtime/pprof"
 	"time"
 
-	"github.com/harness/harness-cli/cmd/api"
 	"github.com/harness/harness-cli/cmd/artifact"
 	"github.com/harness/harness-cli/cmd/auth"
-	"github.com/harness/harness-cli/cmd/organisation"
-	"github.com/harness/harness-cli/cmd/project"
 	"github.com/harness/harness-cli/cmd/registry"
 	"github.com/harness/harness-cli/config"
-	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/util/templates"
 
 	"github.com/rs/zerolog"
@@ -34,8 +30,9 @@ func main() {
 	var verbose bool
 
 	rootCmd := &cobra.Command{
-		Use:   "hc",
-		Short: "CLI tool for Harness",
+		Use:          "hc",
+		Short:        "CLI tool for Harness",
+		SilenceUsage: true,
 		Long: templates.LongDesc(`
       Harness CLI is a tool to interact with Harness Resources.
 
@@ -69,14 +66,17 @@ func main() {
 				}
 			}
 
-			// Set up logging if verbose mode is enabled
+			// Set up logging based on verbose flag
 			if verbose {
 				logWriter := zerolog.ConsoleWriter{
 					Out:        os.Stderr,
 					TimeFormat: time.RFC3339,
 					NoColor:    false,
 				}
-				log.Logger = log.Output(logWriter).Hook(types.ErrorHook{})
+				log.Logger = log.Output(logWriter)
+			} else {
+				// Disable logging when verbose is not enabled
+				log.Logger = zerolog.Nop()
 			}
 
 			return initProfiling()
@@ -131,16 +131,16 @@ func main() {
 	rootCmd.AddCommand(auth.GetRootCmd())
 	rootCmd.AddCommand(registry.GetRootCmd())
 	rootCmd.AddCommand(artifact.GetRootCmd())
-	rootCmd.AddCommand(project.GetRootCmd())
-	rootCmd.AddCommand(organisation.GetRootCmd())
-	rootCmd.AddCommand(api.GetRootCmd())
+	//rootCmd.AddCommand(project.GetRootCmd())
+	//rootCmd.AddCommand(organisation.GetRootCmd())
+	//rootCmd.AddCommand(api.GetRootCmd())
 	rootCmd.AddCommand(versionCmd())
 	rootCmd.AddCommand(upgradeCmd())
 
 	flags := rootCmd.PersistentFlags()
 
 	addProfilingFlags(flags)
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	//zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
