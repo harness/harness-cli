@@ -85,15 +85,15 @@ func (c *LogClient) Tail(ctx context.Context, key string) error {
 	})
 	err = conn.Connect()
 	if err != nil {
-		return nil
+		return err
 	}
 	return nil
 }
 
-func (c *LogClient) Blob(ctx context.Context, key string) error {
+func (c *LogClient) Blob(ctx context.Context, key string) (int, error) {
 	url, err := url.Parse(c.endpoint)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	url.Path = blobEndpoint
 	query := url.Query()
@@ -102,42 +102,44 @@ func (c *LogClient) Blob(ctx context.Context, key string) error {
 	url.RawQuery = query.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	req.Header.Set(authHeaderKey, c.token)
 	resp, err := c.client.HTTPClient.Do(req)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if resp.StatusCode != 200 {
 		logErr := &LogError{}
 		if err := json.Unmarshal(body, logErr); err != nil {
-			return err
+			return 0, err
 		}
-		return logErr
+		return 0, logErr
 	}
 
-	err = readLines(string(body))
+	lineCount, err := readLines(string(body))
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return nil
+	return lineCount, nil
 }
 
-func readLines(lines string) error {
+func readLines(lines string) (int, error) {
+	lineCount := 0
 	scanner := bufio.NewScanner(strings.NewReader(lines))
 	for scanner.Scan() {
+		lineCount += 1
 		line, err := formatLogs(scanner.Text())
 		if err != nil {
-			return err
+			return lineCount, err
 		}
 		fmt.Println(line)
 	}
-	return nil
+	return lineCount, nil
 }
 
 func formatLogs(line string) (string, error) {
