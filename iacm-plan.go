@@ -50,7 +50,7 @@ type IacmClient interface {
 
 type LogClient interface {
 	Tail(ctx context.Context, key string) error
-	Blob(ctx context.Context, key string) error
+	Blob(ctx context.Context, key string) (int, error)
 }
 
 type WorkspaceInfo struct {
@@ -384,8 +384,8 @@ func (c *IacmCommand) walkStage(ctx context.Context, executionID string, stageNo
 						// some steps finish so quickly that the stream is closed by the time we try and
 						// tail it. To mitigate this we try and use the blob endpoint and fall back to tail
 						// if it throws an error
-						err := c.logClient.Blob(ctx, getLogKeyFromStepNode(stepNode))
-						if err != nil {
+						lineCount, err := c.logClient.Blob(ctx, getLogKeyFromStepNode(stepNode))
+						if err != nil || lineCount < 1 {
 							err := c.logClient.Tail(ctx, getLogKeyFromStepNode(stepNode))
 							if err != nil {
 								fmt.Println(err)
@@ -404,7 +404,7 @@ func (c *IacmCommand) walkStage(ctx context.Context, executionID string, stageNo
 				if lastStepNodeID != "" && !ok {
 					go func() {
 						fmt.Printf(startingStepMsg, stepNode.Name)
-						err := c.logClient.Blob(ctx, getLogKeyFromStepNode(stepNode))
+						_, err := c.logClient.Blob(ctx, getLogKeyFromStepNode(stepNode))
 						if err != nil {
 							fmt.Println(err)
 						}
