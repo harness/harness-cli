@@ -1,0 +1,187 @@
+package command
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"mime/multipart"
+	"os"
+	"os/exec"
+	"path/filepath"
+
+	"github.com/harness/harness-cli/config"
+	client "github.com/harness/harness-cli/internal/api/ar"
+	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
+	"github.com/harness/harness-cli/util/common/auth"
+	"github.com/harness/harness-cli/util/common/printer"
+	p "github.com/harness/harness-cli/util/common/progress"
+
+	"github.com/spf13/cobra"
+)
+
+// NewPushDocker Cmd creates a new cobra.Command for pushing docker artifacts to the registry.
+// command example: hc ar push docker <registry_name> <package_file_path>
+func NewPushDockerCmd(c *client.ClientWithResponses) *cobra.Command {
+	var packageName, filename, packageVersion, description string
+	var pkgURL string
+	cmd := &cobra.Command{
+		Use:   "docker <registry_name> <package_file_path>",
+		Short: "Push Docker Artifacts",
+		Long:  "Push Docker Artifacts to Harness Artifact Registry",
+		Args:  cobra.ExactArgs(2),
+		PreRun: func(cmd *cobra.Command, args []string) {
+			config.Global.Registry.PkgURL = pkgURL
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			registryName := args[0]
+			packageFilePath := args[1]
+
+			progress := p.NewConsoleReporter()
+
+			// Validate Registry Name and Version
+			progress.Start("Validating input parameters")
+			// Validate file exists
+
+			command := "docker"
+			arguments := []string{"ps"}
+
+			// Create a new Cmd struct
+			cmdExec := exec.Command(command, arguments...)
+
+			// Execute the command and capture its output
+			output, err := cmdExec.CombinedOutput()
+			if err != nil {
+				log.Fatalf("Error executing docker ps: %v\nOutput: %s", err, output)
+			}
+
+			// Print the captured output
+			fmt.Println(string(output))
+
+			//TODO can push image now to Artifact registry
+
+			fileInfo, err := os.Stat(packageFilePath)
+			if err != nil {
+				return fmt.Errorf("failed to access package file: %w", err)
+			}
+			if fileInfo.IsDir() {
+				return errors.New("package file path must be a file, not a directory")
+			}
+
+			// If version is not provided, use a default version
+			version := packageVersion
+			if version == "" {
+				version = "1.0.0"
+			}
+
+			// Initialize the package client
+			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
+				auth.GetXApiKeyOptionARPKG())
+			if err != nil {
+				return fmt.Errorf("failed to create package client: %w", err)
+			}
+
+			// Create a buffer to store the multipart form data
+			var buffer bytes.Buffer
+			writer := multipart.NewWriter(&buffer)
+
+			// Read file content
+			fileContent, err := ioutil.ReadFile(packageFilePath)
+			if err != nil {
+				return fmt.Errorf("failed to read package file: %w", err)
+			}
+
+			if filename == "" {
+				filename = filepath.Base(packageFilePath)
+			}
+
+			filePart, err := writer.CreateFormFile("file", filename)
+			if err != nil {
+				return fmt.Errorf("failed to create form file: %w", err)
+			}
+
+			_, err = filePart.Write(fileContent)
+			if err != nil {
+				return fmt.Errorf("failed to write file content: %w", err)
+			}
+
+			// Add filename field
+			err = writer.WriteField("filename", filename)
+			if err != nil {
+				return fmt.Errorf("failed to write filename field: %w", err)
+			}
+
+			// Add description field if provided
+			if description != "" {
+				err = writer.WriteField("description", description)
+				if err != nil {
+					return fmt.Errorf("failed to write description field: %w", err)
+				}
+			}
+
+			// Close the writer to set the terminating boundary
+			err = writer.Close()
+			if err != nil {
+				return fmt.Errorf("failed to close multipart writer: %w", err)
+			}
+
+			fmt.Printf("Uploading docker package '%s' (version '%s', filename '%s', description '%s') to registry '%s'...\n",
+				packageName, version, filename, description, registryName)
+
+			bufferSize := int64(buffer.Len())
+			progressBuffer := bytes.NewReader(buffer.Bytes())
+			reader, closer := p.Reader(bufferSize, progressBuffer, filename)
+			defer closer()
+
+			// Call the API with the proper parameters and multipart form body
+			response, err := pkgClient.UploadGenericPackageWithBodyWithResponse(
+				context.Background(),
+				config.Global.AccountID,      // accountId
+				registryName,                 // registry
+				packageName,                  // package name
+				version,                      // version
+				writer.FormDataContentType(), // content type for multipart/form-data
+				reader,                       // multipart form data as io.Reader with progress tracking
+			)
+			if err != nil {
+				return fmt.Errorf("failed to upload package: %w", err)
+			}
+
+			// Check response status
+			if response.StatusCode() >= 400 {
+				return fmt.Errorf("server returned error: %s", response.Status())
+			}
+
+			// Print success with artifact details
+			fmt.Printf("Successfully uploaded generic package '%s' (version '%s') to registry '%s'\n",
+				packageName, version, registryName)
+
+			// Use default json options for response printing
+			if response.Body != nil {
+				options := printer.DefaultJsonOptions()
+				options.ShowPagination = false
+				printer.PrintJsonWithOptions(response.Body, options)
+			}
+
+			return nil
+		},
+	}
+
+	/*
+		// Add flags
+		cmd.Flags().StringVarP(&packageName, "name", "n", "", "name for the artifact")
+		cmd.Flags().StringVar(&filename, "filename", "",
+			"name of the file being uploaded (defaults to name of the file being uploaded)")
+		cmd.Flags().StringVarP(&packageVersion, "version", "v", "", "version for the artifact (defaults to '1.0.0')")
+		cmd.Flags().StringVarP(&description, "description", "d", "", "description of the artifact (default to empty)")
+
+		cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
+
+		cmd.MarkFlagRequired("pkg-url")
+		cmd.MarkFlagRequired("name")
+	*/
+
+	return cmd
+}
