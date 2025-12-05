@@ -1,12 +1,9 @@
 package command
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"mime/multipart"
 	"os"
 	"path/filepath"
 
@@ -23,7 +20,7 @@ import (
 // NewPushGenericCmd creates a new cobra.Command for pushing generic artifacts to the registry.
 // command example: hc ar push generic <registry_name> <package_file_path>
 func NewPushGenericCmd(c *client.ClientWithResponses) *cobra.Command {
-	var packageName, filename, packageVersion, description string
+	var packageName, filename, packageVersion, description, path string
 	var pkgURL string
 	cmd := &cobra.Command{
 		Use:   "generic <registry_name> <package_file_path>",
@@ -52,6 +49,10 @@ func NewPushGenericCmd(c *client.ClientWithResponses) *cobra.Command {
 				version = "1.0.0"
 			}
 
+			if filename == "" {
+				filename = filepath.Base(packageFilePath)
+			}
+
 			// Initialize the package client
 			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
 				auth.GetXApiKeyOptionARPKG())
@@ -59,70 +60,36 @@ func NewPushGenericCmd(c *client.ClientWithResponses) *cobra.Command {
 				return fmt.Errorf("failed to create package client: %w", err)
 			}
 
-			// Create a buffer to store the multipart form data
-			var buffer bytes.Buffer
-			writer := multipart.NewWriter(&buffer)
+			if path == "" {
+				path = filename
+			}
+			// Use file upload API when path is specified
+			fmt.Printf("Uploading generic file '%s' to path '%s' (version '%s') in registry '%s'...\n",
+				filename, path, version, registryName)
 
-			// Read file content
-			fileContent, err := ioutil.ReadFile(packageFilePath)
+			// Read file content directly for file upload
+			file, err := os.Open(packageFilePath)
 			if err != nil {
-				return fmt.Errorf("failed to read package file: %w", err)
+				return fmt.Errorf("failed to open package file: %w", err)
 			}
+			defer file.Close()
 
-			if filename == "" {
-				filename = filepath.Base(packageFilePath)
-			}
-
-			filePart, err := writer.CreateFormFile("file", filename)
-			if err != nil {
-				return fmt.Errorf("failed to create form file: %w", err)
-			}
-
-			_, err = filePart.Write(fileContent)
-			if err != nil {
-				return fmt.Errorf("failed to write file content: %w", err)
-			}
-
-			// Add filename field
-			err = writer.WriteField("filename", filename)
-			if err != nil {
-				return fmt.Errorf("failed to write filename field: %w", err)
-			}
-
-			// Add description field if provided
-			if description != "" {
-				err = writer.WriteField("description", description)
-				if err != nil {
-					return fmt.Errorf("failed to write description field: %w", err)
-				}
-			}
-
-			// Close the writer to set the terminating boundary
-			err = writer.Close()
-			if err != nil {
-				return fmt.Errorf("failed to close multipart writer: %w", err)
-			}
-
-			fmt.Printf("Uploading generic package '%s' (version '%s', filename '%s', description '%s') to registry '%s'...\n",
-				packageName, version, filename, description, registryName)
-
-			bufferSize := int64(buffer.Len())
-			progressBuffer := bytes.NewReader(buffer.Bytes())
-			reader, closer := progress.Reader(bufferSize, progressBuffer, filename)
+			bufferSize := int64(fileInfo.Size())
+			reader, closer := progress.Reader(bufferSize, file, filename)
 			defer closer()
 
-			// Call the API with the proper parameters and multipart form body
-			response, err := pkgClient.UploadGenericPackageWithBodyWithResponse(
+			response, err := pkgClient.UploadGenericFileToPathWithBodyWithResponse(
 				context.Background(),
-				config.Global.AccountID,      // accountId
-				registryName,                 // registry
-				packageName,                  // package name
-				version,                      // version
-				writer.FormDataContentType(), // content type for multipart/form-data
-				reader,                       // multipart form data as io.Reader with progress tracking
+				config.Global.AccountID,    // accountId
+				registryName,               // registry
+				packageName,                // package name
+				version,                    // version
+				path,                       // filepath
+				"application/octet-stream", // content type
+				reader,                     // file content as io.Reader with progress tracking
 			)
 			if err != nil {
-				return fmt.Errorf("failed to upload package: %w", err)
+				return fmt.Errorf("failed to upload file: %w", err)
 			}
 
 			// Check response status
@@ -130,9 +97,8 @@ func NewPushGenericCmd(c *client.ClientWithResponses) *cobra.Command {
 				return fmt.Errorf("server returned error: %s", response.Status())
 			}
 
-			// Print success with artifact details
-			fmt.Printf("Successfully uploaded generic package '%s' (version '%s') to registry '%s'\n",
-				packageName, version, registryName)
+			fmt.Printf("Successfully uploaded generic file '%s' to path '%s' (version '%s') in registry '%s'\n",
+				filename, path, version, registryName)
 
 			// Use default json options for response printing
 			if response.Body != nil {
@@ -149,8 +115,9 @@ func NewPushGenericCmd(c *client.ClientWithResponses) *cobra.Command {
 	cmd.Flags().StringVarP(&packageName, "name", "n", "", "name for the artifact")
 	cmd.Flags().StringVar(&filename, "filename", "",
 		"name of the file being uploaded (defaults to name of the file being uploaded)")
-	cmd.Flags().StringVarP(&packageVersion, "version", "v", "", "version for the artifact (defaults to '1.0.0')")
+	cmd.Flags().StringVar(&packageVersion, "version", "", "version for the artifact (defaults to '1.0.0')")
 	cmd.Flags().StringVarP(&description, "description", "d", "", "description of the artifact (default to empty)")
+	cmd.Flags().StringVar(&path, "path", "", "file path within the package (if not specified, uses file name as file path)")
 
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
 

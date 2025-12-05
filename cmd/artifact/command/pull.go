@@ -61,11 +61,6 @@ func NewPullGenericCmd(c *client.ClientWithResponses) *cobra.Command {
 			packageVersion := splits[1]
 			packageFile := splits[2]
 
-			// Prepare download parameters
-			params := &pkgclient.DownloadGenericPackageParams{
-				Filename: packageFile,
-			}
-
 			// Initialize the package client
 			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
 				auth.GetXApiKeyOptionARPKG())
@@ -73,17 +68,17 @@ func NewPullGenericCmd(c *client.ClientWithResponses) *cobra.Command {
 				return fmt.Errorf("failed to create package client: %w", err)
 			}
 
-			fmt.Printf("Pulling generic package '%s' (version '%s', file: '%s') from registry '%s'...\n",
-				packageName, packageVersion, packageFile, registryName)
+			fmt.Printf("Pulling generic file '%s' from path '%s' (version '%s') in registry '%s'...\n",
+				packageFile, packageFile, packageVersion, registryName)
 
-			// Download the package
-			response, err := pkgClient.DownloadGenericPackage(
+			// Download the file using DownloadGenericFileFromPath
+			response, err := pkgClient.DownloadGenericFileFromPath(
 				context.Background(),
 				config.Global.AccountID,
 				registryName,
 				packageName,
 				packageVersion,
-				params)
+				packageFile)
 			if err != nil {
 				return fmt.Errorf("failed to download package: %w", err)
 			}
@@ -150,8 +145,8 @@ func NewPullGenericCmd(c *client.ClientWithResponses) *cobra.Command {
 				return fmt.Errorf("failed to write to destination file: %w", err)
 			}
 
-			fmt.Printf("Successfully downloaded generic package '%s' (version '%s') from registry '%s'\n",
-				packageName, packageVersion, registryName)
+			fmt.Printf("Successfully downloaded generic file '%s' from path '%s' (version '%s') in registry '%s'\n",
+				packageFile, packageFile, packageVersion, registryName)
 			fmt.Printf("Saved to %s (%d bytes)\n", filePath, written)
 
 			// Print success message - no JSON metadata is returned for download
