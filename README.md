@@ -154,8 +154,11 @@ hc art list  # Using alias
 # List artifacts in a specific registry
 hc artifact list --registry <registry-name>
 
-# Delete an artifact
+# Delete an artifact (deletes all versions)
 hc artifact delete <artifact-name> --registry <registry-name>
+
+# Delete a specific version of an artifact
+hc artifact delete <artifact-name> --registry <registry-name> --version <version>
 
 # Push artifacts
 hc artifact push generic <registry-name> <file-path> --name <artifact-name> --version <version>
