@@ -1,6 +1,7 @@
 package fileutil
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -197,4 +198,21 @@ func IsDir(path string) bool {
 func IsFile(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
+}
+
+/*
+ * Check for Emoty filename
+ * Check for correctness of file name for provided extension
+ */
+func IsFilenameAcceptable(fileName, extension string) (bool, error) {
+	if fileName == "" {
+		return false, fmt.Errorf("empty filename")
+	}
+
+	name := fileName
+	if strings.HasSuffix(name, extension) {
+		return true, nil
+	}
+	//in case of file is having other  extension than provided extension
+	return false, fmt.Errorf("unsupported extension: %s", filepath.Ext(name))
 }

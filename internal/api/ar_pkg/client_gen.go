@@ -19,6 +19,12 @@ const (
 	ApiKeyAuthScopes = "ApiKeyAuth.Scopes"
 )
 
+// UploadCargoPackageMultipartBody defines parameters for UploadCargoPackage.
+type UploadCargoPackageMultipartBody struct {
+	// File Package .cargo file to upload
+	File *openapi_types.File `json:"file,omitempty"`
+}
+
 // DownloadGenericPackageParams defines parameters for DownloadGenericPackage.
 type DownloadGenericPackageParams struct {
 	Filename string `form:"filename" json:"filename"`
@@ -53,6 +59,9 @@ type UploadRpmPackageMultipartBody struct {
 	// File Package .rpm file to upload
 	File *openapi_types.File `json:"file,omitempty"`
 }
+
+// UploadCargoPackageMultipartRequestBody defines body for UploadCargoPackage for multipart/form-data ContentType.
+type UploadCargoPackageMultipartRequestBody UploadCargoPackageMultipartBody
 
 // UploadGenericPackageMultipartRequestBody defines body for UploadGenericPackage for multipart/form-data ContentType.
 type UploadGenericPackageMultipartRequestBody UploadGenericPackageMultipartBody
@@ -136,6 +145,9 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// UploadCargoPackageWithBody request with any body
+	UploadCargoPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// UploadComposerPackageWithBody request with any body
 	UploadComposerPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -165,6 +177,18 @@ type ClientInterface interface {
 
 	// UploadRpmPackageWithBody request with any body
 	UploadRpmPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) UploadCargoPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadCargoPackageRequestWithBody(c.Server, accountId, registry, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) UploadComposerPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -285,6 +309,49 @@ func (c *Client) UploadRpmPackageWithBody(ctx context.Context, accountId string,
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewUploadCargoPackageRequestWithBody generates requests for UploadCargoPackage with any type of body
+func NewUploadCargoPackageRequestWithBody(server string, accountId string, registry string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "registry", runtime.ParamLocationPath, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pkg/%s/%s/cargo/api/v1/crates/new", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
 }
 
 // NewUploadComposerPackageRequestWithBody generates requests for UploadComposerPackage with any type of body
@@ -882,6 +949,9 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// UploadCargoPackageWithBodyWithResponse request with any body
+	UploadCargoPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadCargoPackageResp, error)
+
 	// UploadComposerPackageWithBodyWithResponse request with any body
 	UploadComposerPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadComposerPackageResp, error)
 
@@ -911,6 +981,27 @@ type ClientWithResponsesInterface interface {
 
 	// UploadRpmPackageWithBodyWithResponse request with any body
 	UploadRpmPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadRpmPackageResp, error)
+}
+
+type UploadCargoPackageResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadCargoPackageResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadCargoPackageResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type UploadComposerPackageResp struct {
@@ -1123,6 +1214,15 @@ func (r UploadRpmPackageResp) StatusCode() int {
 	return 0
 }
 
+// UploadCargoPackageWithBodyWithResponse request with arbitrary body returning *UploadCargoPackageResp
+func (c *ClientWithResponses) UploadCargoPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadCargoPackageResp, error) {
+	rsp, err := c.UploadCargoPackageWithBody(ctx, accountId, registry, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadCargoPackageResp(rsp)
+}
+
 // UploadComposerPackageWithBodyWithResponse request with arbitrary body returning *UploadComposerPackageResp
 func (c *ClientWithResponses) UploadComposerPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadComposerPackageResp, error) {
 	rsp, err := c.UploadComposerPackageWithBody(ctx, accountId, registry, contentType, body, reqEditors...)
@@ -1211,6 +1311,22 @@ func (c *ClientWithResponses) UploadRpmPackageWithBodyWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseUploadRpmPackageResp(rsp)
+}
+
+// ParseUploadCargoPackageResp parses an HTTP response from a UploadCargoPackageWithResponse call
+func ParseUploadCargoPackageResp(rsp *http.Response) (*UploadCargoPackageResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadCargoPackageResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
 }
 
 // ParseUploadComposerPackageResp parses an HTTP response from a UploadComposerPackageWithResponse call

@@ -21,6 +21,7 @@ func NewPushArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
 	cmd.AddCommand(NewPushCondaCmd(c))
 	cmd.AddCommand(NewPushComposerCmd(c))
 	cmd.AddCommand(NewPushRpmCmd(c))
+	cmd.AddCommand(NewPushCargoCmd(c))
 
 	return cmd
 }

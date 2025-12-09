@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/harness/harness-cli/config"
 	client "github.com/harness/harness-cli/internal/api/ar"
@@ -17,6 +16,7 @@ import (
 	"github.com/harness/harness-cli/util"
 	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
+	"github.com/harness/harness-cli/util/common/fileutil"
 	p "github.com/harness/harness-cli/util/common/progress"
 	"github.com/spf13/cobra"
 )
@@ -70,7 +70,7 @@ func NewPushRpmCmd(c *client.ClientWithResponses) *cobra.Command {
 			}
 
 			// validate file name
-			valid, err := isFilenameAcceptable(fileName, RpmFileExtension)
+			valid, err := fileutil.IsFilenameAcceptable(fileName, RpmFileExtension)
 			if !valid {
 				progress.Error("Invalid file name")
 				return errors.NewValidationError("file_path", fmt.Sprintf("failed to validate package file name: %v", err))
@@ -140,17 +140,4 @@ func NewPushRpmCmd(c *client.ClientWithResponses) *cobra.Command {
 
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
 	return cmd
-}
-
-func isFilenameAcceptable(fileName, extension string) (bool, error) {
-	if fileName == "" {
-		return false, fmt.Errorf("empty filename")
-	}
-
-	name := fileName
-	if strings.HasSuffix(name, extension) {
-		return true, nil
-	}
-	//in case of file is having other  extension than provided extension
-	return false, fmt.Errorf("unsupported extension: %s", filepath.Ext(name))
 }
