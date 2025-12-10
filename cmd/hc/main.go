@@ -12,6 +12,7 @@ import (
 
 	"github.com/harness/harness-cli/cmd/artifact"
 	"github.com/harness/harness-cli/cmd/auth"
+	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/cmd/registry"
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/util/templates"
@@ -27,6 +28,7 @@ var version = "dev"
 
 func main() {
 	var verbose bool
+	factory := cmdutils.NewFactory()
 
 	rootCmd := &cobra.Command{
 		Use:          "hc",
@@ -36,7 +38,7 @@ func main() {
       Harness CLI is a tool to interact with Harness Resources.
 
       Find more information at:
-            https://developer.harness.io/docs/`),
+            https://developer.harness.io/docs/platform/automation/cli/reference/#v1.0.0-hc`),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Skip loading config for auth commands, version, and upgrade
 			if cmd.CommandPath() == "hc auth" ||
@@ -49,12 +51,19 @@ func main() {
 			}
 
 			// Check if authentication is needed
-			if config.Global.APIBaseURL == "" || config.Global.AuthToken == "" || config.Global.AccountID == "" {
+			if config.Global.APIBaseURL == "" || config.Global.AuthToken == "" {
 				// Only show auth error if we're not displaying help or completion
 				if cmd.Name() != "help" && !cmd.IsAdditionalHelpTopicCommand() && cmd.Name() != "completion" {
 					fmt.Println("Not logged in. Please run 'hc auth login' first.")
 					os.Exit(1)
 				}
+			}
+
+			var err error
+			config.Global.AccountID, err = auth.GetAccountIDFromToken(config.Global.AuthToken)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
 			}
 
 			// Set up logging based on verbose flag
@@ -90,8 +99,6 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&config.Global.OrgID, "org", "", "Org (overrides saved config)")
 	rootCmd.PersistentFlags().StringVar(&config.Global.ProjectID, "project", "", "Project (overrides saved config)")
 	rootCmd.PersistentFlags().StringVar(&config.Global.Format, "format", "table", "Format of the result")
-
-	// Add verbose flag
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging to console")
 
 	// Load auth config
@@ -117,8 +124,8 @@ func main() {
 
 	// Add main command groups
 	rootCmd.AddCommand(auth.GetRootCmd())
-	rootCmd.AddCommand(registry.GetRootCmd())
-	rootCmd.AddCommand(artifact.GetRootCmd())
+	rootCmd.AddCommand(registry.GetRootCmd(factory))
+	rootCmd.AddCommand(artifact.GetRootCmd(factory))
 	//rootCmd.AddCommand(project.GetRootCmd())
 	//rootCmd.AddCommand(organisation.GetRootCmd())
 	//rootCmd.AddCommand(api.GetRootCmd())

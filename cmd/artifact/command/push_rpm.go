@@ -10,14 +10,15 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	client "github.com/harness/harness-cli/internal/api/ar"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util"
 	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	"github.com/harness/harness-cli/util/common/fileutil"
 	p "github.com/harness/harness-cli/util/common/progress"
+
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +26,7 @@ const (
 	RpmFileExtension = ".rpm"
 )
 
-func NewPushRpmCmd(c *client.ClientWithResponses) *cobra.Command {
+func NewPushRpmCmd(c *cmdutils.Factory) *cobra.Command {
 	var pkgURL string
 	cmd := &cobra.Command{
 		Use:   "rpm <registry_name> <file_path>",

@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 
+	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
 	ar "github.com/harness/harness-cli/internal/api/ar"
 	client2 "github.com/harness/harness-cli/util/client"
@@ -14,7 +15,7 @@ import (
 // NewListRegistryCmd wires up:
 //
 //	hc registry list
-func NewListRegistryCmd(client *ar.ClientWithResponses) *cobra.Command {
+func NewListRegistryCmd(f *cmdutils.Factory) *cobra.Command {
 	var packageType string
 	var pageSize int32
 	var pageIndex int32
@@ -37,7 +38,7 @@ func NewListRegistryCmd(client *ar.ClientWithResponses) *cobra.Command {
 				params.PackageType = &[]string{packageType}
 			}
 
-			response, err := client.GetAllRegistriesWithResponse(context.Background(),
+			response, err := f.RegistryHttpClient().GetAllRegistriesWithResponse(context.Background(),
 				client2.GetRef(config.Global.AccountID, config.Global.OrgID, config.Global.ProjectID),
 				params)
 			if err != nil {

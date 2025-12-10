@@ -4,18 +4,19 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/harness/harness-cli/cmd/cmdutils"
 	client "github.com/harness/harness-cli/internal/api/ar"
 	client2 "github.com/harness/harness-cli/util/client"
 	"github.com/harness/harness-cli/util/common/printer"
-	"github.com/rs/zerolog/log"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
 // NewListArtifactCmd wires up:
 //
 //	hc artifact list
-func NewListArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
+func NewListArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 	var registry string
 	var pageSize int32
 	var pageIndex int32
@@ -38,7 +39,9 @@ func NewListArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
 				params.Page = &page
 			}
 
-			response, err := c.GetAllHarnessArtifactsWithResponse(context.Background(), client2.GetScopeRef(), &params)
+			httpClient := c.RegistryHttpClient()
+
+			response, err := httpClient.GetAllHarnessArtifactsWithResponse(context.Background(), client2.GetScopeRef(), &params)
 			if err != nil {
 				return err
 			}

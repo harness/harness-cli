@@ -10,8 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	client "github.com/harness/harness-cli/internal/api/ar"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/module/ar/packages/gopkg"
 	"github.com/harness/harness-cli/util"
@@ -22,7 +22,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewPushGoCmd(c *client.ClientWithResponses) *cobra.Command {
+func NewPushGoCmd(c *cmdutils.Factory) *cobra.Command {
 	var dir = "."
 	var output = "/tmp/go-package"
 	var pkgURL string

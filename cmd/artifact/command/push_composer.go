@@ -8,13 +8,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	client "github.com/harness/harness-cli/internal/api/ar"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util"
 	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	p "github.com/harness/harness-cli/util/common/progress"
+
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +23,7 @@ const (
 	ComposerFileExtension = ".zip"
 )
 
-func NewPushComposerCmd(c *client.ClientWithResponses) *cobra.Command {
+func NewPushComposerCmd(c *cmdutils.Factory) *cobra.Command {
 	var pkgURL string
 	cmd := &cobra.Command{
 		Use:   "composer <registry_name> <file_path>",
@@ -133,4 +134,3 @@ func validateComposerFileName(fileName string) (bool, error) {
 
 	return true, nil
 }
-

@@ -3,7 +3,7 @@ package command
 import (
 	"fmt"
 
-	client "github.com/harness/harness-cli/internal/api/ar"
+	"github.com/harness/harness-cli/cmd/cmdutils"
 
 	"github.com/spf13/cobra"
 )
@@ -11,7 +11,7 @@ import (
 // NewCreateRegistryCmd wires up:
 //
 //	hc registry create
-func NewCreateRegistryCmd(c *client.ClientWithResponses) *cobra.Command {
+func NewCreateRegistryCmd(c *cmdutils.Factory) *cobra.Command {
 	var description, packageType string
 	cmd := &cobra.Command{
 		Use:   "create [identifier]",

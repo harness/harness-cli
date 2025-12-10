@@ -12,13 +12,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	client "github.com/harness/harness-cli/internal/api/ar"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util"
 	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	p "github.com/harness/harness-cli/util/common/progress"
+
 	"github.com/klauspost/compress/zstd"
 	"github.com/spf13/cobra"
 	"github.com/zhyee/zipstream"
@@ -29,7 +30,7 @@ const (
 	Bz2FileExtension   = ".tar.bz2"
 )
 
-func NewPushCondaCmd(c *client.ClientWithResponses) *cobra.Command {
+func NewPushCondaCmd(c *cmdutils.Factory) *cobra.Command {
 	var pkgURL string
 	var customHeaders map[string]string
 	cmd := &cobra.Command{

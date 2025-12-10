@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	client "github.com/harness/harness-cli/internal/api/ar"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util/common"
 	"github.com/harness/harness-cli/util/common/auth"
@@ -35,7 +35,7 @@ func printReadCloser(rc io.ReadCloser) {
 
 // NewPullGenericCmd creates a new cobra.Command for pulling generic artifacts from the registry.
 // command example: hc ar pull generic <registry_name> <package_path> <destination_path>
-func NewPullGenericCmd(c *client.ClientWithResponses) *cobra.Command {
+func NewPullGenericCmd(c *cmdutils.Factory) *cobra.Command {
 	var pkgURL string
 	cmd := &cobra.Command{
 		Use:   "generic <registry_name> <package_path> <destination_path>",

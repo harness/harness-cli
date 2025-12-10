@@ -84,9 +84,9 @@ func readInput(prompt string) (string, error) {
 	return strings.TrimSpace(input), nil
 }
 
-// getAccountIDFromToken gets the account ID from the token
+// GetAccountIDFromToken gets the account ID from the token
 // Token format: pat.AccountID.Random.Random
-func getAccountIDFromToken(token string) (string, error) {
+func GetAccountIDFromToken(token string) (string, error) {
 	splitN := strings.SplitN(token, ".", 3)
 	return splitN[1], nil
 }
@@ -198,7 +198,7 @@ func getLoginCmd() *cobra.Command {
 				// Get Account ID
 				if accountID == "" {
 					var err error
-					accountID, err = getAccountIDFromToken(token)
+					accountID, err = GetAccountIDFromToken(token)
 					if err != nil {
 						return err
 					}

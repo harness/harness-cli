@@ -23,13 +23,13 @@ func Test_getAccountIDFromToken(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := getAccountIDFromToken(tt.args.token)
+			got, err := GetAccountIDFromToken(tt.args.token)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("getAccountIDFromToken() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("GetAccountIDFromToken() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("getAccountIDFromToken() got = %v, want %v", got, tt.want)
+				t.Errorf("GetAccountIDFromToken() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

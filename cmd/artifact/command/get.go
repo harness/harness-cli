@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 
+	"github.com/harness/harness-cli/cmd/cmdutils"
 	client "github.com/harness/harness-cli/internal/api/ar"
 	client2 "github.com/harness/harness-cli/util/client"
 	"github.com/harness/harness-cli/util/common/printer"
@@ -13,7 +14,7 @@ import (
 // NewGetArtifactCmd wires up:
 //
 //	hc artifact get <args>
-func NewGetArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
+func NewGetArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 	var name, registry string
 	var pageSize int32
 	var pageIndex int32
@@ -43,7 +44,9 @@ func NewGetArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
 				params.Page = &page
 			}
 
-			response, err := c.GetAllHarnessArtifactsWithResponse(context.Background(), client2.GetScopeRef(), &params)
+			httpClient := c.RegistryHttpClient()
+
+			response, err := httpClient.GetAllHarnessArtifactsWithResponse(context.Background(), client2.GetScopeRef(), &params)
 			if err != nil {
 				return err
 			}

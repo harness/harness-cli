@@ -15,15 +15,16 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/BurntSushi/toml"
+	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	client "github.com/harness/harness-cli/internal/api/ar"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util"
 	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	"github.com/harness/harness-cli/util/common/fileutil"
 	p "github.com/harness/harness-cli/util/common/progress"
+
+	"github.com/BurntSushi/toml"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +32,7 @@ const (
 	CargoFileExtension = ".crate"
 )
 
-func NewPushCargoCmd(c *client.ClientWithResponses) *cobra.Command {
+func NewPushCargoCmd(f *cmdutils.Factory) *cobra.Command {
 	var pkgURL string
 	cmd := &cobra.Command{
 		Use:   "cargo <registry_name> <file_path>",
@@ -79,7 +80,8 @@ func NewPushCargoCmd(c *client.ClientWithResponses) *cobra.Command {
 			valid, err := fileutil.IsFilenameAcceptable(fileName, CargoFileExtension)
 			if !valid {
 				progress.Error("Invalid file name")
-				return errors.NewValidationError("file_path", fmt.Sprintf("failed to validate package file name: %v", err))
+				return errors.NewValidationError("file_path",
+					fmt.Sprintf("failed to validate package file name: %v", err))
 			}
 
 			metadata, err := getMetadataFromCrateFile(filePath)

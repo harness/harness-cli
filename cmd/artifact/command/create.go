@@ -3,7 +3,7 @@ package command
 import (
 	"fmt"
 
-	client "github.com/harness/harness-cli/internal/api/ar"
+	"github.com/harness/harness-cli/cmd/cmdutils"
 
 	"github.com/spf13/cobra"
 )
@@ -11,7 +11,7 @@ import (
 // NewCreateArtifactCmd wires up:
 //
 //	hc artifact create
-func NewCreateArtifactCmd(c *client.ClientWithResponses) *cobra.Command {
+func NewCreateArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create artifact (use push command instead)",

@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/internal/api/ar"
 	ar2 "github.com/harness/harness-cli/module/ar/migrate"
@@ -16,7 +17,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func getMigrateCmd(*ar.ClientWithResponses) *cobra.Command {
+func getMigrateCmd(*cmdutils.Factory) *cobra.Command {
 	// Create local variables for flag binding
 	var localConfigPath string
 	var localPkgBaseURL string
