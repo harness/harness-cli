@@ -27,7 +27,57 @@ func getMigrateCmd(*cmdutils.Factory) *cobra.Command {
 	migrateCmd := &cobra.Command{
 		Use:   "migrate",
 		Short: "Start a migration based on configuration",
-		Run:   runMigration,
+		Long: `Migrate artifacts from a source registry to a Harness Artifact Registry.
+
+This command reads a YAML configuration file that defines the source and destination
+registries, credentials, and artifact mappings.
+
+Example configuration file (config.yaml):
+
+  version: 1.0.0
+  concurrency: 5
+  overwrite: false
+
+  source:
+    endpoint: https://source-registry.example.com
+    type: JFROG                    # Supported: JFROG, NEXUS
+    credentials:
+      username: source_user
+      password: source_password
+    insecure: false
+
+  destination:
+    endpoint: https://pkg.harness.io
+    type: HAR
+    credentials:
+      username: harness_user
+      password: harness_api_key
+
+  mappings:
+    - artifactType: DOCKER
+      sourceRegistry: docker-repo
+      destinationRegistry: harness-docker-repo
+
+    - artifactType: MAVEN
+      sourceRegistry: maven-releases
+      destinationRegistry: harness-maven
+
+    - artifactType: NPM
+      sourceRegistry: npm-local
+      destinationRegistry: harness-npm
+
+    - artifactType: HELM
+      sourceRegistry: helm-charts
+      destinationRegistry: harness-helm
+
+Supported artifact types:
+  DOCKER, HELM, HELM_LEGACY, MAVEN, NPM, NUGET, PYTHON, GO, GENERIC, CONDA
+
+Environment variables can be used in the config file using ${VAR_NAME} syntax.
+
+Usage example:
+  hc registry migrate -c config.yaml`,
+		Run: runMigration,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			// Sync local flags to global config
 			config.Global.ConfigPath = localConfigPath

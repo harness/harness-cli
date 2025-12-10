@@ -122,6 +122,20 @@ func main() {
 		}
 	}
 
+	// Check environment variables (override auth config, flags will override during Execute)
+	if envVal := os.Getenv("HARNESS_API_URL"); envVal != "" {
+		config.Global.APIBaseURL = envVal
+	}
+	if envVal := os.Getenv("HARNESS_API_KEY"); envVal != "" {
+		config.Global.AuthToken = envVal
+	}
+	if envVal := os.Getenv("HARNESS_ORG_ID"); envVal != "" {
+		config.Global.OrgID = envVal
+	}
+	if envVal := os.Getenv("HARNESS_PROJECT_ID"); envVal != "" {
+		config.Global.ProjectID = envVal
+	}
+
 	// Add main command groups
 	rootCmd.AddCommand(auth.GetRootCmd())
 	rootCmd.AddCommand(registry.GetRootCmd(factory))
