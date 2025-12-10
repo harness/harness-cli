@@ -562,6 +562,24 @@ type ListArtifactVersion struct {
 	PageSize *int `json:"pageSize,omitempty"`
 }
 
+// ListFileDetail A list of Harness Artifact Files
+type ListFileDetail struct {
+	// Files A list of Harness Artifact Files
+	Files []FileDetail `json:"files"`
+
+	// ItemCount The total number of items
+	ItemCount *int64 `json:"itemCount,omitempty"`
+
+	// PageCount The total number of pages
+	PageCount *int64 `json:"pageCount,omitempty"`
+
+	// PageIndex The current page
+	PageIndex *int64 `json:"pageIndex,omitempty"`
+
+	// PageSize The number of items per page
+	PageSize *int `json:"pageSize,omitempty"`
+}
+
 // ListMigrationImage A list of migration images
 type ListMigrationImage struct {
 	// Images A list of Artifact versions
@@ -1209,20 +1227,8 @@ type DockerManifestsResponse struct {
 
 // FileDetailResponse defines model for FileDetailResponse.
 type FileDetailResponse struct {
-	// Files A list of Harness Artifact Files
-	Files []FileDetail `json:"files"`
-
-	// ItemCount The total number of items
-	ItemCount *int64 `json:"itemCount,omitempty"`
-
-	// PageCount The total number of pages
-	PageCount *int64 `json:"pageCount,omitempty"`
-
-	// PageIndex The current page
-	PageIndex *int64 `json:"pageIndex,omitempty"`
-
-	// PageSize The number of items per page
-	PageSize *int `json:"pageSize,omitempty"`
+	// Data A list of Harness Artifact Files
+	Data ListFileDetail `json:"data"`
 
 	// Status Indicates if the request was successful or not
 	Status Status `json:"status"`

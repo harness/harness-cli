@@ -417,38 +417,15 @@ components:
       content:
         application/json:
           schema:
+            type: object
             properties:
-              files:
-                description: A list of Harness Artifact Files
-                items:
-                  $ref: '#/components/schemas/FileDetail'
-                type: array
-              itemCount:
-                description: The total number of items
-                example: 1
-                format: int64
-                type: integer
-              pageCount:
-                description: The total number of pages
-                example: 100
-                format: int64
-                type: integer
-              pageIndex:
-                description: The current page
-                example: 0
-                format: int64
-                type: integer
-              pageSize:
-                description: The number of items per page
-                example: 1
-                type: integer
               status:
-                $ref: '#/components/schemas/Status'
+                $ref: "#/components/schemas/Status"
+              data:
+                $ref: "#/components/schemas/ListFileDetail"
             required:
               - status
               - data
-              - files
-            type: object
       description: response to get artifact files
     HelmArtifactDetailResponse:
       content:
@@ -1483,6 +1460,36 @@ components:
       required:
         - artifacts
       type: object
+    ListFileDetail:
+      type: object
+      description: A list of Harness Artifact Files
+      properties:
+        pageCount:
+          type: integer
+          format: int64
+          description: The total number of pages
+          example: 100
+        itemCount:
+          type: integer
+          format: int64
+          description: The total number of items
+          example: 1
+        pageSize:
+          type: integer
+          description: The number of items per page
+          example: 1
+        pageIndex:
+          type: integer
+          format: int64
+          description: The current page
+          example: 0
+        files:
+          type: array
+          description: A list of Harness Artifact Files
+          items:
+            $ref: "#/components/schemas/FileDetail"
+      required:
+        - files
     ListMigrationImage:
       description: A list of migration images
       properties:
