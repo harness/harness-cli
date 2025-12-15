@@ -340,6 +340,15 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			})
 		}
 		return packages, nil
+	} else if artifactType == types.DART {
+		// Treat Dart like a generic bucket: one logical package
+		packages = append(packages, types.Package{
+			Registry: registry,
+			Path:     "/",
+			Name:     "default",
+			Size:     -1,
+		})
+		return packages, nil
 	} else {
 		return []types.Package{}, errors.New("unknown artifact type")
 	}
@@ -630,6 +639,41 @@ func (a *adapter) GetVersions(
 				Pkg:      pkg,
 				Path:     leaf.Uri,
 				Name:     version,
+				Size:     leaf.Size,
+			})
+		}
+		return versions, nil
+	}
+	if artifactType == types.DART {
+		var versions []types.Version
+		if node == nil {
+			return nil, errors.New("node is nil")
+		}
+
+		// For Dart, find all .tar.gz files and extract version from filename
+		// Dart package filename format: <package_name>-<version>.tar.gz
+		leaves, err := tree.GetAllFiles(node)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+		for _, leaf := range leaves {
+			if leaf.Folder {
+				continue
+			}
+
+			filename := leaf.Name
+			if !strings.HasSuffix(filename, ".tar.gz") {
+				continue
+			}
+
+			// Remove .tar.gz extension
+			nameWithVersion := strings.TrimSuffix(filename, ".tar.gz")
+
+			versions = append(versions, types.Version{
+				Registry: registry,
+				Pkg:      pkg,
+				Path:     leaf.Uri,
+				Name:     nameWithVersion,
 				Size:     leaf.Size,
 			})
 		}

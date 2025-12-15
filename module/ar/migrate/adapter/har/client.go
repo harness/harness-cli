@@ -20,6 +20,7 @@ import (
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/util/common/auth"
 
+	"github.com/google/uuid"
 	retryablehttp "github.com/hashicorp/go-retryablehttp"
 )
 
@@ -367,6 +368,65 @@ func (c *client) AddNPMTag(registry string, name string, version string, tagUri 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to upload file '%s', status code: %d, response: %s",
+			url, resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func (c *client) uploadDartFile(
+	registry string,
+	name string,
+	version string,
+	f *types.File,
+	file io.ReadCloser,
+) error {
+	// POST {endpoint}/pkg/{account_id}/{registry}/pub/api/packages/versions/new/upload/{upload_id}
+	// with multipart form: -F "file=@file.tar.gz"
+	uploadID := uuid.New().String()
+
+	base := strings.TrimRight(c.url, "/")
+	url := fmt.Sprintf("%s/pkg/%s/%s/pub/api/packages/versions/new/upload/%s", base, config.Global.AccountID, registry, uploadID)
+
+	// Create a pipe for streaming multipart form data
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+
+	// Write multipart form in a goroutine
+	go func() {
+		defer pw.Close()
+		defer writer.Close()
+
+		// Create form file field "file"
+		part, err := writer.CreateFormFile("file", f.Name)
+		if err != nil {
+			pw.CloseWithError(fmt.Errorf("failed to create form file: %w", err))
+			return
+		}
+
+		// Copy file content to the form field
+		if _, err := io.Copy(part, file); err != nil {
+			pw.CloseWithError(fmt.Errorf("failed to write file to form: %w", err))
+			return
+		}
+	}()
+
+	req, err := http2.NewRequest(http2.MethodPost, url, pr)
+	if err != nil {
+		return fmt.Errorf("failed to create Dart upload request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to upload Dart package to '%s': %w", url, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to upload Dart package '%s', status code: %d, response: %s",
 			url, resp.StatusCode, string(body))
 	}
 

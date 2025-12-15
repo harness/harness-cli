@@ -1,7 +1,9 @@
 package mock_jfrog
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
 	http2 "net/http"
@@ -32,10 +34,11 @@ type client struct {
 
 // mockData holds all the mock responses
 type mockData struct {
-	registries  map[string]JFrogRepository
-	files       map[string][]types.File
-	catalogs    map[string][]string
-	fileContent map[string]string
+	registries    map[string]JFrogRepository
+	files         map[string][]types.File
+	catalogs      map[string][]string
+	fileContent   map[string]string
+	binaryContent map[string][]byte
 }
 
 // JFrogPackage represents a file entry from JFrog Artifactory
@@ -78,11 +81,18 @@ func (c *client) getFile(registry string, path string) (io.ReadCloser, http2.Hea
 	// Create file key for lookup
 	fileKey := fmt.Sprintf("%s/%s", registry, path)
 
-	// Return mock file content
+	// Return mock file content (string)
 	if content, exists := c.mockData.fileContent[fileKey]; exists {
 		header := make(http2.Header)
 		header.Set("Content-Type", "application/octet-stream")
 		return io.NopCloser(bytes.NewReader([]byte(content))), header, nil
+	}
+
+	// Return mock binary content (tar.gz, etc.)
+	if content, exists := c.mockData.binaryContent[fileKey]; exists {
+		header := make(http2.Header)
+		header.Set("Content-Type", "application/gzip")
+		return io.NopCloser(bytes.NewReader(content)), header, nil
 	}
 
 	if strings.HasPrefix(path, "tmp/") || strings.HasPrefix(path, "Users/") {
@@ -182,6 +192,13 @@ func initMockData() *mockData {
 				Description: "Mock NPM Local Repository",
 				PackageType: "npm",
 			},
+			"dart-local": {
+				Key:         "dart-local",
+				Type:        "LOCAL",
+				Url:         "http://localhost:8081/artifactory/dart-local",
+				Description: "Mock Dart Local Repository",
+				PackageType: "pub",
+			},
 			"generic-local": {
 				Key:         "generic-local",
 				Type:        "LOCAL",
@@ -222,6 +239,35 @@ func initMockData() *mockData {
 					SHA1:         "da39a3ee5e6b4b0d3255bfef95601890afd80707",
 				},
 			},
+			"dart-local": {
+				{
+					Registry:     "dart-local",
+					Name:         "sample_dart_pkg-1.0.0.tar.gz",
+					Uri:          "/packages/sample_dart_pkg/versions/1.0.0.tar.gz",
+					Folder:       false,
+					Size:         3072,
+					LastModified: "2023-01-01T00:00:00.000Z",
+					SHA1:         "da39a3ee5e6b4b0d3255bfef95601890afd80720",
+				},
+				{
+					Registry:     "dart-local",
+					Name:         "sample_dart_pkg-1.1.0.tar.gz",
+					Uri:          "/packages/sample_dart_pkg/versions/1.1.0.tar.gz",
+					Folder:       false,
+					Size:         3200,
+					LastModified: "2023-02-01T00:00:00.000Z",
+					SHA1:         "da39a3ee5e6b4b0d3255bfef95601890afd80721",
+				},
+				{
+					Registry:     "dart-local",
+					Name:         "another_dart_pkg-2.0.0.tar.gz",
+					Uri:          "/packages/another_dart_pkg/versions/2.0.0.tar.gz",
+					Folder:       false,
+					Size:         4096,
+					LastModified: "2023-03-01T00:00:00.000Z",
+					SHA1:         "da39a3ee5e6b4b0d3255bfef95601890afd80722",
+				},
+			},
 			"helm-legacy-local": {
 				{
 					Registry:     "helm-legacy-local",
@@ -250,6 +296,42 @@ func initMockData() *mockData {
 			"maven-local/.pypi/simple.html":   `<html><body><a href="requests/">requests</a><br/><a href="flask/">flask</a><br/></body></html>`,
 			"maven-local/repodata/repomd.xml": `<?xml version="1.0" encoding="UTF-8"?><repomd><data type="primary"><location href="repodata/primary.xml.gz"/></data></repomd>`,
 			"maven-local/index.yaml":          `apiVersion: v1\nentries:\n  nginx:\n    - name: nginx\n      version: 1.0.0\n      urls:\n        - charts/nginx-1.0.0.tgz`,
+			"dart-local/sample_dart_pkg": `{
+  "name": "sample_dart_pkg",
+  "latest": {
+    "version": "1.1.0",
+    "pubspec": {
+      "name": "sample_dart_pkg",
+      "version": "1.1.0",
+      "description": "A sample Dart package for testing migration",
+      "homepage": "https://github.com/example/sample_dart_pkg",
+      "environment": {
+        "sdk": ">=2.17.0 <4.0.0"
+      }
+    },
+    "archive_url": "http://localhost:8081/artifactory/dart-local/packages/sample_dart_pkg/versions/1.1.0.tar.gz"
+  },
+  "versions": [
+    {
+      "version": "1.0.0",
+      "pubspec": {
+        "name": "sample_dart_pkg",
+        "version": "1.0.0",
+        "description": "A sample Dart package for testing migration"
+      },
+      "archive_url": "http://localhost:8081/artifactory/dart-local/packages/sample_dart_pkg/versions/1.0.0.tar.gz"
+    },
+    {
+      "version": "1.1.0",
+      "pubspec": {
+        "name": "sample_dart_pkg",
+        "version": "1.1.0",
+        "description": "A sample Dart package for testing migration"
+      },
+      "archive_url": "http://localhost:8081/artifactory/dart-local/packages/sample_dart_pkg/versions/1.1.0.tar.gz"
+    }
+  ]
+}`,
 			"npm-local/sample-package": `{
   "name": "sample-package",
   "description": "A sample NPM package for testing migration",
@@ -315,6 +397,11 @@ func initMockData() *mockData {
     "2.0.0": "2023-03-01T00:00:00.000Z"
   }
 }`,
+		},
+		binaryContent: map[string][]byte{
+			"dart-local/packages/sample_dart_pkg/versions/1.0.0.tar.gz":  createDartPackageTarGz("sample_dart_pkg", "1.0.0", "A sample Dart package for testing migration"),
+			"dart-local/packages/sample_dart_pkg/versions/1.1.0.tar.gz":  createDartPackageTarGz("sample_dart_pkg", "1.1.0", "A sample Dart package for testing migration"),
+			"dart-local/packages/another_dart_pkg/versions/2.0.0.tar.gz": createDartPackageTarGz("another_dart_pkg", "2.0.0", "Another Dart package for testing migration"),
 		},
 	}
 }
@@ -411,4 +498,144 @@ func (c *client) getDefaultFiles(registry string) []types.File {
 
 func buildCatalogURL(endpoint, repo string) string {
 	return fmt.Sprintf("%s/artifactory/api/docker/%s/v2/_catalog?n=1000", endpoint, repo)
+}
+
+// createDartPackageTarGz creates a valid tar.gz byte slice for a Dart package
+func createDartPackageTarGz(packageName, version, description string) []byte {
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	tarWriter := tar.NewWriter(gzWriter)
+
+	// Create pubspec.yaml content
+	pubspecContent := fmt.Sprintf(`name: %s
+version: %s
+description: %s
+homepage: https://github.com/example/%s
+environment:
+  sdk: '>=2.17.0 <4.0.0'
+dependencies:
+  meta: ^1.8.0
+dev_dependencies:
+  test: ^1.21.0
+`, packageName, version, description, packageName)
+
+	// Create a simple lib/main.dart content
+	libContent := fmt.Sprintf(`/// %s
+///
+/// %s
+library %s;
+
+export 'src/%s_base.dart';
+`, packageName, description, packageName, packageName)
+
+	// Create src/package_base.dart content
+	srcContent := fmt.Sprintf(`/// The main class for %s
+class %sBase {
+  /// Returns a greeting message
+  String greet(String name) {
+    return 'Hello, $name from %s!';
+  }
+
+  /// Returns the package version
+  String get version => '%s';
+}
+`, packageName, toPascalCase(packageName), packageName, version)
+
+	// Create CHANGELOG.md
+	changelogContent := fmt.Sprintf(`# Changelog
+
+## %s
+
+- Initial release
+- Added basic functionality
+`, version)
+
+	// Create README.md
+	readmeContent := fmt.Sprintf(`# %s
+
+%s
+
+## Installation
+
+Add this to your package's pubspec.yaml file:
+
+`+"```yaml"+`
+dependencies:
+  %s: ^%s
+`+"```"+`
+
+## Usage
+
+`+"```dart"+`
+import 'package:%s/%s.dart';
+
+void main() {
+  final instance = %sBase();
+  print(instance.greet('World'));
+}
+`+"```"+`
+`, packageName, description, packageName, version, packageName, packageName, toPascalCase(packageName))
+
+	// Create LICENSE
+	licenseContent := `MIT License
+
+Copyright (c) 2023 Example
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+SERVICES OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+`
+
+	// Add files to tar archive
+	files := []struct {
+		name    string
+		content string
+	}{
+		{"pubspec.yaml", pubspecContent},
+		{"README.md", readmeContent},
+		{"CHANGELOG.md", changelogContent},
+		{"LICENSE", licenseContent},
+		{fmt.Sprintf("lib/%s.dart", packageName), libContent},
+		{fmt.Sprintf("lib/src/%s_base.dart", packageName), srcContent},
+	}
+
+	for _, file := range files {
+		hdr := &tar.Header{
+			Name: file.name,
+			Mode: 0644,
+			Size: int64(len(file.content)),
+		}
+		tarWriter.WriteHeader(hdr)
+		tarWriter.Write([]byte(file.content))
+	}
+
+	tarWriter.Close()
+	gzWriter.Close()
+
+	return buf.Bytes()
+}
+
+// toPascalCase converts a snake_case string to PascalCase
+func toPascalCase(s string) string {
+	parts := strings.Split(s, "_")
+	for i, part := range parts {
+		if len(part) > 0 {
+			parts[i] = strings.ToUpper(part[:1]) + part[1:]
+		}
+	}
+	return strings.Join(parts, "")
 }

@@ -366,6 +366,50 @@ func (r *File) Migrate(ctx context.Context) error {
 			pterm.Success.Println(title)
 		}
 		r.stats.FileStats = append(r.stats.FileStats, stat)
+	} else if r.artifactType == types.DART {
+		if r.file == nil {
+			return fmt.Errorf("no file provided for Dart migration")
+		}
+		downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.file.Uri)
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to download Dart package file")
+			return fmt.Errorf("failed to download Dart package file: %w", err)
+		}
+		defer downloadFile.Close()
+
+		title := fmt.Sprintf("%s (%s)", r.file.Name, common.GetSize(int64(r.file.Size)))
+		pterm.Info.Println(fmt.Sprintf("Copying Dart package %s from %s to %s",
+			r.file.Name, r.srcRegistry, r.destRegistry))
+
+		err = r.destAdapter.UploadFile(
+			r.destRegistry,
+			downloadFile,
+			r.file,
+			header,
+			r.pkg.Name,
+			r.version.Name,
+			r.artifactType,
+			nil,
+		)
+
+		stat := types.FileStat{
+			Name:     r.file.Name,
+			Registry: r.srcRegistry,
+			Uri:      r.file.Uri,
+			Size:     int64(r.file.Size),
+			Status:   types.StatusSuccess,
+		}
+
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to upload Dart package")
+			stat.Status = types.StatusFail
+			stat.Error = err.Error()
+			pterm.Error.Println(title)
+		} else {
+			pterm.Success.Println(title)
+		}
+
+		r.stats.FileStats = append(r.stats.FileStats, stat)
 	}
 
 	logger.Info().

@@ -361,6 +361,40 @@ entries:
 			})
 		}
 		return packages, nil
+	} else if artifactType == types.DART {
+		leaves, _ := tree.GetAllFiles(root)
+		packageMap := make(map[string]bool)
+		for _, leaf := range leaves {
+			if leaf.Folder {
+				continue
+			}
+			if !strings.HasSuffix(leaf.Name, ".tar.gz") {
+				continue
+			}
+
+			// Extract package name from filename: package_name-version.tar.gz
+			filename := leaf.Name
+			nameWithVersion := strings.TrimSuffix(filename, ".tar.gz")
+
+			// Extract package name (everything before the last hyphen)
+			lastHyphenIndex := strings.LastIndex(nameWithVersion, "-")
+			if lastHyphenIndex <= 0 {
+				continue
+			}
+			pkgName := nameWithVersion[:lastHyphenIndex]
+
+			if _, ok := packageMap[pkgName]; ok {
+				continue
+			}
+			packageMap[pkgName] = true
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     "/",
+				Name:     pkgName,
+				Size:     leaf.Size,
+			})
+		}
+		return packages, nil
 	} else {
 		return []types.Package{}, errors.New("unknown artifact type")
 	}
@@ -623,6 +657,63 @@ func (a *adapter) GetVersions(
 					version = nameWithVersion[lastHyphenIndex+1:] // Everything after last hyphen is version
 				}
 			}
+
+			// Skip if version is empty or already processed
+			if version == "" || versionMap[version] {
+				continue
+			}
+
+			versionMap[version] = true
+			versions = append(versions, types.Version{
+				Registry: registry,
+				Pkg:      pkg,
+				Path:     leaf.Uri,
+				Name:     version,
+				Size:     leaf.Size,
+			})
+		}
+		return versions, nil
+	}
+	if artifactType == types.DART {
+		var versions []types.Version
+		if node == nil {
+			return nil, errors.New("node is nil")
+		}
+
+		// For Dart, find all .tar.gz files and extract version from filename
+		// Dart package filename format: <package_name>-<version>.tar.gz
+		leaves, err := tree.GetAllFiles(node)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+
+		versionMap := make(map[string]bool)
+		for _, leaf := range leaves {
+			if leaf.Folder {
+				continue
+			}
+
+			filename := leaf.Name
+			if !strings.HasSuffix(filename, ".tar.gz") {
+				continue
+			}
+
+			// Remove .tar.gz extension
+			nameWithVersion := strings.TrimSuffix(filename, ".tar.gz")
+
+			// Extract version from filename: package_name-version -> version
+			lastHyphenIndex := strings.LastIndex(nameWithVersion, "-")
+			if lastHyphenIndex <= 0 {
+				continue
+			}
+
+			pkgName := nameWithVersion[:lastHyphenIndex]
+			// Only include versions for the requested package
+			if pkgName != pkg {
+				continue
+			}
+
+			version := nameWithVersion[lastHyphenIndex+1:]
 
 			// Skip if version is empty or already processed
 			if version == "" || versionMap[version] {

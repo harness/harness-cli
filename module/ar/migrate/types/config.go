@@ -31,6 +31,7 @@ var (
 	GO          ArtifactType = "GO"
 	CONDA       ArtifactType = "CONDA"
 	COMPOSER    ArtifactType = "COMPOSER"
+	DART        ArtifactType = "DART"
 )
 
 // Config represents the top-level configuration structure

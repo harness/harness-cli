@@ -108,7 +108,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 	var jobs []engine.Job
 
 	if r.artifactType == types.GENERIC || r.artifactType == types.MAVEN || r.artifactType == types.PYTHON ||
-		r.artifactType == types.NUGET || r.artifactType == types.NPM {
+		r.artifactType == types.NUGET || r.artifactType == types.NPM || r.artifactType == types.DART {
 		files, err := tree.GetAllFiles(r.node)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to get files from tree")
