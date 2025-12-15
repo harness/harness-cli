@@ -127,6 +127,8 @@ func (a *adapter) UploadFile(
 		err = a.client.uploadRPMFile(registry, f.Name, file)
 	} else if artifactType == types.CONDA {
 		err = a.client.uploadCondaFile(registry, f.Name, file, metadata)
+	} else if artifactType == types.COMPOSER {
+		err = a.client.uploadComposerFile(registry, f.Name, file)
 	}
 
 	if err != nil {

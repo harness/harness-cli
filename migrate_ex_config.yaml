@@ -45,3 +45,6 @@ mappings:
   - artifactType: CONDA
     sourceRegistry: src
     destinationRegistry: dst
+  - artifactType: COMPOSER
+    sourceRegistry: src
+    destinationRegistry: dst

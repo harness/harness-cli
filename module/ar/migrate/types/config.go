@@ -30,6 +30,7 @@ var (
 	RPM         ArtifactType = "RPM"
 	GO          ArtifactType = "GO"
 	CONDA       ArtifactType = "CONDA"
+	COMPOSER    ArtifactType = "COMPOSER"
 )
 
 // Config represents the top-level configuration structure

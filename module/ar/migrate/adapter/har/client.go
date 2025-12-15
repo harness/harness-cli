@@ -312,6 +312,36 @@ func (c *client) uploadCondaFile(
 	return nil
 }
 
+func (c *client) uploadComposerFile(
+	registry string,
+	filename string,
+	file io.ReadCloser,
+) error {
+	url := fmt.Sprintf("%s/pkg/%s/%s/composer/upload", c.url, config.Global.AccountID, registry)
+	
+	// Create request
+	req, err := http2.NewRequest(http2.MethodPost, url, file)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to upload file '%s': %w", filename, err)
+	}
+	defer resp.Body.Close()
+
+	// Check for successful response
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to upload file '%s', status code: %d, response: %s",
+			filename, resp.StatusCode, string(body))
+	}
+	return nil
+}
+
 func (c *client) AddNPMTag(registry string, name string, version string, tagUri string) error {
 	url := fmt.Sprintf("%s/pkg/%s/%s/npm", c.url, config.Global.AccountID, registry)
 	url = url + tagUri

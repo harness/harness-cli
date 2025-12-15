@@ -71,7 +71,7 @@ Example configuration file (config.yaml):
       destinationRegistry: harness-helm
 
 Supported artifact types:
-  DOCKER, HELM, HELM_LEGACY, MAVEN, NPM, NUGET, PYTHON, GO, GENERIC, CONDA
+  DOCKER, HELM, HELM_LEGACY, MAVEN, NPM, NUGET, PYTHON, GO, GENERIC, CONDA, COMPOSER
 
 Environment variables can be used in the config file using ${VAR_NAME} syntax.
 

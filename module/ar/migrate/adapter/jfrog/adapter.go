@@ -307,6 +307,39 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			})
 		}
 		return packages, nil
+	} else if artifactType == types.COMPOSER {
+		leaves, _ := tree.GetAllFiles(root)
+		packageMap := make(map[string]bool)
+		for _, leaf := range leaves {
+			if leaf.Folder {
+				continue
+			}
+			if !strings.HasSuffix(leaf.Uri, ".zip") {
+				continue
+			}
+			// Extract package name from ZIP filename
+			// Composer packages are typically named: vendor-package-version.zip
+			filename := leaf.Name
+			nameWithoutExt := strings.TrimSuffix(filename, ".zip")
+
+			// For Composer, we'll use the full filename as package name
+			// since Composer packages can have complex naming patterns
+			pkgName := nameWithoutExt
+
+			path := "/"
+			if _, ok := packageMap[pkgName]; ok {
+				continue
+			}
+			packageMap[pkgName] = true
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     path,
+				Name:     pkgName,
+				Size:     leaf.Size,
+				URL:      leaf.Uri,
+			})
+		}
+		return packages, nil
 	} else {
 		return []types.Package{}, errors.New("unknown artifact type")
 	}
@@ -600,6 +633,17 @@ func (a *adapter) GetVersions(
 				Size:     leaf.Size,
 			})
 		}
+		return versions, nil
+	}
+	if artifactType == types.COMPOSER {
+		var versions []types.Version
+		versions = append(versions, types.Version{
+			Registry: registry,
+			Pkg:      pkg,
+			Path:     p.URL,
+			Name:     p.Name,
+			Size:     p.Size,
+		})
 		return versions, nil
 	}
 	return []types.Version{}, errors.New("unknown artifact type")
