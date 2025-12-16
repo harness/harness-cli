@@ -54,6 +54,12 @@ type UploadGoPackageMultipartBody struct {
 	Zip openapi_types.File `json:"zip"`
 }
 
+// UploadNugetPackageMultipartBody defines parameters for UploadNugetPackage.
+type UploadNugetPackageMultipartBody struct {
+	// File Package .nupkg file to upload
+	File *openapi_types.File `json:"file,omitempty"`
+}
+
 // UploadRpmPackageMultipartBody defines parameters for UploadRpmPackage.
 type UploadRpmPackageMultipartBody struct {
 	// File Package .rpm file to upload
@@ -68,6 +74,9 @@ type UploadGenericPackageMultipartRequestBody UploadGenericPackageMultipartBody
 
 // UploadGoPackageMultipartRequestBody defines body for UploadGoPackage for multipart/form-data ContentType.
 type UploadGoPackageMultipartRequestBody UploadGoPackageMultipartBody
+
+// UploadNugetPackageMultipartRequestBody defines body for UploadNugetPackage for multipart/form-data ContentType.
+type UploadNugetPackageMultipartRequestBody UploadNugetPackageMultipartBody
 
 // UploadRpmPackageMultipartRequestBody defines body for UploadRpmPackage for multipart/form-data ContentType.
 type UploadRpmPackageMultipartRequestBody UploadRpmPackageMultipartBody
@@ -174,6 +183,9 @@ type ClientInterface interface {
 
 	// UploadGoPackageWithBody request with any body
 	UploadGoPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadNugetPackageWithBody request with any body
+	UploadNugetPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UploadRpmPackageWithBody request with any body
 	UploadRpmPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -289,6 +301,18 @@ func (c *Client) UploadGenericPackageWithBody(ctx context.Context, accountId str
 
 func (c *Client) UploadGoPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadGoPackageRequestWithBody(c.Server, accountId, registry, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadNugetPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadNugetPackageRequestWithBody(c.Server, accountId, registry, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -863,6 +887,49 @@ func NewUploadGoPackageRequestWithBody(server string, accountId string, registry
 	return req, nil
 }
 
+// NewUploadNugetPackageRequestWithBody generates requests for UploadNugetPackage with any type of body
+func NewUploadNugetPackageRequestWithBody(server string, accountId string, registry string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "registry", runtime.ParamLocationPath, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pkg/%s/%s/nuget", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewUploadRpmPackageRequestWithBody generates requests for UploadRpmPackage with any type of body
 func NewUploadRpmPackageRequestWithBody(server string, accountId string, registry string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -978,6 +1045,9 @@ type ClientWithResponsesInterface interface {
 
 	// UploadGoPackageWithBodyWithResponse request with any body
 	UploadGoPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadGoPackageResp, error)
+
+	// UploadNugetPackageWithBodyWithResponse request with any body
+	UploadNugetPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadNugetPackageResp, error)
 
 	// UploadRpmPackageWithBodyWithResponse request with any body
 	UploadRpmPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadRpmPackageResp, error)
@@ -1193,6 +1263,27 @@ func (r UploadGoPackageResp) StatusCode() int {
 	return 0
 }
 
+type UploadNugetPackageResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadNugetPackageResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadNugetPackageResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type UploadRpmPackageResp struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1302,6 +1393,15 @@ func (c *ClientWithResponses) UploadGoPackageWithBodyWithResponse(ctx context.Co
 		return nil, err
 	}
 	return ParseUploadGoPackageResp(rsp)
+}
+
+// UploadNugetPackageWithBodyWithResponse request with arbitrary body returning *UploadNugetPackageResp
+func (c *ClientWithResponses) UploadNugetPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadNugetPackageResp, error) {
+	rsp, err := c.UploadNugetPackageWithBody(ctx, accountId, registry, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadNugetPackageResp(rsp)
 }
 
 // UploadRpmPackageWithBodyWithResponse request with arbitrary body returning *UploadRpmPackageResp
@@ -1466,6 +1566,22 @@ func ParseUploadGoPackageResp(rsp *http.Response) (*UploadGoPackageResp, error) 
 	}
 
 	response := &UploadGoPackageResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseUploadNugetPackageResp parses an HTTP response from a UploadNugetPackageWithResponse call
+func ParseUploadNugetPackageResp(rsp *http.Response) (*UploadNugetPackageResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadNugetPackageResp{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
