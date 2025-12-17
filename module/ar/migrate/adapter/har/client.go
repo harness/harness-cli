@@ -49,7 +49,7 @@ func newClient(reg *types.RegistryConfig) *client {
 		auth.GetXApiKeyOptionAR())
 
 	pkgClient, _ := pkgclient.NewClientWithResponses(reg.Endpoint,
-		auth.GetXApiKeyOptionARPKG())
+		auth.GetAuthOptionARPKG())
 
 	return &client{
 		client: http.NewClient(
@@ -319,7 +319,7 @@ func (c *client) uploadComposerFile(
 	file io.ReadCloser,
 ) error {
 	url := fmt.Sprintf("%s/pkg/%s/%s/composer/upload", c.url, config.Global.AccountID, registry)
-	
+
 	// Create request
 	req, err := http2.NewRequest(http2.MethodPost, url, file)
 	if err != nil {

@@ -3,10 +3,15 @@ package auth
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/internal/api/ar"
 	"github.com/harness/harness-cli/internal/api/ar_pkg"
+)
+
+const (
+	JWTTokenPrefix = "CIManager"
 )
 
 // GetXApiKeyOptionAR
@@ -21,10 +26,16 @@ func GetXApiKeyOptionAR() func(client *ar.Client) error {
 	}
 }
 
-func GetXApiKeyOptionARPKG() func(client *ar_pkg.Client) error {
+func GetAuthOptionARPKG() func(client *ar_pkg.Client) error {
 	return func(client *ar_pkg.Client) error {
 		client.RequestEditors = append(client.RequestEditors, func(ctx context.Context, req *http.Request) error {
-			req.Header.Set("x-api-key", config.Global.AuthToken)
+			if strings.HasPrefix(config.Global.AuthToken, JWTTokenPrefix) {
+				// JWT token - use Authorization header
+				req.Header.Set("Authorization", config.Global.AuthToken)
+			} else {
+				// API key - use x-api-key header
+				req.Header.Set("x-api-key", config.Global.AuthToken)
+			}
 			return nil
 		})
 		return nil

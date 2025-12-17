@@ -60,10 +60,12 @@ func main() {
 			}
 
 			var err error
-			config.Global.AccountID, err = auth.GetAccountIDFromToken(config.Global.AuthToken)
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+			if config.Global.AccountID == "" {
+				config.Global.AccountID, err = auth.GetAccountIDFromToken(config.Global.AuthToken)
+				if err != nil {
+					fmt.Println(err)
+					os.Exit(1)
+				}
 			}
 
 			// Set up logging based on verbose flag

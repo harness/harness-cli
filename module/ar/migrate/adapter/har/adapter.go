@@ -48,7 +48,7 @@ func (f factory) Create(ctx context.Context, config types.RegistryConfig) (adp.A
 func newAdapter(config2 types.RegistryConfig) (adp.Adapter, error) {
 	c := newClient(&config2)
 	pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-		auth.GetXApiKeyOptionARPKG())
+		auth.GetAuthOptionARPKG())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pkg client: %v", err)
 	}

@@ -102,7 +102,7 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 			// Initialize the package client
 			progress.Step("Initializing package client")
 			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-				auth.GetXApiKeyOptionARPKG())
+				auth.GetAuthOptionARPKG())
 			if err != nil {
 				progress.Error("Failed to create package client")
 				return fmt.Errorf("failed to create package client: %w", err)
