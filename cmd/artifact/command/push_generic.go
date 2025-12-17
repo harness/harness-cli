@@ -55,7 +55,7 @@ func NewPushGenericCmd(c *cmdutils.Factory) *cobra.Command {
 
 			// Initialize the package client
 			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-				auth.GetXApiKeyOptionARPKG())
+				auth.GetAuthOptionARPKG())
 			if err != nil {
 				return fmt.Errorf("failed to create package client: %w", err)
 			}
