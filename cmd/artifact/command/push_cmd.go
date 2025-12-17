@@ -24,6 +24,8 @@ func NewPushArtifactCmd(f *cmdutils.Factory) *cobra.Command {
 	cmd.AddCommand(NewPushRpmCmd(f))
 	cmd.AddCommand(NewPushCargoCmd(f))
 	cmd.AddCommand(NewPushNugetCmd(f))
+	cmd.AddCommand(NewPushNpmCmd(f))
+	cmd.AddCommand(NewPushDartCmd(f))
 
 	return cmd
 }
