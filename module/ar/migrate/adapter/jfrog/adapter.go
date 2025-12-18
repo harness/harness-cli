@@ -152,13 +152,17 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 						registry, name, ver.Version)
 					continue
 				}
+				chartUrl := ver.URLs[0]
+				if strings.HasPrefix(chartUrl, "local://") {
+					chartUrl = strings.TrimPrefix(chartUrl, "local://")
+				}
 
 				pkg := types.Package{
 					Registry: registry,
 					Path:     "/",
 					Name:     nestedName,
 					Size:     -1,
-					URL:      ver.URLs[0],
+					URL:      chartUrl,
 					Version:  ver.Version,
 				}
 				packages = append(packages, pkg)

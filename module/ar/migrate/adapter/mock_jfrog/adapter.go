@@ -152,7 +152,7 @@ entries:
     - name: nginx
       version: 8.2.0
       urls:
-        - tmp/nginx-8.2.0.tgz`
+        - local://tmp/nginx-8.2.0.tgz`
 		} else {
 			// Use dynamic generation from charts path
 			generatedContent, err := GenerateHelmIndexFromPath(chartsPath)
@@ -164,7 +164,7 @@ entries:
     - name: nginx
       version: 8.2.0
       urls:
-        - tmp/nginx-8.2.0.tgz`
+        - local://tmp/nginx-8.2.0.tgz`
 			} else {
 				indexContent = generatedContent
 			}
@@ -187,12 +187,17 @@ entries:
 
 		for name, entries := range index.Entries {
 			for _, ver := range entries {
+				chartUrl := ver.URLs[0]
+				if strings.HasPrefix(chartUrl, "local://") {
+					chartUrl = strings.TrimPrefix(chartUrl, "local://")
+				}
+
 				packages = append(packages, types.Package{
 					Registry: registry,
 					Path:     "/",
 					Name:     name,
 					Size:     -1,
-					URL:      ver.URLs[0],
+					URL:      chartUrl,
 					Version:  ver.Version,
 				})
 			}
@@ -915,7 +920,7 @@ func GenerateHelmIndexFromPath(chartsPath string) (string, error) {
 		chartEntry := HelmIndexEntry{
 			Name:    chartMetadata.Name,
 			Version: chartMetadata.Version,
-			URLs:    []string{filepath.Join(tgzFile)},
+			URLs:    []string{"local:/" + filepath.Join(tgzFile)},
 		}
 
 		// Add to entries
