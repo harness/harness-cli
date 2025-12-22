@@ -16,8 +16,9 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func Update(*cli.Context) (err error) {
-	newVersion := GetNewRelease()
+func Update(ctx *cli.Context) (err error) {
+	v0Update := ctx.Bool("v0")
+	newVersion := GetNewRelease(v0Update)
 	if len(newVersion) == 0 {
 		fmt.Println("Already on latest version. Skipping update")
 		return

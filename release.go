@@ -15,7 +15,7 @@ type GithubRelease struct {
 	TagName    string `json:"tag_name"`
 }
 
-func GetNewRelease() (newVersion string) {
+func GetNewRelease(isV0 bool) (newVersion string) {
 	resp, err := http.Get("https://api.github.com/repos/harness/harness-cli/releases")
 	if err != nil {
 		return
@@ -36,6 +36,9 @@ func GetNewRelease() (newVersion string) {
 	err = json.Unmarshal(body, &releases)
 	if err != nil {
 		return
+	}
+	if isV0 {
+		releases = filterReleases(releases)
 	}
 	// The newest release includes both release & pre-release
 	var latest GithubRelease
@@ -72,11 +75,21 @@ func GetNewRelease() (newVersion string) {
 	return
 }
 
+func filterReleases(releases []GithubRelease) []GithubRelease {
+	filteredReleases := []GithubRelease{}
+	for _, release := range releases {
+		if strings.HasPrefix(release.TagName, "v0.") {
+			filteredReleases = append(filteredReleases, release)
+		}
+	}
+	return filteredReleases
+}
+
 func CheckGithubForReleases() {
 	if Version == "development" {
 		return
 	}
-	newRelease := GetNewRelease()
+	newRelease := GetNewRelease(false)
 	if len(newRelease) > 0 {
 		printUpgradeMessage(Version, newRelease)
 	}

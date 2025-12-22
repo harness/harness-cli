@@ -82,6 +82,11 @@ func main() {
 				Action: func(context *cli.Context) error {
 					return cliWrapper(Update, context)
 				},
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:  "v0",
+						Usage: "Specifying true to upgrade to a newer version of the v0 cli",
+					}},
 			},
 			{
 				Name:    "secret",
