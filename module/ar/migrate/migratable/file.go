@@ -285,7 +285,8 @@ func (r *File) Migrate(ctx context.Context) error {
 		if idx == -1 {
 			return fmt.Errorf("file Download url is not correct for NPM")
 		}
-		tarFileURL := r.file.Uri[:idx]
+		tarFileURL := r.file.Uri
+		logger.Info().Msg("Downloading tar file from " + tarFileURL)
 		tarFileReader, _, err := r.srcAdapter.DownloadFile(r.srcRegistry, tarFileURL)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to fetch metadata")
