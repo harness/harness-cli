@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
-	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
@@ -315,11 +314,6 @@ func (r *File) Migrate(ctx context.Context) error {
 		if pkgName == "" || version == "" {
 			logger.Error().Msg("Package.json must contain non-empty 'name' and 'version'")
 			return fmt.Errorf("package.json must contain non-empty 'name' and 'version'")
-		}
-
-		if config.Global.Registry.PkgURL == "" {
-			logger.Error().Msg("pkg-url must be set")
-			return fmt.Errorf("pkg-url must be set")
 		}
 
 		uploadReader := io.NopCloser(StreamUploadAsJSON(payload))
