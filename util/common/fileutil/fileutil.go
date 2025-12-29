@@ -201,7 +201,7 @@ func IsFile(path string) bool {
 }
 
 /*
- * Check for Emoty filename
+ * Check for Empty filename
  * Check for correctness of file name for provided extension
  */
 func IsFilenameAcceptable(fileName, extension string) (bool, error) {
