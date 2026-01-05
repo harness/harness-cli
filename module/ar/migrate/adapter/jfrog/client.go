@@ -259,3 +259,31 @@ func next(link string) string {
 	}
 	return ""
 }
+
+type PropertiesResponse struct {
+	Properties map[string][]string `json:"properties"`
+}
+
+func (c *client) getProperties(registry, path string) ([]types.MetadataItem, error) {
+	path = strings.TrimPrefix(path, "/")
+	var url string
+	if path == "" {
+		url = fmt.Sprintf("%s/artifactory/api/storage/%s?properties", c.url, registry)
+	} else {
+		url = fmt.Sprintf("%s/artifactory/api/storage/%s/%s?properties", c.url, registry, path)
+	}
+
+	var resp PropertiesResponse
+	err := c.client.Get(url, &resp)
+	if err != nil {
+		return nil, nil
+	}
+
+	var items []types.MetadataItem
+	for key, values := range resp.Properties {
+		for _, val := range values {
+			items = append(items, types.MetadataItem{Key: key, Value: val})
+		}
+	}
+	return items, nil
+}

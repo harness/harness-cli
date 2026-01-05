@@ -157,10 +157,28 @@ func (r *Registry) Post(ctx context.Context) error {
 	logger.Info().Msg("Starting registry post-migration step")
 
 	startTime := time.Now()
-	// Your post-migration code here
+
+	// Migrate registry metadata
+	if err := r.migrateRegistryMetadata(ctx); err != nil {
+		logger.Warn().Err(err).Msg("Failed to migrate registry metadata, continuing...")
+	}
 
 	logger.Info().
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed registry post-migration step")
 	return nil
+}
+
+func (r *Registry) migrateRegistryMetadata(ctx context.Context) error {
+	metadata, err := r.srcAdapter.GetRegistryMetadata(ctx, r.srcRegistry)
+	if err != nil {
+		return fmt.Errorf("get source metadata: %w", err)
+	}
+	if len(metadata) == 0 {
+		r.logger.Debug().Msg("No registry metadata to migrate")
+		return nil
+	}
+
+	r.logger.Info().Int("count", len(metadata)).Msg("Migrating registry metadata")
+	return r.destAdapter.SetRegistryMetadata(ctx, r.destRegistry, metadata)
 }

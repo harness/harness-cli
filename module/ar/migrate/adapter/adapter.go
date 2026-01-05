@@ -62,6 +62,14 @@ type Adapter interface {
 		files []*types.PackageFiles,
 		metadata map[string]interface{},
 	) error
+
+	// Metadata Operations
+	GetRegistryMetadata(ctx context.Context, registry string) ([]types.MetadataItem, error)
+	GetPackageMetadata(ctx context.Context, registry, pkg string) ([]types.MetadataItem, error)
+	GetVersionMetadata(ctx context.Context, registry, pkg, version string) ([]types.MetadataItem, error)
+	SetRegistryMetadata(ctx context.Context, registry string, metadata []types.MetadataItem) error
+	SetPackageMetadata(ctx context.Context, registry, pkg string, metadata []types.MetadataItem) error
+	SetVersionMetadata(ctx context.Context, registry, pkg, version string, metadata []types.MetadataItem) error
 }
 
 var registry = map[types.RegistryType]Factory{}

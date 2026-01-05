@@ -185,3 +185,27 @@ func (a *adapter) CreateVersion(
 		return fmt.Errorf("not implemented")
 	}
 }
+
+func (a *adapter) GetRegistryMetadata(ctx context.Context, registry string) ([]types.MetadataItem, error) {
+	return a.client.getMetadata(ctx, registry, nil, nil)
+}
+
+func (a *adapter) GetPackageMetadata(ctx context.Context, registry, pkg string) ([]types.MetadataItem, error) {
+	return a.client.getMetadata(ctx, registry, &pkg, nil)
+}
+
+func (a *adapter) GetVersionMetadata(ctx context.Context, registry, pkg, version string) ([]types.MetadataItem, error) {
+	return a.client.getMetadata(ctx, registry, &pkg, &version)
+}
+
+func (a *adapter) SetRegistryMetadata(ctx context.Context, registry string, metadata []types.MetadataItem) error {
+	return a.client.setMetadata(ctx, registry, nil, nil, metadata)
+}
+
+func (a *adapter) SetPackageMetadata(ctx context.Context, registry, pkg string, metadata []types.MetadataItem) error {
+	return a.client.setMetadata(ctx, registry, &pkg, nil, metadata)
+}
+
+func (a *adapter) SetVersionMetadata(ctx context.Context, registry, pkg, version string, metadata []types.MetadataItem) error {
+	return a.client.setMetadata(ctx, registry, &pkg, &version, metadata)
+}

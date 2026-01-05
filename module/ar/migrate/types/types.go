@@ -51,6 +51,11 @@ type Version struct {
 	Size     int
 }
 
+type MetadataItem struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 type Artifact struct {
 	Name       string
 	Version    string

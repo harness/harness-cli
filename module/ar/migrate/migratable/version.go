@@ -195,10 +195,28 @@ func (r *Version) Post(ctx context.Context) error {
 	logger.Info().Msg("Starting version post-migration step")
 
 	startTime := time.Now()
-	// Your post-migration code here
+
+	// Migrate version metadata
+	if err := r.migrateVersionMetadata(ctx); err != nil {
+		logger.Warn().Err(err).Msg("Failed to migrate version metadata, continuing...")
+	}
 
 	logger.Info().
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed version post-migration step")
 	return nil
+}
+
+func (r *Version) migrateVersionMetadata(ctx context.Context) error {
+	metadata, err := r.srcAdapter.GetVersionMetadata(ctx, r.srcRegistry, r.pkg.Name, r.version.Name)
+	if err != nil {
+		return fmt.Errorf("get source metadata: %w", err)
+	}
+	if len(metadata) == 0 {
+		r.logger.Debug().Msg("No version metadata to migrate")
+		return nil
+	}
+
+	r.logger.Info().Int("count", len(metadata)).Msg("Migrating version metadata")
+	return r.destAdapter.SetVersionMetadata(ctx, r.destRegistry, r.pkg.Name, r.version.Name, metadata)
 }

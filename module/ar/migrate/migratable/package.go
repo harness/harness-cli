@@ -615,10 +615,28 @@ func (r *Package) Post(ctx context.Context) error {
 	logger.Info().Msg("Starting package post-migration step")
 
 	startTime := time.Now()
-	// Your post-migration code here
+
+	// Migrate package metadata
+	if err := r.migratePackageMetadata(ctx); err != nil {
+		logger.Warn().Err(err).Msg("Failed to migrate package metadata, continuing...")
+	}
 
 	logger.Info().
 		Dur("duration", time.Since(startTime)).
-		Msg("Completed registry post-migration step")
+		Msg("Completed package post-migration step")
 	return nil
+}
+
+func (r *Package) migratePackageMetadata(ctx context.Context) error {
+	metadata, err := r.srcAdapter.GetPackageMetadata(ctx, r.srcRegistry, r.pkg.Name)
+	if err != nil {
+		return fmt.Errorf("get source metadata: %w", err)
+	}
+	if len(metadata) == 0 {
+		r.logger.Debug().Msg("No package metadata to migrate")
+		return nil
+	}
+
+	r.logger.Info().Int("count", len(metadata)).Msg("Migrating package metadata")
+	return r.destAdapter.SetPackageMetadata(ctx, r.destRegistry, r.pkg.Name, metadata)
 }

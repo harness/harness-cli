@@ -798,3 +798,28 @@ func (a *adapter) CreateVersion(
 ) error {
 	return nil
 }
+
+func (a *adapter) GetRegistryMetadata(ctx context.Context, registry string) ([]types.MetadataItem, error) {
+	return a.client.getProperties(registry, "")
+}
+
+func (a *adapter) GetPackageMetadata(ctx context.Context, registry, pkg string) ([]types.MetadataItem, error) {
+	return a.client.getProperties(registry, pkg)
+}
+
+func (a *adapter) GetVersionMetadata(ctx context.Context, registry, pkg, version string) ([]types.MetadataItem, error) {
+	path := fmt.Sprintf("%s/%s", pkg, version)
+	return a.client.getProperties(registry, path)
+}
+
+func (a *adapter) SetRegistryMetadata(ctx context.Context, registry string, metadata []types.MetadataItem) error {
+	return nil
+}
+
+func (a *adapter) SetPackageMetadata(ctx context.Context, registry, pkg string, metadata []types.MetadataItem) error {
+	return nil
+}
+
+func (a *adapter) SetVersionMetadata(ctx context.Context, registry, pkg, version string, metadata []types.MetadataItem) error {
+	return nil
+}

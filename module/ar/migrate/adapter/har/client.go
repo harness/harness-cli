@@ -15,6 +15,7 @@ import (
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/internal/api/ar"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
+	ar_v2 "github.com/harness/harness-cli/internal/api/ar_v2"
 	"github.com/harness/harness-cli/module/ar/migrate/http"
 	"github.com/harness/harness-cli/module/ar/migrate/http/auth/xApiKey"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
@@ -48,6 +49,10 @@ func newClient(reg *types.RegistryConfig) *client {
 		ar.WithHTTPClient(retryingHTTPClient()),
 		auth.GetXApiKeyOptionAR())
 
+	v2Client, _ := ar_v2.NewClientWithResponses(config.Global.APIBaseURL+"/gateway/har/api/v2",
+		ar_v2.WithHTTPClient(retryingHTTPClient()),
+		auth.GetXApiKeyOptionARV2())
+
 	pkgClient, _ := pkgclient.NewClientWithResponses(reg.Endpoint,
 		auth.GetAuthOptionARPKG())
 
@@ -59,6 +64,7 @@ func newClient(reg *types.RegistryConfig) *client {
 			xApiKey.NewAuthorizer(token),
 		),
 		pkgClient: pkgClient,
+		v2Client:  v2Client,
 		url:       reg.Endpoint,
 		insecure:  true,
 		username:  username,
@@ -69,6 +75,7 @@ func newClient(reg *types.RegistryConfig) *client {
 
 type client struct {
 	apiClient *ar.ClientWithResponses
+	v2Client  *ar_v2.ClientWithResponses
 	client    *http.Client
 	url       string
 	insecure  bool
@@ -709,5 +716,63 @@ func (c *client) createGoVersion(
 			artifactName, version, resp.StatusCode, string(body))
 	}
 
+	return nil
+}
+
+func (c *client) getMetadata(ctx context.Context, registry string, pkg, version *string) ([]types.MetadataItem, error) {
+	params := &ar_v2.GetMetadataParams{
+		AccountIdentifier:  config.Global.AccountID,
+		RegistryIdentifier: registry,
+		Package:            pkg,
+		Version:            version,
+	}
+
+	resp, err := c.v2Client.GetMetadataWithResponse(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode() >= 400 {
+		return nil, fmt.Errorf("failed to get metadata: %d", resp.StatusCode())
+	}
+
+	var items []types.MetadataItem
+	if resp.JSON200 != nil && resp.JSON200.Data.Metadata != nil {
+		for _, m := range resp.JSON200.Data.Metadata {
+			items = append(items, types.MetadataItem{Key: m.Key, Value: m.Value})
+		}
+	}
+	return items, nil
+}
+
+func (c *client) setMetadata(ctx context.Context, registry string, pkg, version *string, metadata []types.MetadataItem) error {
+	if len(metadata) == 0 {
+		return nil
+	}
+
+	params := &ar_v2.UpdateMetadataParams{
+		AccountIdentifier: config.Global.AccountID,
+	}
+
+	apiMetadata := make([]ar_v2.MetadataItemInput, len(metadata))
+	for i, m := range metadata {
+		apiMetadata[i] = ar_v2.MetadataItemInput{Key: m.Key, Value: m.Value}
+	}
+
+	body := ar_v2.UpdateMetadataJSONRequestBody{
+		RegistryIdentifier: registry,
+		Package:            pkg,
+		Version:            version,
+		Metadata:           apiMetadata,
+	}
+
+	resp, err := c.v2Client.UpdateMetadataWithResponse(ctx, params, body)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode() >= 400 {
+		return fmt.Errorf("failed to set metadata: %d", resp.StatusCode())
+	}
 	return nil
 }
