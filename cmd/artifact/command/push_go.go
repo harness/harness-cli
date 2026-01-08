@@ -23,11 +23,11 @@ import (
 )
 
 func NewPushGoCmd(c *cmdutils.Factory) *cobra.Command {
-	var dir = "."
 	var output = "/tmp/go-package"
 	var pkgURL string
+	var version string
 	cmd := &cobra.Command{
-		Use:   "go <registry_name> <version>",
+		Use:   "go <registry_name> <folder_path>",
 		Short: "Push Go Artifacts",
 		Long:  "Push Go Artifacts to Harness Artifact Registry",
 		Args:  cobra.ExactArgs(2),
@@ -40,7 +40,7 @@ func NewPushGoCmd(c *cmdutils.Factory) *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]
-			version := args[1]
+			dir := args[1]
 
 			// Create progress reporter
 			progress := p.NewConsoleReporter()
@@ -55,6 +55,16 @@ func NewPushGoCmd(c *cmdutils.Factory) *cobra.Command {
 				progress.Error("Version is required")
 				return errors.NewValidationError("version", "version is required")
 			}
+
+			// Validate directory exists
+			dirInfo, err := os.Stat(dir)
+			if err != nil {
+				return errors.NewValidationError("folder_path", fmt.Sprintf("failed to access folder: %v", err))
+			}
+			if !dirInfo.IsDir() {
+				return errors.NewValidationError("folder_path", "path must be a directory")
+			}
+
 			progress.Success("Input parameters validated")
 
 			// Generate package files
@@ -145,5 +155,6 @@ func NewPushGoCmd(c *cmdutils.Factory) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
+	cmd.Flags().StringVar(&version, "version", "", "Version for the package")
 	return cmd
 }
