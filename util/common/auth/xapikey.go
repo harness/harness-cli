@@ -8,6 +8,7 @@ import (
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/internal/api/ar"
 	"github.com/harness/harness-cli/internal/api/ar_pkg"
+	"github.com/harness/harness-cli/internal/api/ar_v2"
 )
 
 const (
@@ -36,6 +37,16 @@ func GetAuthOptionARPKG() func(client *ar_pkg.Client) error {
 				// API key - use x-api-key header
 				req.Header.Set("x-api-key", config.Global.AuthToken)
 			}
+			return nil
+		})
+		return nil
+	}
+}
+
+func GetXApiKeyOptionARV2() func(client *ar_v2.Client) error {
+	return func(client *ar_v2.Client) error {
+		client.RequestEditors = append(client.RequestEditors, func(ctx context.Context, req *http.Request) error {
+			req.Header.Set("x-api-key", config.Global.AuthToken)
 			return nil
 		})
 		return nil
