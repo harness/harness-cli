@@ -159,8 +159,6 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 		},
 	}
 
-	cmd.SilenceErrors = true //prevent printing errors twice
-
 	cmd.Flags().StringVar(&path, "path", "", "Nested directory")
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
 	cmd.MarkFlagRequired("pkg-url")

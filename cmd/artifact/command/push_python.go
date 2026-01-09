@@ -99,8 +99,7 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 
 		},
 	}
-
-	cmd.SilenceErrors = true //prevent printing errors twice
+	
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
 	cmd.MarkFlagRequired("pkg-url")
 	return cmd

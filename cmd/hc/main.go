@@ -31,9 +31,10 @@ func main() {
 	factory := cmdutils.NewFactory()
 
 	rootCmd := &cobra.Command{
-		Use:          "hc",
-		Short:        "CLI tool for Harness",
-		SilenceUsage: true,
+		Use:           "hc",
+		Short:         "CLI tool for Harness",
+		SilenceUsage:  true,
+		SilenceErrors: true, //prevent duplicate printing of errors
 		Long: templates.LongDesc(`
       Harness CLI is a tool to interact with Harness Resources.
 
