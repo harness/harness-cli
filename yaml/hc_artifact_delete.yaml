@@ -1,0 +1,35 @@
+name: hc artifact delete
+synopsis: Delete an artifact or a specific version
+description: |
+    Deletes an artifact and all its versions, or a specific version if --version flag is provided
+usage: hc artifact delete [artifact-name] [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for delete
+    - name: registry
+      usage: name of the registry
+    - name: version
+      usage: |
+        specific version to delete (if not provided, deletes all versions)
+inherited_options:
+    - name: account
+      usage: Account ID (overrides saved config)
+    - name: api-url
+      usage: Base URL for the API (overrides saved config)
+    - name: format
+      default_value: table
+      usage: 'Output format: table or json'
+    - name: org
+      usage: Organisation ID (overrides saved config)
+    - name: project
+      usage: Project ID (overrides saved config)
+    - name: token
+      usage: Authentication token (overrides saved config)
+    - name: verbose
+      shorthand: v
+      default_value: "false"
+      usage: Enable verbose logging to console
+see_also:
+    - hc artifact - Manage Harness Artifacts

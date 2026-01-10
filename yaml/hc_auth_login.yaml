@@ -1,0 +1,35 @@
+name: hc auth login
+synopsis: Login to Harness
+description: |
+    Authenticate with Harness services and save credentials for future use
+usage: hc auth login [flags]
+options:
+    - name: account
+      usage: Account ID
+    - name: api-token
+      usage: Authentication token
+    - name: api-url
+      usage: 'Harness API URL (default: https://app.harness.io)'
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for login
+    - name: non-interactive
+      default_value: "false"
+      usage: Disable interactive prompts (requires all mandatory flags)
+    - name: org
+      usage: Organization ID
+    - name: project
+      usage: Project ID
+inherited_options:
+    - name: format
+      default_value: table
+      usage: 'Output format: table or json'
+    - name: token
+      usage: Authentication token (overrides saved config)
+    - name: verbose
+      shorthand: v
+      default_value: "false"
+      usage: Enable verbose logging to console
+see_also:
+    - hc auth - Authentication commands for Harness CLI

@@ -1,0 +1,34 @@
+name: hc registry create
+synopsis: Create a new registry
+description: Create a new registry in Harness Artifact Registry
+usage: hc registry create [identifier] [flags]
+options:
+    - name: description
+      usage: Registry description
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for create
+    - name: package-type
+      default_value: DOCKER
+      usage: Package type (DOCKER, MAVEN, NPM, etc.)
+inherited_options:
+    - name: account
+      usage: Account ID (overrides saved config)
+    - name: api-url
+      usage: Base URL for the API (overrides saved config)
+    - name: format
+      default_value: table
+      usage: 'Output format: table or json'
+    - name: org
+      usage: Organisation ID (overrides saved config)
+    - name: project
+      usage: Project ID (overrides saved config)
+    - name: token
+      usage: Authentication token (overrides saved config)
+    - name: verbose
+      shorthand: v
+      default_value: "false"
+      usage: Enable verbose logging to console
+see_also:
+    - hc registry - Manage Harness Artifact Registries

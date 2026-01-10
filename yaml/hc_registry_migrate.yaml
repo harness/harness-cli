@@ -1,0 +1,91 @@
+name: hc registry migrate
+synopsis: Start a migration based on configuration
+description: |-
+    Migrate artifacts from a source registry to a Harness Artifact Registry.
+
+    This command reads a YAML configuration file that defines the source and destination
+    registries, credentials, and artifact mappings.
+
+    Example configuration file (config.yaml):
+
+      version: 1.0.0
+      concurrency: 5
+      overwrite: false
+
+      source:
+        endpoint: https://source-registry.example.com
+        type: JFROG                    # Supported: JFROG, NEXUS
+        credentials:
+          username: source_user
+          password: source_password
+        insecure: false
+
+      destination:
+        endpoint: https://pkg.harness.io
+        type: HAR
+        credentials:
+          username: harness_user
+          password: harness_api_key
+
+      mappings:
+        - artifactType: DOCKER
+          sourceRegistry: docker-repo
+          destinationRegistry: harness-docker-repo
+
+        - artifactType: MAVEN
+          sourceRegistry: maven-releases
+          destinationRegistry: harness-maven
+
+        - artifactType: NPM
+          sourceRegistry: npm-local
+          destinationRegistry: harness-npm
+
+        - artifactType: HELM
+          sourceRegistry: helm-charts
+          destinationRegistry: harness-helm
+
+    Supported artifact types:
+      DOCKER, HELM, HELM_LEGACY, MAVEN, NPM, NUGET, PYTHON, GO, GENERIC, CONDA, COMPOSER
+
+    Environment variables can be used in the config file using ${VAR_NAME} syntax.
+
+    Usage example:
+      hc registry migrate -c config.yaml
+usage: hc registry migrate [flags]
+options:
+    - name: concurrency
+      default_value: "1"
+      usage: Number of concurrent operations (overrides config)
+    - name: config
+      shorthand: c
+      default_value: config.yaml
+      usage: Path to configuration file
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for migrate
+    - name: overwrite
+      default_value: "false"
+      usage: Allow overwriting artifacts
+    - name: pkg-url
+      usage: Base URL for the API (overrides config)
+inherited_options:
+    - name: account
+      usage: Account ID (overrides saved config)
+    - name: api-url
+      usage: Base URL for the API (overrides saved config)
+    - name: format
+      default_value: table
+      usage: 'Output format: table or json'
+    - name: org
+      usage: Organisation ID (overrides saved config)
+    - name: project
+      usage: Project ID (overrides saved config)
+    - name: token
+      usage: Authentication token (overrides saved config)
+    - name: verbose
+      shorthand: v
+      default_value: "false"
+      usage: Enable verbose logging to console
+see_also:
+    - hc registry - Manage Harness Artifact Registries

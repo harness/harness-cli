@@ -1,0 +1,39 @@
+name: hc artifact push
+synopsis: Push artifacts to Harness Artifact Registry
+description: Push artifacts to Harness Artifact Registry
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for push
+inherited_options:
+    - name: account
+      usage: Account ID (overrides saved config)
+    - name: api-url
+      usage: Base URL for the API (overrides saved config)
+    - name: format
+      default_value: table
+      usage: 'Output format: table or json'
+    - name: org
+      usage: Organisation ID (overrides saved config)
+    - name: project
+      usage: Project ID (overrides saved config)
+    - name: token
+      usage: Authentication token (overrides saved config)
+    - name: verbose
+      shorthand: v
+      default_value: "false"
+      usage: Enable verbose logging to console
+see_also:
+    - hc artifact - Manage Harness Artifacts
+    - hc artifact push cargo - Push Cargo Artifacts
+    - hc artifact push composer - Push Composer Artifacts
+    - hc artifact push conda - Push Conda Artifacts
+    - hc artifact push dart - Push Dart package
+    - hc artifact push generic - Push generic artifacts to registry
+    - hc artifact push go - Push Go Artifacts
+    - hc artifact push maven - Get artifact details
+    - hc artifact push npm - Push NPM package
+    - hc artifact push nuget - Push Nuget Artifacts
+    - hc artifact push python - Push Python Artifacts
+    - hc artifact push rpm - Push Rpm Artifacts

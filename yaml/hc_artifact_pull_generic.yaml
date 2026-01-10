@@ -1,0 +1,31 @@
+name: hc artifact pull generic
+synopsis: Pull Generic Artifacts
+description: Pull Generic Artifacts from Harness Artifact Registry
+usage: hc artifact pull generic <registry_name> <package_path> <destination_path> [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for generic
+    - name: pkg-url
+      usage: Base URL for the Packages
+inherited_options:
+    - name: account
+      usage: Account ID (overrides saved config)
+    - name: api-url
+      usage: Base URL for the API (overrides saved config)
+    - name: format
+      default_value: table
+      usage: 'Output format: table or json'
+    - name: org
+      usage: Organisation ID (overrides saved config)
+    - name: project
+      usage: Project ID (overrides saved config)
+    - name: token
+      usage: Authentication token (overrides saved config)
+    - name: verbose
+      shorthand: v
+      default_value: "false"
+      usage: Enable verbose logging to console
+see_also:
+    - hc artifact pull - Pull artifacts from Harness Artifact Registry

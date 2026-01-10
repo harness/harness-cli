@@ -1,0 +1,38 @@
+name: hc artifact get
+synopsis: Get artifact details
+description: |
+    Retrieves detailed information about a specific artifact in the Harness Artifact Registry
+usage: hc artifact get [?artifact-name] [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for get
+    - name: page
+      default_value: "0"
+      usage: page number (zero-indexed)
+    - name: page-size
+      default_value: "10"
+      usage: number of items per page
+    - name: registry
+      usage: name of the registry
+inherited_options:
+    - name: account
+      usage: Account ID (overrides saved config)
+    - name: api-url
+      usage: Base URL for the API (overrides saved config)
+    - name: format
+      default_value: table
+      usage: 'Output format: table or json'
+    - name: org
+      usage: Organisation ID (overrides saved config)
+    - name: project
+      usage: Project ID (overrides saved config)
+    - name: token
+      usage: Authentication token (overrides saved config)
+    - name: verbose
+      shorthand: v
+      default_value: "false"
+      usage: Enable verbose logging to console
+see_also:
+    - hc artifact - Manage Harness Artifacts

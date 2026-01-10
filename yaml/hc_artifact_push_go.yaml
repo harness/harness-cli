@@ -1,0 +1,33 @@
+name: hc artifact push go
+synopsis: Push Go Artifacts
+description: Push Go Artifacts to Harness Artifact Registry
+usage: hc artifact push go <registry_name> <folder_path> [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for go
+    - name: pkg-url
+      usage: Base URL for the Packages
+    - name: version
+      usage: Version for the package
+inherited_options:
+    - name: account
+      usage: Account ID (overrides saved config)
+    - name: api-url
+      usage: Base URL for the API (overrides saved config)
+    - name: format
+      default_value: table
+      usage: 'Output format: table or json'
+    - name: org
+      usage: Organisation ID (overrides saved config)
+    - name: project
+      usage: Project ID (overrides saved config)
+    - name: token
+      usage: Authentication token (overrides saved config)
+    - name: verbose
+      shorthand: v
+      default_value: "false"
+      usage: Enable verbose logging to console
+see_also:
+    - hc artifact push - Push artifacts to Harness Artifact Registry

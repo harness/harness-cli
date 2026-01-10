@@ -1,0 +1,29 @@
+name: hc
+synopsis: CLI tool for Harness
+description: Harness CLI is a tool to interact with Harness Resources.
+options:
+    - name: account
+      usage: Account ID (overrides saved config)
+    - name: api-url
+      usage: Base URL for the API (overrides saved config)
+    - name: format
+      default_value: table
+      usage: 'Output format: table or json'
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for hc
+    - name: org
+      usage: Organisation ID (overrides saved config)
+    - name: project
+      usage: Project ID (overrides saved config)
+    - name: token
+      usage: Authentication token (overrides saved config)
+    - name: verbose
+      shorthand: v
+      default_value: "false"
+      usage: Enable verbose logging to console
+see_also:
+    - hc artifact - Manage Harness Artifacts
+    - hc auth - Authentication commands for Harness CLI
+    - hc registry - Manage Harness Artifact Registries

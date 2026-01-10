@@ -1,0 +1,30 @@
+name: hc auth status
+synopsis: Check authentication status
+description: |
+    Display current authentication status and details by checking the authentication with Harness API
+usage: hc auth status [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for status
+inherited_options:
+    - name: account
+      usage: Account ID (overrides saved config)
+    - name: api-url
+      usage: Base URL for the API (overrides saved config)
+    - name: format
+      default_value: table
+      usage: 'Output format: table or json'
+    - name: org
+      usage: Organisation ID (overrides saved config)
+    - name: project
+      usage: Project ID (overrides saved config)
+    - name: token
+      usage: Authentication token (overrides saved config)
+    - name: verbose
+      shorthand: v
+      default_value: "false"
+      usage: Enable verbose logging to console
+see_also:
+    - hc auth - Authentication commands for Harness CLI

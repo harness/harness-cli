@@ -1,0 +1,36 @@
+name: hc registry metadata set
+synopsis: Set metadata on a registry
+description: Set metadata key-value pairs on a Harness Artifact Registry
+usage: hc registry metadata set [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for set
+    - name: metadata
+      usage: Metadata in key:value,key:value format (required)
+    - name: registry
+      usage: Registry identifier (required)
+inherited_options:
+    - name: account
+      usage: Account ID (overrides saved config)
+    - name: api-url
+      usage: Base URL for the API (overrides saved config)
+    - name: format
+      default_value: table
+      usage: 'Output format: table or json'
+    - name: org
+      usage: Organisation ID (overrides saved config)
+    - name: project
+      usage: Project ID (overrides saved config)
+    - name: token
+      usage: Authentication token (overrides saved config)
+    - name: verbose
+      shorthand: v
+      default_value: "false"
+      usage: Enable verbose logging to console
+example: |4-
+      hc registry metadata set --registry my-docker-reg --metadata "env:prod,region:us"
+      hc registry metadata set --registry npm-packages --metadata "owner:team-a"
+see_also:
+    - hc registry metadata - Manage registry metadata

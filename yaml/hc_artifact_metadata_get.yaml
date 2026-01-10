@@ -1,0 +1,42 @@
+name: hc artifact metadata get
+synopsis: Get metadata from a package or version
+description: |
+    Retrieve metadata key-value pairs from a package or specific version in Harness Artifact Registry
+usage: hc artifact metadata get [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for get
+    - name: package
+      usage: Package name (required)
+    - name: registry
+      usage: Registry identifier (required)
+    - name: version
+      usage: Version (optional, for version-level metadata)
+inherited_options:
+    - name: account
+      usage: Account ID (overrides saved config)
+    - name: api-url
+      usage: Base URL for the API (overrides saved config)
+    - name: format
+      default_value: table
+      usage: 'Output format: table or json'
+    - name: org
+      usage: Organisation ID (overrides saved config)
+    - name: project
+      usage: Project ID (overrides saved config)
+    - name: token
+      usage: Authentication token (overrides saved config)
+    - name: verbose
+      shorthand: v
+      default_value: "false"
+      usage: Enable verbose logging to console
+example: |4-
+      # Package-level metadata
+      hc artifact metadata get --registry r1 --package nginx
+
+      # Version-level metadata
+      hc artifact metadata get --registry r1 --package nginx --version 1.2.3
+see_also:
+    - hc artifact metadata - Manage artifact metadata

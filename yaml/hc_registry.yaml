@@ -1,0 +1,34 @@
+name: hc registry
+synopsis: Manage Harness Artifact Registries
+description: Commands to manage Harness Artifact Registry registries
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for registry
+inherited_options:
+    - name: account
+      usage: Account ID (overrides saved config)
+    - name: api-url
+      usage: Base URL for the API (overrides saved config)
+    - name: format
+      default_value: table
+      usage: 'Output format: table or json'
+    - name: org
+      usage: Organisation ID (overrides saved config)
+    - name: project
+      usage: Project ID (overrides saved config)
+    - name: token
+      usage: Authentication token (overrides saved config)
+    - name: verbose
+      shorthand: v
+      default_value: "false"
+      usage: Enable verbose logging to console
+see_also:
+    - hc - CLI tool for Harness
+    - hc registry create - Create a new registry
+    - hc registry delete - Delete registry
+    - hc registry get - Get registry details
+    - hc registry list - List all registries
+    - hc registry metadata - Manage registry metadata
+    - hc registry migrate - Start a migration based on configuration

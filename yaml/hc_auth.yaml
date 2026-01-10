@@ -1,0 +1,31 @@
+name: hc auth
+synopsis: Authentication commands for Harness CLI
+description: Manage authentication with Harness services
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for auth
+inherited_options:
+    - name: account
+      usage: Account ID (overrides saved config)
+    - name: api-url
+      usage: Base URL for the API (overrides saved config)
+    - name: format
+      default_value: table
+      usage: 'Output format: table or json'
+    - name: org
+      usage: Organisation ID (overrides saved config)
+    - name: project
+      usage: Project ID (overrides saved config)
+    - name: token
+      usage: Authentication token (overrides saved config)
+    - name: verbose
+      shorthand: v
+      default_value: "false"
+      usage: Enable verbose logging to console
+see_also:
+    - hc - CLI tool for Harness
+    - hc auth login - Login to Harness
+    - hc auth logout - Logout from Harness
+    - hc auth status - Check authentication status

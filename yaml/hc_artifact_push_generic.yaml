@@ -1,0 +1,64 @@
+name: hc artifact push generic
+synopsis: Push generic artifacts to registry
+description: "Push generic artifacts to Harness Artifact Registry.\n\nGeneric artifacts can be any file type - binaries, archives, configuration \nfiles, or any other file you want to store and version. The CLI uploads the \nfile with progress tracking and stores it with the specified name and version."
+usage: hc artifact push generic <registry_name> <package_file_path> [flags]
+options:
+    - name: description
+      shorthand: d
+      usage: Description of the artifact
+    - name: filename
+      usage: |
+        Name of the file being uploaded (defaults to actual filename)
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for generic
+    - name: name
+      shorthand: "n"
+      usage: Name for the artifact (required)
+    - name: path
+      usage: File path within the package (defaults to filename)
+    - name: pkg-url
+      usage: Base URL for the Packages API (required)
+    - name: version
+      usage: Version for the artifact (defaults to '1.0.0')
+inherited_options:
+    - name: account
+      usage: Account ID (overrides saved config)
+    - name: api-url
+      usage: Base URL for the API (overrides saved config)
+    - name: format
+      default_value: table
+      usage: 'Output format: table or json'
+    - name: org
+      usage: Organisation ID (overrides saved config)
+    - name: project
+      usage: Project ID (overrides saved config)
+    - name: token
+      usage: Authentication token (overrides saved config)
+    - name: verbose
+      shorthand: v
+      default_value: "false"
+      usage: Enable verbose logging to console
+example: |4-
+      # Basic upload
+      hc artifact push generic my-registry ./app.tar.gz \
+        --name my-app \
+        --version 1.0.0 \
+        --pkg-url https://pkg.harness.io
+
+      # Upload with custom filename
+      hc artifact push generic my-registry ./build/output.zip \
+        --name my-build \
+        --version 2.1.0 \
+        --filename release.zip \
+        --pkg-url https://pkg.harness.io
+
+      # Upload with description
+      hc artifact push generic my-registry ./app.tar.gz \
+        --name my-app \
+        --version 1.0.0 \
+        --description "Production release" \
+        --pkg-url https://pkg.harness.io
+see_also:
+    - hc artifact push - Push artifacts to Harness Artifact Registry
