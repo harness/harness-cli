@@ -84,6 +84,38 @@ paths:
           $ref: "#/components/responses/NotFound"
         500:
           $ref: "#/components/responses/InternalServerError"
+  /copy:
+    post:
+      summary: Create copy of package in another registry
+      description: |
+        Creates a copy of an existing artifact from a source registry
+        into a target registry.
+      operationId: CopyRegistryPackage
+
+      security:
+        - ApiKeyAuth: [ ]
+
+      parameters:
+        - $ref: "#/components/parameters/AccountIdentifier"
+        - $ref: "#/components/parameters/SrcRegistryIdentifier"
+        - $ref: "#/components/parameters/TargetRegistryIdentifier"
+        - $ref: "#/components/parameters/SrcArtifact"
+        - $ref: "#/components/parameters/SrcVersion"
+        - $ref: "#/components/parameters/ArtifactType"
+
+      responses:
+        200:
+          $ref: "#/components/responses/Success"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Unauthorized"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/InternalServerError"
 
 components:
   parameters:
@@ -113,6 +145,45 @@ components:
       in: query
       required: false
       description: Name of the package version
+      schema:
+        type: string
+    SrcRegistryIdentifier:
+      name: src_registry_identifier
+      in: query
+      required: true
+      description: Source registry from where to copy
+      schema:
+        type: string
+
+    TargetRegistryIdentifier:
+      name: target_registry_identifier
+      in: query
+      required: true
+      description: target registry where package will be copied
+      schema:
+        type: string
+
+    SrcArtifact:
+      name: src_artifact
+      in: query
+      required: true
+      description: artifact name to be copied
+      schema:
+        type: string
+
+    SrcVersion:
+      name: src_version
+      in: query
+      required: true
+      description: version to be copied
+      schema:
+        type: string
+
+    ArtifactType:
+      name: artifact_type
+      in: query
+      required: false
+      description: Name of the artifact type e.g model and datasets used for hugging face
       schema:
         type: string
 
