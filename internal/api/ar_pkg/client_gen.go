@@ -202,6 +202,15 @@ type ClientInterface interface {
 	// UploadGoPackageWithBody request with any body
 	UploadGoPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DownloadMavenMetadataXml request
+	DownloadMavenMetadataXml(ctx context.Context, accountId string, registry string, groupId string, artifactId string, file string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadMavenMetadataXmlWithBody request with any body
+	UploadMavenMetadataXmlWithBody(ctx context.Context, accountId string, registry string, groupId string, artifactId string, file string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadMavenPackageWithBody request with any body
+	UploadMavenPackageWithBody(ctx context.Context, accountId string, registry string, groupId string, artifactId string, version string, file string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// UploadNPMPackageWithBody request with any body
 	UploadNPMPackageWithBody(ctx context.Context, accountId string, registry string, pPackage string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -328,6 +337,42 @@ func (c *Client) UploadGenericPackageWithBody(ctx context.Context, accountId str
 
 func (c *Client) UploadGoPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadGoPackageRequestWithBody(c.Server, accountId, registry, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DownloadMavenMetadataXml(ctx context.Context, accountId string, registry string, groupId string, artifactId string, file string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDownloadMavenMetadataXmlRequest(c.Server, accountId, registry, groupId, artifactId, file)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadMavenMetadataXmlWithBody(ctx context.Context, accountId string, registry string, groupId string, artifactId string, file string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadMavenMetadataXmlRequestWithBody(c.Server, accountId, registry, groupId, artifactId, file, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadMavenPackageWithBody(ctx context.Context, accountId string, registry string, groupId string, artifactId string, version string, file string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadMavenPackageRequestWithBody(c.Server, accountId, registry, groupId, artifactId, version, file, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -950,6 +995,203 @@ func NewUploadGoPackageRequestWithBody(server string, accountId string, registry
 	return req, nil
 }
 
+// NewDownloadMavenMetadataXmlRequest generates requests for DownloadMavenMetadataXml
+func NewDownloadMavenMetadataXmlRequest(server string, accountId string, registry string, groupId string, artifactId string, file string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "registry", runtime.ParamLocationPath, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "groupId", runtime.ParamLocationPath, groupId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "artifactId", runtime.ParamLocationPath, artifactId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam4 string
+
+	pathParam4, err = runtime.StyleParamWithLocation("simple", false, "file", runtime.ParamLocationPath, file)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pkg/%s/%s/maven/%s/%s/%s", pathParam0, pathParam1, pathParam2, pathParam3, pathParam4)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUploadMavenMetadataXmlRequestWithBody generates requests for UploadMavenMetadataXml with any type of body
+func NewUploadMavenMetadataXmlRequestWithBody(server string, accountId string, registry string, groupId string, artifactId string, file string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "registry", runtime.ParamLocationPath, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "groupId", runtime.ParamLocationPath, groupId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "artifactId", runtime.ParamLocationPath, artifactId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam4 string
+
+	pathParam4, err = runtime.StyleParamWithLocation("simple", false, "file", runtime.ParamLocationPath, file)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pkg/%s/%s/maven/%s/%s/%s", pathParam0, pathParam1, pathParam2, pathParam3, pathParam4)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUploadMavenPackageRequestWithBody generates requests for UploadMavenPackage with any type of body
+func NewUploadMavenPackageRequestWithBody(server string, accountId string, registry string, groupId string, artifactId string, version string, file string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "registry", runtime.ParamLocationPath, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "groupId", runtime.ParamLocationPath, groupId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "artifactId", runtime.ParamLocationPath, artifactId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam4 string
+
+	pathParam4, err = runtime.StyleParamWithLocation("simple", false, "version", runtime.ParamLocationPath, version)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam5 string
+
+	pathParam5, err = runtime.StyleParamWithLocation("simple", false, "file", runtime.ParamLocationPath, file)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pkg/%s/%s/maven/%s/%s/%s/%s", pathParam0, pathParam1, pathParam2, pathParam3, pathParam4, pathParam5)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewUploadNPMPackageRequestWithBody generates requests for UploadNPMPackage with any type of body
 func NewUploadNPMPackageRequestWithBody(server string, accountId string, registry string, pPackage string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -1252,6 +1494,15 @@ type ClientWithResponsesInterface interface {
 	// UploadGoPackageWithBodyWithResponse request with any body
 	UploadGoPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadGoPackageResp, error)
 
+	// DownloadMavenMetadataXmlWithResponse request
+	DownloadMavenMetadataXmlWithResponse(ctx context.Context, accountId string, registry string, groupId string, artifactId string, file string, reqEditors ...RequestEditorFn) (*DownloadMavenMetadataXmlResp, error)
+
+	// UploadMavenMetadataXmlWithBodyWithResponse request with any body
+	UploadMavenMetadataXmlWithBodyWithResponse(ctx context.Context, accountId string, registry string, groupId string, artifactId string, file string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadMavenMetadataXmlResp, error)
+
+	// UploadMavenPackageWithBodyWithResponse request with any body
+	UploadMavenPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, groupId string, artifactId string, version string, file string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadMavenPackageResp, error)
+
 	// UploadNPMPackageWithBodyWithResponse request with any body
 	UploadNPMPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, pPackage string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadNPMPackageResp, error)
 
@@ -1478,6 +1729,69 @@ func (r UploadGoPackageResp) StatusCode() int {
 	return 0
 }
 
+type DownloadMavenMetadataXmlResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r DownloadMavenMetadataXmlResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DownloadMavenMetadataXmlResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UploadMavenMetadataXmlResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadMavenMetadataXmlResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadMavenMetadataXmlResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UploadMavenPackageResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadMavenPackageResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadMavenPackageResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type UploadNPMPackageResp struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1671,6 +1985,33 @@ func (c *ClientWithResponses) UploadGoPackageWithBodyWithResponse(ctx context.Co
 		return nil, err
 	}
 	return ParseUploadGoPackageResp(rsp)
+}
+
+// DownloadMavenMetadataXmlWithResponse request returning *DownloadMavenMetadataXmlResp
+func (c *ClientWithResponses) DownloadMavenMetadataXmlWithResponse(ctx context.Context, accountId string, registry string, groupId string, artifactId string, file string, reqEditors ...RequestEditorFn) (*DownloadMavenMetadataXmlResp, error) {
+	rsp, err := c.DownloadMavenMetadataXml(ctx, accountId, registry, groupId, artifactId, file, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDownloadMavenMetadataXmlResp(rsp)
+}
+
+// UploadMavenMetadataXmlWithBodyWithResponse request with arbitrary body returning *UploadMavenMetadataXmlResp
+func (c *ClientWithResponses) UploadMavenMetadataXmlWithBodyWithResponse(ctx context.Context, accountId string, registry string, groupId string, artifactId string, file string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadMavenMetadataXmlResp, error) {
+	rsp, err := c.UploadMavenMetadataXmlWithBody(ctx, accountId, registry, groupId, artifactId, file, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadMavenMetadataXmlResp(rsp)
+}
+
+// UploadMavenPackageWithBodyWithResponse request with arbitrary body returning *UploadMavenPackageResp
+func (c *ClientWithResponses) UploadMavenPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, groupId string, artifactId string, version string, file string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadMavenPackageResp, error) {
+	rsp, err := c.UploadMavenPackageWithBody(ctx, accountId, registry, groupId, artifactId, version, file, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadMavenPackageResp(rsp)
 }
 
 // UploadNPMPackageWithBodyWithResponse request with arbitrary body returning *UploadNPMPackageResp
@@ -1871,6 +2212,54 @@ func ParseUploadGoPackageResp(rsp *http.Response) (*UploadGoPackageResp, error) 
 	}
 
 	response := &UploadGoPackageResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseDownloadMavenMetadataXmlResp parses an HTTP response from a DownloadMavenMetadataXmlWithResponse call
+func ParseDownloadMavenMetadataXmlResp(rsp *http.Response) (*DownloadMavenMetadataXmlResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DownloadMavenMetadataXmlResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseUploadMavenMetadataXmlResp parses an HTTP response from a UploadMavenMetadataXmlWithResponse call
+func ParseUploadMavenMetadataXmlResp(rsp *http.Response) (*UploadMavenMetadataXmlResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadMavenMetadataXmlResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseUploadMavenPackageResp parses an HTTP response from a UploadMavenPackageWithResponse call
+func ParseUploadMavenPackageResp(rsp *http.Response) (*UploadMavenPackageResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadMavenPackageResp{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

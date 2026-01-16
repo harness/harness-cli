@@ -645,6 +645,151 @@ paths:
           description: Missing or invalid `x-api-key`
         '5XX':
           description: Server-side error
+  /pkg/{accountId}/{registry}/maven/{groupId}/{artifactId}/{version}/{file}:
+    put:
+      summary: Upload a maven package
+      operationId: uploadMavenPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifactId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+              description: Package .war .jar .xml file to upload
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/maven/{groupId}/{artifactId}/{file}:
+    get:
+      summary: Download maven-metadata.xml
+      operationId: downloadMavenMetadataXml
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifactId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: [ ]
+      responses:
+        '200':
+          description: file downloaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '404':
+          description: File not found
+        '5XX':
+          description: Server-side error
+    put:
+      summary: Upload maven-metadata.xml
+      operationId: uploadMavenMetadataXml
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifactId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+              description: maven-metadata.xml file to upload
+      responses:
+        '200':
+          description: file uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
 components:
   securitySchemes:
     ApiKeyAuth:
