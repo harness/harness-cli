@@ -291,8 +291,10 @@ func (r *File) Migrate(ctx context.Context) error {
 			logger.Error().Err(err).Msg("Failed to fetch metadata")
 			return fmt.Errorf("failed to fetch metadata: %w", err)
 		}
-
 		pkgJSONBytes, err := utils.ExtractPackageJSONFromTarball(tarFileReader)
+		if closeErr := tarFileReader.Close(); closeErr != nil {
+			logger.Warn().Err(closeErr).Msg("Failed to close tar file reader")
+		}
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to extract package.json from tarball")
 			return fmt.Errorf("failed to extract package.json from tarball: %w", err)
@@ -320,6 +322,14 @@ func (r *File) Migrate(ctx context.Context) error {
 
 		err = r.destAdapter.UploadFile(r.destRegistry, uploadReader, r.file, nil, r.pkg.Name, r.version.Name,
 			r.artifactType, nil)
+		_ = uploadReader.Close()
+
+		// Release large in-memory structures as soon as possible.
+		if closeErr := tarFileReader.Close(); closeErr != nil {
+			logger.Warn().Err(closeErr).Msg("Failed to close tar file reader")
+		}
+		pkgJSONBytes = nil
+		payload = nil
 
 		if err != nil {
 			return err
