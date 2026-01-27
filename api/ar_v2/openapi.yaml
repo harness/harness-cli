@@ -1,0 +1,366 @@
+openapi: "3.0.0"
+info:
+  title: Harness Artifact Registry API V2
+  version: 2.0.0
+  description: Harness Artifact Registry V2 APIs for metadata management
+  contact:
+    name: Harness Artifact Registry - developers
+    url: https://www.harness.io
+
+servers:
+  - url: /har/api/v2
+    description: Harness Registry V2 APIs
+
+paths:
+  /metadata:
+    get:
+      summary: Get Metadata
+      description: |
+        Retrieves all metadata key-value pairs associated with a specific entity.
+        This endpoint returns metadata for packages, versions, or registry-level entities based on the provided path.
+      operationId: GetMetadata
+      parameters:
+        - $ref: "#/components/parameters/AccountIdentifier"
+        - $ref: "#/components/parameters/RegistryIdentifier"
+        - $ref: "#/components/parameters/PackageParam"
+        - $ref: "#/components/parameters/VersionParam"
+      responses:
+        200:
+          $ref: "#/components/responses/MetadataResponse"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Unauthorized"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      summary: Update Metadata
+      description: |
+        Creates new metadata or overwrites existing metadata key-value pairs for a specific entity.
+        This endpoint allows you to add new metadata or overwrites existing metadata for packages, versions,
+        or registry-level entities.
+      operationId: UpdateMetadata
+      parameters:
+        - $ref: "#/components/parameters/AccountIdentifier"
+      requestBody:
+        $ref: "#/components/requestBodies/MetadataRequest"
+      responses:
+        200:
+          $ref: "#/components/responses/MetadataResponse"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Unauthorized"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      summary: Delete Metadata
+      description: |
+        Delete metadata key-value pairs for a specific entity.
+        This endpoint allows you to delete existing metadata for packages, versions, or registry-level entities.
+      operationId: DeleteMetadata
+      parameters:
+        - $ref: "#/components/parameters/AccountIdentifier"
+      requestBody:
+        $ref: "#/components/requestBodies/MetadataRequest"
+      responses:
+        200:
+          $ref: "#/components/responses/Success"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Unauthorized"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/InternalServerError"
+  /copy:
+    post:
+      summary: Create copy of package in another registry
+      description: |
+        Creates a copy of an existing artifact from a source registry
+        into a target registry.
+      operationId: CopyRegistryPackage
+
+      security:
+        - ApiKeyAuth: [ ]
+
+      parameters:
+        - $ref: "#/components/parameters/AccountIdentifier"
+        - $ref: "#/components/parameters/SrcRegistryIdentifier"
+        - $ref: "#/components/parameters/TargetRegistryIdentifier"
+        - $ref: "#/components/parameters/SrcArtifact"
+        - $ref: "#/components/parameters/SrcVersion"
+        - $ref: "#/components/parameters/ArtifactType"
+
+      responses:
+        200:
+          $ref: "#/components/responses/Success"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        401:
+          $ref: "#/components/responses/Unauthenticated"
+        403:
+          $ref: "#/components/responses/Unauthorized"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/InternalServerError"
+
+components:
+  parameters:
+    AccountIdentifier:
+      name: account_identifier
+      in: query
+      required: true
+      description: Unique identifier for the Harness account.
+      schema:
+        type: string
+    RegistryIdentifier:
+      name: registry_identifier
+      in: query
+      required: true
+      description: Unique identifier for the artifact registry.
+      schema:
+        type: string
+    PackageParam:
+      name: package
+      in: query
+      required: false
+      description: Name of the package
+      schema:
+        type: string
+    VersionParam:
+      name: version
+      in: query
+      required: false
+      description: Name of the package version
+      schema:
+        type: string
+    SrcRegistryIdentifier:
+      name: src_registry_identifier
+      in: query
+      required: true
+      description: Source registry from where to copy
+      schema:
+        type: string
+
+    TargetRegistryIdentifier:
+      name: target_registry_identifier
+      in: query
+      required: true
+      description: target registry where package will be copied
+      schema:
+        type: string
+
+    SrcArtifact:
+      name: src_artifact
+      in: query
+      required: true
+      description: artifact name to be copied
+      schema:
+        type: string
+
+    SrcVersion:
+      name: src_version
+      in: query
+      required: true
+      description: version to be copied
+      schema:
+        type: string
+
+    ArtifactType:
+      name: artifact_type
+      in: query
+      required: false
+      description: Name of the artifact type e.g model and datasets used for hugging face
+      schema:
+        type: string
+
+  requestBodies:
+    MetadataRequest:
+      description: Request body containing metadata key-value pairs to add or update
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/MetadataInput"
+
+  responses:
+    MetadataResponse:
+      description: Response containing all metadata entries for the requested entity
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                $ref: "#/components/schemas/Status"
+              data:
+                $ref: "#/components/schemas/MetadataOutput"
+            required:
+              - status
+              - data
+    Success:
+      description: Generic success response
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                $ref: "#/components/schemas/Status"
+            required:
+              - status
+    BadRequest:
+      description: The request was invalid or malformed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthenticated:
+      description: Authentication failed or missing credentials
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Access denied due to insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: The requested resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InternalServerError:
+      description: An unexpected server error occurred
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    MetadataInput:
+      type: object
+      description: Request payload containing metadata items to add or update for a specific entity.
+      properties:
+        registryIdentifier:
+          type: string
+          description: The unique identifier of the registry where the metadata will be applied.
+          example: "my-registry"
+        package:
+          type: string
+          description: Optional package name.
+          example: "my-package"
+        version:
+          type: string
+          description: Optional version identifier.
+          example: "1.0.0"
+        metadata:
+          type: array
+          description: Array of metadata key-value pairs
+          items:
+            $ref: "#/components/schemas/MetadataItemInput"
+          minItems: 1
+          maxItems: 50
+      required:
+        - metadata
+        - registryIdentifier
+    MetadataItemInput:
+      type: object
+      description: Metadata key-value pair for create/update operations
+      properties:
+        key:
+          type: string
+          description: The metadata key name (case-sensitive)
+          example: "environment"
+          minLength: 1
+          maxLength: 128
+        value:
+          type: string
+          description: The metadata value
+          example: "production"
+          minLength: 1
+          maxLength: 256
+      required:
+        - key
+        - value
+    MetadataOutput:
+      type: object
+      description: Response containing all metadata entries for an entity
+      properties:
+        metadata:
+          type: array
+          description: Array of metadata entries
+          items:
+            $ref: "#/components/schemas/MetadataItemOutput"
+      required:
+        - metadata
+    MetadataItemOutput:
+      type: object
+      description: Metadata entry
+      properties:
+        id:
+          type: string
+          description: Unique identifier for this metadata entry
+          example: "1xyv567fyb9"
+        key:
+          type: string
+          description: The metadata key name
+          example: "environment"
+        value:
+          type: string
+          description: The metadata value
+          example: "production"
+        type:
+          $ref: "#/components/schemas/MetadataType"
+      required:
+        - id
+        - key
+        - value
+        - type
+    MetadataType:
+      type: string
+      description: Indicates if metadata was manually added (MANUAL) or system-generated (AUTO)
+      enum:
+        - MANUAL
+        - AUTO
+      example: "MANUAL"
+    Status:
+      type: string
+      description: Request processing status indicator
+      enum:
+        - SUCCESS
+        - FAILURE
+        - ERROR
+    Error:
+      type: object
+      description: Standard error response with code, message and optional details
+      properties:
+        code:
+          type: string
+          description: The HTTP error code
+          example: "404"
+        message:
+          type: string
+          description: Human-readable error message explaining what went wrong
+          example: "Registry not found"
+        details:
+          type: object
+          description: Additional context and details about the error.
+      required:
+        - code
+        - message

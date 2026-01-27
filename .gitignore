@@ -1,2 +1,16 @@
 .idea/
-./harness-cli
+harness-upgrade
+.temp.data
+.secrets.json
+harness
+harnesscd-example-apps
+.vscode/
+/hc
+!/cmd/hc/
+.DS_Store
+*/.DS_Store
+registry_migration_*
+logs_*
+
+# goreleaser output
+dist/

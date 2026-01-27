@@ -1,0 +1,142 @@
+version: 2
+
+project_name: hc
+
+git:
+  tag_sort: -version:refname
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: hc
+    main: ./cmd/hc
+    binary: hc
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+      - "386"
+    goarm:
+      - "7"
+    ignore:
+      - goos: darwin
+        goarch: "386"
+      - goos: linux
+        goarch: "386"
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: default
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_
+      {{- if eq .Os "darwin" }}mac-os
+      {{- else if eq .Os "linux" }}linux
+      {{- else if eq .Os "windows" }}windows
+      {{- end }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    files:
+      - README.md
+
+nfpms:
+  - id: hc
+    package_name: hc
+    vendor: Harness
+    homepage: https://github.com/harness/harness-cli
+    maintainer: Arvind Choudhary <arvind.choudhary@harness.io>
+    description: CLI tool for Harness
+    license: Apache 2.0
+    formats:
+      - deb
+      - rpm
+    file_name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_
+      {{- if eq .Os "linux" }}linux
+      {{- end }}_
+      {{- if eq .Arch "amd64" }}amd64
+      {{- else }}{{ .Arch }}{{ end }}
+    bindir: /usr/local/bin
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+release:
+  github:
+    owner: harness
+    name: harness-cli
+  draft: false
+  prerelease: auto
+  mode: replace
+  name_template: "{{.Tag}} (Beta)"
+  header: |
+    ## ⚠️ Beta Release
+    
+    This is a beta release for v1 version.
+    
+    ## What's Changed
+  footer: |
+    ## Installation
+
+    ### Linux
+    
+    **Using Package Managers:**
+    ```bash
+    # Debian/Ubuntu (.deb)
+    sudo dpkg -i hc_{{.Version}}_linux_amd64.deb
+    
+    # RedHat/CentOS (.rpm)
+    sudo rpm -i hc_{{.Version}}_linux_amd64.rpm
+    ```
+    
+    **Using tar.gz:**
+    ```bash
+    tar -xzf hc_{{.Version}}_linux_x86_64.tar.gz
+    sudo mv hc /usr/local/bin/
+    ```
+
+    ### macOS
+    
+    ```bash
+    # Intel Macs
+    tar -xzf hc_{{.Version}}_mac-os_x86_64.tar.gz
+    sudo mv hc /usr/local/bin/
+    
+    # Apple Silicon
+    tar -xzf hc_{{.Version}}_mac-os_arm64.tar.gz
+    sudo mv hc /usr/local/bin/
+    ```
+
+    ### Windows
+    
+    1. Download the appropriate .zip file
+    2. Extract the archive
+    3. Add the extracted directory to your PATH
+
+    ### Verification
+    
+    Verify the checksums using the `checksums.txt` file:
+    ```bash
+    sha256sum -c checksums.txt --ignore-missing
+    ```
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - Merge pull request
+      - Merge branch
+

@@ -1,0 +1,274 @@
+#!/bin/sh
+
+# Harness CLI (hc) Installation Script
+# Usage: curl https://raw.githubusercontent.com/harness/harness-cli/v2/install | sh
+
+set -e
+
+# Configuration
+REPO="harness/harness-cli"
+BINARY_NAME="hc"
+DEFAULT_VERSION="v1.0.0-beta.3"
+INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Helper functions
+info() {
+    printf "${GREEN}[INFO]${NC} %s\n" "$1"
+}
+
+warn() {
+    printf "${YELLOW}[WARN]${NC} %s\n" "$1"
+}
+
+error() {
+    printf "${RED}[ERROR]${NC} %s\n" "$1"
+    exit 1
+}
+
+# Detect OS
+detect_os() {
+    case "$(uname -s)" in
+        Darwin*)
+            echo "mac-os"
+            ;;
+        Linux*)
+            echo "linux"
+            ;;
+        MINGW* | MSYS* | CYGWIN*)
+            echo "windows"
+            ;;
+        *)
+            error "Unsupported operating system: $(uname -s)"
+            ;;
+    esac
+}
+
+# Detect architecture
+detect_arch() {
+    case "$(uname -m)" in
+        x86_64 | amd64)
+            echo "x86_64"
+            ;;
+        aarch64 | arm64)
+            echo "arm64"
+            ;;
+        armv7l)
+            echo "armv7"
+            ;;
+        i386 | i686)
+            echo "i386"
+            ;;
+        *)
+            error "Unsupported architecture: $(uname -m)"
+            ;;
+    esac
+}
+
+# Get the latest version from GitHub
+get_latest_version() {
+    if command -v curl >/dev/null 2>&1; then
+        curl -sL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
+    elif command -v wget >/dev/null 2>&1; then
+        wget -qO- "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
+    else
+        echo "$DEFAULT_VERSION"
+    fi
+}
+
+# Download file
+download_file() {
+    url="$1"
+    output="$2"
+    
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$url" -o "$output"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q "$url" -O "$output"
+    else
+        error "Neither curl nor wget found. Please install one of them."
+    fi
+}
+
+# Verify checksum of downloaded file
+verify_checksum() {
+    file="$1"
+    checksums_file="$2"
+    filename=$(basename "$file")
+
+    # Check if sha256sum or shasum is available
+    if command -v sha256sum >/dev/null 2>&1; then
+        expected_checksum=$(grep "$filename" "$checksums_file" | awk '{print $1}')
+        if [ -z "$expected_checksum" ]; then
+            warn "Checksum for $filename not found in checksums.txt"
+            return 1
+        fi
+        actual_checksum=$(sha256sum "$file" | awk '{print $1}')
+    elif command -v shasum >/dev/null 2>&1; then
+        expected_checksum=$(grep "$filename" "$checksums_file" | awk '{print $1}')
+        if [ -z "$expected_checksum" ]; then
+            warn "Checksum for $filename not found in checksums.txt"
+            return 1
+        fi
+        actual_checksum=$(shasum -a 256 "$file" | awk '{print $1}')
+    else
+        warn "Neither sha256sum nor shasum found, skipping checksum verification"
+        return 0
+    fi
+
+    if [ "$expected_checksum" = "$actual_checksum" ]; then
+        return 0
+    else
+        error "Checksum mismatch!"
+        error "Expected: $expected_checksum"
+        error "Got: $actual_checksum"
+        return 1
+    fi
+}
+
+# Validate version tag
+validate_version() {
+    version="$1"
+
+    # Check if version starts with "v1"
+    case "$version" in
+        v1*)
+            return 0
+            ;;
+        *)
+            error "Invalid version: $version. This installer only supports v1.x releases."
+            ;;
+    esac
+}
+
+# Check if running with sufficient privileges
+check_privileges() {
+    if [ ! -w "$INSTALL_DIR" ]; then
+        if [ "$(id -u)" -ne 0 ]; then
+            warn "Installation requires sudo privileges. Please re-run with sudo or run:"
+            warn "  curl -fsSL https://raw.githubusercontent.com/harness/harness-cli/v2/install | sudo sh"
+            error "Insufficient privileges to write to $INSTALL_DIR"
+        fi
+    fi
+}
+
+# Main installation function
+main() {
+    info "Starting Harness CLI installation..."
+    
+    # Detect system
+    OS=$(detect_os)
+    ARCH=$(detect_arch)
+    info "Detected OS: $OS"
+    info "Detected Architecture: $ARCH"
+    
+    # Get version
+    VERSION="${HC_VERSION:-$(get_latest_version)}"
+    if [ -z "$VERSION" ]; then
+        VERSION="$DEFAULT_VERSION"
+    fi
+
+    # Validate version starts with v1
+    validate_version "$VERSION"
+
+    info "Installing version: $VERSION"
+    
+    # Construct download URL and filename
+    if [ "$OS" = "windows" ]; then
+        FILENAME="${BINARY_NAME}_${VERSION#v}_${OS}_${ARCH}.zip"
+        ARCHIVE_TYPE="zip"
+    else
+        FILENAME="${BINARY_NAME}_${VERSION#v}_${OS}_${ARCH}.tar.gz"
+        ARCHIVE_TYPE="tar.gz"
+    fi
+    
+    DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}/${FILENAME}"
+    info "Download URL: $DOWNLOAD_URL"
+    
+    # Create temporary directory
+    TMP_DIR=$(mktemp -d)
+    trap "rm -rf $TMP_DIR" EXIT
+    
+    # Download archive
+    info "Downloading $FILENAME..."
+    if ! download_file "$DOWNLOAD_URL" "$TMP_DIR/$FILENAME"; then
+        error "Failed to download from $DOWNLOAD_URL"
+    fi
+    
+    # Download checksums file
+    CHECKSUMS_URL="https://github.com/${REPO}/releases/download/${VERSION}/checksums.txt"
+    info "Downloading checksums.txt for verification..."
+    if ! download_file "$CHECKSUMS_URL" "$TMP_DIR/checksums.txt"; then
+        warn "Failed to download checksums.txt, skipping verification"
+    else
+        # Verify checksum
+        info "Verifying checksum..."
+        if ! verify_checksum "$TMP_DIR/$FILENAME" "$TMP_DIR/checksums.txt"; then
+            error "Checksum verification failed! The downloaded file may be corrupted or tampered with."
+        fi
+        info "✓ Checksum verified successfully"
+    fi
+
+    # Extract archive
+    info "Extracting archive..."
+    cd "$TMP_DIR"
+    
+    if [ "$ARCHIVE_TYPE" = "tar.gz" ]; then
+        tar -xzf "$FILENAME"
+    elif [ "$ARCHIVE_TYPE" = "zip" ]; then
+        if command -v unzip >/dev/null 2>&1; then
+            unzip -q "$FILENAME"
+        else
+            error "unzip is required but not installed"
+        fi
+    fi
+    
+    # Verify binary exists
+    if [ ! -f "$BINARY_NAME" ]; then
+        error "Binary $BINARY_NAME not found in archive"
+    fi
+    
+    # Check installation privileges
+    check_privileges
+    
+    # Install binary
+    info "Installing $BINARY_NAME to $INSTALL_DIR..."
+    
+    # Make binary executable
+    chmod +x "$BINARY_NAME"
+    
+    # Move to installation directory
+    if [ -w "$INSTALL_DIR" ]; then
+        mv "$BINARY_NAME" "$INSTALL_DIR/"
+    else
+        # Need sudo
+        if command -v sudo >/dev/null 2>&1; then
+            sudo mv "$BINARY_NAME" "$INSTALL_DIR/"
+        else
+            error "sudo is required to install to $INSTALL_DIR"
+        fi
+    fi
+    
+    # Verify installation
+    if command -v "$BINARY_NAME" >/dev/null 2>&1; then
+        INSTALLED_VERSION=$("$BINARY_NAME" version 2>&1 || echo "unknown")
+        info "✓ Installation successful!"
+        info "Installed version: $INSTALLED_VERSION"
+        info "Binary location: $INSTALL_DIR/$BINARY_NAME"
+        echo ""
+        info "Run '$BINARY_NAME --help' to get started"
+    else
+        warn "Installation completed but $BINARY_NAME not found in PATH"
+        warn "You may need to add $INSTALL_DIR to your PATH:"
+        warn "  export PATH=\"\$PATH:$INSTALL_DIR\""
+    fi
+}
+
+# Run main function
+main
+

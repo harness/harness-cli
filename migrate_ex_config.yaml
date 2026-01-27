@@ -1,0 +1,50 @@
+version: 1.0.0
+concurrency: 5
+overwrite: false
+source:
+  endpoint: ${SRC_ENDPOINT}
+  type: ${SRC_TYPE}
+  credentials:
+    username: ${SRC_USER}
+    password: ${SRC_PASS}
+  insecure: true
+destination:
+  endpoint: ${DST_ENDPOINT}
+  type: HAR
+  credentials:
+    username: ${DST_USER}
+    password: ${DST_PASS}
+mappings:
+  - artifactType: HELM_LEGACY
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: MAVEN
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: PYTHON
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: HELM
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: MAVEN
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: GENERIC
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: NUGET
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: NPM
+    sourceRegistry: src
+    destinationRegistry: npm
+  - artifactType: GO
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: CONDA
+    sourceRegistry: src
+    destinationRegistry: dst
+  - artifactType: COMPOSER
+    sourceRegistry: src
+    destinationRegistry: dst

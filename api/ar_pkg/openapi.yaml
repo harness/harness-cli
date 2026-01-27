@@ -1,0 +1,798 @@
+openapi: 3.0.3
+info:
+  title: Harness Artifact Registry Upload API
+  version: 1.0.0
+  description: |
+    Upload a package (file plus metadata) to the Harness artifact registry.
+
+servers:
+  - description: Registry
+    url: /
+paths:
+  /pkg/{accountId}/{registry}/generic/{package}/{version}:
+    get:
+      summary: Download a generic package file
+      operationId: downloadGenericPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: package
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: filename
+          in: query
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+    put:
+      summary: Upload a generic package file
+      operationId: uploadGenericPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: package
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - filename
+              properties:
+                filename:
+                  type: string
+                  description: Original filename (mirrors form field `filename`)
+                file:
+                  type: string
+                  format: binary
+                  description: Package file to upload
+                description:
+                  type: string
+                  description: Human-readable description of the package/version
+      responses:
+        '201':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/files/{package}/{version}/{filepath}:
+    put:
+      summary: Upload (or replace) a file at a specific nested path within a package version
+      operationId: uploadGenericFileToPath
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: registry
+          in: path
+          required: true
+          schema: { type: string }
+        - name: package
+          in: path
+          required: true
+          schema: { type: string }
+        - name: version
+          in: path
+          required: true
+          schema: { type: string }
+        - name: filepath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: >
+            Nested path of the file within the package version (e.g. "dist/app.tar.gz").
+            If any path segment contains reserved characters, URL-encode them.
+      security:
+        - ApiKeyAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '201':
+          description: File created successfully
+        '200':
+          description: File replaced successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '404':
+          description: Package/version not found
+        '5XX':
+          description: Server-side error
+
+    get:
+      summary: Download a file from a specific nested path within a package version
+      operationId: downloadGenericFileFromPath
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: registry
+          in: path
+          required: true
+          schema: { type: string }
+        - name: package
+          in: path
+          required: true
+          schema: { type: string }
+        - name: version
+          in: path
+          required: true
+          schema: { type: string }
+        - name: filepath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Nested path of the file within the package version.
+      security:
+        - ApiKeyAuth: [ ]
+      responses:
+        '200':
+          description: File downloaded successfully
+          headers:
+            Content-Disposition:
+              description: Suggested filename for download
+              schema: { type: string }
+            ETag:
+              description: Entity tag for the file
+              schema: { type: string }
+            Last-Modified:
+              description: Last modified timestamp
+              schema: { type: string, format: date-time }
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Missing or invalid `x-api-key`
+        '404':
+          description: File not found
+        '5XX':
+          description: Server-side error
+
+    head:
+      summary: Get file metadata (headers only) for a specific nested path
+      operationId: headGenericFileAtPath
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: registry
+          in: path
+          required: true
+          schema: { type: string }
+        - name: package
+          in: path
+          required: true
+          schema: { type: string }
+        - name: version
+          in: path
+          required: true
+          schema: { type: string }
+        - name: filepath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Nested path of the file within the package version.
+      security:
+        - ApiKeyAuth: [ ]
+      responses:
+        '200':
+          description: Metadata returned in headers
+          headers:
+            Content-Length:
+              description: Size of the file in bytes
+              schema: { type: integer, format: int64 }
+            Content-Type:
+              description: MIME type of the file
+              schema: { type: string }
+            ETag:
+              description: Entity tag for the file
+              schema: { type: string }
+            Last-Modified:
+              description: Last modified timestamp
+              schema: { type: string, format: date-time }
+        '401':
+          description: Missing or invalid `x-api-key`
+        '404':
+          description: File not found
+        '5XX':
+          description: Server-side error
+
+    delete:
+      summary: Delete a file from a specific nested path within a package version
+      operationId: deleteGenericFileFromPath
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: registry
+          in: path
+          required: true
+          schema: { type: string }
+        - name: package
+          in: path
+          required: true
+          schema: { type: string }
+        - name: version
+          in: path
+          required: true
+          schema: { type: string }
+        - name: filepath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Nested path of the file within the package version.
+      security:
+        - ApiKeyAuth: [ ]
+      responses:
+        '204':
+          description: File deleted successfully
+        '401':
+          description: Missing or invalid `x-api-key`
+        '404':
+          description: File not found
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/go/upload:
+    put:
+      summary: Upload a go package
+      operationId: uploadGoPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - zip
+                - mod
+                - info
+              properties:
+                info:
+                  type: string
+                  format: binary
+                  description: Package .info file to upload
+                mod:
+                  type: string
+                  format: binary
+                  description: Package .mod file to upload
+                zip:
+                  type: string
+                  format: binary
+                  description: Package .zip file to upload
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/conda/upload:
+    put:
+      summary: Upload a conda package
+      operationId: uploadCondaPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/composer/upload:
+    post:
+      summary: Upload a composer package
+      operationId: uploadComposerPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/rpm:
+    put:
+      summary: Upload a rpm package
+      operationId: uploadRpmPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Package .rpm file to upload
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/cargo/api/v1/crates/new:
+    put:
+      summary: Upload a cargo package
+      operationId: uploadCargoPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Package .cargo file to upload
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/npm/{package}:
+    put:
+      summary: Upload a conda package
+      operationId: uploadNPMPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: package
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/pub/api/packages/versions/new/upload/{uploadId}:
+    post:
+      summary: Upload a Dart (pub) package
+      operationId: uploadDartPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: uploadId
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Package binary file to upload
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '201':
+          description: Package created successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/python:
+    post:
+      summary: Upload a python package
+      operationId: uploadPythonPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Package .whl or .tar.gz file to upload
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/nuget:
+    put:
+      summary: Upload a nuget package
+      operationId: uploadNugetPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Package .nupkg file to upload
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/maven/{groupId}/{artifactId}/{version}/{file}:
+    put:
+      summary: Upload a maven package
+      operationId: uploadMavenPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifactId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+              description: Package .war .jar .xml file to upload
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/maven/{groupId}/{artifactId}/{file}:
+    get:
+      summary: Download maven-metadata.xml
+      operationId: downloadMavenMetadataXml
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifactId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: [ ]
+      responses:
+        '200':
+          description: file downloaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '404':
+          description: File not found
+        '5XX':
+          description: Server-side error
+    put:
+      summary: Upload maven-metadata.xml
+      operationId: uploadMavenMetadataXml
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifactId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+              description: maven-metadata.xml file to upload
+      responses:
+        '200':
+          description: file uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
