@@ -54,6 +54,10 @@ type Adapter interface {
 		fileName *types.File,
 		artifactType types.ArtifactType,
 	) (bool, error)
+	GetAllFilesForVersion(
+		ctx context.Context,
+		registryRef, pkg, version string,
+	) ([]string, error)
 	CreateVersion(
 		registry string,
 		artifactName string,

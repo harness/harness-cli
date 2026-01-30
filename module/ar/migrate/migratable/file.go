@@ -23,7 +23,6 @@ import (
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/module/ar/migrate/types/npm"
-	"github.com/harness/harness-cli/module/ar/migrate/util"
 	"github.com/harness/harness-cli/util/common"
 
 	"github.com/google/uuid"
@@ -114,31 +113,6 @@ func (r *File) Pre(ctx context.Context) error {
 		Logger()
 	logger.Info().Msg("Starting version pre-migration step")
 	startTime := time.Now()
-
-	if !r.config.Overwrite && (r.artifactType != types.MAVEN && r.pkg.Name != "" && r.version.Name != "" && r.file.Name != "") {
-		exists, err := r.destAdapter.FileExists(ctx,
-			r.registry.Path,
-			r.pkg.Name, r.version.Name, r.file, r.artifactType)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to check if version exists")
-			return nil
-		}
-		if exists {
-			util.GetSkipPrinter().Println(fmt.Sprintf("Registry [%s], Package [%s/%s], File [%s] already exists",
-				r.destRegistry,
-				r.pkg.Name, r.version.Name, r.file.Name))
-			r.skipMigration = true
-			stat := types.FileStat{
-				Name:     r.file.Name,
-				Registry: r.srcRegistry,
-				Uri:      r.file.Uri,
-				Size:     int64(r.file.Size),
-				Status:   types.StatusSkip,
-			}
-			r.stats.FileStats = append(r.stats.FileStats, stat)
-			return nil
-		}
-	}
 
 	logger.Info().
 		Dur("duration", time.Since(startTime)).

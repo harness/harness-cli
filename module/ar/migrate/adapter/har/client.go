@@ -561,6 +561,41 @@ func (c *client) artifactFileExists(
 	return false, nil
 }
 
+func (c *client) artifactGetFilesForVersion(
+	ctx context.Context,
+	registryRef, pkg, version string,
+) ([]string, error) {
+	page := int64(0)
+	size := int64(100)
+
+	var allFileNames []string
+	for {
+		response, err := c.apiClient.GetArtifactFilesWithResponse(ctx, registryRef, pkg, version,
+			&ar.GetArtifactFilesParams{
+				Page:      &page,
+				Size:      &size,
+				SortOrder: nil,
+				SortField: nil,
+			})
+		if err != nil {
+			return allFileNames, fmt.Errorf("failed to get artifact files: %w", err)
+		}
+		if response.StatusCode() != http2.StatusOK {
+			return allFileNames, fmt.Errorf("failed to get artifact files: %s", response.Status())
+		}
+		data := response.JSON200
+
+		for _, v := range data.Data.Files {
+			allFileNames = append(allFileNames, v.Name)
+		}
+		if len(data.Data.Files) < int(size) || (nil != data.Data.PageCount && nil != data.Data.PageIndex && (*data.Data.PageIndex+1 >= *data.Data.PageCount)) {
+			break
+		}
+		page++
+	}
+	return allFileNames, nil
+}
+
 func (c *client) getRegistry(
 	ctx context.Context,
 	registry string,

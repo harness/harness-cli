@@ -3,6 +3,7 @@ package har
 import (
 	"context"
 	"fmt"
+
 	//"github.com/harness/harness-cli/module/ar/migrate"
 	//client2 "github.com/harness/harness-cli/util/client"
 	"io"
@@ -168,6 +169,13 @@ func (a *adapter) FileExists(
 	artifactType types.ArtifactType,
 ) (bool, error) {
 	return a.client.artifactFileExists(ctx, registryRef, pkg, version, file, artifactType)
+}
+
+func (a *adapter) GetAllFilesForVersion(
+	ctx context.Context,
+	registryRef, pkg, version string,
+) ([]string, error) {
+	return a.client.artifactGetFilesForVersion(ctx, registryRef, pkg, version)
 }
 
 func (a *adapter) CreateVersion(

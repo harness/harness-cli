@@ -11,6 +11,7 @@ import (
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/tree"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+	"github.com/harness/harness-cli/module/ar/migrate/util"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -18,19 +19,20 @@ import (
 )
 
 type Version struct {
-	srcRegistry  string
-	destRegistry string
-	srcAdapter   adapter.Adapter
-	destAdapter  adapter.Adapter
-	artifactType types.ArtifactType
-	logger       zerolog.Logger
-	pkg          types.Package
-	version      types.Version
-	node         *types.TreeNode
-	stats        *types.TransferStats
-	mapping      *types.RegistryMapping
-	config       *types.Config
-	registry     types.RegistryInfo
+	srcRegistry     string
+	destRegistry    string
+	srcAdapter      adapter.Adapter
+	destAdapter     adapter.Adapter
+	artifactType    types.ArtifactType
+	logger          zerolog.Logger
+	pkg             types.Package
+	version         types.Version
+	node            *types.TreeNode
+	stats           *types.TransferStats
+	mapping         *types.RegistryMapping
+	config          *types.Config
+	registry        types.RegistryInfo
+	existingFileMap map[string]bool
 }
 
 func NewVersionJob(
@@ -59,19 +61,20 @@ func NewVersionJob(
 		Logger()
 
 	return &Version{
-		srcRegistry:  srcRegistry,
-		destRegistry: destRegistry,
-		srcAdapter:   src,
-		destAdapter:  dest,
-		artifactType: artifactType,
-		logger:       jobLogger,
-		pkg:          pkg,
-		version:      version,
-		node:         node,
-		stats:        stats,
-		mapping:      mapping,
-		config:       config,
-		registry:     registry,
+		srcRegistry:     srcRegistry,
+		destRegistry:    destRegistry,
+		srcAdapter:      src,
+		destAdapter:     dest,
+		artifactType:    artifactType,
+		logger:          jobLogger,
+		pkg:             pkg,
+		version:         version,
+		node:            node,
+		stats:           stats,
+		mapping:         mapping,
+		config:          config,
+		registry:        registry,
+		existingFileMap: make(map[string]bool),
 	}
 }
 
@@ -89,6 +92,20 @@ func (r *Version) Pre(ctx context.Context) error {
 	logger.Info().Msg("Starting version pre-migration step")
 	startTime := time.Now()
 
+	// reading all existing files for this version from destination
+
+	if !r.config.Overwrite && (r.artifactType != types.MAVEN && r.pkg.Name != "" && r.version.Name != "") {
+		existingFiles, err := r.getAllExistingFilesForThisVersion(ctx)
+		if err != nil {
+			logger.Warn().Err(err).Msg("Failed to get existing files, will proceed with migration")
+		} else {
+			// Populate existingFileMap with file name
+			for _, fileName := range existingFiles {
+				r.existingFileMap[fileName] = true
+			}
+			logger.Info().Msgf("Found %d existing files for version %s", len(r.existingFileMap), r.version.Name)
+		}
+	}
 	logger.Info().
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed version pre-migration step")
@@ -101,7 +118,6 @@ func (r *Version) Migrate(ctx context.Context) error {
 		Str("step", "migrate").
 		Str("trace_id", traceID).
 		Logger()
-
 	logger.Info().Msg("Starting version migration step")
 	startTime := time.Now()
 
@@ -115,6 +131,25 @@ func (r *Version) Migrate(ctx context.Context) error {
 			return fmt.Errorf("get files from tree failed: %w", err)
 		}
 		for _, file := range files {
+			// Check if file already exists in destination
+			if r.existingFileMap[file.Name] {
+				util.GetSkipPrinter().Println(fmt.Sprintf("Registry [%s], Package [%s/%s], File [%s] already exists",
+					r.destRegistry,
+					r.pkg.Name, r.version.Name, file.Name))
+				logger.Info().Msgf("Skipping file %s as it already exists in destination", file.Uri)
+
+				// Add to statistics
+				stat := types.FileStat{
+					Name:     file.Name,
+					Registry: r.srcRegistry,
+					Uri:      file.Uri,
+					Size:     int64(file.Size),
+					Status:   types.StatusSkip,
+				}
+				r.stats.FileStats = append(r.stats.FileStats, stat)
+				continue
+			}
+
 			job := NewFileJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, r.pkg,
 				r.version, r.node, file, r.stats, r.mapping, r.config, r.registry)
 			jobs = append(jobs, job)
@@ -201,4 +236,23 @@ func (r *Version) Post(ctx context.Context) error {
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed version post-migration step")
 	return nil
+}
+
+// getAllExistingFilesForThisVersion fetches existing files for this version from the destination API
+// Returns a slice of file paths that already exist
+func (r *Version) getAllExistingFilesForThisVersion(ctx context.Context) ([]string, error) {
+	// Call the destination adapter API to get all files for this version
+	allFileNames, err := r.destAdapter.GetAllFilesForVersion(
+		ctx,
+		r.registry.Path,
+		r.pkg.Name,
+		r.version.Name,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get existing files from destination: %w", err)
+	}
+
+	r.logger.Info().Msgf("Retrieved %d existing files from destination API for version %s", len(allFileNames), r.version.Name)
+	return allFileNames, nil
 }

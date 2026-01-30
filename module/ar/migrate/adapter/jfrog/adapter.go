@@ -768,6 +768,13 @@ func (a *adapter) FileExists(
 	return false, fmt.Errorf("not implemented")
 }
 
+func (a *adapter) GetAllFilesForVersion(
+	ctx context.Context,
+	registryRef, pkg, version string,
+) ([]string, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 type repomdData struct {
 	XMLName xml.Name `xml:"repomd"`
 	Data    []struct {

@@ -410,6 +410,13 @@ func (a *adapter) FileExists(
 	return false, nil
 }
 
+func (a *adapter) GetAllFilesForVersion(
+	ctx context.Context,
+	registryRef, pkg, version string,
+) ([]string, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 func (a *adapter) constructFilePath(pkg, version, fileName string, artifactType types.ArtifactType) string {
 	switch artifactType {
 	case types.MAVEN:
