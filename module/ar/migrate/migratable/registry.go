@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/tree"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
-
-	"github.com/google/uuid"
+	"github.com/harness/harness-cli/module/ar/migrate/util"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -81,7 +81,6 @@ func (r *Registry) Pre(ctx context.Context) error {
 	logger.Info().Msg("Starting registry pre-migration step")
 
 	startTime := time.Now()
-
 	registry, err := r.destAdapter.GetRegistry(ctx, r.destRegistry)
 	if err != nil {
 		log.Error().Err(err).Msgf("Failed to get registry %q", r.destRegistry)
@@ -107,6 +106,11 @@ func (r *Registry) Migrate(ctx context.Context) error {
 
 	logger.Info().Msg("Starting registry migration step")
 
+	if len(r.mapping.IncludePatterns) > 0 && len(r.mapping.ExcludePatterns) > 0 {
+		logger.Error().Msgf("Either include or Exclude Pattern is suppoted at a time for %s", r.artifactType)
+		return fmt.Errorf("failed in validating config file for %s ", r.artifactType)
+	}
+
 	startTime := time.Now()
 
 	files, err2 := r.srcAdapter.GetFiles(r.srcRegistry)
@@ -114,12 +118,36 @@ func (r *Registry) Migrate(ctx context.Context) error {
 		logger.Error().Msgf("Failed to get files from registry %s", r.srcRegistry)
 		return fmt.Errorf("get files from registry %s failed: %w", r.srcRegistry, err2)
 	}
+
+	// Filter files based on include/exclude patterns
+	currArtifactType := r.artifactType
+	if util.IsFileLevelFilterableArtifact(currArtifactType) {
+		if len(r.mapping.IncludePatterns) > 0 || len(r.mapping.ExcludePatterns) > 0 {
+			originalCount := len(files)
+			filteredFiles := util.FilterFilesByPatterns(files, r.mapping.IncludePatterns, r.mapping.ExcludePatterns)
+			files = filteredFiles
+			logger.Info().Msgf("Filtered files: %d -> %d (includePatterns: %v, excludePatterns: %v)",
+				originalCount, len(files), r.mapping.IncludePatterns, r.mapping.ExcludePatterns)
+		}
+	}
+
 	root := tree.TransformToTree(files)
 
 	pkgs, err := r.srcAdapter.GetPackages(r.srcRegistry, r.artifactType, root)
 	if err != nil {
 		logger.Error().Msg("Failed to get packages")
 		return fmt.Errorf("get packages failed: %w", err)
+	}
+
+	// applying package level filter
+	if util.IsPackageLevelFilterableArtifact(currArtifactType) {
+		if len(r.mapping.IncludePatterns) > 0 || len(r.mapping.ExcludePatterns) > 0 {
+			originalCount := len(pkgs)
+			filteredPackages := util.FilterFilesByPatternsPackageName(pkgs, r.mapping.IncludePatterns, r.mapping.ExcludePatterns)
+			pkgs = filteredPackages
+			logger.Info().Msgf("Filtered packages: %d -> %d (includePatterns: %v, excludePatterns: %v)",
+				originalCount, len(pkgs), r.mapping.IncludePatterns, r.mapping.ExcludePatterns)
+		}
 	}
 
 	var jobs []engine.Job

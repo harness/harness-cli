@@ -29,6 +29,9 @@ mappings:
     destinationRegistry: dst
   - artifactType: MAVEN
     sourceRegistry: src
+    excludePatterns:
+      - com/*
+      - foo/*
     destinationRegistry: dst
   - artifactType: GENERIC
     sourceRegistry: src
@@ -48,3 +51,8 @@ mappings:
   - artifactType: COMPOSER
     sourceRegistry: src
     destinationRegistry: dst
+  - artifactType: DART
+    sourceRegistry: src
+    destinationRegistry: dst
+    includePatterns:
+      - packages/sample_dart_pkg/**
