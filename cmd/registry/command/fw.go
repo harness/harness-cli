@@ -10,10 +10,11 @@ func NewFirewallCmd(f *cmdutils.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "fw",
 		Aliases: []string{"firewall"},
-		Short:   "Manage firewall settings",
-		Long:    "Commands to manage and view firewall settings for artifacts",
+		Short:   "Firewall and security commands",
+		Long:    "Commands to audit and analyze dependencies for security and compliance",
 	}
 
+	cmd.AddCommand(NewFirewallAuditCmd(f))
 	cmd.AddCommand(NewFirewallExplainCmd(f))
 
 	return cmd

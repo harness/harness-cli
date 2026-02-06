@@ -1803,6 +1803,9 @@ components:
           type: array
         url:
           type: string
+        uuid:
+          type: string
+          description: Registry UUID
       required:
         - name
         - identifier

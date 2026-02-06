@@ -8,33 +8,47 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	ar "github.com/harness/harness-cli/internal/api/ar"
 	ar_v3 "github.com/harness/harness-cli/internal/api/ar_v3"
 	client2 "github.com/harness/harness-cli/util/client"
 	"github.com/harness/harness-cli/util/common/printer"
 	"github.com/harness/harness-cli/util/common/progress"
+	"github.com/rs/zerolog/log"
 
 	"github.com/spf13/cobra"
 )
 
 func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 	var registryName string
+	var packageName string
+	var version string
 	var orgID string
 	var projectID string
 
 	cmd := &cobra.Command{
-		Use:   "explain <name>@<version>",
+		Use:   "explain",
 		Short: "Explain firewall status for an artifact version",
 		Long:  "Get detailed firewall and scan status information for a specific artifact version",
-		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p := progress.NewConsoleReporter()
 
-			artifactWithVersion := args[0]
+			if packageName == "" {
+				log.Error().Msg("--package flag is required")
+				return fmt.Errorf("--package flag is required")
+			}
 
-			// Use local flags if provided, otherwise use global config
+			if version == "" {
+				log.Error().Msg("--version flag is required")
+				return fmt.Errorf("--version flag is required")
+			}
+
+			if registryName == "" {
+				log.Error().Msg("--registry flag is required")
+				return fmt.Errorf("--registry flag is required")
+			}
+
 			org := orgID
 			if org == "" {
 				org = config.Global.OrgID
@@ -44,129 +58,190 @@ func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 				project = config.Global.ProjectID
 			}
 
-			// Handle scoped packages (e.g., @scope/package@version)
-			var artifactName, version string
-			lastAtIndex := strings.LastIndex(artifactWithVersion, "@")
+			p.Start(fmt.Sprintf("Fetching registry details for: %s", registryName))
+			log.Info().Str("registry", registryName).Msg("Fetching registry details")
 
-			if lastAtIndex == -1 {
-				return fmt.Errorf("invalid format: expected <name>@<version>, got %s", artifactWithVersion)
+			registryRef := client2.GetRef(config.Global.AccountID, org, project) + "/" + registryName
+			registryResp, err := f.RegistryHttpClient().GetRegistryWithResponse(context.Background(), registryRef)
+			if err != nil {
+				p.Error("Failed to fetch registry details")
+				log.Error().Err(err).Msg("Failed to fetch registry details")
+				return fmt.Errorf("failed to fetch registry details: %w", err)
 			}
 
-			// If the string starts with @, we need at least 2 @ symbols
-			if strings.HasPrefix(artifactWithVersion, "@") {
-				if lastAtIndex == 0 {
-					return fmt.Errorf("invalid format: expected <name>@<version>, got %s", artifactWithVersion)
+			if registryResp.StatusCode() != 200 {
+				errMsg := fmt.Sprintf("Registry '%s' not found", registryName)
+				if registryResp.JSON404 != nil && registryResp.JSON404.Message != "" {
+					errMsg = registryResp.JSON404.Message
 				}
-				artifactName = artifactWithVersion[:lastAtIndex]
-				version = artifactWithVersion[lastAtIndex+1:]
-			} else {
-				artifactName = artifactWithVersion[:lastAtIndex]
-				version = artifactWithVersion[lastAtIndex+1:]
+				p.Error(errMsg)
+				log.Error().Int("statusCode", registryResp.StatusCode()).Msg(errMsg)
+				return fmt.Errorf(errMsg)
 			}
 
-			if artifactName == "" || version == "" {
-				return fmt.Errorf("invalid format: expected <name>@<version>, got %s", artifactWithVersion)
+			if registryResp.JSON200 == nil || registryResp.JSON200.Data.Uuid == nil {
+				p.Error("Registry UUID not found in response")
+				log.Error().Msg("Registry UUID not found in response")
+				return fmt.Errorf("registry UUID not found in response")
 			}
 
-			p.Start(fmt.Sprintf("Fetching firewall status for %s@%s", artifactName, version))
+			registryUUID, err := uuid.Parse(*registryResp.JSON200.Data.Uuid)
+			if err != nil {
+				p.Error("Invalid registry UUID format in response")
+				log.Error().Err(err).Str("uuid", *registryResp.JSON200.Data.Uuid).Msg("Invalid registry UUID format")
+				return fmt.Errorf("invalid registry UUID format: %w", err)
+			}
 
-			params := &ar.GetArtifactVersionSummaryParams{}
-			response, err := f.RegistryHttpClient().GetArtifactVersionSummaryWithResponse(
+			p.Success(fmt.Sprintf("Found registry UUID: %s", registryUUID.String()))
+			log.Info().Str("registryUUID", registryUUID.String()).Msg("Registry UUID retrieved")
+
+			p.Step(fmt.Sprintf("Initiating scan evaluation for %s@%s", packageName, version))
+			log.Info().Str("package", packageName).Str("version", version).Msg("Initiating scan evaluation")
+
+			artifacts := []ar_v3.ArtifactScanInput{
+				{
+					PackageName: packageName,
+					Version:     version,
+				},
+			}
+
+			initParams := &ar_v3.InitiateBulkScanEvaluationParams{
+				AccountIdentifier: config.Global.AccountID,
+				OrgIdentifier:     &org,
+				ProjectIdentifier: &project,
+			}
+
+			initResp, err := f.RegistryV3HttpClient().InitiateBulkScanEvaluationWithResponse(
 				context.Background(),
-				client2.GetRef(config.Global.AccountID, org, project)+"/"+registryName,
-				artifactName,
-				version,
-				params,
+				initParams,
+				ar_v3.InitiateBulkScanEvaluationJSONRequestBody{
+					RegistryId: registryUUID,
+					Artifacts:  artifacts,
+				},
 			)
 			if err != nil {
-				p.Error("Failed to get artifact version summary")
-				return err
+				p.Error("Failed to initiate scan evaluation")
+				log.Error().Err(err).Msg("Failed to initiate scan evaluation")
+				return fmt.Errorf("failed to initiate scan evaluation: %w", err)
 			}
 
-			// Handle different response status codes
-			switch response.StatusCode() {
-			case 404:
-				p.Error("Artifact version not found")
-				return fmt.Errorf("artifact version '%s@%s' not found in registry '%s'", artifactName, version, registryName)
-			case 400:
-				p.Error("Bad request")
-				return fmt.Errorf("invalid request parameters")
-			case 401:
-				p.Error("Authentication failed")
-				return fmt.Errorf("authentication failed - check your token")
-			case 403:
-				p.Error("Access denied")
-				return fmt.Errorf("access denied - insufficient permissions")
-			case 500:
-				p.Error("Server error")
-				return fmt.Errorf("server error occurred")
+			if initResp.StatusCode() != 202 {
+				errMsg := "Failed to initiate scan evaluation"
+				if initResp.JSONDefault != nil && initResp.JSONDefault.Error.Message != nil {
+					errMsg = *initResp.JSONDefault.Error.Message
+				}
+				p.Error(errMsg)
+				log.Error().Int("statusCode", initResp.StatusCode()).Msg(errMsg)
+				return fmt.Errorf(errMsg)
 			}
 
-			if response.JSON200 == nil {
-				p.Error("Unexpected response from API")
-				return fmt.Errorf("unexpected response from API (status: %d)", response.StatusCode())
+			if initResp.JSON202 == nil || initResp.JSON202.Data == nil || initResp.JSON202.Data.EvaluationId == nil {
+				p.Error("Invalid response from scan evaluation API")
+				log.Error().Msg("Invalid response from scan evaluation API")
+				return fmt.Errorf("invalid response from scan evaluation API")
 			}
 
-			data := response.JSON200.Data
+			evaluationID := *initResp.JSON202.Data.EvaluationId
+			p.Success(fmt.Sprintf("Scan evaluation initiated with ID: %s", evaluationID))
+			log.Info().Str("evaluationId", evaluationID).Msg("Scan evaluation initiated")
 
-			firewallMode := ""
-			if data.FirewallMode != nil {
-				firewallMode = string(*data.FirewallMode)
+			p.Step("Waiting for scan evaluation to complete")
+			log.Info().Msg("Polling scan evaluation status")
+
+			statusParams := &ar_v3.GetBulkScanEvaluationStatusParams{
+				AccountIdentifier: config.Global.AccountID,
+				OrgIdentifier:     &org,
+				ProjectIdentifier: &project,
 			}
+
+			var statusResp *ar_v3.GetBulkScanEvaluationStatusResp
+			var status ar_v3.BulkScanEvaluationStatusDataStatus
+			pollCount := 0
+			maxPolls := 120
+
+			for {
+				pollCount++
+				if pollCount > maxPolls {
+					p.Error("Timeout waiting for scan evaluation to complete")
+					log.Error().Int("maxPolls", maxPolls).Msg("Timeout waiting for scan evaluation")
+					return fmt.Errorf("timeout waiting for scan evaluation to complete")
+				}
+
+				statusResp, err = f.RegistryV3HttpClient().GetBulkScanEvaluationStatusWithResponse(
+					context.Background(),
+					evaluationID,
+					statusParams,
+				)
+				if err != nil {
+					p.Error("Failed to get scan evaluation status")
+					log.Error().Err(err).Msg("Failed to get scan evaluation status")
+					return fmt.Errorf("failed to get scan evaluation status: %w", err)
+				}
+
+				if statusResp.StatusCode() != 200 {
+					errMsg := "Failed to get scan evaluation status"
+					if statusResp.JSONDefault != nil && statusResp.JSONDefault.Error.Message != nil {
+						errMsg = *statusResp.JSONDefault.Error.Message
+					}
+					p.Error(errMsg)
+					log.Error().Int("statusCode", statusResp.StatusCode()).Msg(errMsg)
+					return fmt.Errorf(errMsg)
+				}
+
+				if statusResp.JSON200 == nil || statusResp.JSON200.Data == nil || statusResp.JSON200.Data.Status == nil {
+					p.Error("Invalid response from scan evaluation status API")
+					log.Error().Msg("Invalid response from scan evaluation status API")
+					return fmt.Errorf("invalid response from scan evaluation status API")
+				}
+
+				status = *statusResp.JSON200.Data.Status
+				log.Debug().Str("status", string(status)).Int("poll", pollCount).Msg("Scan evaluation status")
+
+				if status == ar_v3.BulkScanEvaluationStatusDataStatusSUCCESS {
+					p.Success("Scan evaluation completed successfully")
+					log.Info().Msg("Scan evaluation completed successfully")
+					break
+				}
+
+				if status == ar_v3.BulkScanEvaluationStatusDataStatusFAILURE {
+					errMsg := "Scan evaluation failed"
+					if statusResp.JSON200.Data.Error != nil {
+						errMsg = *statusResp.JSON200.Data.Error
+					}
+					p.Error(errMsg)
+					log.Error().Str("error", errMsg).Msg("Scan evaluation failed")
+					return fmt.Errorf(errMsg)
+				}
+
+				time.Sleep(2 * time.Second)
+			}
+
+			if statusResp.JSON200.Data.Scans == nil || len(*statusResp.JSON200.Data.Scans) == 0 {
+				p.Success("No scan results returned")
+				log.Info().Msg("No scan results returned")
+				return nil
+			}
+
+			scans := *statusResp.JSON200.Data.Scans
+			scan := scans[0]
 
 			scanStatus := ""
-			if data.ScanStatus != nil {
-				scanStatus = string(*data.ScanStatus)
+			if scan.ScanStatus != nil {
+				scanStatus = string(*scan.ScanStatus)
 			}
 
 			scanId := ""
-			if data.ScanId != nil {
-				scanId = *data.ScanId
+			if scan.ScanId != nil {
+				scanId = scan.ScanId.String()
 			}
 
-			if config.Global.Format == "json" {
-				result := map[string]interface{}{
-					"registry":        registryName,
-					"artifact":        artifactName,
-					"version":         version,
-					"firewallMode":    firewallMode,
-					"scanStatus":      scanStatus,
-					"scanId":          scanId,
-					"firewallEnabled": firewallMode != "" && firewallMode != "ALLOW",
-				}
-				jsonBytes, err := json.MarshalIndent(result, "", "  ")
-				if err != nil {
-					p.Error("Failed to marshal JSON output")
-					return err
-				}
-				fmt.Println(string(jsonBytes))
-				return nil
-			}
-
-			p.Success(fmt.Sprintf("Retrieved firewall status for %s@%s in registry %s", artifactName, version, registryName))
 			fmt.Println()
+			p.Step("Scan Result")
+			fmt.Printf("   Package:     %s\n", packageName)
+			fmt.Printf("   Version:     %s\n", version)
+			fmt.Printf("   Scan Status: %s\n", getDisplayValue(scanStatus))
+			fmt.Printf("   Scan ID:     %s\n", getDisplayValue(scanId))
 
-			// Check if firewall is enabled
-			if firewallMode == "" || firewallMode == "ALLOW" {
-				p.Step("Firewall is not enabled for the provided registry")
-				fmt.Printf("   Firewall Mode: %s\n", getDisplayValue(firewallMode))
-				return nil
-			}
-
-			// Firewall is enabled (WARN or BLOCK)
-			p.Step("Firewall is enabled")
-			fmt.Printf("   Firewall Mode: %s\n", firewallMode)
-			fmt.Printf("   Scan Status:   %s\n", getDisplayValue(scanStatus))
-			fmt.Printf("   Scan ID:       %s\n", getDisplayValue(scanId))
-
-			// Check if artifact has been scanned
-			if scanStatus == "" || scanId == "" {
-				fmt.Println()
-				p.Step("Artifact has not been scanned yet")
-				return nil
-			}
-
-			// Show scan status result
 			if scanStatus == "BLOCKED" {
 				fmt.Println()
 				p.Error("This artifact version is BLOCKED by the firewall")
@@ -178,9 +253,28 @@ func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 				p.Success("This artifact version is ALLOWED by the firewall")
 			}
 
+			if config.Global.Format == "json" {
+				result := map[string]interface{}{
+					"registry":   registryName,
+					"package":    packageName,
+					"version":    version,
+					"scanStatus": scanStatus,
+					"scanId":     scanId,
+				}
+				jsonBytes, err := json.MarshalIndent(result, "", "  ")
+				if err != nil {
+					p.Error("Failed to marshal JSON output")
+					log.Error().Err(err).Msg("Failed to marshal JSON output")
+					return err
+				}
+				fmt.Println(string(jsonBytes))
+				return nil
+			}
+
 			if scanId != "" {
 				fmt.Println()
 				p.Step("Fetching detailed scan information")
+				log.Info().Str("scanId", scanId).Msg("Fetching scan details")
 
 				scanParams := &ar_v3.GetArtifactScanDetailsParams{
 					AccountIdentifier: config.Global.AccountID,
@@ -193,36 +287,44 @@ func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 				)
 				if err != nil {
 					p.Error("Failed to get scan details")
+					log.Error().Err(err).Msg("Failed to get scan details")
 					return err
 				}
 
-				// Handle different response status codes for scan details
 				switch scanResponse.StatusCode() {
 				case 404:
 					p.Error("Scan details not found")
+					log.Error().Str("scanId", scanId).Msg("Scan details not found")
 					fmt.Printf("   Scan ID '%s' not found\n", scanId)
 				case 400:
 					p.Error("Bad request for scan details")
+					log.Error().Msg("Bad request for scan details")
 					fmt.Printf("   Invalid scan request parameters\n")
 				case 401:
 					p.Error("Authentication failed for scan details")
+					log.Error().Msg("Authentication failed for scan details")
 					fmt.Printf("   Authentication failed - check your token\n")
 				case 403:
 					p.Error("Access denied for scan details")
+					log.Error().Msg("Access denied for scan details")
 					fmt.Printf("   Access denied - insufficient permissions\n")
 				case 500:
 					p.Error("Server error while fetching scan details")
+					log.Error().Msg("Server error while fetching scan details")
 					fmt.Printf("   Server error occurred\n")
 				case 200:
 					if scanResponse.JSON200 != nil && scanResponse.JSON200.Data != nil {
+						log.Info().Msg("Scan details retrieved successfully")
 						err = displayScanDetails(scanResponse.JSON200.Data)
 						if err != nil {
 							p.Error("Failed to display scan details")
+							log.Error().Err(err).Msg("Failed to display scan details")
 							return err
 						}
 					}
 				default:
 					p.Error("Unexpected response from scan details API")
+					log.Error().Int("statusCode", scanResponse.StatusCode()).Msg("Unexpected response from scan details API")
 					fmt.Printf("   Unexpected response (status: %d)\n", scanResponse.StatusCode())
 				}
 			}
@@ -231,10 +333,14 @@ func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&registryName, "registry", "", "Registry identifier (required)")
-	cmd.MarkFlagRequired("registry")
+	cmd.Flags().StringVar(&registryName, "registry", "", "Registry name (required)")
+	cmd.Flags().StringVar(&packageName, "package", "", "Package name (required)")
+	cmd.Flags().StringVar(&version, "version", "", "Package version (required)")
 	cmd.Flags().StringVar(&orgID, "org", "", "Organization identifier (defaults to global config)")
 	cmd.Flags().StringVar(&projectID, "project", "", "Project identifier (defaults to global config)")
+	cmd.MarkFlagRequired("registry")
+	cmd.MarkFlagRequired("package")
+	cmd.MarkFlagRequired("version")
 
 	return cmd
 }
