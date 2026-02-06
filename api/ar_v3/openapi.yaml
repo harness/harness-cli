@@ -1,0 +1,911 @@
+openapi: "3.0.0"
+info:
+  title: Harness Artifact Registry API
+  version: 3.0.0
+  contact:
+    name: Harness Artifact Registry - developers
+    url: https://www.harness.io
+
+tags:
+  - name: Registry V3
+    description: V3 endpoints
+
+
+servers:
+  - url: /api/v3
+    description: Harness Artifact Registry APIs V3
+
+paths:
+  /scans:
+    get:
+      x-internal: false
+      summary: Get the list of artifact scan result for a particular scope
+      description: Get the list of artifact scan result for a particular scope
+      operationId: GetArtifactScans
+      tags:
+        - Registry V3
+      parameters:
+        - $ref: "#/components/parameters/AccountIdentifier"
+        - $ref: "#/components/parameters/OrgIdentifier"
+        - $ref: "#/components/parameters/ProjectIdentifier"
+        - $ref: "#/components/parameters/PackageTypeListParam"
+        - $ref: "#/components/parameters/RegistryIdListParam"
+        - $ref: "#/components/parameters/PolicySetRefParam"
+        - $ref: "#/components/parameters/ScanIDQueryParam"
+        - $ref: "#/components/parameters/ScanStatusParam"
+        - $ref: "#/components/parameters/PageNumber"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/SortOrder"
+        - $ref: "#/components/parameters/SortField"
+        - $ref: "#/components/parameters/SearchTerm"
+        - $ref: "#/components/parameters/RegistryScope"
+      responses:
+        200:
+          $ref: "#/components/responses/ListArtifactScanResponse"
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V3Error"
+          description: Error response.
+  /scans/{scan_id}/details:
+    get:
+      x-internal: false
+      summary: Get the details of a artifact scan
+      description: Get the details of a artifact scan
+      operationId: GetArtifactScanDetails
+      tags:
+        - Registry V3
+      parameters:
+        - $ref: "#/components/parameters/AccountIdentifier"
+        - $ref: "#/components/parameters/ScanIDParam"
+        - $ref: "#/components/parameters/PolicySetRefParam"
+      responses:
+        200:
+          $ref: "#/components/responses/ArtifactScanDetailsResponse"
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V3Error"
+          description: Error response.
+  /scans/evaluate:
+    post:
+      x-internal: false
+      summary: Re-evaluate artifact scan
+      description: Re-evaluate artifact scan
+      operationId: EvaluateArtifactScan
+      tags:
+        - Registry V3
+      parameters:
+        - $ref: "#/components/parameters/AccountIdentifier"
+      requestBody:
+        $ref: "#/components/requestBodies/ArtifactScanEvaluateRequest"
+      responses:
+        "202":
+          $ref: "#/components/responses/ArtifactScanEvaluateRequestAccepted"
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V3Error"
+          description: Error response.
+components:
+  requestBodies:
+    ArtifactScanEvaluateRequest:
+      description: request to re-evaluate artifact scan
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ArtifactScanEvaluateRequest"
+  responses:
+    ListArtifactScanResponse:
+      description: Response containing list of artifact scan
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ pageCount, itemCount, pageSize, pageIndex, data, meta ]
+            properties:
+              pageCount:
+                type: integer
+                format: int64
+                description: The total number of pages
+                example: 100
+              itemCount:
+                type: integer
+                format: int64
+                description: The total number of items
+                example: 1
+              pageSize:
+                type: integer
+                description: The number of items per page
+                example: 1
+              pageIndex:
+                type: integer
+                format: int64
+                description: The current page
+                example: 0
+              data:
+                type: array
+                description: A list of artifact scans
+                items:
+                  $ref: "#/components/schemas/ArtifactScan"
+              meta:
+                $ref: "#/components/schemas/ScanMeta"
+    ArtifactScanDetailsResponse:
+      description: Response containing details of artifact scan
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: "#/components/schemas/ArtifactScanDetails"
+    ArtifactScanEvaluateRequestAccepted:
+      description: Artifact scan evaluate request accepted for processing
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: "#/components/schemas/ArtifactScanEvaluateRequestStatus"
+  schemas:
+    V3Error:
+      description: An error response from the Stripe API
+      properties:
+        error:
+          $ref: '#/components/schemas/ApiErrors'
+      required:
+        - error
+      type: object
+    ApiErrors:
+      description: ''
+      properties:
+        code:
+          description: >-
+            For some errors that could be handled programmatically, a short
+            string indicating the [error
+            code](https://docs.stripe.com/error-codes) reported.
+          maxLength: 5000
+          type: string
+        message:
+          description: >-
+            A human-readable message providing more details about the error. These messages can be shown to users.
+          maxLength: 40000
+          type: string
+        param:
+          description: >-
+            If the error is parameter-specific, the parameter related to the
+            error. For example, we can use this to display a message near the
+            correct form field.
+          maxLength: 5000
+          type: string
+        type:
+          description: >-
+            The type of error returned.
+          enum:
+            - INVALID_REQUEST_ERROR
+            - AUTHENTICATION_ERROR
+            - PERMISSION_ERROR
+            - API_ERROR
+          type: string
+      required:
+        - type
+      title: APIErrors
+      type: object
+    ScanMeta:
+      type: object
+      description: Metadata about the list artifact scans
+      properties:
+        blockedCount:
+          type: integer
+          format: int64
+          description: Count of active blocked artifacts
+          example: 95
+        warnCount:
+          type: integer
+          format: int64
+          description: Count of active Warn artifacts
+          example: 5
+        totalCount:
+          type: integer
+          format: int64
+          description: Count of total artifact violations
+          example: 5
+    ArtifactScanDetails:
+      type: object
+      description: Artifact scans details
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for this artifact scan details
+        packageType:
+          $ref: "#/components/schemas/PackageType"
+        packageName:
+          type: string
+          description: Package name
+        version:
+          type: string
+          description: Version
+        versionId:
+          type: string
+          format: uuid
+          description: Version
+        registryName:
+          type: string
+          description: Registry name
+        policySetRef:
+          type: string
+        policySetName:
+          type: string
+        registryId:
+          type: string
+          format: uuid
+          description: Registry ID
+        policyFailureDetails:
+          type: array
+          items:
+            $ref: "#/components/schemas/PolicyFailureDetail"
+        fixVersionDetails:
+          $ref: "#/components/schemas/FixVersionDetails"
+        scanStatus:
+          type: string
+          description: Scan status
+          enum:
+            - BLOCKED
+            - WARN
+        lastEvaluatedAt:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - packageType
+        - packageName
+        - version
+        - registryName
+        - registry_id
+        - policyFailureDetails
+        - scanStatus
+    PolicyFailureDetail:
+      type: object
+      description: Policy failure detail entry.
+      properties:
+        category:
+          $ref: "#/components/schemas/PolicyFailureDetailCategory"
+        policyName:
+          type: string
+          description: Policy name.
+        policyRef:
+          type: string
+          description: Policy Ref.
+      discriminator:
+        propertyName: category
+        mapping:
+          Security: "#/components/schemas/SecurityPolicyFailureDetail"
+          License: "#/components/schemas/LicensePolicyFailureDetail"
+          PackageAge: "#/components/schemas/PackageAgeViolationPolicyFailureDetail"
+      oneOf:
+        - $ref: "#/components/schemas/SecurityPolicyFailureDetailConfig"
+        - $ref: "#/components/schemas/LicensePolicyFailureDetailConfig"
+        - $ref: "#/components/schemas/PackageAgeViolationPolicyFailureDetailConfig"
+      required:
+        - category
+        - policyName
+        - policyRef
+    PolicyFailureDetailCategory:
+      type: string
+      description: Policy failure detail category.
+      enum:
+        - Security
+        - License
+        - PackageAge
+        - Unknown
+    SecurityPolicyFailureDetailConfig:
+      type: object
+      description: Security-specific failure detail payload.
+      properties:
+        vulnerabilities:
+          type: array
+          description: List of security violations.
+          items:
+            $ref: "#/components/schemas/SecurityPolicyFailureVulnerability"
+      required:
+        - vulnerabilities
+    SecurityPolicyFailureVulnerability:
+      type: object
+      description: Security violation entry.
+      properties:
+        cveId:
+          type: string
+          description: CVE identifier.
+        cvssScore:
+          type: number
+          format: double
+          description: CVSS score.
+        cvssThreshold:
+          type: number
+          format: double
+          description: CVSS threshold.
+      required:
+        - cveId
+        - cvssScore
+        - cvssThreshold
+    LicensePolicyFailureDetailConfig:
+      type: object
+      description: License-specific failure detail payload.
+      properties:
+        allowedLicenses:
+          type: array
+          description: Allowed license list.
+          items:
+            type: string
+        blockedLicense:
+          type: string
+          description: Blocked license.
+      required:
+        - allowedLicenses
+        - blockedLicense
+    PackageAgeViolationPolicyFailureDetailConfig:
+      type: object
+      description: Package age violation failure detail payload.
+      properties:
+        publishedOn:
+          type: string
+          description: Package publish date.
+        packageAgeThreshold:
+          type: string
+          description: Package age threshold.
+      required:
+        - publishedOn
+        - packageAgeThreshold
+    FixVersionDetails:
+      type: object
+      description: Fix version Details
+      properties:
+        fixVersionAvailable:
+          type: boolean
+          description: Fix version available or not
+        currentVersion:
+          type: string
+          description: The current version
+          example: "1.2.0"
+        fixVersion:
+          type: string
+          description: The fix version
+          example: "1.2.2"
+      required:
+        - fixVersionAvailable
+        - currentVersion
+    ArtifactScanEvaluateRequestInput:
+      type: object
+      description: |
+        Input for re-evaluate artifact scan.
+      properties:
+        packageName:
+          type: string
+          description: Name of the package
+        version:
+          type: string
+          description: Version of the package
+        registryIdentifier:
+          type: string
+          description: Registry Identifier
+    ArtifactScanEvaluateRequest:
+      description: |
+        Input for re-evaluate artifact scan.
+        Exactly one of scanId or versionId must be provided.
+      type: object
+      properties:
+        scanId:
+          type: string
+          description: Scan identifier
+        versionId:
+          type: string
+          description: Artifact version identifier
+    ArtifactScanEvaluateRequestStatus:
+      type: string
+      description: Status of the Artifact Scan Evaluate Request
+      enum:
+        - PENDING
+        - PROCESSING
+        - SUCCESS
+        - FAILED
+    PackageType:
+      type: string
+      description: >
+        Package type.
+        Known values include: DOCKER, MAVEN, PYTHON, GENERIC, HELM, NUGET, NPM, RPM, CARGO,
+        COMPOSER, GO, HUGGINGFACE, CONDA, DART, SWIFT.
+        This field is extensible; clients must handle unknown values.
+      example: DOCKER
+      x-extensible-enum:
+        - DOCKER
+        - MAVEN
+        - PYTHON
+        - GENERIC
+        - HELM
+        - NUGET
+        - NPM
+        - RPM
+        - CARGO
+        - COMPOSER
+        - GO
+        - HUGGINGFACE
+        - CONDA
+        - DART
+        - SWIFT
+    PackageKind:
+      type: string
+      description: refers to package kind which is being used in huggingface packages for model, dataset
+      example: model
+    RegistryType:
+      type: string
+      description: refers to type of registry i.e virtual or upstream
+      enum:
+        - VIRTUAL
+        - UPSTREAM
+    DeletedAtMs:
+      type: integer
+      format: int64
+      nullable: true
+      description: Unix timestamp in milliseconds when the resource was soft-deleted
+      example: 1736360000456
+    LastModifiedAtMs:
+      type: integer
+      format: int64
+      nullable: true
+      description: Unix timestamp in milliseconds when the resource was last modified
+      example: 1736360000123
+    policySets:
+      type: array
+      description: List of opa policy sets.
+      items:
+        type: object
+        properties:
+          policySetRef:
+            type: string
+            description: "Unique reference for the opa policy set. Example: `my-policy` or `account.my-policy`"
+          policySetName:
+            type: string
+            description: Policy Set name
+        required:
+          - policySetRef
+          - policySetName
+    ArtifactScan:
+      type: object
+      properties:
+        packageType:
+          $ref: "#/components/schemas/PackageType"
+        id:
+          type: string
+        packageName:
+          type: string
+          description: Package name
+        version:
+          type: string
+          description: Version
+        versionId:
+          type: string
+          description: Version
+        registryName:
+          type: string
+          description: Registry name
+        registryId:
+          type: string
+          description: Registry name
+        policySets:
+          $ref: "#/components/schemas/policySets"
+        scanStatus:
+          type: string
+          description: Scan status
+          enum:
+            - BLOCKED
+            - WARN
+        lastEvaluatedAt:
+          type: string
+        lastEvaluatedBy:
+          type: string
+      required:
+        - id
+        - packageType
+        - packageName
+        - version
+        - registryName
+        - registryId
+        - policySets
+        - scanStatus
+  parameters:
+    AccountIdentifier:
+      name: account_identifier
+      in: query
+      required: true
+      description: |
+        Unique identifier for the Harness account.
+      schema:
+        type: string
+    OrgIdentifier:
+      name: org_identifier
+      in: query
+      required: false
+      description: |
+        Unique identifier for the organization within the account.
+        
+        Example: `default` or `engineering_org`
+      schema:
+        type: string
+    ProjectIdentifier:
+      name: project_identifier
+      in: query
+      required: false
+      description: |
+        Unique identifier for the project within the organization.
+        
+        Example: `my_project` or `frontend_services`
+      schema:
+        type: string
+    RegistryQueryParam:
+      name: registry
+      in: query
+      required: true
+      description: |
+        Unique identifier for the registry.
+        
+        Example: `my-docker-registry` or `npm-packages`
+      schema:
+        type: string
+    RegistryIdParam:
+      name: registry_id
+      in: query
+      required: true
+      description: |
+        Unique registry ID.
+      schema:
+        type: string
+        format: uuid
+    RegistryListParam:
+      name: registry
+      in: query
+      required: false
+      description: |
+        Unique identifier for the registry.
+
+        Example: `my-docker-registry` or `npm-packages`
+
+        Note: This parameter should have one registry if package query param is provided
+      schema:
+        type: array
+        items:
+          type: string
+    PackageIdParam:
+      name: package_id
+      in: query
+      required: true
+      description: |
+        Unique identifier for the package.
+      schema:
+        type: string
+        format: uuid
+    FileIdParam:
+      name: file_id
+      in: query
+      required: true
+      description: |
+        Unique identifier for the file.
+      schema:
+        type: string
+        format: uuid
+    VersionIdParam:
+      name: version_id
+      in: query
+      required: true
+      description: |
+        Unique identifier for the version.
+      schema:
+        type: string
+        format: uuid
+    PackageParam:
+      name: package
+      in: query
+      required: false
+      description: |
+        Name of the package
+        
+        Example: `nginx` or `redis`
+      schema:
+        type: string
+    RegistryIdListParam:
+      name: registry_id
+      in: query
+      required: false
+      style: form
+      explode: false
+      description: |
+        Unique id for the registry.
+        Note: This parameter should have one id if package query param is provided
+      schema:
+        type: array
+        items:
+          type: string
+          format: uuid
+      example:
+        - "12345678-1234-1234-1234-123456789012"
+        - "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    KeyParam:
+      name: key
+      in: query
+      required: true
+      description: |
+        The metadata key for which to retrieve all possible values.
+        This parameter is used to filter metadata values by a specific key name.
+        
+        Examples: `environment`, `team`, `version_type`, `build_number`
+      schema:
+        type: string
+    PathParam:
+      name: path
+      in: query
+      required: false
+      description: |
+        The hierarchical path to the registry entity. The path structure varies based on the entity type:
+        
+        **Registry Level**: Empty path (`""`) - refers to the registry root
+        
+        **package Level**: `{package-name}` - refers to a specific package
+        - Example: `my-package` for an package named "my-package"
+        - Example: `@scope/package-name` for scoped npm packages
+        
+        **Version Level**: `{package-name}/{version}` - refers to a specific version of an package
+        - Example: `my-package/1.0.0` for version "1.0.0" of package "my-package"
+        - Example: `@scope/package-name/2.1.0` for version "2.1.0" of scoped package
+        
+        **Nested Artifacts**: For artifacts with nested structures, use forward slashes as separators
+        - Example: `group/artifact/1.0.0` for Maven-style group/artifact/version
+        - Example: `namespace/Package/latest` for Docker-style namespace/Package/tag
+      schema:
+        type: string
+    PolicySetRefParam:
+      name: policy_set_ref
+      in: query
+      required: false
+      description: "Unique reference for the opa policy set. Example: `my-policy` or `account.my-policy"
+      schema:
+        type: string
+    ScanStatusParam:
+      name: scan_status
+      in: query
+      required: false
+      description: "Scan status of the artifact after opa policy evaluation. Note: It can only be BLOCKED or WARN"
+      schema:
+        type: string
+    V3RegistryIdentifier:
+      name: registry_id
+      in: query
+      required: true
+      description: "Registry identifier"
+      schema:
+        type: string
+    V3VersionParam:
+      name: version
+      in: query
+      required: true
+      description: "Version of the package"
+      schema:
+        type: string
+    ScanIDParam:
+      name: scan_id
+      in: path
+      required: true
+      description: "Scan Identifier"
+      schema:
+        type: string
+    ScanIDQueryParam:
+      name: scan_id
+      in: query
+      required: false
+      description: "Scan Identifier"
+      schema:
+        type: string
+    PackageKindQueryParam:
+      name: package_kind
+      in: query
+      required: false
+      description: "refers to package kind which is being used in huggingface packages for model, dataset"
+      schema:
+        type: string
+        example: model
+    FilePath:
+      name: path
+      in: query
+      required: true
+      description: "Full path of file to download"
+      schema:
+        type: string
+    FileNamePathParam:
+      name: file_name
+      in: path
+      required: true
+      description: "Name of file to download"
+      schema:
+        type: string
+    PageNumber:
+      name: page
+      in: query
+      required: false
+      description: |
+        The page number for pagination (0-indexed).
+        
+        Used to navigate through large result sets. Combined with `size` parameter
+        to control which subset of results to return.
+        
+        Example: `page=0` returns the first page, `page=1` returns the second page
+      schema:
+        type: integer
+        format: int64
+        default: 0
+    PageSize:
+      name: size
+      in: query
+      required: false
+      description: |
+        The number of items to return per page.
+        
+        Controls the page size for paginated results. 
+        
+        Example: `size=50` returns up to 50 items per page
+      schema:
+        type: integer
+        format: int64
+        default: 20
+        minimum: 1
+        maximum: 100
+    Query:
+      name: query
+      in: query
+      required: true
+      description: |
+        Advanced search expression (query language).
+
+        Query structure
+        - A query clause consists of a field followed by an operator followed by a value.
+          Example clause: `email:"amy@rocketrides.io"`
+          - field: `email`
+          - operator: `:`
+          - value: `amy@rocketrides.io`
+
+        Operators
+        - `:` exact match operator (case sensitive): `field:value`
+
+        Combining clauses
+        - You can combine up to 10 query clauses.
+        - Clauses can be separated by a space or by using `AND` / `OR` keywords.
+        - You can’t combine `AND` and `OR` in the same query.
+        - Parentheses are not supported.
+        - If clauses are separated by a space, clauses are combined using `AND` logic.
+
+        Supported query fields for files search api
+        - `package` (string)
+        - `version` (string)
+        - `groupId` (string)
+        - `artifactId` (string)
+        - `classifier` (string)
+        - `extension` (string)
+        - `fileName` (string)
+
+        Examples
+        - `query=package:"usd" AND version:"1.0.0"`
+        - `query=fileName:"report" OR extension:"zip"`
+      schema:
+        type: string
+    SortOrder:
+      name: sort_order
+      in: query
+      required: false
+      description: |
+        The sort order for the results.
+        
+        Determines whether results are sorted in ascending or descending order.
+        Must be used in combination with `sort_field` parameter.
+        
+        Allowed values: `ASC` (ascending), `DESC` (descending)
+      schema:
+        type: string
+        enum: [ "ASC", "DESC" ]
+        default: "ASC"
+    SortField:
+      name: sort_field
+      in: query
+      required: false
+      description: |
+        The field by which to sort the results.
+        
+        Specifies which field should be used for sorting. Available fields depend
+        on the endpoint and the type of data being returned.
+        
+        Common examples: `name`, `createdAt`, `updatedAt`
+      schema:
+        type: string
+    SearchTerm:
+      name: search_term
+      in: query
+      required: false
+      description: |
+        Search term for filtering results.
+        
+        Example: `search_term=prod` might match keys like "production", "prod-env", etc.
+      schema:
+        type: string
+    PackageTypeListParam:
+      name: package_type
+      in: query
+      required: false
+      description: Registry Package Type
+      schema:
+        type: array
+        items:
+          type: string
+    RegistryTypeParam:
+      name: type
+      in: query
+      required: false
+      description: Registry Type
+      schema:
+        type: string
+        enum:
+          - VIRTUAL
+          - UPSTREAM
+    RegistryScope:
+      name: scope
+      in: query
+      description: >
+        **Scope of registries to list**
+
+        * **none** – current space only (default)  
+        * **ancestors** – current space **plus** all parent spaces  
+        * **descendants** – current space **plus** all child spaces  
+
+        If omitted, `none` is assumed.
+      required: false
+      schema:
+        type: string
+        enum:
+          - ancestors
+          - descendants
+          - none
+    MetadataFilterListParam:
+      name: metadata
+      in: query
+      required: false
+      description: Filter by metadata using key:value format
+      schema:
+        type: array
+        items:
+          type: string
+    DeleteFilterParam:
+      name: deleted
+      in: query
+      required: false
+      schema:
+        type: string
+        enum:
+          - exclude
+          - include
+          - only
+        default: exclude
+    IdPathParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ForceParam:
+      name: force
+      in: query
+      required: false
+      schema:
+        type: boolean
+        default: false

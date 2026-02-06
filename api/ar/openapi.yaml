@@ -961,12 +961,17 @@ components:
         - registryPath
       type: object
     ArtifactVersionSummary:
+      type: object
       description: Docker Artifact Version Summary
       properties:
         imageName:
           type: string
+        version:
+          type: string
         packageType:
-          $ref: '#/components/schemas/PackageType'
+          $ref: "#/components/schemas/PackageType"
+        artifactType:
+          $ref: "#/components/schemas/ArtifactType"
         sscaArtifactId:
           type: string
         sscaArtifactSourceId:
@@ -975,13 +980,41 @@ components:
           type: string
         stoPipelineId:
           type: string
-        version:
+        isQuarantined:
+          type: boolean
+        scanStatus:
           type: string
+          enum:
+            - WARN
+            - BLOCKED
+            - ALLOWED
+        lastScannedAt:
+          type: string
+        firewallMode:
+          type: string
+          enum:
+            - WARN
+            - BLOCK
+            - ALLOW
+        registryType:
+          $ref: '#/components/schemas/RegistryType'
+        scanId:
+          type: string
+        quarantineReason:
+          type: string
+        uuid:
+          type: string
+        registryUUID:
+          type: string
+        deletedAt:
+          type: string
+          description: Timestamp in milliseconds when the artifact was soft deleted. Null if not deleted.
       required:
         - imageName
         - version
         - packageType
-      type: object
+        - uuid
+        - registryUUID
     AuthType:
       description: Authentication type
       enum:
@@ -1902,6 +1935,12 @@ components:
         - VIRTUAL
         - UPSTREAM
       type: string
+    ArtifactType:
+      type: string
+      description: refers to artifact type
+      enum:
+        - model
+        - dataset
     ReplicationRegistry:
       oneOf:
         - $ref: '#/components/schemas/LocalReplicationRegistry'
