@@ -22,6 +22,7 @@ func GetRootCmd(f *cmdutils.Factory) *cobra.Command {
 	rootCmd.AddCommand(command.NewDeleteRegistryCmd(f))
 	rootCmd.AddCommand(getMigrateCmd(f))
 	rootCmd.AddCommand(command.NewMetadataCmd(f))
+	rootCmd.AddCommand(command.NewConfigureCmd(f))
 	rootCmd.AddCommand(command.NewFirewallCmd(f))
 
 	return rootCmd
