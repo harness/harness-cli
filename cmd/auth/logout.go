@@ -6,8 +6,10 @@ import (
 	"path/filepath"
 
 	"github.com/harness/harness-cli/config"
+	"github.com/harness/harness-cli/internal/style"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 // getAuthConfigFilePath returns the path to the auth config file for logout
@@ -30,6 +32,7 @@ func getLogoutCmd() *cobra.Command {
 		Long:         `Remove saved Harness credentials by deleting the authentication configuration`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			isTTY := term.IsTerminal(int(os.Stdout.Fd()))
 			configPath := getAuthConfigFilePath()
 
 			// Check if config file exists
@@ -53,7 +56,11 @@ func getLogoutCmd() *cobra.Command {
 			config.Global.OrgID = ""
 			config.Global.ProjectID = ""
 
-			fmt.Println("Successfully logged out from Harness")
+			if isTTY {
+				fmt.Println(style.Success.Render("✓ Successfully logged out from Harness"))
+			} else {
+				fmt.Println("Successfully logged out from Harness")
+			}
 			return nil
 		},
 	}

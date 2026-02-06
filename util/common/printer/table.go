@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/charmbracelet/lipgloss"
+	lgtable "github.com/charmbracelet/lipgloss/table"
+	"github.com/harness/harness-cli/internal/style"
 	"github.com/pterm/pterm"
 	"github.com/rs/zerolog/log"
 )
@@ -12,74 +15,108 @@ import (
 // ColumnMapping defines a mapping between original field names and display names
 type ColumnMapping [][]string
 
-// jsonToTableWithMapping converts JSON string to a table with custom column mapping
-func jsonToTableWithMapping(jsonStr string, mapping ColumnMapping) error {
+// parseTableData converts a JSON string + column mapping into headers and string rows.
+func parseTableData(jsonStr string, mapping ColumnMapping) ([]string, [][]string, error) {
 	var rows []map[string]interface{}
 	if err := json.Unmarshal([]byte(jsonStr), &rows); err != nil {
-		return fmt.Errorf("parse json: %w", err)
+		return nil, nil, fmt.Errorf("parse json: %w", err)
 	}
 	if len(rows) == 0 {
-		return nil
+		return nil, nil, nil
 	}
 
 	// Prepare header and field mapping
 	var header []string
-	fieldToDisplay := make(map[string]string)
 
 	if len(mapping) > 0 {
-		// Use provided mapping for ordering and display names
 		for _, m := range mapping {
 			if len(m) >= 2 {
-				original, display := m[0], m[1]
-				header = append(header, display)
-				fieldToDisplay[original] = display
+				header = append(header, m[1])
 			}
 		}
 	} else {
-		// Fall back to alphabetical ordering
 		for k := range rows[0] {
 			header = append(header, k)
 		}
 		sort.Strings(header)
 	}
 
-	table := pterm.TableData{header} // first row = header
-
+	var tableRows [][]string
 	for _, r := range rows {
 		row := make([]string, len(header))
-
 		if len(mapping) > 0 {
-			// Use mapping order
 			for i, m := range mapping {
 				if len(m) >= 2 {
-					originalField := m[0]
-					val, ok := r[originalField]
+					val, ok := r[m[0]]
 					if !ok {
-						row[i] = "-" // missing key
+						row[i] = "-"
 						continue
 					}
-					row[i] = fmt.Sprint(val) // stringify numbers, bools, etc.
+					row[i] = fmt.Sprint(val)
 				}
 			}
 		} else {
-			// Fall back to alphabetical order
 			for i, col := range header {
 				val, ok := r[col]
 				if !ok {
-					row[i] = "-" // missing key
+					row[i] = "-"
 					continue
 				}
-				row[i] = fmt.Sprint(val) // stringify numbers, bools, etc.
+				row[i] = fmt.Sprint(val)
 			}
 		}
-
-		table = append(table, row)
+		tableRows = append(tableRows, row)
 	}
 
+	return header, tableRows, nil
+}
+
+// renderStyledTable renders a table using lipgloss/table with the project's colour theme.
+func renderStyledTable(headers []string, rows [][]string) {
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(style.Cyan).
+		Padding(0, 1)
+
+	cellStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#FAFAFA")).
+		Padding(0, 1)
+
+	dimCellStyle := lipgloss.NewStyle().
+		Foreground(style.Dim).
+		Padding(0, 1)
+
+	t := lgtable.New().
+		Headers(headers...).
+		Border(lipgloss.RoundedBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(style.Subtle)).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			if row == lgtable.HeaderRow {
+				return headerStyle
+			}
+			if row%2 == 0 {
+				return cellStyle
+			}
+			return dimCellStyle
+		})
+
+	for _, r := range rows {
+		t = t.Row(r...)
+	}
+
+	fmt.Println(t.Render())
+}
+
+// renderPtermTable renders a table using the legacy pterm renderer (for non-TTY / no-color).
+func renderPtermTable(headers []string, rows [][]string) error {
+	data := pterm.TableData{headers}
+	for _, r := range rows {
+		data = append(data, r)
+	}
 	return pterm.DefaultTable.
 		WithHasHeader().
 		WithBoxed(true).
-		WithData(table).
+		WithData(data).
 		Render()
 }
 
@@ -109,22 +146,44 @@ func DefaultTableOptions() TableOptions {
 	}
 }
 
-// PrintTableWithOptions prints the data in a table format using the provided options
+// PrintTableWithOptions prints the data in a table format using the provided options.
+// When colour is enabled (TTY), it renders using lipgloss/table with the project theme.
+// Otherwise it falls back to the pterm boxed table for plain-text environments.
 func PrintTableWithOptions(res any, options TableOptions) error {
 	mrListJSON, err := json.Marshal(res)
 	if err != nil {
 		return fmt.Errorf("failed to marshal data to JSON: %w", err)
 	}
 
-	err = jsonToTableWithMapping(string(mrListJSON), options.ColumnMapping)
+	headers, rows, err := parseTableData(string(mrListJSON), options.ColumnMapping)
 	if err != nil {
-		log.Error().Msgf("failed to render table: %v", err)
+		log.Error().Msgf("failed to parse table data: %v", err)
 		return err
 	}
 
+	if headers == nil {
+		// No data to display
+		return nil
+	}
+
+	if style.Enabled {
+		renderStyledTable(headers, rows)
+	} else {
+		if err := renderPtermTable(headers, rows); err != nil {
+			log.Error().Msgf("failed to render table: %v", err)
+			return err
+		}
+	}
+
 	if options.ShowPagination {
-		fmt.Printf("Page %d of %d (Total: %d)\n",
-			options.PageIndex, options.PageCount, options.ItemCount)
+		if style.Enabled {
+			fmt.Println(lipgloss.NewStyle().Foreground(style.Dim).Render(
+				fmt.Sprintf("Page %d of %d (Total: %d)",
+					options.PageIndex, options.PageCount, options.ItemCount)))
+		} else {
+			fmt.Printf("Page %d of %d (Total: %d)\n",
+				options.PageIndex, options.PageCount, options.ItemCount)
+		}
 	}
 
 	return nil

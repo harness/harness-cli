@@ -12,7 +12,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/charmbracelet/huh"
 	"github.com/harness/harness-cli/config"
+	"github.com/harness/harness-cli/internal/style"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -162,14 +164,73 @@ func getLoginCmd() *cobra.Command {
 		Long:         `Authenticate with Harness services and save credentials for future use`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			isTTY := term.IsTerminal(int(os.Stdout.Fd()))
+
 			// Check if we need interactive mode
 			needInteractive := !nonInteractive && (token == "" || accountID == "")
 
-			// Interactive mode for missing required inputs
-			if needInteractive {
+			// ── Interactive mode: use huh form when in a TTY ────────────
+			if needInteractive && isTTY {
+				fmt.Println(style.Title.Render("Harness CLI — Login"))
+				fmt.Println()
+
+				// Set defaults for the form
+				if apiURL == "" {
+					apiURL = "https://app.harness.io"
+				}
+
+				form := huh.NewForm(
+					huh.NewGroup(
+						huh.NewInput().
+							Title("API URL").
+							Description("The base URL for your Harness instance").
+							Placeholder("https://app.harness.io").
+							Value(&apiURL),
+						huh.NewInput().
+							Title("API Token").
+							Description("Your personal access token (pat.xxx.xxx.xxx)").
+							EchoMode(huh.EchoModePassword).
+							Value(&token).
+							Validate(func(s string) error {
+								if s == "" {
+									return fmt.Errorf("API token is required")
+								}
+								return nil
+							}),
+					),
+					huh.NewGroup(
+						huh.NewInput().
+							Title("Organization ID").
+							Description("Optional — scope commands to an organization").
+							Value(&orgID),
+						huh.NewInput().
+							Title("Project ID").
+							Description("Optional — scope commands to a project").
+							Value(&projectID),
+					),
+				)
+
+				err := form.Run()
+				if err != nil {
+					return err
+				}
+
+				// Extract account ID from token
+				if accountID == "" {
+					accountID, err = GetAccountIDFromToken(token)
+					if err != nil {
+						return err
+					}
+					if accountID == "" {
+						return fmt.Errorf("token does not contain an account ID")
+					}
+					fmt.Println(style.DimText.Render(fmt.Sprintf("Account ID extracted from token: %s", accountID)))
+				}
+
+			} else if needInteractive {
+				// ── Fallback: plain stdin prompts for non-TTY ────────────
 				fmt.Println("Entering interactive login mode. Press Ctrl+C to cancel.")
 
-				// Get API URL
 				if apiURL == "" {
 					defaultURL := "https://app.harness.io"
 					input, err := readInput(fmt.Sprintf("API URL [%s]: ", defaultURL))
@@ -183,7 +244,6 @@ func getLoginCmd() *cobra.Command {
 					}
 				}
 
-				// Get API Token
 				if token == "" {
 					input, err := readToken("API Token: ")
 					if err != nil {
@@ -195,7 +255,6 @@ func getLoginCmd() *cobra.Command {
 					token = input
 				}
 
-				// Get Account ID
 				if accountID == "" {
 					var err error
 					accountID, err = GetAccountIDFromToken(token)
@@ -203,12 +262,11 @@ func getLoginCmd() *cobra.Command {
 						return err
 					}
 					if accountID == "" {
-						return fmt.Errorf("token does not contains accountID")
+						return fmt.Errorf("token does not contain accountID")
 					}
 					fmt.Println("AccountID from token:", accountID)
 				}
 
-				// Get optional Org ID
 				if orgID == "" {
 					input, err := readInput("Organization ID (optional): ")
 					if err != nil {
@@ -217,7 +275,6 @@ func getLoginCmd() *cobra.Command {
 					orgID = input
 				}
 
-				// Get optional Project ID
 				if projectID == "" {
 					input, err := readInput("Project ID (optional): ")
 					if err != nil {
@@ -241,11 +298,22 @@ func getLoginCmd() *cobra.Command {
 			}
 
 			// Validate credentials by making an API call
-			fmt.Println("Validating credentials...")
+			if isTTY {
+				fmt.Print(style.DimText.Render("Validating credentials... "))
+			} else {
+				fmt.Println("Validating credentials...")
+			}
 			if err := validateCredentials(apiURL, token, accountID); err != nil {
+				if isTTY {
+					fmt.Println(style.Error.Render("✗ failed"))
+				}
 				return fmt.Errorf("credential validation failed: %w", err)
 			}
-			fmt.Println("✓ Credentials validated successfully")
+			if isTTY {
+				fmt.Println(style.Success.Render("✓ valid"))
+			} else {
+				fmt.Println("✓ Credentials validated successfully")
+			}
 
 			// Create auth config struct for saving to file
 			authConfig := AuthConfig{
@@ -269,14 +337,29 @@ func getLoginCmd() *cobra.Command {
 			config.Global.ProjectID = projectID
 
 			// Print confirmation message
-			fmt.Println("Successfully logged into Harness")
-			fmt.Println("API URL:     ", apiURL)
-			fmt.Println("Account ID:  ", accountID)
-			if orgID != "" {
-				fmt.Println("Org ID:      ", orgID)
-			}
-			if projectID != "" {
-				fmt.Println("Project ID:  ", projectID)
+			if isTTY {
+				fmt.Println()
+				fmt.Println(style.Success.Render("Successfully logged into Harness"))
+				fmt.Println(style.DimText.Render("  API URL:    ") + apiURL)
+				fmt.Println(style.DimText.Render("  Account ID: ") + accountID)
+				if orgID != "" {
+					fmt.Println(style.DimText.Render("  Org ID:     ") + orgID)
+				}
+				if projectID != "" {
+					fmt.Println(style.DimText.Render("  Project ID: ") + projectID)
+				}
+				fmt.Println()
+				fmt.Println(style.Hint("Run 'hc auth status' to verify, or 'hc' for interactive mode."))
+			} else {
+				fmt.Println("Successfully logged into Harness")
+				fmt.Println("API URL:     ", apiURL)
+				fmt.Println("Account ID:  ", accountID)
+				if orgID != "" {
+					fmt.Println("Org ID:      ", orgID)
+				}
+				if projectID != "" {
+					fmt.Println("Project ID:  ", projectID)
+				}
 			}
 
 			return nil

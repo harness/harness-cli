@@ -223,6 +223,41 @@ hc api /har/api/v1/registries --header "Content-Type: application/json"
 hc api /har/api/v1/registries/my-reg --method DELETE
 ```
 
+## Interactive Mode
+
+When you run `hc` with no arguments in a terminal, the CLI launches an interactive menu powered by [Charm](https://charm.land) libraries. The menu lets you browse available commands, fill in parameters with guided forms, and see styled output with colors, spinners, and tables.
+
+### Launching Interactive Mode
+
+```bash
+# Auto-launches when no subcommand is given in a terminal
+hc
+
+# Explicitly request interactive mode
+hc --interactive
+hc -i
+```
+
+### Features
+
+- **Main menu**: Navigate all commands with arrow keys, filter by typing
+- **Interactive tables**: Registry and artifact lists with keyboard navigation and pagination
+- **Confirmation prompts**: Destructive operations (e.g. `delete`) ask for confirmation before proceeding
+- **Spinners & progress**: Visual feedback during API calls and long operations
+- **Themed output**: Consistent color system with success/error/warning indicators
+
+### Scriptability Guarantees
+
+Interactive mode is **never** enabled when stdout is not a TTY (e.g. piped or redirected). This ensures scripts and CI pipelines always get plain, parseable output:
+
+```bash
+# These all produce plain output, never interactive prompts:
+hc registry list | jq .
+hc registry list > output.txt
+hc registry list --json
+CI=true hc registry list
+```
+
 ## Global Flags
 
 The following flags are available for all commands:
@@ -234,7 +269,10 @@ The following flags are available for all commands:
 --org string              Organisation ID (overrides saved config)
 --project string          Project ID (overrides saved config)
 --format string           Output format: table (default) or json
---log-file string         Path to store logs
+--json                    Output results as JSON (shorthand for --format=json)
+--interactive, -i         Force interactive TUI mode (requires a terminal)
+--no-color                Disable colour output (also respects NO_COLOR env)
+--verbose, -v             Enable verbose logging to stderr
 ```
 
 ## Output Formatting 
@@ -244,6 +282,7 @@ The CLI supports different output formats using the `--format` flag:
 ```bash
 # Output in JSON format
 hc registry list --format=json
+hc registry list --json    # shorthand
 
 # Output in table format (default)
 hc registry list --format=table
@@ -257,30 +296,66 @@ JSON output supports:
 - Smart pagination information
 - Custom output formatting
 
+### Disabling Colours
+
+Colours are automatically disabled when stdout is not a terminal. You can also
+force plain output:
+
+```bash
+# Via flag
+hc registry list --no-color
+
+# Via environment variable (https://no-color.org)
+NO_COLOR=1 hc registry list
+```
+
 ## Development
 
 ### Project Structure
 
 ```
 harness-cli/
-├── api/              # OpenAPI specs for each service
-├── cmd/              # CLI commands implementation
-│   ├── hc/           # Main CLI entry point
-│   ├── auth/         # Authentication commands
-│   ├── registry/     # Registry management commands
-│   ├── artifact/     # Artifact management commands
-│   ├── project/      # Project management commands
-│   ├── organisation/ # Organisation management commands
-│   └── api/          # API passthrough command
-├── config/           # Configuration handling
-├── internal/         # Internal packages and generated API clients
-├── module/           # Service-specific modules
-├── tools/            # Development tools
-└── util/             # Utility functions
+├── api/                  # OpenAPI specs for each service
+├── cmd/                  # CLI commands implementation
+│   ├── hc/               # Main CLI entry point
+│   ├── auth/             # Authentication commands
+│   ├── registry/         # Registry management commands
+│   ├── artifact/         # Artifact management commands
+│   ├── project/          # Project management commands
+│   ├── organisation/     # Organisation management commands
+│   └── api/              # API passthrough command
+├── config/               # Configuration handling
+├── internal/
+│   ├── api/              # Generated API clients (ar, ar_v2, ar_v3, ar_pkg)
+│   ├── style/            # Lipgloss theme tokens (colours, borders, typography)
+│   ├── terminal/         # TTY detection, colour capability helpers
+│   └── tui/              # Bubble Tea models (menu, tables, spinners, forms)
+├── module/               # Service-specific modules
+├── tools/                # Development tools
+└── util/                 # Utility functions (printer, progress, auth, etc.)
 ```
 
-### Adding New Commands (coming soon)
-TODO
+### Adding New Interactive Flows
+
+To add an interactive TUI flow for a new command:
+
+1. **Create a new model** in `internal/tui/` (e.g. `artifact_list.go`).
+   Follow the pattern in `registry_list.go` — define a Bubble Tea `Model` with
+   `Init`, `Update`, `View`, and a `Run*` entry-point function.
+
+2. **Wire it into the menu** by adding a `menuItem` in `internal/tui/menu.go`
+   and a case in `runInteractiveMode()` in `cmd/hc/main.go`.
+
+3. **Use shared components**: spinners (`tui.RunWithSpinner`), confirmations
+   (`tui.ConfirmDeletion`), text inputs (`tui.PromptInput`), and select
+   prompts (`tui.PromptSelect`) are already available.
+
+4. **Keep core logic separate**: the TUI model should call the same API
+   functions used by the non-interactive Cobra command. Never duplicate
+   business logic.
+
+5. **Use the theme**: import `internal/style` for all colours and styles so
+   the UI stays consistent.
 
 ### Building
 
