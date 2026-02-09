@@ -3,9 +3,11 @@ package command
 import (
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -68,29 +70,7 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 				project = config.Global.ProjectID
 			}
 
-			p.Start(fmt.Sprintf("Parsing lock file: %s", filepath.Base(filePath)))
-			log.Info().Str("file", filePath).Msg("Parsing lock file")
-
-			dependencies, err := parseLockFile(filePath)
-			if err != nil {
-				p.Error("Failed to parse lock file")
-				log.Error().Err(err).Msg("Failed to parse lock file")
-				return fmt.Errorf("failed to parse lock file: %w", err)
-			}
-
-			if len(dependencies) == 0 {
-				p.Success("No dependencies found in the lock file")
-				log.Info().Msg("No dependencies found in the lock file")
-				return nil
-			}
-
-			sort.Slice(dependencies, func(i, j int) bool {
-				return dependencies[i].Name < dependencies[j].Name
-			})
-
-			p.Success(fmt.Sprintf("Found %d dependencies in %s", len(dependencies), filepath.Base(filePath)))
-			log.Info().Int("count", len(dependencies)).Msg("Dependencies found")
-
+			// Fetch registry details FIRST to get package type
 			p.Step(fmt.Sprintf("Fetching registry details for: %s", registryName))
 			log.Info().Str("registry", registryName).Msg("Fetching registry details")
 
@@ -125,8 +105,41 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 				return fmt.Errorf("invalid registry UUID format: %w", err)
 			}
 
-			p.Success(fmt.Sprintf("Found registry UUID: %s", registryUUID.String()))
-			log.Info().Str("registryUUID", registryUUID.String()).Msg("Registry UUID retrieved")
+			// Get package type from registry
+			packageType := string(registryResp.JSON200.Data.PackageType)
+
+			p.Success(fmt.Sprintf("Found registry: %s (type: %s)", registryUUID.String(), packageType))
+			log.Info().Str("registryUUID", registryUUID.String()).Str("packageType", packageType).Msg("Registry details retrieved")
+
+			// Validate file type matches registry package type
+			fileName := filepath.Base(filePath)
+			if err := validateFileForPackageType(fileName, packageType); err != nil {
+				p.Error(err.Error())
+				log.Error().Err(err).Str("file", fileName).Str("packageType", packageType).Msg("File type mismatch")
+				return err
+			}
+
+			p.Start(fmt.Sprintf("Parsing dependency file: %s", fileName))
+			log.Info().Str("file", filePath).Msg("Parsing dependency file")
+
+			dependencies, err := parseLockFile(filePath)
+			if err != nil {
+				p.Error("Failed to parse dependency file")
+				log.Error().Err(err).Msg("Failed to parse dependency file")
+				return fmt.Errorf("failed to parse dependency file: %w", err)
+			}
+
+			if len(dependencies) == 0 {
+				p.Success("No dependencies found in the file")
+				log.Info().Msg("No dependencies found in the file")
+				return nil
+			}
+
+			sort.Slice(dependencies, func(i, j int) bool {
+				return dependencies[i].Name < dependencies[j].Name
+			})
+
+			p.Success(fmt.Sprintf("Found %d dependencies in %s", len(dependencies), fileName))
 
 			p.Step(fmt.Sprintf("Initiating bulk scan evaluation for registry: %s", registryName))
 			log.Info().Str("registry", registryName).Msg("Initiating bulk scan evaluation")
@@ -344,6 +357,45 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 	return cmd
 }
 
+// validateFileForPackageType validates that the dependency file matches the registry package type
+func validateFileForPackageType(fileName, packageType string) error {
+	// Define valid files for each package type
+	validFiles := map[string][]string{
+		"NPM": {
+			"package-lock.json",
+			"yarn.lock",
+			"pnpm-lock.yaml",
+		},
+		"PYTHON": {
+			"requirements.txt",
+			"pyproject.toml",
+			"Pipfile.lock",
+			"poetry.lock",
+		},
+		"MAVEN": {
+			"pom.xml",
+			"build.gradle",
+			"build.gradle.kts",
+		},
+	}
+
+	// Get valid files for the package type
+	validFilesList, ok := validFiles[packageType]
+	if !ok {
+		return fmt.Errorf("unsupported package type: %s (supported: NPM, PYTHON, MAVEN)", packageType)
+	}
+
+	// Check if the file is valid for this package type
+	for _, validFile := range validFilesList {
+		if fileName == validFile || strings.HasSuffix(fileName, validFile) {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("file '%s' is not compatible with package type '%s'. Valid files for %s: %s",
+		fileName, packageType, packageType, strings.Join(validFilesList, ", "))
+}
+
 func parseLockFile(filePath string) ([]Dependency, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
@@ -359,8 +411,20 @@ func parseLockFile(filePath string) ([]Dependency, error) {
 		return parsePnpmLock(data)
 	case strings.HasSuffix(fileName, "yarn.lock"):
 		return parseYarnLock(data)
+	case strings.HasSuffix(fileName, "requirements.txt"):
+		return parseRequirementsTxt(data)
+	case strings.HasSuffix(fileName, "pyproject.toml"):
+		return parsePyProjectToml(data)
+	case fileName == "Pipfile.lock":
+		return parsePipfileLock(data)
+	case fileName == "poetry.lock":
+		return parsePoetryLock(data)
+	case strings.HasSuffix(fileName, "pom.xml"):
+		return parsePomXml(data)
+	case strings.HasSuffix(fileName, "build.gradle") || strings.HasSuffix(fileName, "build.gradle.kts"):
+		return parseBuildGradle(data)
 	default:
-		return nil, fmt.Errorf("unsupported lock file format: %s (supported: package-lock.json, pnpm-lock.yaml, yarn.lock)", fileName)
+		return nil, fmt.Errorf("unsupported lock file format: %s (supported: package-lock.json, pnpm-lock.yaml, yarn.lock, requirements.txt, pyproject.toml, Pipfile.lock, poetry.lock, pom.xml, build.gradle)", fileName)
 	}
 }
 
@@ -506,6 +570,468 @@ func parseYarnLock(data []byte) ([]Dependency, error) {
 				})
 			}
 			currentPkg = ""
+		}
+	}
+
+	return deps, nil
+}
+
+func parseRequirementsTxt(data []byte) ([]Dependency, error) {
+	lines := strings.Split(string(data), "\n")
+	deps := make([]Dependency, 0)
+	seen := make(map[string]bool)
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "-") {
+			continue
+		}
+
+		if strings.HasPrefix(line, "git+") || strings.HasPrefix(line, "http://") || strings.HasPrefix(line, "https://") {
+			continue
+		}
+
+		var name, version string
+
+		if strings.Contains(line, "==") {
+			parts := strings.SplitN(line, "==", 2)
+			name = strings.TrimSpace(parts[0])
+			version = strings.TrimSpace(parts[1])
+		} else if strings.Contains(line, ">=") {
+			parts := strings.SplitN(line, ">=", 2)
+			name = strings.TrimSpace(parts[0])
+			version = strings.TrimSpace(parts[1])
+			if idx := strings.Index(version, ","); idx != -1 {
+				version = version[:idx]
+			}
+		} else if strings.Contains(line, "<=") {
+			parts := strings.SplitN(line, "<=", 2)
+			name = strings.TrimSpace(parts[0])
+			version = strings.TrimSpace(parts[1])
+		} else if strings.Contains(line, "~=") {
+			parts := strings.SplitN(line, "~=", 2)
+			name = strings.TrimSpace(parts[0])
+			version = strings.TrimSpace(parts[1])
+		} else if strings.Contains(line, ">") {
+			parts := strings.SplitN(line, ">", 2)
+			name = strings.TrimSpace(parts[0])
+			version = strings.TrimSpace(parts[1])
+			if idx := strings.Index(version, ","); idx != -1 {
+				version = version[:idx]
+			}
+		} else if strings.Contains(line, "<") {
+			parts := strings.SplitN(line, "<", 2)
+			name = strings.TrimSpace(parts[0])
+			version = strings.TrimSpace(parts[1])
+		} else {
+			name = line
+			version = "latest"
+		}
+
+		if idx := strings.Index(name, "["); idx != -1 {
+			name = name[:idx]
+		}
+
+		name = strings.TrimSpace(name)
+		version = strings.TrimSpace(version)
+
+		if strings.Contains(version, ";") {
+			version = strings.TrimSpace(strings.Split(version, ";")[0])
+		}
+
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+
+		deps = append(deps, Dependency{
+			Name:    name,
+			Version: version,
+			Source:  "requirements.txt",
+		})
+	}
+
+	return deps, nil
+}
+
+func parsePyProjectToml(data []byte) ([]Dependency, error) {
+	deps := make([]Dependency, 0)
+	seen := make(map[string]bool)
+
+	lines := strings.Split(string(data), "\n")
+	inDependencies := false
+	inOptionalDeps := false
+	inPoetryDeps := false
+
+	for _, line := range lines {
+		trimmedLine := strings.TrimSpace(line)
+
+		if strings.HasPrefix(trimmedLine, "[") {
+			inDependencies = false
+			inOptionalDeps = false
+			inPoetryDeps = false
+
+			if trimmedLine == "[tool.poetry.dependencies]" {
+				inPoetryDeps = true
+			} else if strings.HasPrefix(trimmedLine, "[project.optional-dependencies") {
+				inOptionalDeps = true
+			}
+			continue
+		}
+
+		if trimmedLine == "dependencies = [" {
+			inDependencies = true
+			continue
+		}
+
+		if trimmedLine == "]" {
+			inDependencies = false
+			inOptionalDeps = false
+			continue
+		}
+
+		if inPoetryDeps {
+			if trimmedLine == "" || strings.HasPrefix(trimmedLine, "#") {
+				continue
+			}
+			if strings.HasPrefix(trimmedLine, "python") {
+				continue
+			}
+
+			if strings.Contains(trimmedLine, "=") {
+				parts := strings.SplitN(trimmedLine, "=", 2)
+				name := strings.TrimSpace(parts[0])
+				versionPart := strings.TrimSpace(parts[1])
+
+				versionPart = strings.Trim(versionPart, "\"'^~>=<")
+				if strings.HasPrefix(versionPart, "{") {
+					if strings.Contains(versionPart, "version") {
+						re := strings.Index(versionPart, "version")
+						if re != -1 {
+							sub := versionPart[re:]
+							if eqIdx := strings.Index(sub, "\""); eqIdx != -1 {
+								endIdx := strings.Index(sub[eqIdx+1:], "\"")
+								if endIdx != -1 {
+									versionPart = sub[eqIdx+1 : eqIdx+1+endIdx]
+								}
+							}
+						}
+					} else {
+						versionPart = "latest"
+					}
+				}
+
+				versionPart = strings.Trim(versionPart, "\"'^~>=<,}")
+
+				if name != "" && !seen[name] {
+					seen[name] = true
+					deps = append(deps, Dependency{
+						Name:    name,
+						Version: versionPart,
+						Source:  "pyproject.toml",
+					})
+				}
+			}
+			continue
+		}
+
+		if inDependencies || inOptionalDeps {
+			if trimmedLine == "" || strings.HasPrefix(trimmedLine, "#") {
+				continue
+			}
+
+			depLine := strings.Trim(trimmedLine, "\",")
+
+			if !strings.Contains(depLine, "==") && !strings.Contains(depLine, ">=") && !strings.Contains(depLine, "~=") && !strings.Contains(depLine, ">") && !strings.Contains(depLine, "<") {
+				if strings.Contains(depLine, "=") {
+					continue
+				}
+			}
+
+			var name, version string
+
+			if strings.Contains(depLine, "==") {
+				parts := strings.SplitN(depLine, "==", 2)
+				name = strings.TrimSpace(parts[0])
+				version = strings.TrimSpace(parts[1])
+			} else if strings.Contains(depLine, ">=") {
+				parts := strings.SplitN(depLine, ">=", 2)
+				name = strings.TrimSpace(parts[0])
+				version = strings.TrimSpace(parts[1])
+				if idx := strings.Index(version, ","); idx != -1 {
+					version = version[:idx]
+				}
+			} else if strings.Contains(depLine, "~=") {
+				parts := strings.SplitN(depLine, "~=", 2)
+				name = strings.TrimSpace(parts[0])
+				version = strings.TrimSpace(parts[1])
+			} else {
+				name = depLine
+				version = "latest"
+			}
+
+			if idx := strings.Index(name, "["); idx != -1 {
+				name = name[:idx]
+			}
+
+			name = strings.TrimSpace(name)
+			version = strings.TrimSpace(version)
+
+			if strings.Contains(version, ";") {
+				version = strings.Split(version, ";")[0]
+			}
+			version = strings.Trim(version, "\"',")
+
+			if name == "" || seen[name] {
+				continue
+			}
+			seen[name] = true
+
+			deps = append(deps, Dependency{
+				Name:    name,
+				Version: version,
+				Source:  "pyproject.toml",
+			})
+		}
+	}
+
+	return deps, nil
+}
+
+func parsePipfileLock(data []byte) ([]Dependency, error) {
+	var lockFile struct {
+		Default map[string]struct {
+			Version string `json:"version"`
+		} `json:"default"`
+		Develop map[string]struct {
+			Version string `json:"version"`
+		} `json:"develop"`
+	}
+
+	if err := json.Unmarshal(data, &lockFile); err != nil {
+		return nil, fmt.Errorf("failed to parse Pipfile.lock: %w", err)
+	}
+
+	deps := make([]Dependency, 0)
+	seen := make(map[string]bool)
+
+	for name, pkg := range lockFile.Default {
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+
+		version := strings.TrimPrefix(pkg.Version, "==")
+		deps = append(deps, Dependency{
+			Name:    name,
+			Version: version,
+			Source:  "Pipfile.lock",
+		})
+	}
+
+	for name, pkg := range lockFile.Develop {
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+
+		version := strings.TrimPrefix(pkg.Version, "==")
+		deps = append(deps, Dependency{
+			Name:    name,
+			Version: version,
+			Source:  "Pipfile.lock",
+		})
+	}
+
+	return deps, nil
+}
+
+func parsePoetryLock(data []byte) ([]Dependency, error) {
+	deps := make([]Dependency, 0)
+	seen := make(map[string]bool)
+
+	lines := strings.Split(string(data), "\n")
+	inPackage := false
+	var currentName, currentVersion string
+
+	for _, line := range lines {
+		trimmedLine := strings.TrimSpace(line)
+
+		if trimmedLine == "[[package]]" {
+			if currentName != "" && !seen[currentName] {
+				seen[currentName] = true
+				deps = append(deps, Dependency{
+					Name:    currentName,
+					Version: currentVersion,
+					Source:  "poetry.lock",
+				})
+			}
+			inPackage = true
+			currentName = ""
+			currentVersion = ""
+			continue
+		}
+
+		if inPackage {
+			if strings.HasPrefix(trimmedLine, "name = ") {
+				currentName = strings.Trim(strings.TrimPrefix(trimmedLine, "name = "), "\"")
+			} else if strings.HasPrefix(trimmedLine, "version = ") {
+				currentVersion = strings.Trim(strings.TrimPrefix(trimmedLine, "version = "), "\"")
+			} else if strings.HasPrefix(trimmedLine, "[") && trimmedLine != "[[package]]" {
+				inPackage = false
+			}
+		}
+	}
+
+	if currentName != "" && !seen[currentName] {
+		seen[currentName] = true
+		deps = append(deps, Dependency{
+			Name:    currentName,
+			Version: currentVersion,
+			Source:  "poetry.lock",
+		})
+	}
+
+	return deps, nil
+}
+
+func parsePomXml(data []byte) ([]Dependency, error) {
+	type PomDependency struct {
+		GroupId    string `xml:"groupId"`
+		ArtifactId string `xml:"artifactId"`
+		Version    string `xml:"version"`
+		Scope      string `xml:"scope"`
+	}
+
+	type PomProject struct {
+		XMLName      xml.Name `xml:"project"`
+		Dependencies struct {
+			Dependency []PomDependency `xml:"dependency"`
+		} `xml:"dependencies"`
+		DependencyManagement struct {
+			Dependencies struct {
+				Dependency []PomDependency `xml:"dependency"`
+			} `xml:"dependencies"`
+		} `xml:"dependencyManagement"`
+		Properties map[string]string `xml:"-"`
+	}
+
+	var pom PomProject
+	if err := xml.Unmarshal(data, &pom); err != nil {
+		return nil, fmt.Errorf("failed to parse pom.xml: %w", err)
+	}
+
+	pom.Properties = make(map[string]string)
+	propsRegex := regexp.MustCompile(`<([a-zA-Z0-9._-]+)>([^<]+)</[a-zA-Z0-9._-]+>`)
+	propsSection := regexp.MustCompile(`(?s)<properties>(.*?)</properties>`)
+	if matches := propsSection.FindSubmatch(data); len(matches) > 1 {
+		propMatches := propsRegex.FindAllSubmatch(matches[1], -1)
+		for _, match := range propMatches {
+			if len(match) >= 3 {
+				pom.Properties[string(match[1])] = string(match[2])
+			}
+		}
+	}
+
+	deps := make([]Dependency, 0)
+	seen := make(map[string]bool)
+
+	resolveVersion := func(version string) string {
+		if strings.HasPrefix(version, "${") && strings.HasSuffix(version, "}") {
+			propName := version[2 : len(version)-1]
+			if resolved, ok := pom.Properties[propName]; ok {
+				return resolved
+			}
+		}
+		return version
+	}
+
+	allDeps := append(pom.Dependencies.Dependency, pom.DependencyManagement.Dependencies.Dependency...)
+
+	for _, dep := range allDeps {
+		if dep.GroupId == "" || dep.ArtifactId == "" {
+			continue
+		}
+
+		name := dep.GroupId + ":" + dep.ArtifactId
+		version := resolveVersion(dep.Version)
+		if version == "" {
+			version = "latest"
+		}
+
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+
+		deps = append(deps, Dependency{
+			Name:    name,
+			Version: version,
+			Source:  "pom.xml",
+		})
+	}
+
+	return deps, nil
+}
+
+func parseBuildGradle(data []byte) ([]Dependency, error) {
+	deps := make([]Dependency, 0)
+	seen := make(map[string]bool)
+
+	content := string(data)
+
+	depPatterns := []*regexp.Regexp{
+		regexp.MustCompile(`(?:implementation|api|compile|runtimeOnly|testImplementation|testCompile|compileOnly)\s*\(\s*['"]([^'"]+):([^'"]+):([^'"]+)['"]\s*\)`),
+		regexp.MustCompile(`(?:implementation|api|compile|runtimeOnly|testImplementation|testCompile|compileOnly)\s*\(\s*group:\s*['"]([^'"]+)['"]\s*,\s*name:\s*['"]([^'"]+)['"]\s*,\s*version:\s*['"]([^'"]+)['"]\s*\)`),
+		regexp.MustCompile(`(?:implementation|api|compile|runtimeOnly|testImplementation|testCompile|compileOnly)\s+['"]([^'"]+):([^'"]+):([^'"]+)['"]`),
+	}
+
+	for _, pattern := range depPatterns {
+		matches := pattern.FindAllStringSubmatch(content, -1)
+		for _, match := range matches {
+			var name, version string
+			if len(match) >= 4 {
+				name = match[1] + ":" + match[2]
+				version = match[3]
+			}
+
+			if name == "" || seen[name] {
+				continue
+			}
+			seen[name] = true
+
+			deps = append(deps, Dependency{
+				Name:    name,
+				Version: version,
+				Source:  "build.gradle",
+			})
+		}
+	}
+
+	kotlinPatterns := []*regexp.Regexp{
+		regexp.MustCompile(`(?:implementation|api|compile|runtimeOnly|testImplementation|testCompile|compileOnly)\s*\(\s*"([^"]+):([^"]+):([^"]+)"\s*\)`),
+	}
+
+	for _, pattern := range kotlinPatterns {
+		matches := pattern.FindAllStringSubmatch(content, -1)
+		for _, match := range matches {
+			var name, version string
+			if len(match) >= 4 {
+				name = match[1] + ":" + match[2]
+				version = match[3]
+			}
+
+			if name == "" || seen[name] {
+				continue
+			}
+			seen[name] = true
+
+			deps = append(deps, Dependency{
+				Name:    name,
+				Version: version,
+				Source:  "build.gradle",
+			})
 		}
 	}
 
