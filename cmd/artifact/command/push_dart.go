@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
@@ -54,6 +55,15 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 				progress.Error("Package file path is required")
 				return fmt.Errorf("package file path is required")
 			}
+
+			// Resolve file path (supports glob patterns like *.tar.gz)
+			files, err := utils.ResolveFilePath(packageFilePath, ".gz", ".tgz")
+			if err != nil {
+				progress.Error("Failed to resolve file path")
+				return err
+			}
+			packageFilePath = files[0]
+			progress.Step(fmt.Sprintf("Uploading file: %s", packageFilePath))
 
 			fileInfo, err := os.Stat(packageFilePath)
 			if err != nil {

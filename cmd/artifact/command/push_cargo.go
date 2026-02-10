@@ -15,6 +15,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
@@ -64,6 +65,15 @@ func NewPushCargoCmd(f *cmdutils.Factory) *cobra.Command {
 				progress.Error("File path is required")
 				return errors.NewValidationError("file_path", "file path is required")
 			}
+
+			// Resolve file path (supports glob patterns like *.crate)
+			files, err := utils.ResolveFilePath(filePath, CargoFileExtension)
+			if err != nil {
+				progress.Error("Failed to resolve file path")
+				return err
+			}
+			filePath = files[0]
+			progress.Step(fmt.Sprintf("Uploading file: %s", filePath))
 
 			fileName := filepath.Base(filePath)
 

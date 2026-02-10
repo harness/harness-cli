@@ -51,6 +51,15 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 				return fmt.Errorf("package file path is required")
 			}
 
+			// Resolve file path (supports glob patterns like *.tgz)
+			files, err := utils.ResolveFilePath(packageFilePath, ".tgz")
+			if err != nil {
+				progress.Error("Failed to resolve file path")
+				return err
+			}
+			packageFilePath = files[0]
+			progress.Step(fmt.Sprintf("Uploading file: %s", packageFilePath))
+
 			fileInfo, err := os.Stat(packageFilePath)
 			if err != nil {
 				progress.Error("Failed to access package file")
