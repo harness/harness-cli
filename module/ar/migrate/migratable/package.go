@@ -150,7 +150,7 @@ func (r *Package) Pre(ctx context.Context) error {
 		craneOpts := []crane.Option{
 			crane.WithContext(ctx),
 			crane.WithJobs(r.config.Concurrency),
-			crane.WithNoClobber(true),
+			crane.WithNoClobber(!r.config.Overwrite),
 			crane.WithAuthFromKeychain(keyChain),
 		}
 		if r.srcAdapter.GetConfig().Insecure {
@@ -239,7 +239,7 @@ func (r *Package) Migrate(ctx context.Context) error {
 			crane.WithUserAgent("harness-cli"),
 			crane.WithContext(ctx),
 			crane.WithJobs(r.config.Concurrency),
-			crane.WithNoClobber(true),
+			crane.WithNoClobber(!r.config.Overwrite),
 			crane.WithAuthFromKeychain(keyChain),
 		}
 
