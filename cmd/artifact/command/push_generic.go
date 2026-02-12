@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
@@ -33,6 +34,14 @@ func NewPushGenericCmd(c *cmdutils.Factory) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]
 			packageFilePath := args[1]
+
+			// Resolve file path (supports glob patterns like *.zip)
+			files, err := utils.ResolveFilePath(packageFilePath)
+			if err != nil {
+				return err
+			}
+			packageFilePath = files[0]
+			fmt.Printf("Uploading file: %s\n", packageFilePath)
 
 			// Validate file exists
 			fileInfo, err := os.Stat(packageFilePath)
