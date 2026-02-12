@@ -359,9 +359,9 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 
 // validateFileForPackageType validates that the dependency file matches the registry package type
 func validateFileForPackageType(fileName, packageType string) error {
-	// Define valid files for each package type
 	validFiles := map[string][]string{
 		"NPM": {
+			"package.json",
 			"package-lock.json",
 			"yarn.lock",
 			"pnpm-lock.yaml",
@@ -379,13 +379,11 @@ func validateFileForPackageType(fileName, packageType string) error {
 		},
 	}
 
-	// Get valid files for the package type
 	validFilesList, ok := validFiles[packageType]
 	if !ok {
 		return fmt.Errorf("unsupported package type: %s (supported: NPM, PYTHON, MAVEN)", packageType)
 	}
 
-	// Check if the file is valid for this package type
 	for _, validFile := range validFilesList {
 		if fileName == validFile || strings.HasSuffix(fileName, validFile) {
 			return nil
@@ -405,6 +403,8 @@ func parseLockFile(filePath string) ([]Dependency, error) {
 	fileName := filepath.Base(filePath)
 
 	switch {
+	case fileName == "package.json":
+		return parsePackageJson(data)
 	case strings.HasSuffix(fileName, "package-lock.json"):
 		return parsePackageLock(data)
 	case strings.HasSuffix(fileName, "pnpm-lock.yaml"):
@@ -424,8 +424,89 @@ func parseLockFile(filePath string) ([]Dependency, error) {
 	case strings.HasSuffix(fileName, "build.gradle") || strings.HasSuffix(fileName, "build.gradle.kts"):
 		return parseBuildGradle(data)
 	default:
-		return nil, fmt.Errorf("unsupported lock file format: %s (supported: package-lock.json, pnpm-lock.yaml, yarn.lock, requirements.txt, pyproject.toml, Pipfile.lock, poetry.lock, pom.xml, build.gradle)", fileName)
+		return nil, fmt.Errorf("unsupported dependency file format: %s (supported: package.json, package-lock.json, pnpm-lock.yaml, yarn.lock, requirements.txt, pyproject.toml, Pipfile.lock, poetry.lock, pom.xml, build.gradle)", fileName)
 	}
+}
+
+func parsePackageJson(data []byte) ([]Dependency, error) {
+	var pkgJson struct {
+		Dependencies         map[string]string `json:"dependencies"`
+		DevDependencies      map[string]string `json:"devDependencies"`
+		PeerDependencies     map[string]string `json:"peerDependencies"`
+		OptionalDependencies map[string]string `json:"optionalDependencies"`
+	}
+
+	if err := json.Unmarshal(data, &pkgJson); err != nil {
+		return nil, fmt.Errorf("failed to parse package.json: %w", err)
+	}
+
+	deps := make([]Dependency, 0)
+	seen := make(map[string]bool)
+
+	cleanVersion := func(version string) string {
+		version = strings.TrimSpace(version)
+		version = strings.TrimPrefix(version, "^")
+		version = strings.TrimPrefix(version, "~")
+		version = strings.TrimPrefix(version, ">=")
+		version = strings.TrimPrefix(version, ">")
+		version = strings.TrimPrefix(version, "<=")
+		version = strings.TrimPrefix(version, "<")
+		version = strings.TrimPrefix(version, "=")
+		if idx := strings.Index(version, " "); idx != -1 {
+			version = version[:idx]
+		}
+		return version
+	}
+
+	for name, version := range pkgJson.Dependencies {
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		deps = append(deps, Dependency{
+			Name:    name,
+			Version: cleanVersion(version),
+			Source:  "package.json",
+		})
+	}
+
+	for name, version := range pkgJson.DevDependencies {
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		deps = append(deps, Dependency{
+			Name:    name,
+			Version: cleanVersion(version),
+			Source:  "package.json",
+		})
+	}
+
+	for name, version := range pkgJson.PeerDependencies {
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		deps = append(deps, Dependency{
+			Name:    name,
+			Version: cleanVersion(version),
+			Source:  "package.json",
+		})
+	}
+
+	for name, version := range pkgJson.OptionalDependencies {
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		deps = append(deps, Dependency{
+			Name:    name,
+			Version: cleanVersion(version),
+			Source:  "package.json",
+		})
+	}
+
+	return deps, nil
 }
 
 func parsePackageLock(data []byte) ([]Dependency, error) {

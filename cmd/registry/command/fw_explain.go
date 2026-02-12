@@ -385,9 +385,17 @@ func displayScanDetails(scanDetails *ar_v3.ArtifactScanDetails) error {
 		fmt.Printf("Last Evaluated: %s\n", formatTimestamp(*scanDetails.LastEvaluatedAt))
 	}
 
-	if scanDetails.FixVersionDetails != nil {
+	hasSecurityViolation := false
+	for _, failure := range scanDetails.PolicyFailureDetails {
+		if failure.Category == "Security" {
+			hasSecurityViolation = true
+			break
+		}
+	}
+
+	if hasSecurityViolation && scanDetails.FixVersionDetails != nil {
 		fmt.Println()
-		fmt.Println("Fix Version Information:")
+		fmt.Println("Security Fix Information:")
 		fmt.Printf("  Fix Available: %v\n", scanDetails.FixVersionDetails.FixVersionAvailable)
 		fmt.Printf("  Current Version: %s\n", scanDetails.FixVersionDetails.CurrentVersion)
 		if scanDetails.FixVersionDetails.FixVersion != nil {
