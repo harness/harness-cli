@@ -209,13 +209,13 @@ type ArtifactScanInput struct {
 	Version string `json:"version"`
 }
 
-// BulkScanEvaluationAcceptedData Response data for bulk scan evaluation request
+// BulkScanEvaluationAcceptedData Response data for bulk evaluation request
 type BulkScanEvaluationAcceptedData struct {
-	// EvaluationId Unique evaluation ID for tracking the bulk scan evaluation
+	// EvaluationId Unique evaluation ID for tracking the bulk evaluation
 	EvaluationId *string `json:"evaluationId,omitempty"`
 }
 
-// BulkScanEvaluationRequest Request to initiate bulk scan evaluation
+// BulkScanEvaluationRequest Request to initiate bulk evaluation
 type BulkScanEvaluationRequest struct {
 	// Artifacts List of artifacts to evaluate (max 50)
 	Artifacts []ArtifactScanInput `json:"artifacts"`
@@ -224,7 +224,7 @@ type BulkScanEvaluationRequest struct {
 	RegistryId openapi_types.UUID `json:"registryId"`
 }
 
-// BulkScanEvaluationStatusData Response data for bulk scan evaluation status
+// BulkScanEvaluationStatusData Response data for bulk evaluation status
 type BulkScanEvaluationStatusData struct {
 	// Error Error message (only present when status is failure)
 	Error *string `json:"error"`
@@ -415,13 +415,13 @@ type ArtifactScanEvaluateRequestAccepted struct {
 
 // BulkScanEvaluationAccepted defines model for BulkScanEvaluationAccepted.
 type BulkScanEvaluationAccepted struct {
-	// Data Response data for bulk scan evaluation request
+	// Data Response data for bulk evaluation request
 	Data *BulkScanEvaluationAcceptedData `json:"data,omitempty"`
 }
 
 // BulkScanEvaluationStatusResponse defines model for BulkScanEvaluationStatusResponse.
 type BulkScanEvaluationStatusResponse struct {
-	// Data Response data for bulk scan evaluation status
+	// Data Response data for bulk evaluation status
 	Data *BulkScanEvaluationStatusData `json:"data,omitempty"`
 }
 
