@@ -93,7 +93,7 @@ paths:
   /scans/bulk-evaluate:
     post:
       x-internal: false
-      summary: Initiate bulk scan evaluation
+      summary: Initiate bulk evaluation
       description: Triggers firewall policy evaluation for multiple artifacts (max 50)
       operationId: InitiateBulkScanEvaluation
       tags:
@@ -116,8 +116,8 @@ paths:
   /scans/bulk-evaluate/{evaluation_id}:
     get:
       x-internal: false
-      summary: Get bulk scan evaluation status
-      description: Returns the status of a bulk scan evaluation
+      summary: Get bulk evaluation status
+      description: Returns the status of a bulk evaluation
       operationId: GetBulkScanEvaluationStatus
       tags:
         - Registry V3
@@ -144,7 +144,7 @@ components:
           schema:
             $ref: "#/components/schemas/ArtifactScanEvaluateRequest"
     BulkScanEvaluationRequest:
-      description: Request to initiate bulk scan evaluation
+      description: Request to initiate bulk evaluation
       content:
         application/json:
           schema:
@@ -203,7 +203,7 @@ components:
               data:
                 $ref: "#/components/schemas/ArtifactScanEvaluateRequestStatus"
     BulkScanEvaluationAccepted:
-      description: Bulk scan evaluation request accepted for processing
+      description: Bulk evaluation request accepted for processing
       content:
         application/json:
           schema:
@@ -212,7 +212,7 @@ components:
               data:
                 $ref: "#/components/schemas/BulkScanEvaluationAcceptedData"
     BulkScanEvaluationStatusResponse:
-      description: Bulk scan evaluation status response
+      description: Bulk evaluation status response
       content:
         application/json:
           schema:
@@ -485,7 +485,7 @@ components:
         - FAILED
     BulkScanEvaluationRequest:
       type: object
-      description: Request to initiate bulk scan evaluation
+      description: Request to initiate bulk evaluation
       required:
         - registryId
         - artifacts
@@ -516,14 +516,14 @@ components:
           description: Version of the package
     BulkScanEvaluationAcceptedData:
       type: object
-      description: Response data for bulk scan evaluation request
+      description: Response data for bulk evaluation request
       properties:
         evaluationId:
           type: string
-          description: Unique evaluation ID for tracking the bulk scan evaluation
+          description: Unique evaluation ID for tracking the bulk evaluation
     BulkScanEvaluationStatusData:
       type: object
-      description: Response data for bulk scan evaluation status
+      description: Response data for bulk evaluation status
       properties:
         evaluationId:
           type: string

@@ -141,8 +141,8 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 
 			p.Success(fmt.Sprintf("Found %d dependencies in %s", len(dependencies), fileName))
 
-			p.Step(fmt.Sprintf("Initiating bulk scan evaluation for registry: %s", registryName))
-			log.Info().Str("registry", registryName).Msg("Initiating bulk scan evaluation")
+			p.Step(fmt.Sprintf("Initiating bulk evaluation for registry: %s", registryName))
+			log.Info().Str("registry", registryName).Msg("Initiating bulk evaluation")
 
 			artifacts := make([]ar_v3.ArtifactScanInput, 0, len(dependencies))
 			for _, dep := range dependencies {
@@ -167,13 +167,13 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 				},
 			)
 			if err != nil {
-				p.Error("Failed to initiate bulk scan evaluation")
-				log.Error().Err(err).Msg("Failed to initiate bulk scan evaluation")
-				return fmt.Errorf("failed to initiate bulk scan evaluation: %w", err)
+				p.Error("Failed to initiate bulk evaluation")
+				log.Error().Err(err).Msg("Failed to initiate bulk evaluation")
+				return fmt.Errorf("failed to initiate bulk evaluation: %w", err)
 			}
 
 			if initResp.StatusCode() != 202 {
-				errMsg := "Failed to initiate bulk scan evaluation"
+				errMsg := "Failed to initiate bulk evaluation"
 				if initResp.JSONDefault != nil && initResp.JSONDefault.Error.Message != nil {
 					errMsg = *initResp.JSONDefault.Error.Message
 				}
@@ -183,17 +183,17 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 			}
 
 			if initResp.JSON202 == nil || initResp.JSON202.Data == nil || initResp.JSON202.Data.EvaluationId == nil {
-				p.Error("Invalid response from bulk scan evaluation API")
-				log.Error().Msg("Invalid response from bulk scan evaluation API")
-				return fmt.Errorf("invalid response from bulk scan evaluation API")
+				p.Error("Invalid response from bulk evaluation API")
+				log.Error().Msg("Invalid response from bulk evaluation API")
+				return fmt.Errorf("invalid response from bulk evaluation API")
 			}
 
 			evaluationID := *initResp.JSON202.Data.EvaluationId
-			p.Success(fmt.Sprintf("Bulk scan evaluation initiated with ID: %s", evaluationID))
-			log.Info().Str("evaluationId", evaluationID).Msg("Bulk scan evaluation initiated")
+			p.Success(fmt.Sprintf("Bulk evaluation initiated with ID: %s", evaluationID))
+			log.Info().Str("evaluationId", evaluationID).Msg("Bulk evaluation initiated")
 
-			p.Step("Waiting for bulk scan evaluation to complete")
-			log.Info().Msg("Polling bulk scan evaluation status")
+			p.Step("Waiting for bulk evaluation to complete")
+			log.Info().Msg("Polling bulk evaluation status")
 
 			statusParams := &ar_v3.GetBulkScanEvaluationStatusParams{
 				AccountIdentifier: config.Global.AccountID,
@@ -209,9 +209,9 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 			for {
 				pollCount++
 				if pollCount > maxPolls {
-					p.Error("Timeout waiting for bulk scan evaluation to complete")
-					log.Error().Int("maxPolls", maxPolls).Msg("Timeout waiting for bulk scan evaluation")
-					return fmt.Errorf("timeout waiting for bulk scan evaluation to complete")
+					p.Error("Timeout waiting for bulk evaluation to complete")
+					log.Error().Int("maxPolls", maxPolls).Msg("Timeout waiting for bulk evaluation")
+					return fmt.Errorf("timeout waiting for bulk evaluation to complete")
 				}
 
 				statusResp, err = f.RegistryV3HttpClient().GetBulkScanEvaluationStatusWithResponse(
@@ -220,13 +220,13 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 					statusParams,
 				)
 				if err != nil {
-					p.Error("Failed to get bulk scan evaluation status")
-					log.Error().Err(err).Msg("Failed to get bulk scan evaluation status")
-					return fmt.Errorf("failed to get bulk scan evaluation status: %w", err)
+					p.Error("Failed to get bulk evaluation status")
+					log.Error().Err(err).Msg("Failed to get bulk evaluation status")
+					return fmt.Errorf("failed to get bulk evaluation status: %w", err)
 				}
 
 				if statusResp.StatusCode() != 200 {
-					errMsg := "Failed to get bulk scan evaluation status"
+					errMsg := "Failed to get bulk evaluation status"
 					if statusResp.JSONDefault != nil && statusResp.JSONDefault.Error.Message != nil {
 						errMsg = *statusResp.JSONDefault.Error.Message
 					}
@@ -236,27 +236,27 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 				}
 
 				if statusResp.JSON200 == nil || statusResp.JSON200.Data == nil || statusResp.JSON200.Data.Status == nil {
-					p.Error("Invalid response from bulk scan evaluation status API")
-					log.Error().Msg("Invalid response from bulk scan evaluation status API")
-					return fmt.Errorf("invalid response from bulk scan evaluation status API")
+					p.Error("Invalid response from bulk evaluation status API")
+					log.Error().Msg("Invalid response from bulk evaluation status API")
+					return fmt.Errorf("invalid response from bulk evaluation status API")
 				}
 
 				status = *statusResp.JSON200.Data.Status
-				log.Debug().Str("status", string(status)).Int("poll", pollCount).Msg("Bulk scan evaluation status")
+				log.Debug().Str("status", string(status)).Int("poll", pollCount).Msg("Bulk evaluation status")
 
 				if status == ar_v3.BulkScanEvaluationStatusDataStatusSUCCESS {
-					p.Success("Bulk scan evaluation completed successfully")
-					log.Info().Msg("Bulk scan evaluation completed successfully")
+					p.Success("Bulk evaluation completed successfully")
+					log.Info().Msg("Bulk evaluation completed successfully")
 					break
 				}
 
 				if status == ar_v3.BulkScanEvaluationStatusDataStatusFAILURE {
-					errMsg := "Bulk scan evaluation failed"
+					errMsg := "Bulk evaluation failed"
 					if statusResp.JSON200.Data.Error != nil {
 						errMsg = *statusResp.JSON200.Data.Error
 					}
 					p.Error(errMsg)
-					log.Error().Str("error", errMsg).Msg("Bulk scan evaluation failed")
+					log.Error().Str("error", errMsg).Msg("Bulk evaluation failed")
 					return fmt.Errorf(errMsg)
 				}
 

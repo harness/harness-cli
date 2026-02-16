@@ -95,8 +95,8 @@ func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 			p.Success(fmt.Sprintf("Found registry UUID: %s", registryUUID.String()))
 			log.Info().Str("registryUUID", registryUUID.String()).Msg("Registry UUID retrieved")
 
-			p.Step(fmt.Sprintf("Initiating scan evaluation for %s@%s", packageName, version))
-			log.Info().Str("package", packageName).Str("version", version).Msg("Initiating scan evaluation")
+			p.Step(fmt.Sprintf("Initiating evaluation for %s@%s", packageName, version))
+			log.Info().Str("package", packageName).Str("version", version).Msg("Initiating evaluation")
 
 			artifacts := []ar_v3.ArtifactScanInput{
 				{
@@ -120,13 +120,13 @@ func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 				},
 			)
 			if err != nil {
-				p.Error("Failed to initiate scan evaluation")
-				log.Error().Err(err).Msg("Failed to initiate scan evaluation")
-				return fmt.Errorf("failed to initiate scan evaluation: %w", err)
+				p.Error("Failed to initiate evaluation")
+				log.Error().Err(err).Msg("Failed to initiate evaluation")
+				return fmt.Errorf("failed to initiate evaluation: %w", err)
 			}
 
 			if initResp.StatusCode() != 202 {
-				errMsg := "Failed to initiate scan evaluation"
+				errMsg := "Failed to initiate evaluation"
 				if initResp.JSONDefault != nil && initResp.JSONDefault.Error.Message != nil {
 					errMsg = *initResp.JSONDefault.Error.Message
 				}
@@ -136,17 +136,17 @@ func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 			}
 
 			if initResp.JSON202 == nil || initResp.JSON202.Data == nil || initResp.JSON202.Data.EvaluationId == nil {
-				p.Error("Invalid response from scan evaluation API")
-				log.Error().Msg("Invalid response from scan evaluation API")
-				return fmt.Errorf("invalid response from scan evaluation API")
+				p.Error("Invalid response from evaluation API")
+				log.Error().Msg("Invalid response from evaluation API")
+				return fmt.Errorf("invalid response from evaluation API")
 			}
 
 			evaluationID := *initResp.JSON202.Data.EvaluationId
-			p.Success(fmt.Sprintf("Scan evaluation initiated with ID: %s", evaluationID))
-			log.Info().Str("evaluationId", evaluationID).Msg("Scan evaluation initiated")
+			p.Success(fmt.Sprintf("Evaluation initiated with ID: %s", evaluationID))
+			log.Info().Str("evaluationId", evaluationID).Msg("Evaluation initiated")
 
-			p.Step("Waiting for scan evaluation to complete")
-			log.Info().Msg("Polling scan evaluation status")
+			p.Step("Waiting for evaluation to complete")
+			log.Info().Msg("Polling evaluation status")
 
 			statusParams := &ar_v3.GetBulkScanEvaluationStatusParams{
 				AccountIdentifier: config.Global.AccountID,
@@ -162,9 +162,9 @@ func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 			for {
 				pollCount++
 				if pollCount > maxPolls {
-					p.Error("Timeout waiting for scan evaluation to complete")
-					log.Error().Int("maxPolls", maxPolls).Msg("Timeout waiting for scan evaluation")
-					return fmt.Errorf("timeout waiting for scan evaluation to complete")
+					p.Error("Timeout waiting for evaluation to complete")
+					log.Error().Int("maxPolls", maxPolls).Msg("Timeout waiting for evaluation")
+					return fmt.Errorf("timeout waiting for evaluation to complete")
 				}
 
 				statusResp, err = f.RegistryV3HttpClient().GetBulkScanEvaluationStatusWithResponse(
@@ -173,13 +173,13 @@ func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 					statusParams,
 				)
 				if err != nil {
-					p.Error("Failed to get scan evaluation status")
-					log.Error().Err(err).Msg("Failed to get scan evaluation status")
-					return fmt.Errorf("failed to get scan evaluation status: %w", err)
+					p.Error("Failed to get evaluation status")
+					log.Error().Err(err).Msg("Failed to get evaluation status")
+					return fmt.Errorf("failed to get evaluation status: %w", err)
 				}
 
 				if statusResp.StatusCode() != 200 {
-					errMsg := "Failed to get scan evaluation status"
+					errMsg := "Failed to get evaluation status"
 					if statusResp.JSONDefault != nil && statusResp.JSONDefault.Error.Message != nil {
 						errMsg = *statusResp.JSONDefault.Error.Message
 					}
@@ -189,27 +189,27 @@ func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 				}
 
 				if statusResp.JSON200 == nil || statusResp.JSON200.Data == nil || statusResp.JSON200.Data.Status == nil {
-					p.Error("Invalid response from scan evaluation status API")
-					log.Error().Msg("Invalid response from scan evaluation status API")
-					return fmt.Errorf("invalid response from scan evaluation status API")
+					p.Error("Invalid response from evaluation status API")
+					log.Error().Msg("Invalid response from evaluation status API")
+					return fmt.Errorf("invalid response from evaluation status API")
 				}
 
 				status = *statusResp.JSON200.Data.Status
-				log.Debug().Str("status", string(status)).Int("poll", pollCount).Msg("Scan evaluation status")
+				log.Debug().Str("status", string(status)).Int("poll", pollCount).Msg("Evaluation status")
 
 				if status == ar_v3.BulkScanEvaluationStatusDataStatusSUCCESS {
-					p.Success("Scan evaluation completed successfully")
-					log.Info().Msg("Scan evaluation completed successfully")
+					p.Success("Evaluation completed successfully")
+					log.Info().Msg("Evaluation completed successfully")
 					break
 				}
 
 				if status == ar_v3.BulkScanEvaluationStatusDataStatusFAILURE {
-					errMsg := "Scan evaluation failed"
+					errMsg := "Evaluation failed"
 					if statusResp.JSON200.Data.Error != nil {
 						errMsg = *statusResp.JSON200.Data.Error
 					}
 					p.Error(errMsg)
-					log.Error().Str("error", errMsg).Msg("Scan evaluation failed")
+					log.Error().Str("error", errMsg).Msg("Evaluation failed")
 					return fmt.Errorf(errMsg)
 				}
 
@@ -239,8 +239,8 @@ func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 			p.Step("Scan Result")
 			fmt.Printf("   Package:     %s\n", packageName)
 			fmt.Printf("   Version:     %s\n", version)
-			fmt.Printf("   Scan Status: %s\n", getDisplayValue(scanStatus))
-			fmt.Printf("   Scan ID:     %s\n", getDisplayValue(scanId))
+			fmt.Printf("   Evaluation Status: %s\n", getDisplayValue(scanStatus))
+			fmt.Printf("   Evaluation ID:     %s\n", getDisplayValue(scanId))
 
 			if scanStatus == "BLOCKED" {
 				fmt.Println()
@@ -295,7 +295,7 @@ func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 				case 404:
 					p.Error("Scan details not found")
 					log.Error().Str("scanId", scanId).Msg("Scan details not found")
-					fmt.Printf("   Scan ID '%s' not found\n", scanId)
+					fmt.Printf("   Evaluation ID '%s' not found\n", scanId)
 				case 400:
 					p.Error("Bad request for scan details")
 					log.Error().Msg("Bad request for scan details")
@@ -372,7 +372,7 @@ func formatTimestamp(timestampStr string) string {
 
 func displayScanDetails(scanDetails *ar_v3.ArtifactScanDetails) error {
 	fmt.Println()
-	fmt.Println("Scan Details:")
+	fmt.Println("Evaluation Details:")
 	fmt.Println(strings.Repeat("=", 60))
 
 	if scanDetails.PolicySetName != nil && *scanDetails.PolicySetName != "" {
