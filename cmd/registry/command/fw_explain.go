@@ -375,21 +375,22 @@ func displayScanDetails(scanDetails *ar_v3.ArtifactScanDetails) error {
 	fmt.Println("Evaluation Details:")
 	fmt.Println(strings.Repeat("=", 60))
 
-	if scanDetails.PolicySetName != nil && *scanDetails.PolicySetName != "" {
-		fmt.Printf("Policy Set: %s\n", *scanDetails.PolicySetName)
-	}
-	if scanDetails.PolicySetRef != nil && *scanDetails.PolicySetRef != "" {
-		fmt.Printf("Policy Set Ref: %s\n", *scanDetails.PolicySetRef)
-	}
 	if scanDetails.LastEvaluatedAt != nil && *scanDetails.LastEvaluatedAt != "" {
 		fmt.Printf("Last Evaluated: %s\n", formatTimestamp(*scanDetails.LastEvaluatedAt))
 	}
 
 	hasSecurityViolation := false
-	for _, failure := range scanDetails.PolicyFailureDetails {
-		if failure.Category == "Security" {
-			hasSecurityViolation = true
-			break
+	if scanDetails.PolicySetFailureDetails != nil {
+		for _, policySetFailure := range *scanDetails.PolicySetFailureDetails {
+			for _, failure := range policySetFailure.PolicyFailureDetails {
+				if failure.Category == "Security" {
+					hasSecurityViolation = true
+					break
+				}
+			}
+			if hasSecurityViolation {
+				break
+			}
 		}
 	}
 
@@ -403,54 +404,61 @@ func displayScanDetails(scanDetails *ar_v3.ArtifactScanDetails) error {
 		}
 	}
 
-	if len(scanDetails.PolicyFailureDetails) > 0 {
+	if scanDetails.PolicySetFailureDetails != nil && len(*scanDetails.PolicySetFailureDetails) > 0 {
 		fmt.Println()
-		fmt.Println("Policy Violations:")
-		fmt.Println()
+		fmt.Println("Policy Set Violations:")
 
-		for i, failure := range scanDetails.PolicyFailureDetails {
-			fmt.Printf("\n%d. %s\n", i+1, string(failure.Category))
+		for psIdx, policySetFailure := range *scanDetails.PolicySetFailureDetails {
+			fmt.Println()
+			fmt.Printf("Policy Set %d: %s\n", psIdx+1, policySetFailure.PolicySetName)
+			fmt.Printf("Policy Set Ref: %s\n", policySetFailure.PolicySetRef)
 			fmt.Println(strings.Repeat("-", 60))
-			fmt.Printf("   Policy Name: %s\n", failure.PolicyName)
-			fmt.Printf("   Policy Ref:  %s\n", failure.PolicyRef)
 
-			switch failure.Category {
-			case "Security":
-				securityConfig, err := failure.AsSecurityPolicyFailureDetailConfig()
-				if err == nil && len(securityConfig.Vulnerabilities) > 0 {
-					fmt.Println("\n   Vulnerabilities:")
-					var vulnData []map[string]interface{}
-					for _, vuln := range securityConfig.Vulnerabilities {
-						vulnData = append(vulnData, map[string]interface{}{
-							"cveId":         vuln.CveId,
-							"cvssScore":     fmt.Sprintf("%.1f", vuln.CvssScore),
-							"cvssThreshold": fmt.Sprintf("%.1f", vuln.CvssThreshold),
-						})
-					}
-					err := printer.Print(vulnData, 0, 1, int64(len(vulnData)), false, [][]string{
-						{"cveId", "CVE ID"},
-						{"cvssScore", "CVSS Score"},
-						{"cvssThreshold", "CVSS Threshold"},
-					})
-					if err != nil {
-						return err
-					}
-				}
+			if len(policySetFailure.PolicyFailureDetails) > 0 {
+				for i, failure := range policySetFailure.PolicyFailureDetails {
+					fmt.Printf("\n  %d.%d %s\n", psIdx+1, i+1, string(failure.Category))
+					fmt.Printf("      Policy Name: %s\n", failure.PolicyName)
+					fmt.Printf("      Policy Ref:  %s\n", failure.PolicyRef)
 
-			case "License":
-				licenseConfig, err := failure.AsLicensePolicyFailureDetailConfig()
-				if err == nil {
-					fmt.Printf("\n   Blocked License: %s\n", licenseConfig.BlockedLicense)
-					if len(licenseConfig.AllowedLicenses) > 0 {
-						fmt.Printf("   Allowed Licenses: %s\n", strings.Join(licenseConfig.AllowedLicenses, ", "))
-					}
-				}
+					switch failure.Category {
+					case "Security":
+						securityConfig, err := failure.AsSecurityPolicyFailureDetailConfig()
+						if err == nil && len(securityConfig.Vulnerabilities) > 0 {
+							fmt.Println("\n      Vulnerabilities:")
+							var vulnData []map[string]interface{}
+							for _, vuln := range securityConfig.Vulnerabilities {
+								vulnData = append(vulnData, map[string]interface{}{
+									"cveId":         vuln.CveId,
+									"cvssScore":     fmt.Sprintf("%.1f", vuln.CvssScore),
+									"cvssThreshold": fmt.Sprintf("%.1f", vuln.CvssThreshold),
+								})
+							}
+							err := printer.Print(vulnData, 0, 1, int64(len(vulnData)), false, [][]string{
+								{"cveId", "CVE ID"},
+								{"cvssScore", "CVSS Score"},
+								{"cvssThreshold", "CVSS Threshold"},
+							})
+							if err != nil {
+								return err
+							}
+						}
 
-			case "PackageAge":
-				packageAgeConfig, err := failure.AsPackageAgeViolationPolicyFailureDetailConfig()
-				if err == nil {
-					fmt.Printf("\n   Published On: %s\n", formatTimestamp(packageAgeConfig.PublishedOn))
-					fmt.Printf("   Package Age Threshold: %s\n", packageAgeConfig.PackageAgeThreshold)
+					case "License":
+						licenseConfig, err := failure.AsLicensePolicyFailureDetailConfig()
+						if err == nil {
+							fmt.Printf("\n      Blocked License: %s\n", licenseConfig.BlockedLicense)
+							if len(licenseConfig.AllowedLicenses) > 0 {
+								fmt.Printf("      Allowed Licenses: %s\n", strings.Join(licenseConfig.AllowedLicenses, ", "))
+							}
+						}
+
+					case "PackageAge":
+						packageAgeConfig, err := failure.AsPackageAgeViolationPolicyFailureDetailConfig()
+						if err == nil {
+							fmt.Printf("\n      Published On: %s\n", formatTimestamp(packageAgeConfig.PublishedOn))
+							fmt.Printf("      Package Age Threshold: %s\n", packageAgeConfig.PackageAgeThreshold)
+						}
+					}
 				}
 			}
 		}

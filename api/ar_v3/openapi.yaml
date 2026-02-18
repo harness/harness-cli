@@ -306,18 +306,14 @@ components:
         registryName:
           type: string
           description: Registry name
-        policySetRef:
-          type: string
-        policySetName:
-          type: string
         registryId:
           type: string
           format: uuid
           description: Registry ID
-        policyFailureDetails:
+        policySetFailureDetails:
           type: array
           items:
-            $ref: "#/components/schemas/PolicyFailureDetail"
+            $ref: "#/components/schemas/PolicySetFailureDetail"
         fixVersionDetails:
           $ref: "#/components/schemas/FixVersionDetails"
         scanStatus:
@@ -365,6 +361,24 @@ components:
         - category
         - policyName
         - policyRef
+    PolicySetFailureDetail:
+      type: object
+      description: Policy set failure detail entry.
+      properties:
+        policySetRef:
+          type: string
+          description: Policy set reference.
+        policySetName:
+          type: string
+          description: Policy set name.
+        policyFailureDetails:
+          type: array
+          items:
+            $ref: "#/components/schemas/PolicyFailureDetail"
+      required:
+        - policySetRef
+        - policySetName
+        - policyFailureDetails
     PolicyFailureDetailCategory:
       type: string
       description: Policy failure detail category.
