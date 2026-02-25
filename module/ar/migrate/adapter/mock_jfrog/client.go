@@ -231,8 +231,8 @@ func initMockData() *mockData {
 			"npm-local": {
 				{
 					Registry:     "npm-local",
-					Name:         "sample-package-1.0.0.tgz",
-					Uri:          "/sample-package/-/sample-package-1.0.0.tgz",
+					Name:         "@har/sample-package-1.0.0.tgz",
+					Uri:          "/@har/sample-package/-/@har/sample-package-1.0.0.tgz",
 					Folder:       false,
 					Size:         2048,
 					LastModified: "2023-01-01T00:00:00.000Z",
@@ -332,8 +332,8 @@ func initMockData() *mockData {
     }
   ]
 }`,
-			"npm-local/sample-package": `{
-  "name": "sample-package",
+			"npm-local/@har/sample-package": `{
+  "name": "@har/sample-package",
   "description": "A sample NPM package for testing migration",
   "dist-tags": {
     "latest": "2.0.0",
@@ -341,7 +341,7 @@ func initMockData() *mockData {
   },
   "versions": {
     "1.0.0": {
-      "name": "sample-package",
+      "name": "@har/sample-package",
       "version": "1.0.0",
       "description": "A sample NPM package for testing migration",
       "main": "index.js",
@@ -357,7 +357,7 @@ func initMockData() *mockData {
       }
     },
     "1.1.0": {
-      "name": "sample-package",
+      "name": "@har/sample-package",
       "version": "1.1.0",
       "description": "A sample NPM package for testing migration",
       "main": "index.js",
@@ -373,7 +373,7 @@ func initMockData() *mockData {
       }
     },
     "2.0.0": {
-      "name": "sample-package",
+      "name": "@har/sample-package",
       "version": "2.0.0",
       "description": "A sample NPM package for testing migration",
       "main": "index.js",
@@ -399,9 +399,12 @@ func initMockData() *mockData {
 }`,
 		},
 		binaryContent: map[string][]byte{
-			"dart-local/packages/sample_dart_pkg/versions/1.0.0.tar.gz":  createDartPackageTarGz("sample_dart_pkg", "1.0.0", "A sample Dart package for testing migration"),
-			"dart-local/packages/sample_dart_pkg/versions/1.1.0.tar.gz":  createDartPackageTarGz("sample_dart_pkg", "1.1.0", "A sample Dart package for testing migration"),
-			"dart-local/packages/another_dart_pkg/versions/2.0.0.tar.gz": createDartPackageTarGz("another_dart_pkg", "2.0.0", "Another Dart package for testing migration"),
+			"dart-local/packages/sample_dart_pkg/versions/1.0.0.tar.gz":     createDartPackageTarGz("sample_dart_pkg", "1.0.0", "A sample Dart package for testing migration"),
+			"dart-local/packages/sample_dart_pkg/versions/1.1.0.tar.gz":     createDartPackageTarGz("sample_dart_pkg", "1.1.0", "A sample Dart package for testing migration"),
+			"dart-local/packages/another_dart_pkg/versions/2.0.0.tar.gz":    createDartPackageTarGz("another_dart_pkg", "2.0.0", "Another Dart package for testing migration"),
+			"npm-local/@har/sample-package/-/@har/sample-package-1.0.0.tgz": createNpmPackageTgz("@har/sample-package", "1.0.0", "A sample NPM package for testing migration"),
+			"npm-local/@har/sample-package/-/@har/sample-package-1.1.0.tgz": createNpmPackageTgz("@har/sample-package", "1.1.0", "A sample NPM package for testing migration"),
+			"npm-local/@har/sample-package/-/@har/sample-package-2.0.0.tgz": createNpmPackageTgz("@har/sample-package", "2.0.0", "A sample NPM package for testing migration"),
 		},
 	}
 }
@@ -638,4 +641,85 @@ func toPascalCase(s string) string {
 		}
 	}
 	return strings.Join(parts, "")
+}
+
+// createNpmPackageTgz creates a valid tar.gz byte slice for an NPM package
+func createNpmPackageTgz(packageName, version, description string) []byte {
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	tarWriter := tar.NewWriter(gzWriter)
+
+	// Create package.json content
+	packageJSON := fmt.Sprintf(`{
+  "name": "%s",
+  "version": "%s",
+  "description": "%s",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["sample", "testing", "migration"],
+  "author": "Test Author",
+  "license": "MIT"
+}`, packageName, version, description)
+
+	// Create index.js content
+	indexJS := fmt.Sprintf(`'use strict';
+
+/**
+ * %s
+ * %s
+ */
+
+module.exports = {
+  version: '%s',
+  greet: function(name) {
+    return 'Hello, ' + name + ' from %s!';
+  }
+};
+`, packageName, description, version, packageName)
+
+	// Create README.md
+	readmeContent := fmt.Sprintf(`# %s
+
+%s
+
+## Installation
+
+`+"```bash"+`
+npm install %s
+`+"```"+`
+
+## Usage
+
+`+"```javascript"+`
+const pkg = require('%s');
+console.log(pkg.greet('World'));
+`+"```"+`
+`, packageName, description, packageName, packageName)
+
+	// NPM packages have files inside a "package" directory
+	files := []struct {
+		name    string
+		content string
+	}{
+		{"package/package.json", packageJSON},
+		{"package/index.js", indexJS},
+		{"package/README.md", readmeContent},
+	}
+
+	for _, file := range files {
+		hdr := &tar.Header{
+			Name: file.name,
+			Mode: 0644,
+			Size: int64(len(file.content)),
+		}
+		tarWriter.WriteHeader(hdr)
+		tarWriter.Write([]byte(file.content))
+	}
+
+	tarWriter.Close()
+	gzWriter.Close()
+
+	return buf.Bytes()
 }

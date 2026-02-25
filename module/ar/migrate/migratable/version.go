@@ -33,6 +33,7 @@ type Version struct {
 	config          *types.Config
 	registry        types.RegistryInfo
 	existingFileMap map[string]bool
+	dryRunStats     *types.DryRunStats
 }
 
 func NewVersionJob(
@@ -48,6 +49,7 @@ func NewVersionJob(
 	mapping *types.RegistryMapping,
 	config *types.Config,
 	registry types.RegistryInfo,
+	dryRunStats *types.DryRunStats,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -75,6 +77,7 @@ func NewVersionJob(
 		config:          config,
 		registry:        registry,
 		existingFileMap: make(map[string]bool),
+		dryRunStats:     dryRunStats,
 	}
 }
 
@@ -91,6 +94,15 @@ func (r *Version) Pre(ctx context.Context) error {
 		Logger()
 	logger.Info().Msg("Starting version pre-migration step")
 	startTime := time.Now()
+
+	// Skip destination checks in dry-run mode
+	if r.config.DryRun {
+		logger.Info().Msg("Dry-run mode: skipping destination version checks")
+		logger.Info().
+			Dur("duration", time.Since(startTime)).
+			Msg("Completed version pre-migration step (dry-run)")
+		return nil
+	}
 
 	// reading all existing files for this version from destination
 
@@ -120,6 +132,12 @@ func (r *Version) Migrate(ctx context.Context) error {
 		Logger()
 	logger.Info().Msg("Starting version migration step")
 	startTime := time.Now()
+
+	// In dry-run mode, add version to directory structure
+	if r.config.DryRun && r.dryRunStats != nil {
+		r.addVersionToDryRunDirectory()
+		logger.Info().Msgf("Dry-run: processing version %s for package %s", r.version.Name, r.pkg.Name)
+	}
 
 	var jobs []engine.Job
 
@@ -151,7 +169,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 			}
 
 			job := NewFileJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, r.pkg,
-				r.version, r.node, file, r.stats, r.mapping, r.config, r.registry)
+				r.version, r.node, file, r.stats, r.mapping, r.config, r.registry, r.dryRunStats)
 			jobs = append(jobs, job)
 		}
 	}
@@ -217,6 +235,38 @@ func (r *Version) Migrate(ctx context.Context) error {
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed version migration step")
 	return nil
+}
+
+// addVersionToDryRunDirectory adds version to the directory structure
+func (r *Version) addVersionToDryRunDirectory() {
+	if r.dryRunStats == nil {
+		return
+	}
+
+	// Ensure registry and package entries exist
+	if r.dryRunStats.Directories[r.srcRegistry] == nil {
+		r.dryRunStats.Directories[r.srcRegistry] = &types.DryRunDirectoryEntry{
+			Registry: r.srcRegistry,
+			Packages: make(map[string]*types.DryRunPackageEntry),
+		}
+	}
+	dirEntry := r.dryRunStats.Directories[r.srcRegistry]
+
+	if dirEntry.Packages[r.pkg.Name] == nil {
+		dirEntry.Packages[r.pkg.Name] = &types.DryRunPackageEntry{
+			Name:     r.pkg.Name,
+			Versions: make(map[string]*types.DryRunVersionEntry),
+		}
+	}
+	pkgEntry := dirEntry.Packages[r.pkg.Name]
+
+	// Add version entry if not exists
+	if pkgEntry.Versions[r.version.Name] == nil {
+		pkgEntry.Versions[r.version.Name] = &types.DryRunVersionEntry{
+			Name:  r.version.Name,
+			Files: make([]types.DryRunVersionFileEntry, 0),
+		}
+	}
 }
 
 // Post Any post processing work

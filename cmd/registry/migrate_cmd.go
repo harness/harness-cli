@@ -23,6 +23,7 @@ func getMigrateCmd(*cmdutils.Factory) *cobra.Command {
 	var localPkgBaseURL string
 	var localConcurrency int
 	var overwrite bool
+	var dryRun bool
 
 	migrateCmd := &cobra.Command{
 		Use:   "migrate",
@@ -86,12 +87,14 @@ Usage example:
 			}
 			config.Global.Registry.Migrate.Concurrency = localConcurrency
 			config.Global.Registry.Migrate.Overwrite = overwrite
+			config.Global.Registry.Migrate.DryRun = dryRun
 		},
 	}
 	migrateCmd.Flags().StringVarP(&localConfigPath, "config", "c", "config.yaml", "Path to configuration file")
 	migrateCmd.Flags().StringVar(&localPkgBaseURL, "pkg-url", "", "Base URL for the API (overrides config)")
 	migrateCmd.Flags().IntVar(&localConcurrency, "concurrency", 1, "Number of concurrent operations (overrides config)")
 	migrateCmd.Flags().BoolVar(&overwrite, "overwrite", false, "Allow overwriting artifacts")
+	migrateCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Run migration in dry-run mode (no uploads, generates file list and directory structure)")
 
 	migrateCmd.MarkFlagRequired("config")
 
@@ -111,6 +114,10 @@ func runMigration(cmd *cobra.Command, args []string) {
 
 	if config.Global.Registry.Migrate.Overwrite {
 		cfg.Overwrite = true
+	}
+
+	if config.Global.Registry.Migrate.DryRun {
+		cfg.DryRun = true
 	}
 
 	// Create an API client for orchestration purpose. The registry clients will be initiated separately

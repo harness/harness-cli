@@ -51,6 +51,7 @@ type Package struct {
 	mapping               *types.RegistryMapping
 	config                *types.Config
 	registry              types.RegistryInfo
+	dryRunStats           *types.DryRunStats
 }
 
 func NewPackageJob(
@@ -66,6 +67,7 @@ func NewPackageJob(
 	mapping *types.RegistryMapping,
 	config *types.Config,
 	registry types.RegistryInfo,
+	dryRunStats *types.DryRunStats,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -91,6 +93,7 @@ func NewPackageJob(
 		mapping:               mapping,
 		config:                config,
 		registry:              registry,
+		dryRunStats:           dryRunStats,
 	}
 }
 
@@ -108,6 +111,15 @@ func (r *Package) Pre(ctx context.Context) error {
 		Logger()
 	logger.Info().Msg("Starting package pre-migration step")
 	startTime := time.Now()
+
+	// Skip destination checks in dry-run mode
+	if r.config.DryRun {
+		logger.Info().Msg("Dry-run mode: skipping destination package checks")
+		logger.Info().
+			Dur("duration", time.Since(startTime)).
+			Msg("Completed package pre-migration step (dry-run)")
+		return nil
+	}
 
 	if !r.config.Overwrite && (r.artifactType == types.HELM_LEGACY && r.pkg.Name != "" && r.pkg.Version != "") {
 		exists, err := r.destAdapter.VersionExists(ctx, r.pkg,
@@ -213,9 +225,16 @@ func (r *Package) Migrate(ctx context.Context) error {
 		return nil
 	}
 
+	// In dry-run mode, add package to directory structure
+	if r.config.DryRun && r.dryRunStats != nil {
+		r.addPackageToDryRunDirectory()
+		logger.Info().Msgf("Dry-run: processing package %s", r.pkg.Name)
+	}
+
 	if r.artifactType == types.DOCKER || r.artifactType == types.HELM {
 		srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.sourcePackageHostname, r.pkg.Name)
 		dstImage, _ := r.destAdapter.GetOCIImagePath(r.destRegistry, "", r.pkg.Name)
+
 		pterm.Info.Println(fmt.Sprintf("Copying repository %s to %s", srcImage, dstImage))
 		logger.Info().Ctx(ctx).Msgf("Copying repository %s to %s", srcImage, dstImage)
 
@@ -287,7 +306,7 @@ func (r *Package) Migrate(ctx context.Context) error {
 				return fmt.Errorf("get version failed: %w", err)
 			}
 			job := NewVersionJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, r.pkg,
-				version, versionNode, r.stats, r.mapping, r.config, r.registry)
+				version, versionNode, r.stats, r.mapping, r.config, r.registry, r.dryRunStats)
 			jobs = append(jobs, job)
 		}
 
@@ -601,6 +620,30 @@ func (r *Package) pushChart(ctx context.Context, chartPath string, dstRef string
 func check(err error, context string) {
 	if err != nil {
 		log.Error().Msgf("❌  %s: %v", context, err)
+	}
+}
+
+// addPackageToDryRunDirectory adds package to the directory structure
+func (r *Package) addPackageToDryRunDirectory() {
+	if r.dryRunStats == nil {
+		return
+	}
+
+	// Ensure registry entry exists (should already be created by Registry)
+	if r.dryRunStats.Directories[r.srcRegistry] == nil {
+		r.dryRunStats.Directories[r.srcRegistry] = &types.DryRunDirectoryEntry{
+			Registry: r.srcRegistry,
+			Packages: make(map[string]*types.DryRunPackageEntry),
+		}
+	}
+	dirEntry := r.dryRunStats.Directories[r.srcRegistry]
+
+	// Add package entry if not exists
+	if dirEntry.Packages[r.pkg.Name] == nil {
+		dirEntry.Packages[r.pkg.Name] = &types.DryRunPackageEntry{
+			Name:     r.pkg.Name,
+			Versions: make(map[string]*types.DryRunVersionEntry),
+		}
 	}
 }
 

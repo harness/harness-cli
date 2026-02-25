@@ -26,6 +26,7 @@ type Registry struct {
 	stats                 *types.TransferStats
 	mapping               *types.RegistryMapping
 	config                *types.Config
+	dryRunStats           *types.DryRunStats
 
 	// Transient
 	registry types.RegistryInfo
@@ -41,6 +42,7 @@ func NewRegistryJob(
 	stats *types.TransferStats,
 	mapping *types.RegistryMapping,
 	config *types.Config,
+	dryRunStats *types.DryRunStats,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -62,6 +64,7 @@ func NewRegistryJob(
 		stats:                 stats,
 		mapping:               mapping,
 		config:                config,
+		dryRunStats:           dryRunStats,
 	}
 }
 
@@ -81,6 +84,19 @@ func (r *Registry) Pre(ctx context.Context) error {
 	logger.Info().Msg("Starting registry pre-migration step")
 
 	startTime := time.Now()
+
+	// Skip destination registry check in dry-run mode
+	if r.config.DryRun {
+		logger.Info().Msg("Dry-run mode: skipping destination registry check")
+		r.registry = types.RegistryInfo{
+			Path: r.destRegistry,
+		}
+		logger.Info().
+			Dur("duration", time.Since(startTime)).
+			Msg("Completed registry pre-migration step (dry-run)")
+		return nil
+	}
+
 	registry, err := r.destAdapter.GetRegistry(ctx, r.destRegistry)
 	if err != nil {
 		log.Error().Err(err).Msgf("Failed to get registry %q", r.destRegistry)
@@ -117,6 +133,30 @@ func (r *Registry) Migrate(ctx context.Context) error {
 	if err2 != nil {
 		logger.Error().Msgf("Failed to get files from registry %s", r.srcRegistry)
 		return fmt.Errorf("get files from registry %s failed: %w", r.srcRegistry, err2)
+	}
+
+	// In dry-run mode, collect all files and initialize directory entry for this registry
+	if r.config.DryRun && r.dryRunStats != nil {
+		// Add all files to the file list
+		for _, file := range files {
+			entry := types.DryRunFileEntry{
+				Registry:     r.srcRegistry,
+				Name:         file.Name,
+				Uri:          file.Uri,
+				Size:         file.Size,
+				LastModified: file.LastModified,
+			}
+			r.dryRunStats.Files = append(r.dryRunStats.Files, entry)
+		}
+		logger.Info().Msgf("Dry-run: collected %d files from registry %s", len(files), r.srcRegistry)
+
+		// Initialize directory entry for this registry
+		if r.dryRunStats.Directories[r.srcRegistry] == nil {
+			r.dryRunStats.Directories[r.srcRegistry] = &types.DryRunDirectoryEntry{
+				Registry: r.srcRegistry,
+				Packages: make(map[string]*types.DryRunPackageEntry),
+			}
+		}
 	}
 
 	// Filter files based on include/exclude patterns
@@ -158,7 +198,7 @@ func (r *Registry) Migrate(ctx context.Context) error {
 			return fmt.Errorf("get node for path %s failed: %w", pkg.Path, err2)
 		}
 		job := NewPackageJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.sourcePackageHostname, r.destRegistry, r.artifactType, pkg, treeNode,
-			r.stats, r.mapping, r.config, r.registry)
+			r.stats, r.mapping, r.config, r.registry, r.dryRunStats)
 		jobs = append(jobs, job)
 	}
 

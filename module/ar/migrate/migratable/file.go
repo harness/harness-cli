@@ -48,6 +48,7 @@ type File struct {
 	mapping       *types.RegistryMapping
 	config        *types.Config
 	registry      types.RegistryInfo
+	dryRunStats   *types.DryRunStats
 }
 
 func NewFileJob(
@@ -64,6 +65,7 @@ func NewFileJob(
 	mapping *types.RegistryMapping,
 	config *types.Config,
 	registry types.RegistryInfo,
+	dryRunStats *types.DryRunStats,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -92,6 +94,7 @@ func NewFileJob(
 		mapping:      mapping,
 		config:       config,
 		registry:     registry,
+		dryRunStats:  dryRunStats,
 	}
 }
 
@@ -131,6 +134,16 @@ func (r *File) Migrate(ctx context.Context) error {
 	startTime := time.Now()
 
 	if r.skipMigration {
+		return nil
+	}
+
+	// Handle dry-run mode - add file to directory structure without uploading
+	if r.config.DryRun {
+		logger.Info().Msgf("Dry-run: would migrate file %s", r.file.Name)
+		r.addFileToDryRunDirectory()
+		logger.Info().
+			Dur("duration", time.Since(startTime)).
+			Msg("Completed file migration step (dry-run)")
 		return nil
 	}
 
@@ -451,6 +464,48 @@ func generatePythonMetadataMap(metadata string, path string) (map[string]interfa
 	mapData["blake2_256_digest"] = hex.EncodeToString(blake2bHash.Sum(nil))
 
 	return mapData, nil
+}
+
+// addFileToDryRunDirectory adds file name to the directory structure
+func (r *File) addFileToDryRunDirectory() {
+	if r.dryRunStats == nil || r.file == nil {
+		return
+	}
+
+	// Ensure registry, package, and version entries exist
+	if r.dryRunStats.Directories[r.srcRegistry] == nil {
+		r.dryRunStats.Directories[r.srcRegistry] = &types.DryRunDirectoryEntry{
+			Registry: r.srcRegistry,
+			Packages: make(map[string]*types.DryRunPackageEntry),
+		}
+	}
+	dirEntry := r.dryRunStats.Directories[r.srcRegistry]
+
+	if dirEntry.Packages[r.pkg.Name] == nil {
+		dirEntry.Packages[r.pkg.Name] = &types.DryRunPackageEntry{
+			Name:     r.pkg.Name,
+			Versions: make(map[string]*types.DryRunVersionEntry),
+		}
+	}
+	pkgEntry := dirEntry.Packages[r.pkg.Name]
+
+	if pkgEntry.Versions[r.version.Name] == nil {
+		pkgEntry.Versions[r.version.Name] = &types.DryRunVersionEntry{
+			Name:  r.version.Name,
+			Files: make([]types.DryRunVersionFileEntry, 0),
+		}
+	}
+	versionEntry := pkgEntry.Versions[r.version.Name]
+
+	// Add file with full details to the version's file list
+	fileEntry := types.DryRunVersionFileEntry{
+		Name:         r.file.Name,
+		Registry:     r.srcRegistry,
+		Uri:          r.file.Uri,
+		Size:         r.file.Size,
+		LastModified: r.file.LastModified,
+	}
+	versionEntry.Files = append(versionEntry.Files, fileEntry)
 }
 
 func (r *File) Post(ctx context.Context) error {
