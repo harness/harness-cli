@@ -106,7 +106,7 @@ func (r *Version) Pre(ctx context.Context) error {
 
 	// reading all existing files for this version from destination
 
-	if !r.config.Overwrite && (r.artifactType != types.MAVEN && r.pkg.Name != "" && r.version.Name != "") {
+	if !r.config.Overwrite && (r.artifactType != types.MAVEN && r.artifactType != types.NPM && r.pkg.Name != "" && r.version.Name != "") {
 		existingFiles, err := r.getAllExistingFilesForThisVersion(ctx)
 		if err != nil {
 			logger.Warn().Err(err).Msg("Failed to get existing files, will proceed with migration")
@@ -149,6 +149,11 @@ func (r *Version) Migrate(ctx context.Context) error {
 			return fmt.Errorf("get files from tree failed: %w", err)
 		}
 		for _, file := range files {
+			// For NPM, skip files that don't have .tgz extension
+			if r.artifactType == types.NPM && !strings.HasSuffix(file.Name, ".tgz") {
+				logger.Debug().Msgf("Skipping non-tgz file %s for NPM migration", file.Name)
+				continue
+			}
 			// Check if file already exists in destination
 			if r.existingFileMap[file.Name] {
 				util.GetSkipPrinter().Println(fmt.Sprintf("Registry [%s], Package [%s/%s], File [%s] already exists",

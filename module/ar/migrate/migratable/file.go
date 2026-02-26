@@ -261,16 +261,6 @@ func (r *File) Migrate(ctx context.Context) error {
 		}
 		r.stats.FileStats = append(r.stats.FileStats, stat)
 	} else if r.artifactType == types.NPM {
-		if !strings.Contains(r.file.Uri, "/-/") {
-			logger.Error().Msg("File Download url is not correct for NPM")
-			return fmt.Errorf("file Download url is not correct for NPM")
-		}
-
-		// Truncate everything after the last "/-/" segment
-		idx := strings.LastIndex(r.file.Uri, "/-/")
-		if idx == -1 {
-			return fmt.Errorf("file Download url is not correct for NPM")
-		}
 		tarFileURL := r.file.Uri
 		logger.Info().Msg("Downloading tar file from " + tarFileURL)
 		tarFileReader, _, err := r.srcAdapter.DownloadFile(r.srcRegistry, tarFileURL)
@@ -307,7 +297,7 @@ func (r *File) Migrate(ctx context.Context) error {
 
 		uploadReader := io.NopCloser(StreamUploadAsJSON(payload))
 
-		err = r.destAdapter.UploadFile(r.destRegistry, uploadReader, r.file, nil, r.pkg.Name, r.version.Name,
+		err = r.destAdapter.UploadFile(r.destRegistry, uploadReader, r.file, nil, pkgName, version,
 			r.artifactType, nil)
 		_ = uploadReader.Close()
 

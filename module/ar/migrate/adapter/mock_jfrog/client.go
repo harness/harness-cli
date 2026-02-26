@@ -238,6 +238,51 @@ func initMockData() *mockData {
 					LastModified: "2023-01-01T00:00:00.000Z",
 					SHA1:         "da39a3ee5e6b4b0d3255bfef95601890afd80707",
 				},
+				{
+					Registry:     "npm-local",
+					Name:         "@har/sample-package-2.0.0-beta.1.tgz",
+					Uri:          "/@har/sample-package/-/@har/sample-package-2.0.0-beta.1.tgz",
+					Folder:       false,
+					Size:         2100,
+					LastModified: "2023-04-01T00:00:00.000Z",
+					SHA1:         "da39a3ee5e6b4b0d3255bfef95601890afd80713",
+				},
+				{
+					Registry:     "npm-local",
+					Name:         "@har/sample-package-3.0.0-rc.1.tgz",
+					Uri:          "/@har/sample-package/-/@har/sample-package-3.0.0-rc.1.tgz",
+					Folder:       false,
+					Size:         2200,
+					LastModified: "2023-05-01T00:00:00.000Z",
+					SHA1:         "da39a3ee5e6b4b0d3255bfef95601890afd80714",
+				},
+				{
+					Registry:     "npm-local",
+					Name:         "lodash-4.17.21-alpha.0.tgz",
+					Uri:          "/lodash/-/lodash-4.17.21-alpha.0.tgz",
+					Folder:       false,
+					Size:         5000,
+					LastModified: "2023-06-01T00:00:00.000Z",
+					SHA1:         "da39a3ee5e6b4b0d3255bfef95601890afd80715",
+				},
+				{
+					Registry:     "npm-local",
+					Name:         "package.json",
+					Uri:          "/@har/sample-package/package.json",
+					Folder:       false,
+					Size:         512,
+					LastModified: "2023-01-01T00:00:00.000Z",
+					SHA1:         "da39a3ee5e6b4b0d3255bfef95601890afd80716",
+				},
+				{
+					Registry:     "npm-local",
+					Name:         ".package-lock.json",
+					Uri:          "/@har/sample-package/.package-lock.json",
+					Folder:       false,
+					Size:         256,
+					LastModified: "2023-01-01T00:00:00.000Z",
+					SHA1:         "da39a3ee5e6b4b0d3255bfef95601890afd80717",
+				},
 			},
 			"dart-local": {
 				{
@@ -387,14 +432,76 @@ func initMockData() *mockData {
         "tarball": "http://localhost:8081/artifactory/npm-local/sample-package/-/sample-package-2.0.0.tgz",
         "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80712"
       }
+    },
+    "2.0.0-beta.1": {
+      "name": "@har/sample-package",
+      "version": "2.0.0-beta.1",
+      "description": "A sample NPM package beta version",
+      "main": "index.js",
+      "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+      },
+      "keywords": ["sample", "testing", "migration", "beta"],
+      "author": "Test Author",
+      "license": "MIT",
+      "dist": {
+        "tarball": "http://localhost:8081/artifactory/npm-local/sample-package/-/sample-package-2.0.0-beta.1.tgz",
+        "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80713"
+      }
+    },
+    "3.0.0-rc.1": {
+      "name": "@har/sample-package",
+      "version": "3.0.0-rc.1",
+      "description": "A sample NPM package release candidate",
+      "main": "index.js",
+      "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+      },
+      "keywords": ["sample", "testing", "migration", "rc"],
+      "author": "Test Author",
+      "license": "MIT",
+      "dist": {
+        "tarball": "http://localhost:8081/artifactory/npm-local/sample-package/-/sample-package-3.0.0-rc.1.tgz",
+        "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80714"
+      }
     }
   },
   "time": {
     "created": "2023-01-01T00:00:00.000Z",
-    "modified": "2023-03-01T00:00:00.000Z",
+    "modified": "2023-05-01T00:00:00.000Z",
     "1.0.0": "2023-01-01T00:00:00.000Z",
     "1.1.0": "2023-02-01T00:00:00.000Z",
-    "2.0.0": "2023-03-01T00:00:00.000Z"
+    "2.0.0": "2023-03-01T00:00:00.000Z",
+    "2.0.0-beta.1": "2023-04-01T00:00:00.000Z",
+    "3.0.0-rc.1": "2023-05-01T00:00:00.000Z"
+  }
+}`,
+			"npm-local/lodash": `{
+  "name": "lodash",
+  "description": "Lodash modular utilities",
+  "dist-tags": {
+    "latest": "4.17.21",
+    "alpha": "4.17.21-alpha.0"
+  },
+  "versions": {
+    "4.17.21-alpha.0": {
+      "name": "lodash",
+      "version": "4.17.21-alpha.0",
+      "description": "Lodash alpha version for testing",
+      "main": "lodash.js",
+      "keywords": ["modules", "stdlib", "util"],
+      "author": "John-David Dalton",
+      "license": "MIT",
+      "dist": {
+        "tarball": "http://localhost:8081/artifactory/npm-local/lodash/-/lodash-4.17.21-alpha.0.tgz",
+        "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80715"
+      }
+    }
+  },
+  "time": {
+    "created": "2023-06-01T00:00:00.000Z",
+    "modified": "2023-06-01T00:00:00.000Z",
+    "4.17.21-alpha.0": "2023-06-01T00:00:00.000Z"
   }
 }`,
 		},
@@ -405,6 +512,9 @@ func initMockData() *mockData {
 			"npm-local/@har/sample-package/-/@har/sample-package-1.0.0.tgz": createNpmPackageTgz("@har/sample-package", "1.0.0", "A sample NPM package for testing migration"),
 			"npm-local/@har/sample-package/-/@har/sample-package-1.1.0.tgz": createNpmPackageTgz("@har/sample-package", "1.1.0", "A sample NPM package for testing migration"),
 			"npm-local/@har/sample-package/-/@har/sample-package-2.0.0.tgz": createNpmPackageTgz("@har/sample-package", "2.0.0", "A sample NPM package for testing migration"),
+			"npm-local/@har/sample-package/-/@har/sample-package-2.0.0-beta.1.tgz": createNpmPackageTgz("@har/sample-package", "2.0.0-beta.1", "A sample NPM package beta version"),
+			"npm-local/@har/sample-package/-/@har/sample-package-3.0.0-rc.1.tgz": createNpmPackageTgz("@har/sample-package", "3.0.0-rc.1", "A sample NPM package release candidate"),
+			"npm-local/lodash/-/lodash-4.17.21-alpha.0.tgz": createNpmPackageTgz("lodash", "4.17.21-alpha.0", "Lodash alpha version for testing"),
 		},
 	}
 }
