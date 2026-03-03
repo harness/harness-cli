@@ -10,6 +10,7 @@ import (
 	"runtime/pprof"
 	"time"
 
+	"github.com/harness/harness-cli/cmd/iacm"
 	"github.com/harness/harness-cli/cmd/artifact"
 	"github.com/harness/harness-cli/cmd/auth"
 	"github.com/harness/harness-cli/cmd/cmdutils"
@@ -143,6 +144,7 @@ func main() {
 	rootCmd.AddCommand(auth.GetRootCmd())
 	rootCmd.AddCommand(registry.GetRootCmd(factory))
 	rootCmd.AddCommand(artifact.GetRootCmd(factory))
+	rootCmd.AddCommand(iacm.GetRootCmd())
 	//rootCmd.AddCommand(project.GetRootCmd())
 	//rootCmd.AddCommand(organisation.GetRootCmd())
 	//rootCmd.AddCommand(api.GetRootCmd())

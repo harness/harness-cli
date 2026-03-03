@@ -1,15 +1,17 @@
 module github.com/harness/harness-cli
 
-go 1.24.1
+go 1.25
 
 require (
 	github.com/BurntSushi/toml v1.5.0
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/getkin/kin-openapi v0.132.0
+	github.com/go-resty/resty/v2 v2.17.1
 	github.com/gobwas/glob v0.2.3
 	github.com/google/go-containerregistry v0.20.6
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-retryablehttp v0.7.8
+	github.com/hashicorp/go-slug v1.0.0
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/pterm/pterm v0.12.80
@@ -17,10 +19,12 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
+	github.com/stretchr/testify v1.10.0
+	github.com/tmaxmax/go-sse v0.11.0
 	github.com/zhyee/zipstream v0.0.0-20230625125559-133d8d1afaa0
-	golang.org/x/crypto v0.39.0
-	golang.org/x/net v0.40.0
-	golang.org/x/term v0.32.0
+	golang.org/x/crypto v0.42.0
+	golang.org/x/net v0.44.0
+	golang.org/x/term v0.35.0
 	gopkg.in/yaml.v3 v3.0.1
 	helm.sh/helm/v3 v3.18.4
 )
@@ -63,11 +67,12 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/time v0.9.0 // indirect
+	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241209162323-e6fa225c2576 // indirect
 	google.golang.org/grpc v1.68.1 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
@@ -124,9 +129,9 @@ require (
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/vbatts/tar-split v0.12.1 // indirect
-	golang.org/x/mod v0.26.0
-	golang.org/x/sync v0.15.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
+	golang.org/x/mod v0.28.0
+	golang.org/x/sync v0.17.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
+	golang.org/x/text v0.29.0 // indirect
 	gopkg.in/ini.v1 v1.67.0
 )
