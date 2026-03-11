@@ -489,7 +489,7 @@ paths:
           description: Server-side error
   /pkg/{accountId}/{registry}/npm/{package}:
     put:
-      summary: Upload a conda package
+      summary: Upload a NPM package
       operationId: uploadNPMPackage
       parameters:
         - name: accountId
@@ -523,6 +523,40 @@ paths:
           description: Invalid request parameters
         '401':
           description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+    get:
+      summary: Download NPM package metadata
+      operationId: downloadNPMPackageMetadata
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: package
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '403':
+          description: Unauthorized
+        '404':
+          description: Package Not Found
         '5XX':
           description: Server-side error
   /pkg/{accountId}/{registry}/pub/api/packages/versions/new/upload/{uploadId}:

@@ -126,6 +126,41 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 				return fmt.Errorf("failed to create package client: %w", err)
 			}
 
+			progress.Step("checking if already exist")
+			//calling to get all the existing version to prevent duplicate upload ,same as npm publish
+			metadataResp, err := pkgClient.DownloadNPMPackageMetadataWithResponse(
+				context.Background(),
+				config.Global.AccountID,
+				registryName,
+				pkgName,
+			)
+			if err != nil {
+				progress.Error("Failed to download NPM package detail ")
+				return fmt.Errorf("Failed to  download NPM package details: %w", err)
+			}
+			// Check response
+			if metadataResp.StatusCode() != http.StatusOK && metadataResp.StatusCode() != http.StatusNotFound {
+				progress.Error("download of metadata  failed")
+				return fmt.Errorf("failed to downlad NPM metadata: %s \n response: %s", metadataResp.Status(), metadataResp.Body)
+			}
+			//Check for pre exist only if success response came
+			if metadataResp.StatusCode() == http.StatusOK {
+
+				var existingPkgDetails NpmPackage
+				if err := json.Unmarshal(metadataResp.Body, &existingPkgDetails); err != nil {
+					return err
+				}
+
+				if err != nil {
+					return fmt.Errorf("failed to parse response data %w", err)
+				}
+
+				if _, ok := existingPkgDetails.Versions[version]; ok {
+					progress.Error(fmt.Sprintf("You cannot publish over the previously published versions %s", version))
+					return fmt.Errorf("already exist %s", version)
+				}
+			}
+
 			// Prepare streaming JSON body from PackageUpload
 			progress.Step("Preparing package upload")
 			pr, pw := io.Pipe()
@@ -175,4 +210,14 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 	cmd.MarkFlagRequired("pkg-url")
 
 	return cmd
+}
+
+type NpmPackage struct {
+	ID       string                `json:"_id"`
+	Name     string                `json:"name"`
+	Versions map[string]NpmVersion `json:"versions"`
+}
+
+type NpmVersion struct {
+	Version string `json:"version"`
 }
