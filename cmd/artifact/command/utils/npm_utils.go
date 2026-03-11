@@ -60,8 +60,36 @@ type MinimalPackageJSON struct {
 	Dependencies         map[string]string `json:"dependencies"`
 	DevDependencies      map[string]string `json:"devDependencies"`
 	PeerDependencies     map[string]string `json:"peerDependencies"`
+	PeerDependenciesMeta interface{}       `json:"peerDependenciesMeta"`
 	OptionalDependencies map[string]string `json:"optionalDependencies"`
+	AcceptDependencies   interface{}       `json:"acceptDependencies"`
+	BundleDependencies   interface{}       `json:"bundleDependencies"`
 	Bin                  interface{}       `json:"bin"`
+	Contributors         interface{}       `json:"contributors"`
+	Bugs                 interface{}       `json:"bugs"`
+	Engines              interface{}       `json:"engines"`
+	Deprecated           interface{}       `json:"deprecated"`
+	Directories          interface{}       `json:"directories"`
+	Funding              interface{}       `json:"funding"`
+	CPU                  interface{}       `json:"cpu"`
+	OS                   interface{}       `json:"os"`
+	Main                 interface{}       `json:"main"`
+	Module               interface{}       `json:"module"`
+	Types                interface{}       `json:"types"`
+	Typings              interface{}       `json:"typings"`
+	Exports              interface{}       `json:"exports"`
+	Imports              interface{}       `json:"imports"`
+	Files                interface{}       `json:"files"`
+	Workspaces           interface{}       `json:"workspaces"`
+	Scripts              interface{}       `json:"scripts"`
+	Config               interface{}       `json:"config"`
+	PublishConfig        interface{}       `json:"publishConfig"`
+	SideEffects          interface{}       `json:"sideEffects"`
+	HasShrinkwrap        interface{}       `json:"_hasShrinkwrap"`
+	HasInstallScript     interface{}       `json:"hasInstallScript"`
+	NodeVersion          interface{}       `json:"_nodeVersion"`
+	NpmUser              interface{}       `json:"_npmUser"`
+	NpmVersion           interface{}       `json:"_npmVersion"`
 }
 
 func BuildNpmUploadFromPackageJSON(pkgJSON []byte, file io.ReadCloser) (*npm.PackageUpload, string, string, error) {
@@ -85,14 +113,41 @@ func BuildNpmUploadFromPackageJSON(pkgJSON []byte, file io.ReadCloser) (*npm.Pac
 		Repository:           pkg.Repository,
 		Keywords:             pkg.Keywords,
 		Dependencies:         pkg.Dependencies,
-		BundleDependencies:   nil,
+		BundleDependencies:   pkg.BundleDependencies,
 		DevDependencies:      pkg.DevDependencies,
 		PeerDependencies:     pkg.PeerDependencies,
+		PeerDependenciesMeta: pkg.PeerDependenciesMeta,
 		Bin:                  pkg.Bin,
 		OptionalDependencies: pkg.OptionalDependencies,
+		AcceptDependencies:   pkg.AcceptDependencies,
 		Readme:               "",
 		Dist:                 npm.PackageDistribution{},
 		Maintainers:          nil,
+		Contributors:         pkg.Contributors,
+		Bugs:                 pkg.Bugs,
+		Engines:              pkg.Engines,
+		Deprecated:           pkg.Deprecated,
+		Directories:          pkg.Directories,
+		Funding:              pkg.Funding,
+		CPU:                  pkg.CPU,
+		OS:                   pkg.OS,
+		Main:                 pkg.Main,
+		Module:               pkg.Module,
+		Types:                pkg.Types,
+		Typings:              pkg.Typings,
+		Exports:              pkg.Exports,
+		Imports:              pkg.Imports,
+		Files:                pkg.Files,
+		Workspaces:           pkg.Workspaces,
+		Scripts:              pkg.Scripts,
+		Config:               pkg.Config,
+		PublishConfig:        pkg.PublishConfig,
+		SideEffects:          pkg.SideEffects,
+		HasShrinkwrap:        pkg.HasShrinkwrap,
+		HasInstallScript:     pkg.HasInstallScript,
+		NodeVersion:          pkg.NodeVersion,
+		NpmUser:              pkg.NpmUser,
+		NpmVersion:           pkg.NpmVersion,
 	}
 
 	metadata := npm.PackageMetadata{
@@ -107,11 +162,13 @@ func BuildNpmUploadFromPackageJSON(pkgJSON []byte, file io.ReadCloser) (*npm.Pac
 		},
 		Readme:         "",
 		Maintainers:    nil,
+		Contributors:   pkg.Contributors,
 		Time:           nil,
 		Homepage:       pkg.Homepage,
 		Keywords:       pkg.Keywords,
 		Repository:     pkg.Repository,
 		Author:         pkg.Author,
+		Bugs:           pkg.Bugs,
 		ReadmeFilename: "",
 		Users:          nil,
 		License:        pkg.License,
