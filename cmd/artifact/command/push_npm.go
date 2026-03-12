@@ -85,7 +85,7 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 			}
 			defer file.Close()
 
-			pkgJSONBytes, err := utils.ExtractPackageJSONFromTarball(file)
+			pkgJSONBytes, readme, err := utils.ExtractPackageJSONAndReadmeFromTarball(file)
 			if err != nil {
 				progress.Error("Failed to extract package.json from tarball")
 				return fmt.Errorf("failed to extract package.json from tarball: %w", err)
@@ -100,7 +100,7 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 			defer file.Close()
 
 			progress.Step("Building NPM upload payload")
-			upload, pkgName, version, err := utils.BuildNpmUploadFromPackageJSON(pkgJSONBytes, file)
+			upload, pkgName, version, err := utils.BuildNpmUploadFromPackageJSON(pkgJSONBytes, readme, file)
 			if err != nil {
 				progress.Error("Failed to build NPM upload body")
 				return fmt.Errorf("failed to build NPM upload body: %w", err)

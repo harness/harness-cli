@@ -268,7 +268,7 @@ func (r *File) Migrate(ctx context.Context) error {
 			logger.Error().Err(err).Msg("Failed to fetch metadata")
 			return fmt.Errorf("failed to fetch metadata: %w", err)
 		}
-		pkgJSONBytes, err := utils.ExtractPackageJSONFromTarball(tarFileReader)
+		pkgJSONBytes, readme, err := utils.ExtractPackageJSONAndReadmeFromTarball(tarFileReader)
 		if closeErr := tarFileReader.Close(); closeErr != nil {
 			logger.Warn().Err(closeErr).Msg("Failed to close tar file reader")
 		}
@@ -284,7 +284,7 @@ func (r *File) Migrate(ctx context.Context) error {
 		}
 		// Build NPM upload payload
 		logger.Info().Msg("Building NPM upload payload")
-		payload, pkgName, version, err := utils.BuildNpmUploadFromPackageJSON(pkgJSONBytes, tarFileReader)
+		payload, pkgName, version, err := utils.BuildNpmUploadFromPackageJSON(pkgJSONBytes, readme, tarFileReader)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to build NPM upload body")
 			return fmt.Errorf("failed to build NPM upload body: %w", err)
@@ -294,6 +294,11 @@ func (r *File) Migrate(ctx context.Context) error {
 			logger.Error().Msg("Package.json must contain non-empty 'name' and 'version'")
 			return fmt.Errorf("package.json must contain non-empty 'name' and 'version'")
 		}
+
+		logger.Info().
+			Str("npm_package", pkgName).
+			Str("npm_version", version).
+			Msgf("Uploading NPM package %s@%s to registry %s", pkgName, version, r.destRegistry)
 
 		uploadReader := io.NopCloser(StreamUploadAsJSON(payload))
 
@@ -308,10 +313,7 @@ func (r *File) Migrate(ctx context.Context) error {
 		pkgJSONBytes = nil
 		payload = nil
 
-		if err != nil {
-			return err
-		}
-
+		title := fmt.Sprintf("%s - %s@%s (%s)", r.file.Name, pkgName, version, common.GetSize(int64(r.file.Size)))
 		stat := types.FileStat{
 			Name:     r.file.Name,
 			Registry: r.srcRegistry,
@@ -319,13 +321,20 @@ func (r *File) Migrate(ctx context.Context) error {
 			Size:     int64(r.file.Size),
 			Status:   types.StatusSuccess,
 		}
-		title := fmt.Sprintf("%s (%s)", r.file.Name, common.GetSize(int64(r.file.Size)))
 		if err != nil {
-			logger.Error().Err(err).Msg("Failed to upload file")
+			logger.Error().
+				Err(err).
+				Str("npm_package", pkgName).
+				Str("npm_version", version).
+				Msg("Failed to upload NPM package")
 			stat.Status = types.StatusFail
 			stat.Error = err.Error()
 			pterm.Error.Println(title)
 		} else {
+			logger.Info().
+				Str("npm_package", pkgName).
+				Str("npm_version", version).
+				Msgf("Successfully uploaded NPM package %s@%s", pkgName, version)
 			pterm.Success.Println(title)
 		}
 		r.stats.FileStats = append(r.stats.FileStats, stat)

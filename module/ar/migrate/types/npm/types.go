@@ -7,14 +7,14 @@ type PackageMetadata struct {
 	ID             string                             `json:"_id"`
 	Rev            string                             `json:"_rev,omitempty"`
 	Name           string                             `json:"name"`
-	Description    string                             `json:"description"`
+	Description    interface{}                        `json:"description"`
 	DistTags       map[string]string                  `json:"dist-tags,omitempty"`
 	Versions       map[string]*PackageMetadataVersion `json:"versions"`
 	Readme         string                             `json:"readme,omitempty"`
 	Maintainers    []User                             `json:"maintainers,omitempty"`
 	Contributors   interface{}                        `json:"contributors,omitempty"`
 	Time           map[string]time.Time               `json:"time,omitempty"`
-	Homepage       string                             `json:"homepage,omitempty"`
+	Homepage       interface{}                        `json:"homepage,omitempty"`
 	Keywords       []string                           `json:"keywords,omitempty"`
 	Repository     interface{}                        `json:"repository,omitempty"`
 	Author         interface{}                        `json:"author"`
@@ -39,7 +39,7 @@ type PackageMetadataVersion struct {
 	License              interface{}         `json:"license,omitempty"`
 	Repository           interface{}         `json:"repository,omitempty"`
 	Keywords             interface{}         `json:"keywords,omitempty"`
-	Dependencies         map[string]string   `json:"dependencies,omitempty"`
+	Dependencies         interface{}         `json:"dependencies,omitempty"`
 	BundleDependencies   interface{}         `json:"bundleDependencies,omitempty"`
 	DevDependencies      interface{}         `json:"devDependencies,omitempty"`
 	PeerDependencies     interface{}         `json:"peerDependencies,omitempty"`
