@@ -1,0 +1,58 @@
+{
+  "docker-local": {
+    "key": "docker-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/docker-local",
+    "description": "Mock Docker Local Repository",
+    "packageType": "Docker"
+  },
+  "helm-legacy-local": {
+    "key": "helm-legacy-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/helm-legacy-local",
+    "description": "Mock helm-legacy Local Repository",
+    "packageType": "HELM"
+  },
+  "maven-local": {
+    "key": "maven-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/maven-local",
+    "description": "Mock Maven Local Repository",
+    "packageType": "Maven"
+  },
+  "npm-local": {
+    "key": "npm-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/npm-local",
+    "description": "Mock NPM Local Repository",
+    "packageType": "npm"
+  },
+  "dart-local": {
+    "key": "dart-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/dart-local",
+    "description": "Mock Dart Local Repository",
+    "packageType": "pub"
+  },
+  "generic-local": {
+    "key": "generic-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/generic-local",
+    "description": "Mock Generic Local Repository",
+    "packageType": "Generic"
+  },
+  "python-local": {
+    "key": "python-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/python-local",
+    "description": "Mock Python Local Repository",
+    "packageType": "pypi"
+  },
+  "python-noindex-local": {
+    "key": "python-noindex-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/python-noindex-local",
+    "description": "Mock Python Local Repository (no .pypi index)",
+    "packageType": "pypi"
+  }
+}

@@ -1,0 +1,56 @@
+[
+  {
+    "Registry": "npm-local",
+    "Name": "@har/sample-package-1.0.0.tgz",
+    "Uri": "/@har/sample-package/-/@har/sample-package-1.0.0.tgz",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80707"
+  },
+  {
+    "Registry": "npm-local",
+    "Name": "@har/sample-package-2.0.0-beta.1.tgz",
+    "Uri": "/@har/sample-package/-/@har/sample-package-2.0.0-beta.1.tgz",
+    "Folder": false,
+    "Size": 2100,
+    "LastModified": "2023-04-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80713"
+  },
+  {
+    "Registry": "npm-local",
+    "Name": "@har/sample-package-3.0.0-rc.1.tgz",
+    "Uri": "/@har/sample-package/-/@har/sample-package-3.0.0-rc.1.tgz",
+    "Folder": false,
+    "Size": 2200,
+    "LastModified": "2023-05-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80714"
+  },
+  {
+    "Registry": "npm-local",
+    "Name": "lodash-4.17.21-alpha.0.tgz",
+    "Uri": "/lodash/-/lodash-4.17.21-alpha.0.tgz",
+    "Folder": false,
+    "Size": 5000,
+    "LastModified": "2023-06-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80715"
+  },
+  {
+    "Registry": "npm-local",
+    "Name": "package.json",
+    "Uri": "/@har/sample-package/package.json",
+    "Folder": false,
+    "Size": 512,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80716"
+  },
+  {
+    "Registry": "npm-local",
+    "Name": ".package-lock.json",
+    "Uri": "/@har/sample-package/.package-lock.json",
+    "Folder": false,
+    "Size": 256,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80717"
+  }
+]

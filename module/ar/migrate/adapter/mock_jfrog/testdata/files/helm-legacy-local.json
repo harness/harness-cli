@@ -1,0 +1,20 @@
+[
+  {
+    "Registry": "helm-legacy-local",
+    "Name": "nginx-8.2.0.tgz",
+    "Uri": "/nginx-8.2.0.tgz",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80707"
+  },
+  {
+    "Registry": "helm-legacy-local",
+    "Name": "index.yaml",
+    "Uri": "/index.yaml",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80707"
+  }
+]

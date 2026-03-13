@@ -1,0 +1,38 @@
+[
+  {
+    "Registry": "python-local",
+    "Name": "simple.html",
+    "Uri": "/.pypi/simple.html",
+    "Folder": false,
+    "Size": 256,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80730"
+  },
+  {
+    "Registry": "python-local",
+    "Name": "requests.html",
+    "Uri": "/.pypi/requests/requests.html",
+    "Folder": false,
+    "Size": 512,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80731"
+  },
+  {
+    "Registry": "python-local",
+    "Name": "requests-2.28.0.tar.gz",
+    "Uri": "/requests/2.28.0/requests-2.28.0.tar.gz",
+    "Folder": false,
+    "Size": 4096,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80732"
+  },
+  {
+    "Registry": "python-local",
+    "Name": "requests-2.29.0.tar.gz",
+    "Uri": "/requests/2.29.0/requests-2.29.0.tar.gz",
+    "Folder": false,
+    "Size": 4200,
+    "LastModified": "2023-02-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80733"
+  }
+]

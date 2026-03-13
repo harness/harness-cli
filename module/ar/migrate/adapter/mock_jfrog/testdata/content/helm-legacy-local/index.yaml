@@ -1,0 +1,7 @@
+apiVersion: v1
+entries:
+  nginx:
+    - name: nginx
+      version: 8.2.0
+      urls:
+        - nginx-8.2.0.tgz

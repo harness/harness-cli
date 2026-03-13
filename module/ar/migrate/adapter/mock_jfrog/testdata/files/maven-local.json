@@ -1,0 +1,20 @@
+[
+  {
+    "Registry": "maven-local",
+    "Name": "sample-1.0.jar",
+    "Uri": "/com/example/sample/1.0/sample-1.0.jar",
+    "Folder": false,
+    "Size": 1024,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+  },
+  {
+    "Registry": "maven-local",
+    "Name": "sample-1.0.pom",
+    "Uri": "/com/example/sample/1.0/sample-1.0.pom",
+    "Folder": false,
+    "Size": 512,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80708"
+  }
+]

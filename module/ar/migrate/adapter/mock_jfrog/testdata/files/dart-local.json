@@ -1,0 +1,29 @@
+[
+  {
+    "Registry": "dart-local",
+    "Name": "sample_dart_pkg-1.0.0.tar.gz",
+    "Uri": "/packages/sample_dart_pkg/versions/1.0.0.tar.gz",
+    "Folder": false,
+    "Size": 3072,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80720"
+  },
+  {
+    "Registry": "dart-local",
+    "Name": "sample_dart_pkg-1.1.0.tar.gz",
+    "Uri": "/packages/sample_dart_pkg/versions/1.1.0.tar.gz",
+    "Folder": false,
+    "Size": 3200,
+    "LastModified": "2023-02-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80721"
+  },
+  {
+    "Registry": "dart-local",
+    "Name": "another_dart_pkg-2.0.0.tar.gz",
+    "Uri": "/packages/another_dart_pkg/versions/2.0.0.tar.gz",
+    "Folder": false,
+    "Size": 4096,
+    "LastModified": "2023-03-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80722"
+  }
+]

@@ -54,7 +54,7 @@ func (f factory) Create(ctx context.Context, config types.RegistryConfig) (adp.A
 }
 
 type adapter struct {
-	client *client
+	client Client
 	reg    types.RegistryConfig
 }
 
@@ -63,6 +63,12 @@ func newAdapter(config types.RegistryConfig) (adp.Adapter, error) {
 		client: newClient(&config),
 		reg:    config,
 	}, nil
+}
+
+// NewAdapterWithClient creates an adapter with a custom Client implementation.
+// This is used by mock_jfrog to inject a mock client while reusing all adapter logic.
+func NewAdapterWithClient(config types.RegistryConfig, c Client) adp.Adapter {
+	return &adapter{client: c, reg: config}
 }
 
 func (a *adapter) GetKeyChain(sourcePackageHostname string) (authn.Keychain, error) {
@@ -85,7 +91,7 @@ func (a *adapter) GetConfig() types.RegistryConfig {
 
 func (a *adapter) ValidateCredentials() (bool, error) { return false, nil }
 func (a *adapter) GetRegistry(ctx context.Context, registry string) (types.RegistryInfo, error) {
-	reg, err := a.client.getRegistry(registry)
+	reg, err := a.client.GetRegistry(registry)
 	if err != nil {
 		return types.RegistryInfo{}, fmt.Errorf("get registry: %w", err)
 	}
@@ -116,7 +122,7 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			Size:     -1,
 		})
 	} else if artifactType == types.DOCKER || artifactType == types.HELM {
-		catalog, err := a.client.getCatalog(registry)
+		catalog, err := a.client.GetCatalog(registry)
 		if err != nil {
 			return nil, fmt.Errorf("get catalog: %w", err)
 		}
@@ -453,9 +459,14 @@ func (a *adapter) GetVersions(
 	if artifactType == types.PYTHON {
 		var versions []types.Version
 		indexPath := fmt.Sprintf(".pypi/%s/%s.html", pkg, pkg)
-		file, _, err := a.client.getFile(registry, indexPath)
+		file, _, err := a.client.GetFile(registry, indexPath)
 		if err != nil {
-			return nil, fmt.Errorf("download file: %w", err)
+			// Fall back to extracting versions from the file tree when .pypi
+			// metadata files don't exist (e.g. packages deployed directly via
+			// Jenkins or the generic deploy API, not via the PyPI upload API).
+			log.Warn().Err(err).Msgf(
+				"Failed to get .pypi index for %s, falling back to file tree", pkg)
+			return a.getPythonVersionsFromTree(node, registry, pkg)
 		}
 		defer file.Close()
 		_versions, err := extractPythonPackageNames(file)
@@ -572,7 +583,7 @@ func (a *adapter) GetVersions(
 }
 
 func (a *adapter) GetFiles(registry string) ([]types.File, error) {
-	files, err := a.client.getFiles(registry)
+	files, err := a.client.GetFiles(registry)
 	if err != nil {
 		log.Error().Msgf("Failed to get files from registry: %v", err)
 		return nil, fmt.Errorf("failed to get files from registry: %w", err)
@@ -582,7 +593,7 @@ func (a *adapter) GetFiles(registry string) ([]types.File, error) {
 }
 
 func (a *adapter) DownloadFile(registry string, uri string) (io.ReadCloser, http.Header, error) {
-	return a.client.getFile(registry, uri)
+	return a.client.GetFile(registry, uri)
 }
 
 func (a *adapter) GetOCIImagePath(registry string, packageHostname string, image string) (string, error) {
@@ -678,4 +689,55 @@ func (a *adapter) CreateVersion(
 	metadata map[string]interface{},
 ) error {
 	return nil
+}
+
+// getPythonVersionsFromTree extracts Python package versions by scanning the
+// file tree. This is used as a fallback when the .pypi index HTML files are
+// not available (e.g. packages deployed directly, not via the PyPI API).
+func (a *adapter) getPythonVersionsFromTree(
+	node *types.TreeNode,
+	registry, pkg string,
+) ([]types.Version, error) {
+	if node == nil {
+		return nil, errors.New("node is nil")
+	}
+
+	pkgNode, err := tree.GetNodeForPath(node, pkg)
+	if err != nil {
+		return nil, fmt.Errorf("package path %q not found in file tree: %w", pkg, err)
+	}
+
+	files, err := tree.GetAllFiles(pkgNode)
+	if err != nil {
+		return nil, fmt.Errorf("get files for package %s: %w", pkg, err)
+	}
+
+	var versions []types.Version
+	seen := make(map[string]bool)
+	for _, f := range files {
+		if f.Folder {
+			continue
+		}
+		version := util.GetPyPIVersion(f.Name)
+		if version == "" {
+			continue
+		}
+		if seen[version] {
+			continue
+		}
+		seen[version] = true
+
+		// Use the directory containing this file as the version path
+		versionPath := path.Dir(f.Uri)
+		versions = append(versions, types.Version{
+			Registry: registry,
+			Pkg:      pkg,
+			Path:     versionPath,
+			Name:     version,
+			Size:     -1,
+		})
+	}
+
+	log.Info().Msgf("Found %d versions for package %s from file tree", len(versions), pkg)
+	return versions, nil
 }

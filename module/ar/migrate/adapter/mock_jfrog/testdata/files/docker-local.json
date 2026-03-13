@@ -1,0 +1,11 @@
+[
+  {
+    "Registry": "docker-local",
+    "Name": "mock-file.txt",
+    "Uri": "/mock-file.txt",
+    "Folder": false,
+    "Size": 100,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+  }
+]

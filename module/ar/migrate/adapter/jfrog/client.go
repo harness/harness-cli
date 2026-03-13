@@ -13,6 +13,16 @@ import (
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 )
 
+// Client defines the interface for interacting with a JFrog Artifactory instance.
+// It is implemented by the real HTTP client and can be replaced with a mock for testing.
+type Client interface {
+	GetRegistries() ([]JFrogRepository, error)
+	GetRegistry(registry string) (JFrogRepository, error)
+	GetFile(registry string, path string) (io.ReadCloser, http2.Header, error)
+	GetFiles(registry string) ([]types.File, error)
+	GetCatalog(registry string) ([]string, error)
+}
+
 // newClient constructs a jfrog client
 func newClient(reg *types.RegistryConfig) *client {
 	username, password := "", ""
@@ -58,7 +68,7 @@ type JFrogRepository struct {
 	PackageType string `json:"packageType"`
 }
 
-func (c *client) getRegistries() ([]JFrogRepository, error) {
+func (c *client) GetRegistries() ([]JFrogRepository, error) {
 	url := fmt.Sprintf("%s/artifactory/api/repositories", c.url)
 
 	// Make GET request to fetch repositories
@@ -70,14 +80,19 @@ func (c *client) getRegistries() ([]JFrogRepository, error) {
 	return repositories, nil
 }
 
-func (c *client) getRegistry(registry string) (JFrogRepository, error) {
-	repositories, err := c.getRegistries()
+func (c *client) GetRegistry(registry string) (JFrogRepository, error) {
+	repositories, err := c.GetRegistries()
 	if err != nil {
 		return JFrogRepository{}, fmt.Errorf("failed to get repositories: %w", err)
 	}
 
 	for _, repo := range repositories {
 		if repo.Key == registry {
+			if repo.Type != "LOCAL" {
+				return JFrogRepository{}, fmt.Errorf(
+					"registry %s is of type %s; only LOCAL repositories are supported for migration",
+					registry, repo.Type)
+			}
 			return repo, nil
 		}
 	}
@@ -85,7 +100,7 @@ func (c *client) getRegistry(registry string) (JFrogRepository, error) {
 	return JFrogRepository{}, fmt.Errorf("registry %s not found", registry)
 }
 
-func (c *client) getFile(registry string, path string) (io.ReadCloser, http2.Header, error) {
+func (c *client) GetFile(registry string, path string) (io.ReadCloser, http2.Header, error) {
 	path = strings.TrimPrefix(path, "/")
 	path = strings.TrimSuffix(path, "/")
 
@@ -122,8 +137,8 @@ func (c *client) getFile(registry string, path string) (io.ReadCloser, http2.Hea
 }
 
 // getFiles retrieves a list of files from the specified JFrog Artifactory registry
-func (c *client) getFiles(registry string) ([]types.File, error) {
-	repo, err := c.getRegistry(registry)
+func (c *client) GetFiles(registry string) ([]types.File, error) {
+	repo, err := c.GetRegistry(registry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get registry %s: %w", registry, err)
 	}
@@ -203,7 +218,7 @@ func buildCatalogURLRelative(endpoint, repo, relativePath string) string {
 	return fmt.Sprintf("%s/artifactory/api/docker/%s%s", endpoint, repo, relativePath)
 }
 
-func (c *client) getCatalog(registry string) (repositories []string, err error) {
+func (c *client) GetCatalog(registry string) (repositories []string, err error) {
 	url := buildCatalogURL(c.url, registry)
 	for {
 		repos, next, err := c.catalog(url)
