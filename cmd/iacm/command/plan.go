@@ -18,6 +18,7 @@ import (
 	"github.com/harness/harness-cli/util/common/progress"
 	"github.com/hashicorp/go-slug"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -28,7 +29,52 @@ const (
 
 	startingStepMsg  = "========================== Starting step %s ==========================\n"
 	startingStageMsg = "========================== Starting stage %s ==========================\n"
+
+	workspaceInfoCliArgErr = "org-id, project-id and workspace-id must be specified together when using CLI arguments"
+	workspaceInfoFileErr   = "workspace not found: specify org-id, project-id and workspace-id via flags or add .harness/workspace.yaml"
 )
+
+// WorkspaceInfo holds org, project and workspace identifiers from CLI or .harness/workspace.yaml
+type WorkspaceInfo struct {
+	Org       string `yaml:"org_id"`
+	Project   string `yaml:"project_id"`
+	Workspace string `yaml:"workspace_id"`
+}
+
+// getWorkspaceInfo returns the values supplied directly to the cli if they are present
+// and falls back to a config file in .harness/workspace.yaml if not
+func getWorkspaceInfo(org, project, workspace, workingDirectory string) (*WorkspaceInfo, error) {
+	if org != "" && project != "" && workspace != "" {
+		return &WorkspaceInfo{
+			Org:       org,
+			Project:   project,
+			Workspace: workspace,
+		}, nil
+	}
+	if org == "" && (project != "" || workspace != "") {
+		return nil, errors.New(workspaceInfoCliArgErr)
+	}
+	if project == "" && (org != "" || workspace != "") {
+		return nil, errors.New(workspaceInfoCliArgErr)
+	}
+	if workspace == "" && (org != "" || project != "") {
+		return nil, errors.New(workspaceInfoCliArgErr)
+	}
+
+	file, err := os.ReadFile(filepath.Join(workingDirectory, ".harness", "workspace.yaml"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, errors.New(workspaceInfoFileErr)
+		}
+		return nil, fmt.Errorf("reading workspace config: %w", err)
+	}
+	workspaceInfo := &WorkspaceInfo{}
+	err = yaml.Unmarshal(file, workspaceInfo)
+	if err != nil {
+		return nil, fmt.Errorf("parsing workspace config: %w", err)
+	}
+	return workspaceInfo, nil
+}
 
 func NewPlanCmd() *cobra.Command {
 	var (
@@ -45,7 +91,10 @@ func NewPlanCmd() *cobra.Command {
 		Long: `Execute a Terraform plan on Harness servers using remote execution.
 This command uploads your local Terraform code and executes it remotely,
 streaming logs back to your terminal.`,
-		Example: `  # Basic plan execution
+		Example: `  # Plan using .harness/workspace.yaml (no flags needed)
+  hc iacm plan
+
+  # Basic plan execution with flags
   hc iacm plan --workspace-id my-workspace
 
   # Plan with specific targets
@@ -54,6 +103,15 @@ streaming logs back to your terminal.`,
   # Plan with variable replacements
   hc iacm plan --workspace-id my-workspace --replace key1=value1 --replace key2=value2`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			wd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("getting current directory: %w", err)
+			}
+			wsInfo, err := getWorkspaceInfo(orgID, projectID, workspaceID, wd)
+			if err != nil {
+				return err
+			}
+			orgID, projectID, workspaceID = wsInfo.Org, wsInfo.Project, wsInfo.Workspace
 			if orgID == "" {
 				orgID = config.Global.OrgID
 			}
@@ -61,7 +119,7 @@ streaming logs back to your terminal.`,
 				projectID = config.Global.ProjectID
 			}
 			if workspaceID == "" {
-				return errors.New("workspace-id is required")
+				return errors.New(workspaceInfoFileErr)
 			}
 
 			verbose, _ := cmd.Flags().GetBool("verbose")
@@ -75,13 +133,11 @@ streaming logs back to your terminal.`,
 		},
 	}
 
-	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace identifier (required)")
-	cmd.Flags().StringVar(&orgID, "org-id", "", "Organization identifier (defaults to global config)")
-	cmd.Flags().StringVar(&projectID, "project-id", "", "Project identifier (defaults to global config)")
+	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace identifier (defaults to .harness/workspace.yaml if present)")
+	cmd.Flags().StringVar(&orgID, "org-id", "", "Organization identifier (defaults to global config or .harness/workspace.yaml)")
+	cmd.Flags().StringVar(&projectID, "project-id", "", "Project identifier (defaults to global config or .harness/workspace.yaml)")
 	cmd.Flags().StringArrayVar(&targets, "target", []string{}, "Resource targets to plan (can be specified multiple times)")
 	cmd.Flags().StringArrayVar(&replacements, "replace", []string{}, "Variable replacements in key=value format (can be specified multiple times)")
-
-	cmd.MarkFlagRequired("workspace-id")
 
 	return cmd
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/harness/harness-cli/util/client/iacm"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 )
 
 type GetPipelineExecutionMock struct {
@@ -278,4 +279,89 @@ func TestGetStartingNodeID(t *testing.T) {
 		assert.Equal(t, expectedStartingNodeID, actualStartingNodeID)
 		assert.Equal(t, expectedErr.Error(), actualErr.Error())
 	})
+}
+
+func TestGetWorkspaceInfo(t *testing.T) {
+	tt := map[string]struct {
+		expectedInfo *WorkspaceInfo
+		expectedErr  error
+		org          string
+		project      string
+		workspace    string
+		fileContent  *WorkspaceInfo
+	}{
+		"CLI args are returned when all are present": {
+			expectedInfo: &WorkspaceInfo{
+				Org:       "cli-arg-org",
+				Project:   "cli-arg-project",
+				Workspace: "cli-arg-workspace",
+			},
+			expectedErr: nil,
+			org:         "cli-arg-org",
+			project:     "cli-arg-project",
+			workspace:   "cli-arg-workspace",
+			fileContent: nil,
+		},
+		"error when only org and project provided via CLI": {
+			expectedInfo: nil,
+			expectedErr:  errors.New(workspaceInfoCliArgErr),
+			org:          "cli-arg-org",
+			project:      "cli-arg-project",
+			workspace:    "",
+			fileContent:  nil,
+		},
+		"error when only workspace provided via CLI": {
+			expectedInfo: nil,
+			expectedErr:  errors.New(workspaceInfoCliArgErr),
+			org:          "",
+			project:      "",
+			workspace:    "cli-arg-workspace",
+			fileContent:  nil,
+		},
+		"file info is returned when no CLI args and file exists": {
+			expectedInfo: &WorkspaceInfo{
+				Org:       "file-org",
+				Project:   "file-project",
+				Workspace: "file-workspace",
+			},
+			expectedErr: nil,
+			org:         "",
+			project:     "",
+			workspace:   "",
+			fileContent: &WorkspaceInfo{
+				Org:       "file-org",
+				Project:   "file-project",
+				Workspace: "file-workspace",
+			},
+		},
+		"error when no CLI args and file does not exist": {
+			expectedInfo: nil,
+			expectedErr:  errors.New(workspaceInfoFileErr),
+			org:          "",
+			project:      "",
+			workspace:    "",
+			fileContent:  nil,
+		},
+	}
+	for name, tc := range tt {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			if tc.fileContent != nil {
+				harnessDir := filepath.Join(dir, ".harness")
+				assert.Nil(t, os.MkdirAll(harnessDir, 0755))
+				data, err := yaml.Marshal(tc.fileContent)
+				assert.Nil(t, err)
+				assert.Nil(t, os.WriteFile(filepath.Join(harnessDir, "workspace.yaml"), data, 0600))
+			}
+			info, err := getWorkspaceInfo(tc.org, tc.project, tc.workspace, dir)
+			if tc.expectedErr != nil {
+				assert.Error(t, err)
+				assert.Equal(t, tc.expectedErr.Error(), err.Error())
+				assert.Nil(t, info)
+				return
+			}
+			assert.Nil(t, err)
+			assert.Equal(t, tc.expectedInfo, info)
+		})
+	}
 }
