@@ -824,6 +824,58 @@ paths:
           description: Missing or invalid `x-api-key`
         '5XX':
           description: Server-side error
+  /har/pkg/{accountId}/{registry}/swift/{scope}/{name}/{version}:
+    get:
+      summary: Upload a Swift package
+      operationId: uploadSwiftPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: scope
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Swift Package .zip file to upload
+      responses:
+        '200':
+          description: file uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
 components:
   securitySchemes:
     ApiKeyAuth:

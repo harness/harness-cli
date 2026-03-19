@@ -19,6 +19,12 @@ const (
 	ApiKeyAuthScopes = "ApiKeyAuth.Scopes"
 )
 
+// UploadSwiftPackageMultipartBody defines parameters for UploadSwiftPackage.
+type UploadSwiftPackageMultipartBody struct {
+	// File Swift Package .zip file to upload
+	File *openapi_types.File `json:"file,omitempty"`
+}
+
 // UploadCargoPackageMultipartBody defines parameters for UploadCargoPackage.
 type UploadCargoPackageMultipartBody struct {
 	// File Package .cargo file to upload
@@ -77,6 +83,9 @@ type UploadRpmPackageMultipartBody struct {
 	// File Package .rpm file to upload
 	File *openapi_types.File `json:"file,omitempty"`
 }
+
+// UploadSwiftPackageMultipartRequestBody defines body for UploadSwiftPackage for multipart/form-data ContentType.
+type UploadSwiftPackageMultipartRequestBody UploadSwiftPackageMultipartBody
 
 // UploadCargoPackageMultipartRequestBody defines body for UploadCargoPackage for multipart/form-data ContentType.
 type UploadCargoPackageMultipartRequestBody UploadCargoPackageMultipartBody
@@ -172,6 +181,9 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// UploadSwiftPackageWithBody request with any body
+	UploadSwiftPackageWithBody(ctx context.Context, accountId string, registry string, scope string, name string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// UploadCargoPackageWithBody request with any body
 	UploadCargoPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -228,6 +240,18 @@ type ClientInterface interface {
 
 	// UploadRpmPackageWithBody request with any body
 	UploadRpmPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) UploadSwiftPackageWithBody(ctx context.Context, accountId string, registry string, scope string, name string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadSwiftPackageRequestWithBody(c.Server, accountId, registry, scope, name, version, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) UploadCargoPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -456,6 +480,70 @@ func (c *Client) UploadRpmPackageWithBody(ctx context.Context, accountId string,
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewUploadSwiftPackageRequestWithBody generates requests for UploadSwiftPackage with any type of body
+func NewUploadSwiftPackageRequestWithBody(server string, accountId string, registry string, scope string, name string, version string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "registry", runtime.ParamLocationPath, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "scope", runtime.ParamLocationPath, scope)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "name", runtime.ParamLocationPath, name)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam4 string
+
+	pathParam4, err = runtime.StyleParamWithLocation("simple", false, "version", runtime.ParamLocationPath, version)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/har/pkg/%s/%s/swift/%s/%s/%s", pathParam0, pathParam1, pathParam2, pathParam3, pathParam4)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
 }
 
 // NewUploadCargoPackageRequestWithBody generates requests for UploadCargoPackage with any type of body
@@ -1527,6 +1615,9 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// UploadSwiftPackageWithBodyWithResponse request with any body
+	UploadSwiftPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, scope string, name string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSwiftPackageResp, error)
+
 	// UploadCargoPackageWithBodyWithResponse request with any body
 	UploadCargoPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadCargoPackageResp, error)
 
@@ -1583,6 +1674,27 @@ type ClientWithResponsesInterface interface {
 
 	// UploadRpmPackageWithBodyWithResponse request with any body
 	UploadRpmPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadRpmPackageResp, error)
+}
+
+type UploadSwiftPackageResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadSwiftPackageResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadSwiftPackageResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type UploadCargoPackageResp struct {
@@ -1984,6 +2096,15 @@ func (r UploadRpmPackageResp) StatusCode() int {
 	return 0
 }
 
+// UploadSwiftPackageWithBodyWithResponse request with arbitrary body returning *UploadSwiftPackageResp
+func (c *ClientWithResponses) UploadSwiftPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, scope string, name string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSwiftPackageResp, error) {
+	rsp, err := c.UploadSwiftPackageWithBody(ctx, accountId, registry, scope, name, version, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadSwiftPackageResp(rsp)
+}
+
 // UploadCargoPackageWithBodyWithResponse request with arbitrary body returning *UploadCargoPackageResp
 func (c *ClientWithResponses) UploadCargoPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadCargoPackageResp, error) {
 	rsp, err := c.UploadCargoPackageWithBody(ctx, accountId, registry, contentType, body, reqEditors...)
@@ -2153,6 +2274,22 @@ func (c *ClientWithResponses) UploadRpmPackageWithBodyWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseUploadRpmPackageResp(rsp)
+}
+
+// ParseUploadSwiftPackageResp parses an HTTP response from a UploadSwiftPackageWithResponse call
+func ParseUploadSwiftPackageResp(rsp *http.Response) (*UploadSwiftPackageResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadSwiftPackageResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
 }
 
 // ParseUploadCargoPackageResp parses an HTTP response from a UploadCargoPackageWithResponse call
