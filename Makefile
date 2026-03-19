@@ -52,3 +52,7 @@ format: tools # Format go code and error if any changes are made
 $(GOBIN)/oapi-codegen:
 	@echo "🔘 Installing oapi-codegen... (`date '+%H:%M:%S'`)"
 	@go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+
+# For test coverage
+test:
+	go test -timeout 30m -cover -coverprofile=coverage.out ./...

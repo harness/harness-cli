@@ -76,7 +76,7 @@ func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 				}
 				p.Error(errMsg)
 				log.Error().Int("statusCode", registryResp.StatusCode()).Msg(errMsg)
-				return fmt.Errorf(errMsg)
+				return fmt.Errorf("%s", errMsg)
 			}
 
 			if registryResp.JSON200 == nil || registryResp.JSON200.Data.Uuid == nil {
@@ -132,7 +132,7 @@ func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 				}
 				p.Error(errMsg)
 				log.Error().Int("statusCode", initResp.StatusCode()).Msg(errMsg)
-				return fmt.Errorf(errMsg)
+				return fmt.Errorf("%s", errMsg)
 			}
 
 			if initResp.JSON202 == nil || initResp.JSON202.Data == nil || initResp.JSON202.Data.EvaluationId == nil {
@@ -185,7 +185,7 @@ func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 					}
 					p.Error(errMsg)
 					log.Error().Int("statusCode", statusResp.StatusCode()).Msg(errMsg)
-					return fmt.Errorf(errMsg)
+					return fmt.Errorf("%s", errMsg)
 				}
 
 				if statusResp.JSON200 == nil || statusResp.JSON200.Data == nil || statusResp.JSON200.Data.Status == nil {
@@ -210,7 +210,7 @@ func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 					}
 					p.Error(errMsg)
 					log.Error().Str("error", errMsg).Msg("Evaluation failed")
-					return fmt.Errorf(errMsg)
+					return fmt.Errorf("%s", errMsg)
 				}
 
 				time.Sleep(2 * time.Second)

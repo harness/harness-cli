@@ -11,6 +11,7 @@ harnesscd-example-apps
 */.DS_Store
 registry_migration_*
 logs_*
+coverage.out
 
 # goreleaser output
 dist/
