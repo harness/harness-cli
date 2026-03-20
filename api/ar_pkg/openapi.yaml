@@ -825,7 +825,7 @@ paths:
         '5XX':
           description: Server-side error
   /har/pkg/{accountId}/{registry}/swift/{scope}/{name}/{version}:
-    get:
+    put:
       summary: Upload a Swift package
       operationId: uploadSwiftPackage
       parameters:

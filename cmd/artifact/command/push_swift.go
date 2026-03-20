@@ -121,7 +121,7 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 			fileWriter := multipart.NewWriter(&formData)
 
 			// Create the form field "file" to match curl
-			part, err := fileWriter.CreateFormFile("file", filepath.Base(filePath))
+			part, err := fileWriter.CreateFormFile("source-archive", filepath.Base(filePath))
 			if err != nil {
 				return err
 			}

@@ -536,7 +536,7 @@ func NewUploadSwiftPackageRequestWithBody(server string, accountId string, regis
 		return nil, err
 	}
 
-	req, err := http.NewRequest("GET", queryURL.String(), body)
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
