@@ -17,7 +17,7 @@ endif
 .PHONY: generate build clean
 
 # Generate code for every service folder that owns an openapi.yaml
-generate: $(SERVICES:%=generate-%)
+generate: $(GOBIN)/oapi-codegen $(SERVICES:%=generate-%)
 
 
 tools = $(addprefix $(GOBIN)/, golangci-lint goimports govulncheck protoc-gen-go protoc-gen-go-grpc gci oapi-codegen)
