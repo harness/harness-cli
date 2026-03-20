@@ -1,0 +1,65 @@
+[
+  {
+    "Registry": "nuget-local",
+    "Name": "company.grpc.pkg.1.0.0.nupkg",
+    "Uri": "/foo/company.grpc.pkg/1.0.0/company.grpc.pkg.1.0.0.nupkg",
+    "Folder": false,
+    "Size": 8192,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80740"
+  },
+  {
+    "Registry": "nuget-local",
+    "Name": "company.grpc.pkg.1.0.0.nupkg.sha512",
+    "Uri": "/foo/company.grpc.pkg/1.0.0/company.grpc.pkg.1.0.0.nupkg.sha512",
+    "Folder": false,
+    "Size": 128,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80741"
+  },
+  {
+    "Registry": "nuget-local",
+    "Name": "company.grpc.pkg.nuspec",
+    "Uri": "/foo/company.grpc.pkg/1.0.0/company.grpc.pkg.nuspec",
+    "Folder": false,
+    "Size": 512,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80742"
+  },
+  {
+    "Registry": "nuget-local",
+    "Name": "company.grpc.pkg.2.0.0.nupkg",
+    "Uri": "/foo/company.grpc.pkg/2.0.0/company.grpc.pkg.2.0.0.nupkg",
+    "Folder": false,
+    "Size": 9216,
+    "LastModified": "2023-03-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80743"
+  },
+  {
+    "Registry": "nuget-local",
+    "Name": "company.grpc.pkg.2.0.0.snupkg",
+    "Uri": "/foo/company.grpc.pkg/2.0.0/company.grpc.pkg.2.0.0.snupkg",
+    "Folder": false,
+    "Size": 4096,
+    "LastModified": "2023-03-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80744"
+  },
+  {
+    "Registry": "nuget-local",
+    "Name": "company.grpc.pkg.2.0.0.nupkg.sha512",
+    "Uri": "/foo/company.grpc.pkg/2.0.0/company.grpc.pkg.2.0.0.nupkg.sha512",
+    "Folder": false,
+    "Size": 128,
+    "LastModified": "2023-03-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80745"
+  },
+  {
+    "Registry": "nuget-local",
+    "Name": "company.grpc.pkg.nuspec",
+    "Uri": "/foo/company.grpc.pkg/2.0.0/company.grpc.pkg.nuspec",
+    "Folder": false,
+    "Size": 512,
+    "LastModified": "2023-03-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80746"
+  }
+]

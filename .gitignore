@@ -13,5 +13,9 @@ registry_migration_*
 logs_*
 coverage.out
 
+# mock_jfrog generated fixtures (run `make mock-init` to create)
+module/ar/migrate/adapter/mock_jfrog/testdata/binary/
+.claude/
+dry-run-output/
 # goreleaser output
 dist/

@@ -1,7 +1,0 @@
-apiVersion: v1
-entries:
-  nginx:
-    - name: nginx
-      version: 1.0.0
-      urls:
-        - charts/nginx-1.0.0.tgz

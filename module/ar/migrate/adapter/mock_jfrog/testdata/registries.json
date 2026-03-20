@@ -54,5 +54,12 @@
     "url": "http://localhost:8081/artifactory/python-noindex-local",
     "description": "Mock Python Local Repository (no .pypi index)",
     "packageType": "pypi"
+  },
+  "nuget-local": {
+    "key": "nuget-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/nuget-local",
+    "description": "Mock NuGet Local Repository",
+    "packageType": "nuget"
   }
 }

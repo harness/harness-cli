@@ -29,11 +29,10 @@ generate-%:
 	@echo ">> Generating $*"
 	$(GOCMD) run $(GEN) --service=$* --in=$(API_DIR)/$*/openapi.yaml --out=cmd/$* --cmd=$(API_DIR)/$*/command.yaml
 
-# Build the CLI (runs `generate` first so everything is up to date)
 build-all: generate format
 	CGO_ENABLED=0 $(GOCMD) build -ldflags="-s -w" -o hc ./cmd/hc
 
-build: 
+build: generate format
 	CGO_ENABLED=0 $(GOCMD) build -ldflags="-s -w" -o hc ./cmd/hc
 
 
@@ -52,6 +51,15 @@ format: tools # Format go code and error if any changes are made
 $(GOBIN)/oapi-codegen:
 	@echo "🔘 Installing oapi-codegen... (`date '+%H:%M:%S'`)"
 	@go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+
+# Generate mock binary fixtures (NuGet .nupkg, NPM .tgz, Dart .tar.gz)
+# into testdata/binary/ for the mock_jfrog adapter. Run once after cloning.
+mock-init:
+	$(GOCMD) run ./module/ar/migrate/adapter/mock_jfrog/cmd
+
+# Remove generated mock binary fixtures
+mock-clean:
+	rm -rf module/ar/migrate/adapter/mock_jfrog/testdata/binary
 
 # For test coverage
 test:

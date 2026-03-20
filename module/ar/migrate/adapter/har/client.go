@@ -136,9 +136,12 @@ func (c *client) uploadNugetFile(
 	file io.ReadCloser,
 ) error {
 	fileUri := strings.TrimPrefix(f.Uri, "/")
-	url := fmt.Sprintf("%s/pkg/%s/%s/nuget/", c.url, config.Global.AccountID, registry)
-	if strings.HasSuffix(url, ".snupkg") {
-		url = fmt.Sprintf("%s/pkg/%s/%s/nuget/symbolpackage/", c.url, config.Global.AccountID, registry)
+
+	subDir := nugetSubDir(fileUri)
+
+	url := fmt.Sprintf("%s/pkg/%s/%s/nuget/%s", c.url, config.Global.AccountID, registry, subDir)
+	if strings.HasSuffix(f.Name, ".snupkg") {
+		url = fmt.Sprintf("%s/pkg/%s/%s/nuget/symbolpackage/%s", c.url, config.Global.AccountID, registry, subDir)
 	}
 
 	// Create a pipe to write the multipart form data
@@ -188,6 +191,26 @@ func (c *client) uploadNugetFile(
 	}
 
 	return nil
+}
+
+// nugetSubDir extracts the subdirectory prefix from a NuGet file URI.
+// JFrog stores NuGet packages as: /{subdir}/{packageId}/{version}/{filename}
+// The last 3 segments are always packageId/version/filename.
+// Returns the subdirectory with a trailing slash, or empty string if none.
+//
+// Examples:
+//
+//	"foo/company.grpc.pkg/1.0.0/company.grpc.pkg.1.0.0.nupkg" → "foo/"
+//	"a/b/pkg/1.0.0/pkg.1.0.0.nupkg"                           → "a/b/"
+//	"company.grpc.pkg/1.0.0/company.grpc.pkg.1.0.0.nupkg"     → ""
+func nugetSubDir(fileUri string) string {
+	parts := strings.Split(strings.TrimPrefix(fileUri, "/"), "/")
+	// Need at least 4 segments for there to be a subdirectory
+	// (subdir + packageId + version + filename)
+	if len(parts) <= 3 {
+		return ""
+	}
+	return strings.Join(parts[:len(parts)-3], "/") + "/"
 }
 
 func (c *client) uploadNPMFile(
@@ -386,7 +409,8 @@ func (c *client) uploadDartFile(
 	uploadID := uuid.New().String()
 
 	base := strings.TrimRight(c.url, "/")
-	url := fmt.Sprintf("%s/pkg/%s/%s/pub/api/packages/versions/new/upload/%s", base, config.Global.AccountID, registry, uploadID)
+	url := fmt.Sprintf("%s/pkg/%s/%s/pub/api/packages/versions/new/upload/%s", base, config.Global.AccountID, registry,
+		uploadID)
 
 	// Create a pipe for streaming multipart form data
 	pr, pw := io.Pipe()
