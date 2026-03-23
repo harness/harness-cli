@@ -17,7 +17,7 @@ endif
 .PHONY: generate build clean
 
 # Generate code for every service folder that owns an openapi.yaml
-generate: $(SERVICES:%=generate-%)
+generate: $(GOBIN)/oapi-codegen $(SERVICES:%=generate-%)
 
 
 tools = $(addprefix $(GOBIN)/, golangci-lint goimports govulncheck protoc-gen-go protoc-gen-go-grpc gci oapi-codegen)
@@ -50,7 +50,7 @@ format: tools # Format go code and error if any changes are made
 # Install oapi-codegen
 $(GOBIN)/oapi-codegen:
 	@echo "🔘 Installing oapi-codegen... (`date '+%H:%M:%S'`)"
-	@go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+	@go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1
 
 # Generate mock binary fixtures (NuGet .nupkg, NPM .tgz, Dart .tar.gz)
 # into testdata/binary/ for the mock_jfrog adapter. Run once after cloning.

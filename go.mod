@@ -11,7 +11,7 @@ require (
 	github.com/google/go-containerregistry v0.20.6
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-retryablehttp v0.7.8
-	github.com/hashicorp/go-slug v1.0.0
+	github.com/hashicorp/go-slug v0.16.8
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/pterm/pterm v0.12.80
