@@ -8,15 +8,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
 	ar_v3 "github.com/harness/harness-cli/internal/api/ar_v3"
 	client2 "github.com/harness/harness-cli/util/client"
 	"github.com/harness/harness-cli/util/common/printer"
 	"github.com/harness/harness-cli/util/common/progress"
-	"github.com/rs/zerolog/log"
 
+	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 

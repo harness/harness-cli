@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-resty/resty/v2"
 	"github.com/harness/harness-cli/config"
+
+	"github.com/go-resty/resty/v2"
 )
 
 const (

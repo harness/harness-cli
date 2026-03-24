@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/harness/harness-cli/util/client/iacm"
+
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
@@ -163,7 +164,7 @@ func TestGetNextActiveStage(t *testing.T) {
 func TestGetNextActiveStep(t *testing.T) {
 	tt := map[string]struct {
 		expectedActiveStage string
-		startingNodeID       string
+		startingNodeID      string
 		layoutNodeMap       map[string]iacm.GraphLayoutNode
 	}{
 		"finds the next active stage": {
@@ -221,7 +222,6 @@ func TestGetNextActiveStep(t *testing.T) {
 		})
 	}
 }
-
 
 func TestGetStartingNodeID(t *testing.T) {
 	t.Run("successfully retrieve starting node", func(t *testing.T) {

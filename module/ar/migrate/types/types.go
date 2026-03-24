@@ -121,8 +121,8 @@ type DryRunDirectoryEntry struct {
 
 // DryRunPackageEntry represents a package in the directory structure
 type DryRunPackageEntry struct {
-	Name     string                          `json:"name"`
-	Versions map[string]*DryRunVersionEntry  `json:"versions"`
+	Name     string                         `json:"name"`
+	Versions map[string]*DryRunVersionEntry `json:"versions"`
 }
 
 // DryRunVersionFileEntry represents a file with full details in the directory structure
@@ -136,12 +136,12 @@ type DryRunVersionFileEntry struct {
 
 // DryRunVersionEntry represents a version in the directory structure
 type DryRunVersionEntry struct {
-	Name  string                    `json:"name"`
-	Files []DryRunVersionFileEntry  `json:"files"`
+	Name  string                   `json:"name"`
+	Files []DryRunVersionFileEntry `json:"files"`
 }
 
 // DryRunStats holds the dry-run statistics
 type DryRunStats struct {
-	Files       []DryRunFileEntry                 // All files from GetFiles
-	Directories map[string]*DryRunDirectoryEntry  // Directory structure built incrementally
+	Files       []DryRunFileEntry                // All files from GetFiles
+	Directories map[string]*DryRunDirectoryEntry // Directory structure built incrementally
 }

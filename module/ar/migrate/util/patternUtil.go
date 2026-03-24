@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gobwas/glob"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+
+	"github.com/gobwas/glob"
 )
 
 /* Patterns support * and ** wildcards:

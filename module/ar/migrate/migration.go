@@ -128,7 +128,7 @@ func (m *MigrationService) Run(ctx context.Context) error {
 // writeDryRunOutput writes the dry-run output files
 func (m *MigrationService) writeDryRunOutput(logger zerolog.Logger) error {
 	timestamp := time.Now().Format("20060102_150405")
-	
+
 	// Create output directory
 	outputDir := "dry-run-output"
 	if err := os.MkdirAll(outputDir, 0755); err != nil {

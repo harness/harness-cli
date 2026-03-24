@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/harness/harness-cli/config"
+
 	"github.com/tmaxmax/go-sse"
 )
 

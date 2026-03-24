@@ -10,10 +10,10 @@ import (
 	"runtime/pprof"
 	"time"
 
-	"github.com/harness/harness-cli/cmd/iacm"
 	"github.com/harness/harness-cli/cmd/artifact"
 	"github.com/harness/harness-cli/cmd/auth"
 	"github.com/harness/harness-cli/cmd/cmdutils"
+	"github.com/harness/harness-cli/cmd/iacm"
 	"github.com/harness/harness-cli/cmd/registry"
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/util/templates"

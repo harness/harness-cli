@@ -16,6 +16,7 @@ import (
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/util/client/iacm"
 	"github.com/harness/harness-cli/util/common/progress"
+
 	"github.com/hashicorp/go-slug"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -78,10 +79,10 @@ func getWorkspaceInfo(org, project, workspace, workingDirectory string) (*Worksp
 
 func NewPlanCmd() *cobra.Command {
 	var (
-		workspaceID string
-		orgID       string
-		projectID   string
-		targets     []string
+		workspaceID  string
+		orgID        string
+		projectID    string
+		targets      []string
 		replacements []string
 	)
 
@@ -126,7 +127,7 @@ streaming logs back to your terminal.`,
 
 			iacmClient := iacm.NewIacmClient(verbose)
 			logClient := iacm.NewLogClient()
-			
+
 			p := progress.NewConsoleReporter()
 
 			return executePlan(cmd.Context(), iacmClient, logClient, p, orgID, projectID, workspaceID, targets, replacements)
@@ -284,7 +285,7 @@ func getRepoRootFromWorkingDirectory(workingDirectory string, workspace *iacm.Wo
 
 	workingDirectory = filepath.Clean(workingDirectory)
 	repositoryPath := filepath.Clean(workspace.RepositoryPath)
-	
+
 	if strings.HasSuffix(workingDirectory, repositoryPath) {
 		repoRoot := strings.TrimSuffix(workingDirectory, workspace.RepositoryPath)
 		repoRoot = filepath.Clean(repoRoot)
@@ -332,7 +333,7 @@ func getStartingNodeID(ctx context.Context, iacmClient pipelineExecutionGetter, 
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 	timer := time.After(5 * time.Second)
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -372,7 +373,7 @@ func walkExecutionGraph(ctx context.Context, iacmClient *iacm.IacmClient, logCli
 	defer ticker.Stop()
 	stageNodeID := startingNodeID
 	visited := map[string]struct{}{}
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -385,21 +386,21 @@ func walkExecutionGraph(ctx context.Context, iacmClient *iacm.IacmClient, logCli
 			if execution.PipelineExecutionSummary == nil || execution.ExecutionGraph == nil {
 				continue
 			}
-			
+
 			stageNode := getNextActiveStage(ctx, execution.PipelineExecutionSummary.LayoutNodeMap, stageNodeID)
 			if stageNode.NodeUuid == "" {
 				return nil
 			}
-			
+
 			_, ok := visited[stageNode.NodeUuid]
 			if ok {
 				continue
 			}
-			
+
 			visited[stageNode.NodeUuid] = struct{}{}
 			stageNodeID = stageNode.NodeUuid
 			fmt.Printf(startingStageMsg, stageNode.Name)
-			
+
 			err = walkStage(ctx, iacmClient, logClient, org, project, executionID, stageNodeID, execution.ExecutionGraph.RootNodeId)
 			if err != nil {
 				return err
@@ -422,7 +423,7 @@ func walkStage(ctx context.Context, iacmClient *iacm.IacmClient, logClient *iacm
 	defer ticker.Stop()
 	lastStepNodeID := rootNodeID
 	visited := map[string]struct{}{}
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -435,14 +436,14 @@ func walkStage(ctx context.Context, iacmClient *iacm.IacmClient, logClient *iacm
 			if execution.PipelineExecutionSummary == nil || execution.ExecutionGraph == nil {
 				continue
 			}
-			
+
 			if lastStepNodeID == "" {
 				lastStepNodeID = rootNodeID
 			}
-			
+
 			stageNode := execution.PipelineExecutionSummary.LayoutNodeMap[stageNodeID]
 			var stepNode iacm.ExecutionNode
-			
+
 			switch {
 			case isActiveStageNode(stageNode.Status):
 				stepNode = getNextActiveStep(*execution.ExecutionGraph, lastStepNodeID)
@@ -555,10 +556,10 @@ func isInactiveStageNode(status string) bool {
 }
 
 func shouldIgnoreStepType(stepType string) bool {
-	return stepType == "IACMIntegrationStageStepPMS" || 
-		   stepType == "IntegrationStageStepPMS" || 
-		   stepType == "NG_EXECUTION" || 
-		   stepType == "IACMPrepareExecution"
+	return stepType == "IACMIntegrationStageStepPMS" ||
+		stepType == "IntegrationStageStepPMS" ||
+		stepType == "NG_EXECUTION" ||
+		stepType == "IACMPrepareExecution"
 }
 
 func getLogKeyFromStepNode(stepNode iacm.ExecutionNode) string {

@@ -22,6 +22,7 @@ import (
 	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	p "github.com/harness/harness-cli/util/common/progress"
+
 	"github.com/spf13/cobra"
 )
 
@@ -99,7 +100,7 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 
 		},
 	}
-	
+
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
 	cmd.MarkFlagRequired("pkg-url")
 	return cmd
