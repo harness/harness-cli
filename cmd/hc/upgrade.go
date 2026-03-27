@@ -83,14 +83,18 @@ func runUpgrade(includePreRelease bool) error {
 
 	latestVersion := release.TagName
 
+	//removing v for version v1.13.12  if contain any
+	normalizedCurrent := strings.TrimPrefix(currentVersion, "v")
+	normalizedLatest := strings.TrimPrefix(latestVersion, "v")
+
 	// Compare versions
-	if currentVersion == latestVersion {
+	if normalizedCurrent == normalizedLatest {
 		fmt.Printf("✓ You are already using the latest version: %s\n", currentVersion)
 		return nil
 	}
 
-	fmt.Printf("Current version: %s\n", currentVersion)
-	fmt.Printf("Latest version:  %s\n", latestVersion)
+	fmt.Printf("Current version: %s\n", normalizedCurrent)
+	fmt.Printf("Latest version:  %s\n", normalizedLatest)
 
 	if release.Prerelease {
 		fmt.Println("⚠️  This is a pre-release version")
