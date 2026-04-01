@@ -135,6 +135,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/V3Error"
           description: Error response.
+  /system/info:
+    get:
+      x-internal: false
+      summary: Get system information
+      description: Get system information
+      operationId: GetSystemInfo
+      tags:
+        - Registry V3
+      parameters:
+        - $ref: "#/components/parameters/AccountIdentifier"
+      responses:
+        200:
+          description: System information response
+          content:
+            application/json:
+              schema:
+                type: object
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V3Error"
+          description: Error response.
 components:
   requestBodies:
     ArtifactScanEvaluateRequest:

@@ -50,10 +50,7 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 		PreRun: func(cmd *cobra.Command, args []string) {
 			if pkgURL != "" {
 				config.Global.Registry.PkgURL = util.GetPkgUrl(pkgURL)
-			} else {
-				config.Global.Registry.PkgURL = util.GetPkgUrl(config.Global.APIBaseURL)
 			}
-
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]
@@ -102,7 +99,6 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
-	cmd.MarkFlagRequired("pkg-url")
 	return cmd
 }
 

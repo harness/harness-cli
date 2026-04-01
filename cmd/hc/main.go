@@ -124,6 +124,14 @@ func main() {
 		if config.Global.ProjectID == "" {
 			config.Global.ProjectID = authConfig.ProjectID
 		}
+		if config.Global.Registry.PkgURL == "" {
+			if authConfig.RegistryURL == "" {
+				fmt.Println("RegistryURL missing , Please logout and login again")
+
+			}
+			config.Global.Registry.PkgURL = authConfig.RegistryURL
+
+		}
 	}
 
 	// Check environment variables (override auth config, flags will override during Execute)
@@ -177,11 +185,12 @@ func versionCmd() *cobra.Command {
 
 // AuthConfig represents authentication configuration
 type AuthConfig struct {
-	BaseURL   string `json:"base_url"`
-	Token     string `json:"token"`
-	AccountID string `json:"account_id"`
-	OrgID     string `json:"org_id,omitempty"`
-	ProjectID string `json:"project_id,omitempty"`
+	BaseURL     string `json:"base_url"`
+	Token       string `json:"token"`
+	AccountID   string `json:"account_id"`
+	OrgID       string `json:"org_id,omitempty"`
+	ProjectID   string `json:"project_id,omitempty"`
+	RegistryURL string `json:"registry_url,omitempty"`
 }
 
 // getAuthConfigPath returns the path to the auth config file

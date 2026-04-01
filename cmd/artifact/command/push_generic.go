@@ -11,6 +11,7 @@ import (
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
+	"github.com/harness/harness-cli/util"
 	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/printer"
 	"github.com/harness/harness-cli/util/common/progress"
@@ -29,7 +30,9 @@ func NewPushGenericCmd(c *cmdutils.Factory) *cobra.Command {
 		Long:  "Push Generic Artifacts to Harness Artifact Registry",
 		Args:  cobra.ExactArgs(2),
 		PreRun: func(cmd *cobra.Command, args []string) {
-			config.Global.Registry.PkgURL = pkgURL
+			if pkgURL != "" {
+				config.Global.Registry.PkgURL = util.GetPkgUrl(pkgURL)
+			}
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]
@@ -130,7 +133,6 @@ func NewPushGenericCmd(c *cmdutils.Factory) *cobra.Command {
 
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
 
-	cmd.MarkFlagRequired("pkg-url")
 	cmd.MarkFlagRequired("name")
 
 	return cmd

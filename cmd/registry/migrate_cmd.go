@@ -13,6 +13,7 @@ import (
 	"github.com/harness/harness-cli/internal/api/ar"
 	ar2 "github.com/harness/harness-cli/module/ar/migrate"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+	"github.com/harness/harness-cli/util"
 
 	"github.com/spf13/cobra"
 )
@@ -83,7 +84,7 @@ Usage example:
 			// Sync local flags to global config
 			config.Global.ConfigPath = localConfigPath
 			if localPkgBaseURL != "" {
-				config.Global.Registry.PkgURL = localPkgBaseURL
+				config.Global.Registry.PkgURL = util.GetPkgUrl(localPkgBaseURL)
 			}
 			config.Global.Registry.Migrate.Concurrency = localConcurrency
 			config.Global.Registry.Migrate.Overwrite = overwrite

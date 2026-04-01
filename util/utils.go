@@ -113,7 +113,9 @@ func ProgressBar(current, total int, width int) string {
 }
 
 // GetPkgUrl returns the URL for the packages
+// Deprecated
 func GetPkgUrl(url string) string {
+	fmt.Println("INFO :: usage of flag pkg-url is deprecated...")
 	if !strings.Contains(url, "://") {
 		url = "https://" + url
 	}

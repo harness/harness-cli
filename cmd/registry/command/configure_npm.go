@@ -9,6 +9,7 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
+	"github.com/harness/harness-cli/util"
 	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/spf13/cobra"
@@ -26,6 +27,11 @@ func NewConfigureNpmCmd(f *cmdutils.Factory) *cobra.Command {
 		Use:   "npm",
 		Short: "Configure npm client for Harness Artifact Registry",
 		Long:  "Configure npm client to use a Harness Artifact Registry virtual npm registry",
+		PreRun: func(cmd *cobra.Command, args []string) {
+			if pkgURL != "" {
+				config.Global.Registry.PkgURL = util.GetPkgUrl(pkgURL)
+			}
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			progress := p.NewConsoleReporter()
 
@@ -33,11 +39,6 @@ func NewConfigureNpmCmd(f *cmdutils.Factory) *cobra.Command {
 			if registryIdentifier == "" {
 				progress.Error("Registry identifier is required")
 				return fmt.Errorf("--registry flag is required")
-			}
-
-			if pkgURL == "" {
-				progress.Error("Package URL is required")
-				return fmt.Errorf("--pkg-url flag is required")
 			}
 
 			if scope != "" && !strings.HasPrefix(scope, "@") {
@@ -55,7 +56,7 @@ func NewConfigureNpmCmd(f *cmdutils.Factory) *cobra.Command {
 			progress.Success("Input parameters validated")
 
 			progress.Start("Loading configuration")
-			baseURL := pkgURL
+			baseURL := config.Global.Registry.PkgURL
 			accountID := config.Global.AccountID
 			authToken := token
 			if authToken == "" {
