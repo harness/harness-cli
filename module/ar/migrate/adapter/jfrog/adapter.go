@@ -114,13 +114,43 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			Name:     "default",
 			Size:     -1,
 		})
-	} else if artifactType == types.MAVEN || artifactType == types.NUGET || artifactType == types.NPM {
+	} else if artifactType == types.MAVEN || artifactType == types.NPM {
 		packages = append(packages, types.Package{
 			Registry: registry,
 			Path:     "/",
 			Name:     "",
 			Size:     -1,
 		})
+	} else if artifactType == types.NUGET {
+		// Extract unique package names from NUGET files in the tree
+		files, err := tree.GetAllFiles(root)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+
+		pkgMap := make(map[string]bool)
+		for _, file := range files {
+			if file.Folder {
+				continue
+			}
+
+			pkgName, _, ok := util.ParseNugetFileNameWithPath(file.Uri)
+
+			if !ok {
+				continue
+			}
+			pkgMap[pkgName] = true
+		}
+
+		for pkgName := range pkgMap {
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     "/",
+				Name:     pkgName,
+				Size:     -1,
+			})
+		}
+		log.Info().Msgf("Found %d NUGET packages", len(packages))
 	} else if artifactType == types.DOCKER || artifactType == types.HELM {
 		catalog, err := a.client.GetCatalog(registry)
 		if err != nil {
@@ -432,7 +462,7 @@ func (a *adapter) GetVersions(
 		}, nil
 	}
 
-	if artifactType == types.MAVEN || artifactType == types.NUGET || artifactType == types.NPM {
+	if artifactType == types.MAVEN || artifactType == types.NPM {
 		return []types.Version{
 			{
 				Registry: registry,
@@ -442,6 +472,40 @@ func (a *adapter) GetVersions(
 				Size:     -1,
 			},
 		}, nil
+	}
+
+	if artifactType == types.NUGET {
+		// Extract versions for this NUGET package from the file tree
+		files, err := tree.GetAllFiles(node)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+
+		versionMap := make(map[string]bool)
+		for _, file := range files {
+			if file.Folder {
+				continue
+			}
+
+			pkgName, version, ok := util.ParseNugetFileNameWithPath(file.Uri)
+			if !ok || pkgName != pkg {
+				continue
+			}
+			versionMap[version] = true
+		}
+
+		var versions []types.Version
+		for version := range versionMap {
+			versions = append(versions, types.Version{
+				Registry: registry,
+				Pkg:      pkg,
+				Path:     "/",
+				Name:     version,
+				Size:     -1,
+			})
+		}
+		log.Info().Msgf("Found %d versions for NUGET package %s", len(versions), pkg)
+		return versions, nil
 	}
 
 	if artifactType == types.HELM_LEGACY {
