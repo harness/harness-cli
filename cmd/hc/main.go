@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"runtime/pprof"
 	"time"
 
@@ -103,6 +104,8 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&config.Global.OrgID, "org", "", "Org (overrides saved config)")
 	rootCmd.PersistentFlags().StringVar(&config.Global.ProjectID, "project", "", "Project (overrides saved config)")
 	rootCmd.PersistentFlags().StringVar(&config.Global.Format, "format", "table", "Format of the result")
+	rootCmd.PersistentFlags().IntVar(&config.Global.TimeoutSeconds, "timeout", config.DefaultTimeoutSeconds,
+		"Request timeout in seconds (0 for no timeout)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging to console")
 
 	// Load auth config
@@ -146,6 +149,11 @@ func main() {
 	}
 	if envVal := os.Getenv("HARNESS_PROJECT_ID"); envVal != "" {
 		config.Global.ProjectID = envVal
+	}
+	if envVal := os.Getenv("HARNESS_TIMEOUT"); envVal != "" {
+		if timeout, err := strconv.Atoi(envVal); err == nil {
+			config.Global.TimeoutSeconds = timeout
+		}
 	}
 
 	// Add main command groups

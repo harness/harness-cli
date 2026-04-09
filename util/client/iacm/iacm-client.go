@@ -26,7 +26,7 @@ type IacmClient struct {
 func NewIacmClient(debug bool) *IacmClient {
 	r := resty.New()
 	r.SetBaseURL(config.Global.APIBaseURL)
-	r.SetTimeout(10 * time.Second)
+	r.SetTimeout(time.Duration(config.Global.TimeoutSeconds) * time.Second)
 	r.SetRetryCount(3)
 	r.SetRetryWaitTime(2 * time.Second)
 	r.SetRetryMaxWaitTime(60 * time.Second)
