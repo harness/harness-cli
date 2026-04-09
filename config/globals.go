@@ -48,6 +48,4 @@ type StatusConfig struct {
 const DefaultTimeoutSeconds = 10
 
 // Global is the shared instance of GlobalFlags
-var Global = GlobalFlags{
-	TimeoutSeconds: DefaultTimeoutSeconds,
-}
+var Global = GlobalFlags{}

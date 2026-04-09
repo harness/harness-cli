@@ -150,10 +150,13 @@ func main() {
 	if envVal := os.Getenv("HARNESS_PROJECT_ID"); envVal != "" {
 		config.Global.ProjectID = envVal
 	}
-	if envVal := os.Getenv("HARNESS_TIMEOUT"); envVal != "" {
-		if timeout, err := strconv.Atoi(envVal); err == nil {
-			config.Global.TimeoutSeconds = timeout
+	if envVal := os.Getenv("HARNESS_TIMEOUT_SECONDS"); envVal != "" {
+		timeout, err := strconv.Atoi(envVal)
+		if err != nil {
+			fmt.Printf("Invalid HARNESS_TIMEOUT_SECONDS value %q: must be an integer\n", envVal)
+			os.Exit(1)
 		}
+		config.Global.TimeoutSeconds = timeout
 	}
 
 	// Add main command groups

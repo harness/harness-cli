@@ -106,9 +106,9 @@ type accountResponse struct {
 
 // validateCredentials validates the provided credentials by making an API call
 func validateCredentials(apiURL, token, accountID string) error {
-	// Create HTTP client with configurable timeout
+	// Create HTTP client with reasonable timeout
 	client := &http.Client{
-		Timeout: time.Duration(config.Global.TimeoutSeconds) * time.Second,
+		Timeout: 10 * time.Second,
 	}
 
 	// Build the request URL
