@@ -1,0 +1,15 @@
+version: 1.0.0
+concurrency: 5
+org_id: ${ORG_ID}
+project_id: ${PROJECT_ID}
+
+registries:
+  Registry1:
+    package1: [v1, v2, v3, v4, v5, v6]
+    package2: [v1, v2, v5, v6]
+    package3: [] # empty means delete all versions
+
+  Registry2:
+    package1: [v1, v2, v6]
+    package4: [v2, v6]
+    package5: [] # empty means delete all versions

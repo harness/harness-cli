@@ -2,6 +2,8 @@ package command
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	client2 "github.com/harness/harness-cli/util/client"
@@ -11,14 +13,22 @@ import (
 )
 
 func NewDeleteArtifactCmd(c *cmdutils.Factory) *cobra.Command {
-	var name, registry, version string
+	var name, registry, version, configPath string
 	cmd := &cobra.Command{
 		Use:   "delete [artifact-name]",
 		Short: "Delete an artifact or a specific version",
-		Long:  "Deletes an artifact and all its versions, or a specific version if --version flag is provided",
+		Long:  "Deletes an artifact and all its versions, or a specific version if --version flag is provided. Use 'all' with --config flag for bulk delete.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name = args[0]
+
+			// If --config flag is provided, only then execute bulk delete
+			if configPath != "" {
+				executeBulkDelete(configPath)
+				return nil
+			}
+
+			// Otherwise, we will execute old normal flow
 			// If version flag is provided, delete specific version
 			if version != "" {
 				response, err := c.RegistryHttpClient().DeleteArtifactVersionWithResponse(context.Background(),
@@ -51,10 +61,51 @@ func NewDeleteArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 	}
 
 	// Common flags
-	cmd.Flags().StringVar(&registry, "registry", "", "name of the registry")
+	cmd.Flags().StringVar(&registry, "registry", "", "name of the registry (required for normal delete, not needed with --config)")
 	cmd.Flags().StringVar(&version, "version", "", "specific version to delete (if not provided, deletes all versions)")
+	cmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to bulk delete configuration file")
 
-	cmd.MarkFlagRequired("registry")
+	// Make registry required only when config is not provided
+	cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+		if configPath == "" && registry == "" {
+			return fmt.Errorf("--registry flag is required when --config is not provided")
+		}
+		return nil
+	}
 
 	return cmd
+}
+
+func executeBulkDelete(configPath string) {
+	if configPath == "" {
+		return
+	}
+
+	config, err := LoadBulkDeleteConfig(configPath)
+	if err != nil {
+		log.Error().Msgf("Failed to load bulk delete config: %v", err)
+		return
+	}
+
+	configJSON, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		log.Error().Msgf("Failed to marshal config to JSON: %v", err)
+		return
+	}
+
+	fmt.Println("=== Bulk Delete Configuration ===")
+	fmt.Println(string(configJSON))
+	fmt.Println("\n=== Detailed Registry Information ===")
+
+	for registryName, packages := range config.Registries {
+		fmt.Printf("\nRegistry: %s\n", registryName)
+		for packageName, versions := range packages {
+			fmt.Printf("  Package: %s\n", packageName)
+			if len(versions) == 0 {
+				fmt.Printf("    Versions: [] (delete all versions)\n")
+			} else {
+				fmt.Printf("    Versions: %v\n", versions)
+			}
+		}
+	}
 }
