@@ -47,5 +47,8 @@ type StatusConfig struct {
 // DefaultTimeoutSeconds is the default request timeout
 const DefaultTimeoutSeconds = 10
 
+// MaxTimeoutSeconds is the maximum allowed request timeout
+const MaxTimeoutSeconds = 3600
+
 // Global is the shared instance of GlobalFlags
 var Global = GlobalFlags{}

@@ -43,6 +43,11 @@ func main() {
       Find more information at:
             https://developer.harness.io/docs/platform/automation/cli/reference/#v1.0.0-hc`),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// Validate timeout range
+			if config.Global.TimeoutSeconds < 0 || config.Global.TimeoutSeconds > config.MaxTimeoutSeconds {
+				return fmt.Errorf("invalid --timeout value %d: must be between 0 and %d", config.Global.TimeoutSeconds, config.MaxTimeoutSeconds)
+			}
+
 			// Skip loading config for auth commands, version, and upgrade
 			if cmd.CommandPath() == "hc auth" ||
 				cmd.CommandPath() == "hc auth login" ||
@@ -154,6 +159,10 @@ func main() {
 		timeout, err := strconv.Atoi(envVal)
 		if err != nil {
 			fmt.Printf("Invalid HARNESS_TIMEOUT_SECONDS value %q: must be an integer\n", envVal)
+			os.Exit(1)
+		}
+		if timeout < 0 || timeout > config.MaxTimeoutSeconds {
+			fmt.Printf("Invalid HARNESS_TIMEOUT_SECONDS value %d: must be between 0 and %d\n", timeout, config.MaxTimeoutSeconds)
 			os.Exit(1)
 		}
 		config.Global.TimeoutSeconds = timeout
