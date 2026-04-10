@@ -1,7 +1,7 @@
 version: 1.0.0
 concurrency: 5
-org_id: ${ORG_ID}
-project_id: ${PROJECT_ID}
+org_id: ${ORG_ID} # if not provided this will read from values set at login time
+project_id: ${PROJECT_ID} # if not provided this will read from values set at login time
 
 registries:
   Registry1:
