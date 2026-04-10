@@ -11,6 +11,9 @@ type GlobalFlags struct {
 	ProjectID  string
 	Format     string
 
+	// Request timeout in seconds (0 means no timeout)
+	TimeoutSeconds int
+
 	// Command-specific configurations
 	Registry RegistryConfig
 }
@@ -40,6 +43,9 @@ type StatusConfig struct {
 	MigrationID  string
 	PollInterval int
 }
+
+// DefaultTimeoutSeconds is the default request timeout (0 means no timeout)
+const DefaultTimeoutSeconds = 0
 
 // Global is the shared instance of GlobalFlags
 var Global = GlobalFlags{}
