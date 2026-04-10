@@ -44,11 +44,8 @@ type StatusConfig struct {
 	PollInterval int
 }
 
-// DefaultTimeoutSeconds is the default request timeout
-const DefaultTimeoutSeconds = 10
-
-// MaxTimeoutSeconds is the maximum allowed request timeout
-const MaxTimeoutSeconds = 3600
+// DefaultTimeoutSeconds is the default request timeout (0 means no timeout)
+const DefaultTimeoutSeconds = 0
 
 // Global is the shared instance of GlobalFlags
 var Global = GlobalFlags{}

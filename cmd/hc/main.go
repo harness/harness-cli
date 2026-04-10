@@ -43,9 +43,9 @@ func main() {
       Find more information at:
             https://developer.harness.io/docs/platform/automation/cli/reference/#v1.0.0-hc`),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// Validate timeout range
-			if config.Global.TimeoutSeconds < 0 || config.Global.TimeoutSeconds > config.MaxTimeoutSeconds {
-				return fmt.Errorf("invalid --timeout value %d: must be between 0 and %d", config.Global.TimeoutSeconds, config.MaxTimeoutSeconds)
+			// Validate timeout is not negative
+			if config.Global.TimeoutSeconds < 0 {
+				return fmt.Errorf("invalid --timeout value %d: must be 0 (no timeout) or a positive number of seconds", config.Global.TimeoutSeconds)
 			}
 
 			// Skip loading config for auth commands, version, and upgrade
@@ -110,7 +110,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&config.Global.ProjectID, "project", "", "Project (overrides saved config)")
 	rootCmd.PersistentFlags().StringVar(&config.Global.Format, "format", "table", "Format of the result")
 	rootCmd.PersistentFlags().IntVar(&config.Global.TimeoutSeconds, "timeout", config.DefaultTimeoutSeconds,
-		"Request timeout in seconds (0 for no timeout)")
+		"Request timeout in seconds (default: no timeout)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging to console")
 
 	// Load auth config
@@ -161,8 +161,8 @@ func main() {
 			fmt.Printf("Invalid HARNESS_TIMEOUT_SECONDS value %q: must be an integer\n", envVal)
 			os.Exit(1)
 		}
-		if timeout < 0 || timeout > config.MaxTimeoutSeconds {
-			fmt.Printf("Invalid HARNESS_TIMEOUT_SECONDS value %d: must be between 0 and %d\n", timeout, config.MaxTimeoutSeconds)
+		if timeout < 0 {
+			fmt.Printf("Invalid HARNESS_TIMEOUT_SECONDS value %d: must be 0 (no timeout) or a positive number of seconds\n", timeout)
 			os.Exit(1)
 		}
 		config.Global.TimeoutSeconds = timeout
