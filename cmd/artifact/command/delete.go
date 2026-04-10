@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	client2 "github.com/harness/harness-cli/util/client"
 
@@ -22,7 +23,7 @@ func NewDeleteArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name = args[0]
 
-			// If --config flag is provided, only then execute bulk delete
+			// If config flag is provided, only then execute bulk delete
 			if configPath != "" {
 				executeBulkDelete(configPath)
 				return nil
@@ -81,7 +82,7 @@ func executeBulkDelete(configPath string) {
 		return
 	}
 
-	config, err := LoadBulkDeleteConfig(configPath)
+	config, err := utils.LoadBulkDeleteConfig(configPath)
 	if err != nil {
 		log.Error().Msgf("Failed to load bulk delete config: %v", err)
 		return
@@ -103,8 +104,10 @@ func executeBulkDelete(configPath string) {
 			fmt.Printf("  Package: %s\n", packageName)
 			if len(versions) == 0 {
 				fmt.Printf("    Versions: [] (delete all versions)\n")
+				//call version delete API
 			} else {
 				fmt.Printf("    Versions: %v\n", versions)
+				// call package delete API , API Is same but  parameter is different
 			}
 		}
 	}
