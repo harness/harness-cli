@@ -23,41 +23,21 @@ func NewDeleteArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name = args[0]
 
-			// If config flag is provided, only then execute bulk delete
+			// If config file provided from flag is provided, only then execute bulk delete
 			if configPath != "" {
 				executeBulkDelete(configPath)
 				return nil
 			}
-
+			registryRef := client2.GetRef(client2.GetScopeRef(), registry)
 			// Otherwise, we will execute old normal flow
 			// If version flag is provided, delete specific version
 			if version != "" {
-				response, err := c.RegistryHttpClient().DeleteArtifactVersionWithResponse(context.Background(),
-					client2.GetRef(client2.GetScopeRef(), registry), name, version)
-				if err != nil {
-					return err
-				}
-				if response.JSON200 != nil {
-					log.Info().Msgf("Deleted artifact version %s/%s; msg:%s", name, version, response.JSON200.Status)
-				} else {
-					log.Error().Msgf("failed to delete artifact version %s/%s %s", name, version, string(response.Body))
-				}
-				return nil
+				return performVersionDelete(c, registryRef, name, version)
 			}
 
 			// Otherwise, delete entire artifact (all versions)
-			response, err := c.RegistryHttpClient().DeleteArtifactWithResponse(context.Background(),
-				client2.GetRef(client2.GetScopeRef(), registry), name)
-			if err != nil {
-				return err
-			}
-			if response.JSON200 != nil {
-				log.Info().Msgf("Deleted artifact %s and all its versions; msg:%s", name, response.JSON200.Status)
-			} else {
-				log.Error().Msgf("failed to delete artifact %s %s", name, string(response.Body))
-			}
+			return performArtifactDelete(c, registryRef, name)
 
-			return nil
 		},
 	}
 
@@ -77,6 +57,32 @@ func NewDeleteArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 	return cmd
 }
 
+func performVersionDelete(c *cmdutils.Factory, registryRef, name, version string) error {
+	response, err := c.RegistryHttpClient().DeleteArtifactVersionWithResponse(context.Background(), registryRef, name, version)
+	if err != nil {
+		return err
+	}
+	if response.JSON200 != nil {
+		log.Info().Msgf("Deleted artifact version %s/%s; msg:%s", name, version, response.JSON200.Status)
+	} else {
+		log.Error().Msgf("failed to delete artifact version %s/%s %s", name, version, string(response.Body))
+	}
+	return nil
+}
+
+func performArtifactDelete(c *cmdutils.Factory, registryRef, name string) error {
+	response, err := c.RegistryHttpClient().DeleteArtifactWithResponse(context.Background(), registryRef, name)
+	if err != nil {
+		return err
+	}
+	if response.JSON200 != nil {
+		log.Info().Msgf("Deleted artifact %s and all its versions; msg:%s", name, response.JSON200.Status)
+	} else {
+		log.Error().Msgf("failed to delete artifact %s %s", name, string(response.Body))
+	}
+	return nil
+}
+
 func executeBulkDelete(configPath string) {
 	if configPath == "" {
 		return
@@ -94,16 +100,17 @@ func executeBulkDelete(configPath string) {
 		return
 	}
 
+	log.Info().Msgf("Bulk delete configuration loaded from %s", configPath)
 	fmt.Println("=== Bulk Delete Configuration ===")
-	fmt.Println(string(configJSON))
-	fmt.Println("\n=== Detailed Registry Information ===")
+	log.Info().Msgf(string(configJSON))
+	log.Info().Msgf("\n=== Detailed Registry Information ===")
 
 	for registryName, packages := range config.Registries {
-		fmt.Printf("\nRegistry: %s\n", registryName)
+		log.Info().Msgf("\nRegistry: %s\n", registryName)
 		for packageName, versions := range packages {
-			fmt.Printf("  Package: %s\n", packageName)
+			log.Info().Msgf("  Package: %s\n", packageName)
 			if len(versions) == 0 {
-				fmt.Printf("    Versions: [] (delete all versions)\n")
+				log.Info().Msgf("    Versions: [] (delete all versions)\n")
 				//call version delete API
 			} else {
 				fmt.Printf("    Versions: %v\n", versions)
