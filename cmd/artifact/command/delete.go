@@ -7,6 +7,7 @@ import (
 
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
+	"github.com/harness/harness-cli/config"
 	client2 "github.com/harness/harness-cli/util/client"
 	p "github.com/harness/harness-cli/util/common/progress"
 
@@ -94,18 +95,23 @@ func executeBulkDelete(c *cmdutils.Factory, configPath string, progress *p.Conso
 		return
 	}
 
-	config, err := utils.LoadBulkDeleteConfig(configPath)
+	deleteConfig, err := utils.LoadBulkDeleteConfig(configPath)
 	if err != nil {
 		progress.Error("Failed to load bulk delete config ")
 		log.Error().Msgf("Failed to load bulk delete config: %v", err)
 		return
 	}
 
+	scopeRef := client2.GetScopeRef()
+	if deleteConfig.OrgID != "" && deleteConfig.ProjectID != "" {
+		log.Info().Msgf("creating scopeRef using  orgID and projectID provided in bulk delete config file")
+		scopeRef = client2.GetRef(config.Global.AccountID, deleteConfig.OrgID, deleteConfig.ProjectID)
+	}
 	// Collect all deletion jobs
 	var jobs []deleteJob
-	for registryName, packages := range config.Registries {
+	for registryName, packages := range deleteConfig.Registries {
 
-		registryRef := client2.GetRef(client2.GetScopeRef(), registryName)
+		registryRef := client2.GetRef(scopeRef, registryName)
 
 		for packageName, versions := range packages {
 
@@ -133,10 +139,10 @@ func executeBulkDelete(c *cmdutils.Factory, configPath string, progress *p.Conso
 	}
 	progress.Step("Starting bulk delete ..")
 	log.Info().Msgf("\nTotal deletion jobs collected: %d", len(jobs))
-	log.Info().Msgf("Starting concurrent deletion with concurrency: %d\n", config.Concurrency)
+	log.Info().Msgf("Starting concurrent deletion with concurrency: %d\n", deleteConfig.Concurrency)
 
 	// Execute deletions concurrently
-	processDeletionsConcurrently(c, jobs, config.Concurrency)
+	processDeletionsConcurrently(c, jobs, deleteConfig.Concurrency)
 	progress.Step("Bulk delete execution complete..")
 }
 

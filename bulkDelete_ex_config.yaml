@@ -7,9 +7,9 @@ registries:
   Registry1:
     package1: [v1, v2, v3, v4, v5, v6]
     package2: [v1, v2, v5, v6]
-    package3: [] # empty means delete all versions
+    package3: [] # empty means delete complete artifact
 
   Registry2:
     package1: [v1, v2, v6]
     package4: [v2, v6]
-    package5: [] # empty means delete all versions
+    package5: [] # empty means delete complete artifact
