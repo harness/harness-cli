@@ -8,6 +8,7 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	client2 "github.com/harness/harness-cli/util/client"
+	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -23,19 +24,23 @@ func NewDeleteArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name = args[0]
 
+			progress := p.NewConsoleReporter()
 			// If config file provided from flag is provided, only then execute bulk delete
 			if configPath != "" {
-				executeBulkDelete(c, configPath)
+				progress.Start("Found Config file for bulk delete ")
+				executeBulkDelete(c, configPath, progress)
 				return nil
 			}
 			registryRef := client2.GetRef(client2.GetScopeRef(), registry)
 			// Otherwise, we will execute old normal flow
 			// If version flag is provided, delete specific version
 			if version != "" {
+				progress.Step("deleting the provided version ")
 				return performVersionDelete(c, registryRef, name, version)
 			}
 
 			// Otherwise, delete entire artifact (all versions)
+			progress.Step("deleting the provided artifact ")
 			return performArtifactDelete(c, registryRef, name)
 
 		},
@@ -46,7 +51,7 @@ func NewDeleteArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 	cmd.Flags().StringVar(&version, "version", "", "specific version to delete (if not provided, deletes all versions)")
 	cmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to bulk delete configuration file")
 
-	// Make registry required only when config is not provided
+	// forcing registry required only when config is not provided AH-2948
 	cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
 		if configPath == "" && registry == "" {
 			return fmt.Errorf("--registry flag is required when --config is not provided")
@@ -59,7 +64,6 @@ func NewDeleteArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 
 func performVersionDelete(c *cmdutils.Factory, registryRef, name, version string) error {
 
-	fmt.Println(registryRef)
 	response, err := c.RegistryHttpClient().DeleteArtifactVersionWithResponse(context.Background(), registryRef, name, version)
 	if err != nil {
 		return err
@@ -85,40 +89,28 @@ func performArtifactDelete(c *cmdutils.Factory, registryRef, name string) error 
 	return nil
 }
 
-func executeBulkDelete(c *cmdutils.Factory, configPath string) {
+func executeBulkDelete(c *cmdutils.Factory, configPath string, progress *p.ConsoleReporter) {
 	if configPath == "" {
 		return
 	}
 
 	config, err := utils.LoadBulkDeleteConfig(configPath)
 	if err != nil {
+		progress.Error("Failed to load bulk delete config ")
 		log.Error().Msgf("Failed to load bulk delete config: %v", err)
 		return
 	}
 
-	/*configJSON, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		log.Error().Msgf("Failed to marshal config to JSON: %v", err)
-		return
-	}
-
-	log.Info().Msgf("Bulk delete configuration loaded from %s", configPath)
-	log.Info().Msgf(string(configJSON))
-	log.Info().Msgf("\n=== Detailed Registry Information ===")
-
-	*/
-
 	// Collect all deletion jobs
 	var jobs []deleteJob
 	for registryName, packages := range config.Registries {
-		//log.Info().Msgf("\nRegistry: %s\n", registryName)
+
 		registryRef := client2.GetRef(client2.GetScopeRef(), registryName)
 
 		for packageName, versions := range packages {
-			//log.Info().Msgf("  Package: %s\n", packageName)
+
 			if len(versions) == 0 {
-				//log.Info().Msgf("    Versions: [] (delete all versions)\n")
-				// creating complete Artifact delete job
+				// creating  Artifact delete job
 				jobs = append(jobs, deleteJob{
 					jobType:      "artifact",
 					registryName: registryName,
@@ -126,7 +118,6 @@ func executeBulkDelete(c *cmdutils.Factory, configPath string) {
 					packageName:  packageName,
 				})
 			} else {
-				log.Info().Msgf("    Versions: %v\n", versions)
 				// creating version delete job
 				for _, version := range versions {
 					jobs = append(jobs, deleteJob{
@@ -140,12 +131,13 @@ func executeBulkDelete(c *cmdutils.Factory, configPath string) {
 			}
 		}
 	}
-
+	progress.Step("Starting bulk delete ..")
 	log.Info().Msgf("\nTotal deletion jobs collected: %d", len(jobs))
 	log.Info().Msgf("Starting concurrent deletion with concurrency: %d\n", config.Concurrency)
 
 	// Execute deletions concurrently
 	processDeletionsConcurrently(c, jobs, config.Concurrency)
+	progress.Step("Bulk delete execution complete..")
 }
 
 func processDeletionsConcurrently(c *cmdutils.Factory, jobs []deleteJob, concurrency int) {
@@ -163,22 +155,14 @@ func processDeletionsConcurrently(c *cmdutils.Factory, jobs []deleteJob, concurr
 						workerID, job.packageName, job.version, job.registryName)
 					err := performVersionDelete(c, job.registryRef, job.packageName, job.version)
 					if err != nil {
-						log.Error().Msgf("[Worker %d] Failed to delete version %s : %s - %v",
-							workerID, job.packageName, job.version, err)
-					} else {
-						log.Info().Msgf("[Worker %d] Successfully deleted version %s :%s",
-							workerID, job.packageName, job.version)
+						log.Error().Msgf("Failed to delete version : %v", err)
 					}
 				} else if job.jobType == "artifact" {
 					log.Info().Msgf("[Worker %d] Deleting artifact %s (all versions) from registry %s",
 						workerID, job.packageName, job.registryName)
 					err := performArtifactDelete(c, job.registryRef, job.packageName)
 					if err != nil {
-						log.Error().Msgf("[Worker %d] Failed to delete artifact %s - %v",
-							workerID, job.packageName, err)
-					} else {
-						log.Info().Msgf("[Worker %d] Successfully deleted artifact %s",
-							workerID, job.packageName)
+						log.Error().Msgf("Failed to Delete artifact: %v", err)
 					}
 				}
 			}
@@ -193,7 +177,8 @@ func processDeletionsConcurrently(c *cmdutils.Factory, jobs []deleteJob, concurr
 
 	// Wait for all workers to complete
 	wg.Wait()
-	log.Info().Msgf("\nBulk deletion completed. Processed %d jobs.", len(jobs))
+
+	log.Info().Msgf("Bulk deletion completed.")
 }
 
 type deleteJob struct {
