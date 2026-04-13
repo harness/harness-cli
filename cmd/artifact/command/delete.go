@@ -26,9 +26,12 @@ func NewDeleteArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 			name = args[0]
 
 			progress := p.NewConsoleReporter()
-			// If config file provided from flag is provided, only then execute bulk delete
+			// If config file  from flag is provided, only then execute bulk delete
 			if configPath != "" {
 				progress.Start("Found Config file for bulk delete ")
+				if name != "all" {
+					return fmt.Errorf("USAGE for bulk delete : hc artifact delete all --config <path>")
+				}
 				executeBulkDelete(c, configPath, progress)
 				return nil
 			}
