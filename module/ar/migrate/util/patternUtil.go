@@ -122,7 +122,7 @@ func FilterFilesByPatternsPackageName(packages []types.Package, includePatterns,
 
 func IsFileLevelFilterableArtifact(artifactType types.ArtifactType) bool {
 	switch artifactType {
-	case types.GENERIC, types.PYTHON, types.MAVEN, types.NUGET, types.NPM, types.DART, types.GO:
+	case types.GENERIC, types.RAW, types.PYTHON, types.MAVEN, types.NUGET, types.NPM, types.DART, types.GO:
 		return true
 	default:
 		return false

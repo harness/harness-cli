@@ -1,0 +1,38 @@
+[
+  {
+    "Registry": "raw-local",
+    "Name": "readme.txt",
+    "Uri": "/docs/readme.txt",
+    "Folder": false,
+    "Size": 256,
+    "LastModified": "2024-01-15T10:30:00.000Z",
+    "SHA1": "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3"
+  },
+  {
+    "Registry": "raw-local",
+    "Name": "config.yaml",
+    "Uri": "/configs/v1/config.yaml",
+    "Folder": false,
+    "Size": 512,
+    "LastModified": "2024-02-20T14:00:00.000Z",
+    "SHA1": "b6589fc6ab0dc82cf12099d1c2d40ab994e8410c"
+  },
+  {
+    "Registry": "raw-local",
+    "Name": "app-1.0.tar.gz",
+    "Uri": "/releases/app-1.0.tar.gz",
+    "Folder": false,
+    "Size": 10240,
+    "LastModified": "2024-03-01T08:00:00.000Z",
+    "SHA1": "356a192b7913b04c54574d18c28d46e6395428ab"
+  },
+  {
+    "Registry": "raw-local",
+    "Name": "logo.png",
+    "Uri": "/assets/images/logo.png",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2024-01-10T12:00:00.000Z",
+    "SHA1": "da4b9237bacccdf19c0760cab7aec4a8359010b0"
+  }
+]

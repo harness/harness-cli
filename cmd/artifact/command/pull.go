@@ -75,13 +75,12 @@ func NewPullGenericCmd(c *cmdutils.Factory) *cobra.Command {
 				packageFile, packageFile, packageVersion, registryName)
 
 			// Download the file using DownloadGenericFileFromPath
+			fullPath := fmt.Sprintf("%s/%s/%s", packageName, packageVersion, packageFile)
 			response, err := pkgClient.DownloadGenericFileFromPath(
 				context.Background(),
 				config.Global.AccountID,
 				registryName,
-				packageName,
-				packageVersion,
-				packageFile)
+				fullPath)
 			if err != nil {
 				return fmt.Errorf("failed to download package: %w", err)
 			}

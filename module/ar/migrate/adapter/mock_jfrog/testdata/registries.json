@@ -61,5 +61,12 @@
     "url": "http://localhost:8081/artifactory/nuget-local",
     "description": "Mock NuGet Local Repository",
     "packageType": "nuget"
+  },
+  "raw-local": {
+    "key": "raw-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/raw-local",
+    "description": "Mock Raw Local Repository",
+    "packageType": "raw"
   }
 }

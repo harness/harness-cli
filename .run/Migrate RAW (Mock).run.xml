@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Migrate RAW (Mock)" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="harness-cli" />
+    <working_directory value="$PROJECT_DIR$" />
+    <parameters value="registry migrate -c module/ar/migrate/adapter/mock_jfrog/testdata/raw-migrate-config.yaml" />
+    <kind value="PACKAGE" />
+    <package value="github.com/harness/harness-cli/cmd/hc" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/cmd/hc/main.go" />
+    <method v="2" />
+  </configuration>
+</component>

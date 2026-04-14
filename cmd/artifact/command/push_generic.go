@@ -90,13 +90,12 @@ func NewPushGenericCmd(c *cmdutils.Factory) *cobra.Command {
 			reader, closer := progress.Reader(bufferSize, file, filename)
 			defer closer()
 
+			fullPath := fmt.Sprintf("%s/%s/%s", packageName, version, path)
 			response, err := pkgClient.UploadGenericFileToPathWithBodyWithResponse(
 				context.Background(),
 				config.Global.AccountID,    // accountId
 				registryName,               // registry
-				packageName,                // package name
-				version,                    // version
-				path,                       // filepath
+				fullPath,                   // filepath (package/version/path)
 				"application/octet-stream", // content type
 				reader,                     // file content as io.Reader with progress tracking
 			)

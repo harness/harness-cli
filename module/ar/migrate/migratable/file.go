@@ -114,8 +114,28 @@ func (r *File) Pre(ctx context.Context) error {
 		Str("step", "pre").
 		Str("trace_id", traceID).
 		Logger()
-	logger.Info().Msg("Starting version pre-migration step")
+	logger.Info().Msg("Starting file pre-migration step")
 	startTime := time.Now()
+
+	// For RAW artifacts, use HEAD to check if file already exists at destination
+	if r.artifactType == types.RAW && !r.config.Overwrite && !r.config.DryRun {
+		exists, err := r.destAdapter.FileExists(ctx, r.registry.Path, r.pkg.Name, r.version.Name, r.file,
+			r.artifactType)
+		if err != nil {
+			logger.Warn().Err(err).Msgf("Failed to HEAD raw file %s, will proceed with migration", r.file.Uri)
+		} else if exists {
+			logger.Info().Msgf("Skipping raw file %s as it already exists in destination (HEAD 200)", r.file.Uri)
+			r.skipMigration = true
+			stat := types.FileStat{
+				Name:     r.file.Name,
+				Registry: r.srcRegistry,
+				Uri:      r.file.Uri,
+				Size:     int64(r.file.Size),
+				Status:   types.StatusSkip,
+			}
+			r.stats.FileStats = append(r.stats.FileStats, stat)
+		}
+	}
 
 	logger.Info().
 		Dur("duration", time.Since(startTime)).
@@ -152,7 +172,7 @@ func (r *File) Migrate(ctx context.Context) error {
 		return fmt.Errorf("OCI migrate file is not supported")
 	}
 
-	if r.artifactType == types.GENERIC || r.artifactType == types.MAVEN || r.artifactType == types.NUGET {
+	if r.artifactType == types.GENERIC || r.artifactType == types.RAW || r.artifactType == types.MAVEN || r.artifactType == types.NUGET {
 		downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.file.Uri)
 		defer downloadFile.Close()
 		if err != nil {

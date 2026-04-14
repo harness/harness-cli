@@ -105,9 +105,9 @@ paths:
           description: Missing or invalid `x-api-key`
         '5XX':
           description: Server-side error
-  /pkg/{accountId}/{registry}/files/{package}/{version}/{filepath}:
+  /pkg/{accountId}/{registry}/files/{filepath}:
     put:
-      summary: Upload (or replace) a file at a specific nested path within a package version
+      summary: Upload (or replace) a file at a specific path within a registry
       operationId: uploadGenericFileToPath
       parameters:
         - name: accountId
@@ -118,22 +118,15 @@ paths:
           in: path
           required: true
           schema: { type: string }
-        - name: package
-          in: path
-          required: true
-          schema: { type: string }
-        - name: version
-          in: path
-          required: true
-          schema: { type: string }
         - name: filepath
           in: path
           required: true
           schema:
             type: string
           description: >
-            Nested path of the file within the package version (e.g. "dist/app.tar.gz").
-            If any path segment contains reserved characters, URL-encode them.
+            Full path of the file (e.g. "pkg/version/file.tar.gz" or "docs/readme.txt").
+            For generic artifacts, include package/version as path segments.
+            For raw artifacts, use the file path directly.
       security:
         - ApiKeyAuth: [ ]
       requestBody:
@@ -153,12 +146,14 @@ paths:
         '401':
           description: Missing or invalid `x-api-key`
         '404':
-          description: Package/version not found
+          description: Registry not found
+        '409':
+          description: File already exists
         '5XX':
           description: Server-side error
 
     get:
-      summary: Download a file from a specific nested path within a package version
+      summary: Download a file from a specific path within a registry
       operationId: downloadGenericFileFromPath
       parameters:
         - name: accountId
@@ -169,20 +164,12 @@ paths:
           in: path
           required: true
           schema: { type: string }
-        - name: package
-          in: path
-          required: true
-          schema: { type: string }
-        - name: version
-          in: path
-          required: true
-          schema: { type: string }
         - name: filepath
           in: path
           required: true
           schema:
             type: string
-          description: Nested path of the file within the package version.
+          description: Full path of the file within the registry.
       security:
         - ApiKeyAuth: [ ]
       responses:
@@ -211,7 +198,7 @@ paths:
           description: Server-side error
 
     head:
-      summary: Get file metadata (headers only) for a specific nested path
+      summary: Check if a file exists at a specific path (headers only)
       operationId: headGenericFileAtPath
       parameters:
         - name: accountId
@@ -222,20 +209,12 @@ paths:
           in: path
           required: true
           schema: { type: string }
-        - name: package
-          in: path
-          required: true
-          schema: { type: string }
-        - name: version
-          in: path
-          required: true
-          schema: { type: string }
         - name: filepath
           in: path
           required: true
           schema:
             type: string
-          description: Nested path of the file within the package version.
+          description: Full path of the file within the registry.
       security:
         - ApiKeyAuth: [ ]
       responses:
@@ -262,7 +241,7 @@ paths:
           description: Server-side error
 
     delete:
-      summary: Delete a file from a specific nested path within a package version
+      summary: Delete a file from a specific path within a registry
       operationId: deleteGenericFileFromPath
       parameters:
         - name: accountId
@@ -273,20 +252,12 @@ paths:
           in: path
           required: true
           schema: { type: string }
-        - name: package
-          in: path
-          required: true
-          schema: { type: string }
-        - name: version
-          in: path
-          required: true
-          schema: { type: string }
         - name: filepath
           in: path
           required: true
           schema:
             type: string
-          description: Nested path of the file within the package version.
+          description: Full path of the file within the registry.
       security:
         - ApiKeyAuth: [ ]
       responses:
@@ -298,6 +269,7 @@ paths:
           description: File not found
         '5XX':
           description: Server-side error
+
   /pkg/{accountId}/{registry}/go/upload:
     put:
       summary: Upload a go package

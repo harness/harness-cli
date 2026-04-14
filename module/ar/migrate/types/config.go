@@ -32,6 +32,7 @@ var (
 	CONDA       ArtifactType = "CONDA"
 	COMPOSER    ArtifactType = "COMPOSER"
 	DART        ArtifactType = "DART"
+	RAW         ArtifactType = "RAW"
 )
 
 // Config represents the top-level configuration structure

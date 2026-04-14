@@ -131,6 +131,8 @@ func (a *adapter) UploadFile(
 		err = a.client.uploadComposerFile(registry, f.Name, file)
 	} else if artifactType == types.DART {
 		err = a.client.uploadDartFile(registry, artifactName, version, f, file)
+	} else if artifactType == types.RAW {
+		err = a.client.uploadRawFile(registry, f, file)
 	}
 
 	if err != nil {
@@ -167,6 +169,9 @@ func (a *adapter) FileExists(
 	file *types.File,
 	artifactType types.ArtifactType,
 ) (bool, error) {
+	if artifactType == types.RAW {
+		return a.client.headRawFile(registryRef, file.Uri)
+	}
 	return a.client.artifactFileExists(ctx, registryRef, pkg, version, file, artifactType)
 }
 

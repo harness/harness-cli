@@ -78,18 +78,63 @@ type client struct {
 }
 
 func (c *client) uploadGenericFile(registry, artifactName, version string, f *types.File, file io.ReadCloser) error {
+	// For generic, include package/version as path segments: {package}/{version}/{filepath}
 	fileUri := strings.TrimPrefix(f.Uri, "/")
+	fullPath := fmt.Sprintf("%s/%s/%s", artifactName, version, fileUri)
 	defer file.Close()
 
 	_, err2 := c.pkgClient.UploadGenericFileToPathWithBodyWithResponse(
 		context.Background(),
 		config.Global.AccountID,
 		registry,
-		artifactName,
-		version, fileUri, "application/octet-stream", file)
+		fullPath,
+		"application/octet-stream",
+		file)
 
 	if err2 != nil {
 		return fmt.Errorf("failed to upload file '%s/%s': %w", artifactName, version, err2)
+	}
+
+	return nil
+}
+
+func (c *client) headRawFile(registryRef string, fileUri string) (bool, error) {
+	fileUri = strings.TrimPrefix(fileUri, "/")
+	parts := strings.Split(registryRef, "/")
+	registry := parts[len(parts)-1]
+	resp, err := c.pkgClient.HeadGenericFileAtPathWithResponse(
+		context.Background(),
+		config.Global.AccountID,
+		registry,
+		fileUri,
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to HEAD raw file '%s': %w", fileUri, err)
+	}
+
+	if resp.StatusCode() == http2.StatusOK {
+		return true, nil
+	}
+	if resp.StatusCode() == http2.StatusNotFound {
+		return false, nil
+	}
+	return false, fmt.Errorf("unexpected status code %d for HEAD on raw file '%s'", resp.StatusCode(), fileUri)
+}
+
+func (c *client) uploadRawFile(registry string, f *types.File, file io.ReadCloser) error {
+	fileUri := strings.TrimPrefix(f.Uri, "/")
+	defer file.Close()
+
+	_, err := c.pkgClient.UploadGenericFileToPathWithBodyWithResponse(
+		context.Background(),
+		config.Global.AccountID,
+		registry,
+		fileUri,
+		"application/octet-stream",
+		file,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to upload raw file '%s': %w", fileUri, err)
 	}
 
 	return nil
@@ -551,7 +596,7 @@ func (c *client) artifactFileExists(
 	page := int64(0)
 	size := int64(100)
 	fileURI := file.Name
-	if artifactType == types.GENERIC {
+	if artifactType == types.GENERIC || artifactType == types.RAW {
 		fileURI = strings.TrimPrefix(file.Uri, "/")
 	} else {
 		fileURI = strings.TrimPrefix(fileURI, "/")

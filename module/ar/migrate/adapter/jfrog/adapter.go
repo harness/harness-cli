@@ -107,7 +107,7 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 	error,
 ) {
 	var packages []types.Package
-	if artifactType == types.GENERIC {
+	if artifactType == types.GENERIC || artifactType == types.RAW {
 		packages = append(packages, types.Package{
 			Registry: registry,
 			Path:     "/",
@@ -450,7 +450,7 @@ func (a *adapter) GetVersions(
 	registry, pkg string,
 	artifactType types.ArtifactType,
 ) ([]types.Version, error) {
-	if artifactType == types.GENERIC {
+	if artifactType == types.GENERIC || artifactType == types.RAW {
 		return []types.Version{
 			{
 				Registry: registry,
