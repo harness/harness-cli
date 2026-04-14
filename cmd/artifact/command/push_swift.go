@@ -29,6 +29,7 @@ const (
 
 func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 	var pkgURL string
+	var metadataPath string
 	const expectedNumberOfArgument = 3
 	cmd := &cobra.Command{
 		Use:   "swift  <registry_name> <file_path> <SCOPE>/<NAME>/<VERSION>",
@@ -49,7 +50,6 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 			} else {
 				config.Global.Registry.PkgURL = util.GetPkgUrl(config.Global.APIBaseURL)
 			}
-
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]
@@ -61,16 +61,6 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 
 			// Validate Registry Name and file_path
 			progress.Start("Validating input parameters")
-
-			// Resolve file path
-			/*files, err := utils.ResolveFilePath(filePath, SwiftSupportedFileExtension)
-			if err != nil {
-				progress.Error("Failed to resolve file path")
-				return err
-			}
-
-			*/
-			//filePath = files[0]
 
 			fileName := filepath.Base(filePath)
 
@@ -99,8 +89,6 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 			packageName := taregetDetail[1]
 			version := taregetDetail[2]
 
-			tempRes := fmt.Sprintf("target detail %s %s %s", targetScope, packageName, version)
-			fmt.Println(tempRes)
 			progress.Success("Input parameters validated")
 
 			// Initialize the package client
@@ -132,6 +120,27 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 				return err
 			}
 
+			// Add metadata file if provided from flag
+			if metadataPath != "" {
+				progress.Step("adding metadata file to upload")
+				metadataFile, err := os.Open(metadataPath)
+				if err != nil {
+					progress.Error("Failed to open metadata file")
+					return fmt.Errorf("failed to open metadata file: %w", err)
+				}
+				defer metadataFile.Close()
+
+				metadataPart, err := fileWriter.CreateFormFile("metadata", filepath.Base(metadataPath))
+				if err != nil {
+					return fmt.Errorf("failed to create metadata form field: %w", err)
+				}
+
+				_, err = io.Copy(metadataPart, metadataFile)
+				if err != nil {
+					return fmt.Errorf("failed to copy metadata file: %w", err)
+				}
+			}
+
 			fileWriter.Close()
 
 			// Initialize progress reader
@@ -139,9 +148,6 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 			bufferSize := int64(formData.Len())
 			reader, closer := p.Reader(bufferSize, &formData, "swift")
 			defer closer()
-
-			//TODO may be creation of custome header is required like conda
-			//and pass that reader
 
 			resp, err := pkgClient.UploadSwiftPackageWithBodyWithResponse(
 				context.Background(),
@@ -170,6 +176,7 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
+	cmd.Flags().StringVar(&metadataPath, "metadata-path", "", "Path to metadata file")
 	return cmd
 }
 
