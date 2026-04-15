@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"runtime/pprof"
+	"strconv"
 	"time"
 
 	"github.com/harness/harness-cli/cmd/artifact"

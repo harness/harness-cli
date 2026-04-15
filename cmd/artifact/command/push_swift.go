@@ -14,7 +14,6 @@ import (
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
-	"github.com/harness/harness-cli/util"
 	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	"github.com/harness/harness-cli/util/common/fileutil"
@@ -28,8 +27,9 @@ const (
 )
 
 func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
-	var pkgURL string
+
 	var metadataPath string
+	var customHeaders map[string]string
 	const expectedNumberOfArgument = 3
 	cmd := &cobra.Command{
 		Use:   "swift  <registry_name> <file_path> <SCOPE>/<NAME>/<VERSION>",
@@ -44,13 +44,7 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 			return nil
 		},
-		PreRun: func(cmd *cobra.Command, args []string) {
-			if pkgURL != "" {
-				config.Global.Registry.PkgURL = util.GetPkgUrl(pkgURL)
-			} else {
-				config.Global.Registry.PkgURL = util.GetPkgUrl(config.Global.APIBaseURL)
-			}
-		},
+		//PreRun: func(cmd *cobra.Command, args []string) {}, --not in use
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]
 			filePath := args[1]
@@ -143,6 +137,8 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 
 			fileWriter.Close()
 
+			additionalHeader := getAdditionalHeader(customHeaders)
+
 			// Initialize progress reader
 			progress.Step("Uploading package to registry")
 			bufferSize := int64(formData.Len())
@@ -158,6 +154,7 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 				version,
 				fileWriter.FormDataContentType(),
 				reader,
+				additionalHeader,
 			)
 
 			if err != nil {
@@ -175,7 +172,6 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
 	cmd.Flags().StringVar(&metadataPath, "metadata-path", "", "Path to metadata file")
 	return cmd
 }
@@ -213,4 +209,21 @@ func parseTargetPath(input string) ([]string, error) {
 	}
 
 	return []string{scope, name, version}, nil
+}
+
+func getAdditionalHeader(customHeaders map[string]string) func(ctx context.Context, req *http.Request) error {
+	if customHeaders == nil {
+		customHeaders = make(map[string]string)
+	}
+
+	customHeaders["Accept"] = "application/vnd.swift.registry.v1+json"
+
+	customHeaderEditor := func(ctx context.Context, req *http.Request) error {
+		for key, value := range customHeaders {
+			req.Header.Set(key, value)
+		}
+		return nil
+	}
+
+	return customHeaderEditor
 }

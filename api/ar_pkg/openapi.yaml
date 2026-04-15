@@ -824,7 +824,7 @@ paths:
           description: Missing or invalid `x-api-key`
         '5XX':
           description: Server-side error
-  /har/pkg/{accountId}/{registry}/swift/{scope}/{name}/{version}:
+  /pkg/{accountId}/{registry}/swift/{scope}/{name}/{version}:
     put:
       summary: Upload a Swift package
       operationId: uploadSwiftPackage
