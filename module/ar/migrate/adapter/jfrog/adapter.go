@@ -320,6 +320,61 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			})
 		}
 		return packages, nil
+	} else if artifactType == types.SWIFT {
+		leaves, _ := tree.GetAllFiles(root)
+		packageMap := make(map[string]bool)
+		for _, leaf := range leaves {
+			if leaf.Folder {
+				continue
+			}
+			if !strings.HasSuffix(leaf.Uri, ".zip") {
+				continue
+			}
+
+			// Swift packages in JFrog have two possible URI formats:
+			// 4-segment: /<scope>/<name>/<version>/<name>-<version>.zip (Publish API)
+			// 3-segment: /<scope>/<name>/<name>-<version>.zip (direct deploy)
+			uriPath := strings.TrimPrefix(leaf.Uri, "/")
+			parts := strings.Split(uriPath, "/")
+
+			var scope, name, version string
+			if len(parts) >= 4 {
+				scope = parts[0]
+				name = parts[1]
+				version = parts[2]
+			} else if len(parts) == 3 {
+				scope = parts[0]
+				name = parts[1]
+				// Extract version from filename: <name>-<version>.zip
+				filename := strings.TrimSuffix(parts[2], ".zip")
+				if strings.HasPrefix(filename, name+"-") {
+					version = strings.TrimPrefix(filename, name+"-")
+				} else {
+					continue
+				}
+			} else {
+				continue
+			}
+
+			// Package name in scope.name format
+			pkgName := scope + "." + name
+			pkgKey := pkgName + "-" + version
+
+			path := "/"
+			if _, ok := packageMap[pkgKey]; ok {
+				continue
+			}
+			packageMap[pkgKey] = true
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     path,
+				Name:     pkgName,
+				Version:  version,
+				Size:     leaf.Size,
+				URL:      leaf.Uri,
+			})
+		}
+		return packages, nil
 	} else if artifactType == types.DART {
 		// Treat Dart like a generic bucket: one logical package
 		packages = append(packages, types.Package{
@@ -639,6 +694,17 @@ func (a *adapter) GetVersions(
 			Pkg:      pkg,
 			Path:     p.URL,
 			Name:     p.Name,
+			Size:     p.Size,
+		})
+		return versions, nil
+	}
+	if artifactType == types.SWIFT {
+		var versions []types.Version
+		versions = append(versions, types.Version{
+			Registry: registry,
+			Pkg:      pkg,
+			Path:     p.URL,
+			Name:     p.Version,
 			Size:     p.Size,
 		})
 		return versions, nil

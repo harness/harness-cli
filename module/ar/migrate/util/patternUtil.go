@@ -132,7 +132,7 @@ func IsFileLevelFilterableArtifact(artifactType types.ArtifactType) bool {
 func IsPackageLevelFilterableArtifact(artifactType types.ArtifactType) bool {
 
 	switch artifactType {
-	case types.DOCKER, types.HELM, types.HELM_LEGACY, types.RPM, types.CONDA, types.COMPOSER:
+	case types.DOCKER, types.HELM, types.HELM_LEGACY, types.RPM, types.CONDA, types.COMPOSER, types.SWIFT:
 		return true
 	default:
 		return false

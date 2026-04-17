@@ -33,6 +33,7 @@ var (
 	COMPOSER    ArtifactType = "COMPOSER"
 	DART        ArtifactType = "DART"
 	RAW         ArtifactType = "RAW"
+	SWIFT       ArtifactType = "SWIFT"
 )
 
 // Config represents the top-level configuration structure

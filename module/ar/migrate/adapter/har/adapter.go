@@ -129,6 +129,8 @@ func (a *adapter) UploadFile(
 		err = a.client.uploadCondaFile(registry, f.Name, file, metadata)
 	} else if artifactType == types.COMPOSER {
 		err = a.client.uploadComposerFile(registry, f.Name, file)
+	} else if artifactType == types.SWIFT {
+		err = a.client.uploadSwiftFile(registry, f.Name, file, artifactName, version)
 	} else if artifactType == types.DART {
 		err = a.client.uploadDartFile(registry, artifactName, version, f, file)
 	} else if artifactType == types.RAW {
