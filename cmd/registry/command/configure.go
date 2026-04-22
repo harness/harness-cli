@@ -14,6 +14,9 @@ func NewConfigureCmd(f *cmdutils.Factory) *cobra.Command {
 	}
 
 	cmd.AddCommand(NewConfigureNpmCmd(f))
+	cmd.AddCommand(NewConfigureMavenCmd(f))
+	cmd.AddCommand(NewConfigurePipCmd(f))
+	cmd.AddCommand(NewConfigureNuGetCmd(f))
 
 	return cmd
 }

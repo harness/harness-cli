@@ -26,9 +26,9 @@ import (
 )
 
 type Dependency struct {
-	Name    string
-	Version string
-	Source  string
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	Source  string `json:"source"`
 }
 
 type ScanResult struct {
@@ -122,7 +122,7 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 			p.Start(fmt.Sprintf("Parsing dependency file: %s", fileName))
 			log.Info().Str("file", filePath).Msg("Parsing dependency file")
 
-			dependencies, err := parseLockFile(filePath)
+			dependencies, err := ParseLockFile(filePath)
 			if err != nil {
 				p.Error("Failed to parse dependency file")
 				log.Error().Err(err).Msg("Failed to parse dependency file")
@@ -394,7 +394,7 @@ func validateFileForPackageType(fileName, packageType string) error {
 		fileName, packageType, packageType, strings.Join(validFilesList, ", "))
 }
 
-func parseLockFile(filePath string) ([]Dependency, error) {
+func ParseLockFile(filePath string) ([]Dependency, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
