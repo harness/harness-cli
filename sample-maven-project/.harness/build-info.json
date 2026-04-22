@@ -1,0 +1,28 @@
+{
+  "client": "mvn",
+  "command": "install",
+  "registry": "maven-upstream",
+  "timestamp": "2026-04-21T19:16:20Z",
+  "dependencies": [
+    {
+      "name": "com.fasterxml.jackson.core:jackson-databind",
+      "version": "2.17.0",
+      "source": "pom.xml"
+    },
+    {
+      "name": "org.springframework:spring-web",
+      "version": "6.1.6",
+      "source": "pom.xml"
+    },
+    {
+      "name": "org.apache.httpcomponents.client5:httpclient5",
+      "version": "5.3.1",
+      "source": "pom.xml"
+    },
+    {
+      "name": "com.google.guava:guava",
+      "version": "32.1.3-jre",
+      "source": "pom.xml"
+    }
+  ]
+}
