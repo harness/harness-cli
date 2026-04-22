@@ -61,5 +61,19 @@
     "url": "http://localhost:8081/artifactory/nuget-local",
     "description": "Mock NuGet Local Repository",
     "packageType": "nuget"
+  },
+  "raw-local": {
+    "key": "raw-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/raw-local",
+    "description": "Mock Raw Local Repository",
+    "packageType": "raw"
+  },
+  "swift-local": {
+    "key": "swift-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/swift-local",
+    "description": "Mock Swift Local Repository",
+    "packageType": "swift"
   }
 }

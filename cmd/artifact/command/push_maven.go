@@ -23,6 +23,7 @@ import (
 	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	p "github.com/harness/harness-cli/util/common/progress"
+	"github.com/harness/harness-cli/util/common/upload"
 
 	"github.com/spf13/cobra"
 )
@@ -37,6 +38,7 @@ const (
 func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 	var pkgURL string
 	var pomPath string
+	var maxConcurrentUploads int = upload.DefaultUploadWorker
 	const expectedNumberOfArgument = 2
 	cmd := &cobra.Command{
 		Use:   "maven <registry_name> <file_path>",
@@ -54,10 +56,7 @@ func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 		PreRun: func(cmd *cobra.Command, args []string) {
 			if pkgURL != "" {
 				config.Global.Registry.PkgURL = util.GetPkgUrl(pkgURL)
-			} else {
-				config.Global.Registry.PkgURL = util.GetPkgUrl(config.Global.APIBaseURL)
 			}
-
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]
@@ -143,33 +142,66 @@ func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 				return errors.NewValidationError("CHECKSUM_ERROR", fmt.Sprintf("Failed to generate CHECKSUM files: %v", err))
 			}
 
-			progress.Success("checksum file is generated")
+			progress.Success("Checksum files generated")
 
-			// Initialize the package client
+			progress.Step("Preparing upload jobs")
+			jobs := make([]upload.FileUploadJob, 0, len(mavenFilesToUpload)+len(checksumFiles))
+
+			// Adding files to upload in jobs
+			for _, fileNameWithPath := range mavenFilesToUpload {
+				progress.Step(fmt.Sprintf("Processing job for %s ", filepath.Base(fileNameWithPath)))
+				fileInfo, err := os.Stat(fileNameWithPath)
+				if err != nil {
+					return errors.NewValidationError("FILE_ERROR", fmt.Sprintf("Failed to stat file: %v", err))
+				}
+
+				fileName := upload.NormalizeFileName(fileNameWithPath, coordsFromPom.ArtifactID, coordsFromPom.Version)
+				job := upload.NewMavenUploadJobFromDisk(
+					fileNameWithPath,
+					fileName,
+					registryName,
+					coordsFromPom.GroupID,
+					coordsFromPom.ArtifactID,
+					coordsFromPom.Version,
+					fileInfo.Size(),
+				)
+				jobs = append(jobs, job)
+			}
+
+			// Add checksum upload jobs
+			progress.Step("preparing job for checksum files ")
+			for _, checksumFile := range checksumFiles {
+				job := upload.NewMavenUploadJobFromMemory(
+					checksumFile.FileName,
+					registryName,
+					coordsFromPom.GroupID,
+					coordsFromPom.ArtifactID,
+					coordsFromPom.Version,
+					checksumFile.Content,
+				)
+				jobs = append(jobs, job)
+			}
+
+			progress.Success(fmt.Sprintf("Prepared %d upload jobs", len(jobs)))
+
+			// uploads using the engine
+			engine := upload.NewFileUploadEngine(maxConcurrentUploads, progress)
+			results := engine.Execute(context.Background(), jobs)
+
+			if upload.HasUploadErrors(results) {
+				errors := upload.GetUploadErrors(results)
+				for jobID, err := range errors {
+					progress.Error(fmt.Sprintf("Failed to upload %s: %v", jobID, err))
+				}
+				return fmt.Errorf("failed to upload %d files", len(errors))
+			}
+
+			// Initialize the package client for metadata operations
 			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
 				auth.GetAuthOptionARPKG())
 			if err != nil {
 				return fmt.Errorf("failed to create package client: %w", err)
 			}
-
-			for _, fileNameWithPath := range mavenFilesToUpload {
-				progress.Step(fmt.Sprintf("Uploading %s ", filepath.Base(fileNameWithPath)))
-				err := uploadSingleMavenPackageFile(pkgClient, fileNameWithPath, registryName, progress, coordsFromPom)
-				if err != nil {
-					return errors.NewValidationError("UPLOAD_ERROR", fmt.Sprintf("Failed in uploading : %v", err))
-				}
-			}
-			progress.Success(fmt.Sprintf("Successfully uploaded package and pom"))
-
-			//Uploading  checksum artifacts
-			for _, checksumFile := range checksumFiles {
-				err := uploadInMemoryMavenFile(pkgClient, checksumFile, registryName, progress, coordsFromPom)
-				if err != nil {
-					return errors.NewValidationError("UPLOAD_ERROR", fmt.Sprintf("Failed in uploading : %v", err))
-				}
-			}
-
-			progress.Success(fmt.Sprintf("Successfully uploaded checksum files"))
 
 			progress.Step("Downloading maven-metadata.xml")
 			//download maven-metadata.xml
@@ -195,7 +227,7 @@ func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 
 			progress.Success("maven-metadata.xml uploaded successfully")
-			progress.Success(fmt.Sprintf("Successfully uploaded package"))
+			progress.Success("Successfully uploaded package")
 
 			return nil
 
@@ -204,9 +236,8 @@ func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 
 	cmd.Flags().StringVar(&pomPath, "pom-file", "", "pom file path")
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
-
+	cmd.Flags().IntVar(&maxConcurrentUploads, "max-concurrent-uploads", upload.DefaultUploadWorker, "Maximum number of concurrent file uploads, 1 for sequential")
 	cmd.MarkFlagRequired("pom-file")
-	cmd.MarkFlagRequired("pkg-url")
 
 	return cmd
 }

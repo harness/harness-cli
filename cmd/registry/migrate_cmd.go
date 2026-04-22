@@ -13,6 +13,7 @@ import (
 	"github.com/harness/harness-cli/internal/api/ar"
 	ar2 "github.com/harness/harness-cli/module/ar/migrate"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+	"github.com/harness/harness-cli/util"
 
 	"github.com/spf13/cobra"
 )
@@ -72,7 +73,7 @@ Example configuration file (config.yaml):
       destinationRegistry: harness-helm
 
 Supported artifact types:
-  DOCKER, HELM, HELM_LEGACY, MAVEN, NPM, NUGET, PYTHON, GO, GENERIC, CONDA, COMPOSER
+  DOCKER, HELM, HELM_LEGACY, MAVEN, NPM, NUGET, PYTHON, GO, GENERIC, CONDA, COMPOSER ,SWIFT
 
 Environment variables can be used in the config file using ${VAR_NAME} syntax.
 
@@ -83,7 +84,7 @@ Usage example:
 			// Sync local flags to global config
 			config.Global.ConfigPath = localConfigPath
 			if localPkgBaseURL != "" {
-				config.Global.Registry.PkgURL = localPkgBaseURL
+				config.Global.Registry.PkgURL = util.GetPkgUrl(localPkgBaseURL)
 			}
 			config.Global.Registry.Migrate.Concurrency = localConcurrency
 			config.Global.Registry.Migrate.Overwrite = overwrite

@@ -14,6 +14,7 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
+	"github.com/harness/harness-cli/util"
 	client2 "github.com/harness/harness-cli/util/client"
 	p "github.com/harness/harness-cli/util/common/progress"
 
@@ -37,6 +38,7 @@ func NewConfigureNpmCmd(f *cmdutils.Factory) *cobra.Command {
 	var registryIdentifier string
 	var scope string
 	var token string
+	var pkgURL string
 	var global bool
 	var projectLevel bool
 
@@ -44,6 +46,11 @@ func NewConfigureNpmCmd(f *cmdutils.Factory) *cobra.Command {
 		Use:   "npm",
 		Short: "Configure npm client for Harness Artifact Registry",
 		Long:  "Configure npm client to use a Harness Artifact Registry virtual npm registry",
+		PreRun: func(cmd *cobra.Command, args []string) {
+			if pkgURL != "" {
+				config.Global.Registry.PkgURL = util.GetPkgUrl(pkgURL)
+			}
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			progress := p.NewConsoleReporter()
 
@@ -190,6 +197,7 @@ func NewConfigureNpmCmd(f *cmdutils.Factory) *cobra.Command {
 	cmd.Flags().StringVar(&registryIdentifier, "registry", "", "Registry identifier (required)")
 	cmd.Flags().StringVar(&scope, "scope", "", "NPM scope (e.g., @myorg) (optional, configures default registry if not provided)")
 	cmd.Flags().StringVar(&token, "token", "", "Auth token (optional, uses token from login if not provided)")
+	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Package registry base URL (optional)")
 	cmd.Flags().BoolVar(&global, "global", false, "Configure globally for the user")
 	cmd.Flags().BoolVar(&projectLevel, "project-level", false, "Configure at project level (.npmrc in current directory)")
 

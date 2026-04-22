@@ -56,3 +56,6 @@ mappings:
     destinationRegistry: dst
     includePatterns:
       - packages/sample_dart_pkg/**
+  - artifactType: SWIFT
+    sourceRegistry: src
+    destinationRegistry: dst

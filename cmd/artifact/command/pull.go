@@ -13,6 +13,7 @@ import (
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
+	"github.com/harness/harness-cli/util"
 	"github.com/harness/harness-cli/util/common"
 	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/printer"
@@ -43,7 +44,9 @@ func NewPullGenericCmd(c *cmdutils.Factory) *cobra.Command {
 		Long:  "Pull Generic Artifacts from Harness Artifact Registry",
 		Args:  cobra.ExactArgs(3),
 		PreRun: func(cmd *cobra.Command, args []string) {
-			config.Global.Registry.PkgURL = pkgURL
+			if pkgURL != "" {
+				config.Global.Registry.PkgURL = util.GetPkgUrl(pkgURL)
+			}
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]
@@ -72,13 +75,12 @@ func NewPullGenericCmd(c *cmdutils.Factory) *cobra.Command {
 				packageFile, packageFile, packageVersion, registryName)
 
 			// Download the file using DownloadGenericFileFromPath
+			fullPath := fmt.Sprintf("%s/%s/%s", packageName, packageVersion, packageFile)
 			response, err := pkgClient.DownloadGenericFileFromPath(
 				context.Background(),
 				config.Global.AccountID,
 				registryName,
-				packageName,
-				packageVersion,
-				packageFile)
+				fullPath)
 			if err != nil {
 				return fmt.Errorf("failed to download package: %w", err)
 			}
@@ -168,7 +170,6 @@ func NewPullGenericCmd(c *cmdutils.Factory) *cobra.Command {
 
 	// Add flags
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
-	cmd.MarkFlagRequired("pkg-url")
 
 	return cmd
 }

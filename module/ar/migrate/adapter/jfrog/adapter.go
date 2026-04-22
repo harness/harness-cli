@@ -107,20 +107,50 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 	error,
 ) {
 	var packages []types.Package
-	if artifactType == types.GENERIC {
+	if artifactType == types.GENERIC || artifactType == types.RAW {
 		packages = append(packages, types.Package{
 			Registry: registry,
 			Path:     "/",
 			Name:     "default",
 			Size:     -1,
 		})
-	} else if artifactType == types.MAVEN || artifactType == types.NUGET || artifactType == types.NPM {
+	} else if artifactType == types.MAVEN || artifactType == types.NPM {
 		packages = append(packages, types.Package{
 			Registry: registry,
 			Path:     "/",
 			Name:     "",
 			Size:     -1,
 		})
+	} else if artifactType == types.NUGET {
+		// Extract unique package names from NUGET files in the tree
+		files, err := tree.GetAllFiles(root)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+
+		pkgMap := make(map[string]bool)
+		for _, file := range files {
+			if file.Folder {
+				continue
+			}
+
+			pkgName, _, ok := util.ParseNugetFileNameWithPath(file.Uri)
+
+			if !ok {
+				continue
+			}
+			pkgMap[pkgName] = true
+		}
+
+		for pkgName := range pkgMap {
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     "/",
+				Name:     pkgName,
+				Size:     -1,
+			})
+		}
+		log.Info().Msgf("Found %d NUGET packages", len(packages))
 	} else if artifactType == types.DOCKER || artifactType == types.HELM {
 		catalog, err := a.client.GetCatalog(registry)
 		if err != nil {
@@ -290,6 +320,61 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			})
 		}
 		return packages, nil
+	} else if artifactType == types.SWIFT {
+		leaves, _ := tree.GetAllFiles(root)
+		packageMap := make(map[string]bool)
+		for _, leaf := range leaves {
+			if leaf.Folder {
+				continue
+			}
+			if !strings.HasSuffix(leaf.Uri, ".zip") {
+				continue
+			}
+
+			// Swift packages in JFrog have two possible URI formats:
+			// 4-segment: /<scope>/<name>/<version>/<name>-<version>.zip (Publish API)
+			// 3-segment: /<scope>/<name>/<name>-<version>.zip (direct deploy)
+			uriPath := strings.TrimPrefix(leaf.Uri, "/")
+			parts := strings.Split(uriPath, "/")
+
+			var scope, name, version string
+			if len(parts) >= 4 {
+				scope = parts[0]
+				name = parts[1]
+				version = parts[2]
+			} else if len(parts) == 3 {
+				scope = parts[0]
+				name = parts[1]
+				// Extract version from filename: <name>-<version>.zip
+				filename := strings.TrimSuffix(parts[2], ".zip")
+				if strings.HasPrefix(filename, name+"-") {
+					version = strings.TrimPrefix(filename, name+"-")
+				} else {
+					continue
+				}
+			} else {
+				continue
+			}
+
+			// Package name in scope.name format
+			pkgName := scope + "." + name
+			pkgKey := pkgName + "-" + version
+
+			path := "/"
+			if _, ok := packageMap[pkgKey]; ok {
+				continue
+			}
+			packageMap[pkgKey] = true
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     path,
+				Name:     pkgName,
+				Version:  version,
+				Size:     leaf.Size,
+				URL:      leaf.Uri,
+			})
+		}
+		return packages, nil
 	} else if artifactType == types.DART {
 		// Treat Dart like a generic bucket: one logical package
 		packages = append(packages, types.Package{
@@ -420,7 +505,7 @@ func (a *adapter) GetVersions(
 	registry, pkg string,
 	artifactType types.ArtifactType,
 ) ([]types.Version, error) {
-	if artifactType == types.GENERIC {
+	if artifactType == types.GENERIC || artifactType == types.RAW {
 		return []types.Version{
 			{
 				Registry: registry,
@@ -432,7 +517,7 @@ func (a *adapter) GetVersions(
 		}, nil
 	}
 
-	if artifactType == types.MAVEN || artifactType == types.NUGET || artifactType == types.NPM {
+	if artifactType == types.MAVEN || artifactType == types.NPM {
 		return []types.Version{
 			{
 				Registry: registry,
@@ -442,6 +527,40 @@ func (a *adapter) GetVersions(
 				Size:     -1,
 			},
 		}, nil
+	}
+
+	if artifactType == types.NUGET {
+		// Extract versions for this NUGET package from the file tree
+		files, err := tree.GetAllFiles(node)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+
+		versionMap := make(map[string]bool)
+		for _, file := range files {
+			if file.Folder {
+				continue
+			}
+
+			pkgName, version, ok := util.ParseNugetFileNameWithPath(file.Uri)
+			if !ok || pkgName != pkg {
+				continue
+			}
+			versionMap[version] = true
+		}
+
+		var versions []types.Version
+		for version := range versionMap {
+			versions = append(versions, types.Version{
+				Registry: registry,
+				Pkg:      pkg,
+				Path:     "/",
+				Name:     version,
+				Size:     -1,
+			})
+		}
+		log.Info().Msgf("Found %d versions for NUGET package %s", len(versions), pkg)
+		return versions, nil
 	}
 
 	if artifactType == types.HELM_LEGACY {
@@ -575,6 +694,17 @@ func (a *adapter) GetVersions(
 			Pkg:      pkg,
 			Path:     p.URL,
 			Name:     p.Name,
+			Size:     p.Size,
+		})
+		return versions, nil
+	}
+	if artifactType == types.SWIFT {
+		var versions []types.Version
+		versions = append(versions, types.Version{
+			Registry: registry,
+			Pkg:      pkg,
+			Path:     p.URL,
+			Name:     p.Version,
 			Size:     p.Size,
 		})
 		return versions, nil

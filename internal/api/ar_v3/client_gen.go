@@ -581,6 +581,12 @@ type GetArtifactScanDetailsParams struct {
 	PolicySetRef *PolicySetRefParam `form:"policy_set_ref,omitempty" json:"policy_set_ref,omitempty"`
 }
 
+// GetSystemInfoParams defines parameters for GetSystemInfo.
+type GetSystemInfoParams struct {
+	// AccountIdentifier Unique identifier for the Harness account.
+	AccountIdentifier AccountIdentifier `form:"account_identifier" json:"account_identifier"`
+}
+
 // InitiateBulkScanEvaluationJSONRequestBody defines body for InitiateBulkScanEvaluation for application/json ContentType.
 type InitiateBulkScanEvaluationJSONRequestBody = BulkScanEvaluationRequest
 
@@ -860,6 +866,9 @@ type ClientInterface interface {
 
 	// GetArtifactScanDetails request
 	GetArtifactScanDetails(ctx context.Context, scanId ScanIDParam, params *GetArtifactScanDetailsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSystemInfo request
+	GetSystemInfo(ctx context.Context, params *GetSystemInfoParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) GetArtifactScans(ctx context.Context, params *GetArtifactScansParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -936,6 +945,18 @@ func (c *Client) EvaluateArtifactScan(ctx context.Context, params *EvaluateArtif
 
 func (c *Client) GetArtifactScanDetails(ctx context.Context, scanId ScanIDParam, params *GetArtifactScanDetailsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetArtifactScanDetailsRequest(c.Server, scanId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetSystemInfo(ctx context.Context, params *GetSystemInfoParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSystemInfoRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1499,6 +1520,51 @@ func NewGetArtifactScanDetailsRequest(server string, scanId ScanIDParam, params 
 	return req, nil
 }
 
+// NewGetSystemInfoRequest generates requests for GetSystemInfo
+func NewGetSystemInfoRequest(server string, params *GetSystemInfoParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/system/info")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "account_identifier", runtime.ParamLocationQuery, params.AccountIdentifier); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -1560,6 +1626,9 @@ type ClientWithResponsesInterface interface {
 
 	// GetArtifactScanDetailsWithResponse request
 	GetArtifactScanDetailsWithResponse(ctx context.Context, scanId ScanIDParam, params *GetArtifactScanDetailsParams, reqEditors ...RequestEditorFn) (*GetArtifactScanDetailsResp, error)
+
+	// GetSystemInfoWithResponse request
+	GetSystemInfoWithResponse(ctx context.Context, params *GetSystemInfoParams, reqEditors ...RequestEditorFn) (*GetSystemInfoResp, error)
 }
 
 type GetArtifactScansResp struct {
@@ -1677,6 +1746,29 @@ func (r GetArtifactScanDetailsResp) StatusCode() int {
 	return 0
 }
 
+type GetSystemInfoResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *map[string]interface{}
+	JSONDefault  *V3Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSystemInfoResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSystemInfoResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // GetArtifactScansWithResponse request returning *GetArtifactScansResp
 func (c *ClientWithResponses) GetArtifactScansWithResponse(ctx context.Context, params *GetArtifactScansParams, reqEditors ...RequestEditorFn) (*GetArtifactScansResp, error) {
 	rsp, err := c.GetArtifactScans(ctx, params, reqEditors...)
@@ -1736,6 +1828,15 @@ func (c *ClientWithResponses) GetArtifactScanDetailsWithResponse(ctx context.Con
 		return nil, err
 	}
 	return ParseGetArtifactScanDetailsResp(rsp)
+}
+
+// GetSystemInfoWithResponse request returning *GetSystemInfoResp
+func (c *ClientWithResponses) GetSystemInfoWithResponse(ctx context.Context, params *GetSystemInfoParams, reqEditors ...RequestEditorFn) (*GetSystemInfoResp, error) {
+	rsp, err := c.GetSystemInfo(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSystemInfoResp(rsp)
 }
 
 // ParseGetArtifactScansResp parses an HTTP response from a GetArtifactScansWithResponse call
@@ -1886,6 +1987,39 @@ func ParseGetArtifactScanDetailsResp(rsp *http.Response) (*GetArtifactScanDetail
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest ArtifactScanDetailsResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest V3Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSystemInfoResp parses an HTTP response from a GetSystemInfoWithResponse call
+func ParseGetSystemInfoResp(rsp *http.Response) (*GetSystemInfoResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSystemInfoResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest map[string]interface{}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

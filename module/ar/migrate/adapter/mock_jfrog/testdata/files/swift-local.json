@@ -1,0 +1,29 @@
+[
+  {
+    "Registry": "swift-local",
+    "Name": "harness-1.0.0.zip",
+    "Uri": "/myscope/harness/1.0.0/harness-1.0.0.zip",
+    "Folder": false,
+    "Size": 1850,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "6a38dc2b581a0fa478b22e88425a2c8e7a26627a"
+  },
+  {
+    "Registry": "swift-local",
+    "Name": "trial-1.0.2.zip",
+    "Uri": "/swift/trial/trial-1.0.2.zip",
+    "Folder": false,
+    "Size": 1985,
+    "LastModified": "2023-01-02T00:00:00.000Z",
+    "SHA1": "c41413168496bf430770b08e3245ddac0f8244e1"
+  },
+  {
+    "Registry": "swift-local",
+    "Name": "harness-1.0.1.zip",
+    "Uri": "/myscope/harness/1.0.1/harness-1.0.1.zip",
+    "Folder": false,
+    "Size": 703652,
+    "LastModified": "2023-01-03T00:00:00.000Z",
+    "SHA1": "ghi789"
+  }
+]

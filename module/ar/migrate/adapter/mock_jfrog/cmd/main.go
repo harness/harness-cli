@@ -93,6 +93,16 @@ func main() {
 		{"content/python-local/.pypi/requests/requests.html",
 			[]byte(`<html><body><a href="../requests-2.28.0.tar.gz#sha256=abc123">requests-2.28.0.tar.gz</a><br/><a href="../requests-2.29.0.tar.gz#sha256=def456">requests-2.29.0.tar.gz</a><br/></body></html>`)},
 
+		// Raw registry — plain files, no package/version structure
+		{"content/raw-local/docs/readme.txt",
+			[]byte("# Raw Registry\nSample readme for migration testing.\n")},
+		{"content/raw-local/configs/v1/config.yaml",
+			[]byte("server:\n  host: localhost\n  port: 8080\n")},
+		{"content/raw-local/releases/app-1.0.tar.gz",
+			[]byte("fake-tarball-content-for-testing")},
+		{"content/raw-local/assets/images/logo.png",
+			[]byte("fake-png-content-for-testing")},
+
 		// ── Binary packages ──
 
 		// NPM tarballs

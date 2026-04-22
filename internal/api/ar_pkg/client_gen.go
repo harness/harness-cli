@@ -78,6 +78,12 @@ type UploadRpmPackageMultipartBody struct {
 	File *openapi_types.File `json:"file,omitempty"`
 }
 
+// UploadSwiftPackageMultipartBody defines parameters for UploadSwiftPackage.
+type UploadSwiftPackageMultipartBody struct {
+	// File Swift Package .zip file to upload
+	File *openapi_types.File `json:"file,omitempty"`
+}
+
 // UploadCargoPackageMultipartRequestBody defines body for UploadCargoPackage for multipart/form-data ContentType.
 type UploadCargoPackageMultipartRequestBody UploadCargoPackageMultipartBody
 
@@ -98,6 +104,9 @@ type UploadPythonPackageMultipartRequestBody UploadPythonPackageMultipartBody
 
 // UploadRpmPackageMultipartRequestBody defines body for UploadRpmPackage for multipart/form-data ContentType.
 type UploadRpmPackageMultipartRequestBody UploadRpmPackageMultipartBody
+
+// UploadSwiftPackageMultipartRequestBody defines body for UploadSwiftPackage for multipart/form-data ContentType.
+type UploadSwiftPackageMultipartRequestBody UploadSwiftPackageMultipartBody
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -182,16 +191,16 @@ type ClientInterface interface {
 	UploadCondaPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteGenericFileFromPath request
-	DeleteGenericFileFromPath(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DeleteGenericFileFromPath(ctx context.Context, accountId string, registry string, filepath string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadGenericFileFromPath request
-	DownloadGenericFileFromPath(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DownloadGenericFileFromPath(ctx context.Context, accountId string, registry string, filepath string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// HeadGenericFileAtPath request
-	HeadGenericFileAtPath(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	HeadGenericFileAtPath(ctx context.Context, accountId string, registry string, filepath string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UploadGenericFileToPathWithBody request with any body
-	UploadGenericFileToPathWithBody(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UploadGenericFileToPathWithBody(ctx context.Context, accountId string, registry string, filepath string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadGenericPackage request
 	DownloadGenericPackage(ctx context.Context, accountId string, registry string, pPackage string, version string, params *DownloadGenericPackageParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -228,6 +237,9 @@ type ClientInterface interface {
 
 	// UploadRpmPackageWithBody request with any body
 	UploadRpmPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadSwiftPackageWithBody request with any body
+	UploadSwiftPackageWithBody(ctx context.Context, accountId string, registry string, scope string, name string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) UploadCargoPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -266,8 +278,8 @@ func (c *Client) UploadCondaPackageWithBody(ctx context.Context, accountId strin
 	return c.Client.Do(req)
 }
 
-func (c *Client) DeleteGenericFileFromPath(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteGenericFileFromPathRequest(c.Server, accountId, registry, pPackage, version, filepath)
+func (c *Client) DeleteGenericFileFromPath(ctx context.Context, accountId string, registry string, filepath string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteGenericFileFromPathRequest(c.Server, accountId, registry, filepath)
 	if err != nil {
 		return nil, err
 	}
@@ -278,8 +290,8 @@ func (c *Client) DeleteGenericFileFromPath(ctx context.Context, accountId string
 	return c.Client.Do(req)
 }
 
-func (c *Client) DownloadGenericFileFromPath(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDownloadGenericFileFromPathRequest(c.Server, accountId, registry, pPackage, version, filepath)
+func (c *Client) DownloadGenericFileFromPath(ctx context.Context, accountId string, registry string, filepath string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDownloadGenericFileFromPathRequest(c.Server, accountId, registry, filepath)
 	if err != nil {
 		return nil, err
 	}
@@ -290,8 +302,8 @@ func (c *Client) DownloadGenericFileFromPath(ctx context.Context, accountId stri
 	return c.Client.Do(req)
 }
 
-func (c *Client) HeadGenericFileAtPath(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewHeadGenericFileAtPathRequest(c.Server, accountId, registry, pPackage, version, filepath)
+func (c *Client) HeadGenericFileAtPath(ctx context.Context, accountId string, registry string, filepath string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewHeadGenericFileAtPathRequest(c.Server, accountId, registry, filepath)
 	if err != nil {
 		return nil, err
 	}
@@ -302,8 +314,8 @@ func (c *Client) HeadGenericFileAtPath(ctx context.Context, accountId string, re
 	return c.Client.Do(req)
 }
 
-func (c *Client) UploadGenericFileToPathWithBody(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUploadGenericFileToPathRequestWithBody(c.Server, accountId, registry, pPackage, version, filepath, contentType, body)
+func (c *Client) UploadGenericFileToPathWithBody(ctx context.Context, accountId string, registry string, filepath string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadGenericFileToPathRequestWithBody(c.Server, accountId, registry, filepath, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -458,6 +470,18 @@ func (c *Client) UploadRpmPackageWithBody(ctx context.Context, accountId string,
 	return c.Client.Do(req)
 }
 
+func (c *Client) UploadSwiftPackageWithBody(ctx context.Context, accountId string, registry string, scope string, name string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadSwiftPackageRequestWithBody(c.Server, accountId, registry, scope, name, version, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // NewUploadCargoPackageRequestWithBody generates requests for UploadCargoPackage with any type of body
 func NewUploadCargoPackageRequestWithBody(server string, accountId string, registry string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -588,7 +612,7 @@ func NewUploadCondaPackageRequestWithBody(server string, accountId string, regis
 }
 
 // NewDeleteGenericFileFromPathRequest generates requests for DeleteGenericFileFromPath
-func NewDeleteGenericFileFromPathRequest(server string, accountId string, registry string, pPackage string, version string, filepath string) (*http.Request, error) {
+func NewDeleteGenericFileFromPathRequest(server string, accountId string, registry string, filepath string) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -607,21 +631,7 @@ func NewDeleteGenericFileFromPathRequest(server string, accountId string, regist
 
 	var pathParam2 string
 
-	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "package", runtime.ParamLocationPath, pPackage)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam3 string
-
-	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "version", runtime.ParamLocationPath, version)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam4 string
-
-	pathParam4, err = runtime.StyleParamWithLocation("simple", false, "filepath", runtime.ParamLocationPath, filepath)
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "filepath", runtime.ParamLocationPath, filepath)
 	if err != nil {
 		return nil, err
 	}
@@ -631,7 +641,7 @@ func NewDeleteGenericFileFromPathRequest(server string, accountId string, regist
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/pkg/%s/%s/files/%s/%s/%s", pathParam0, pathParam1, pathParam2, pathParam3, pathParam4)
+	operationPath := fmt.Sprintf("/pkg/%s/%s/files/%s", pathParam0, pathParam1, pathParam2)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -650,7 +660,7 @@ func NewDeleteGenericFileFromPathRequest(server string, accountId string, regist
 }
 
 // NewDownloadGenericFileFromPathRequest generates requests for DownloadGenericFileFromPath
-func NewDownloadGenericFileFromPathRequest(server string, accountId string, registry string, pPackage string, version string, filepath string) (*http.Request, error) {
+func NewDownloadGenericFileFromPathRequest(server string, accountId string, registry string, filepath string) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -669,21 +679,7 @@ func NewDownloadGenericFileFromPathRequest(server string, accountId string, regi
 
 	var pathParam2 string
 
-	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "package", runtime.ParamLocationPath, pPackage)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam3 string
-
-	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "version", runtime.ParamLocationPath, version)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam4 string
-
-	pathParam4, err = runtime.StyleParamWithLocation("simple", false, "filepath", runtime.ParamLocationPath, filepath)
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "filepath", runtime.ParamLocationPath, filepath)
 	if err != nil {
 		return nil, err
 	}
@@ -693,7 +689,7 @@ func NewDownloadGenericFileFromPathRequest(server string, accountId string, regi
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/pkg/%s/%s/files/%s/%s/%s", pathParam0, pathParam1, pathParam2, pathParam3, pathParam4)
+	operationPath := fmt.Sprintf("/pkg/%s/%s/files/%s", pathParam0, pathParam1, pathParam2)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -712,7 +708,7 @@ func NewDownloadGenericFileFromPathRequest(server string, accountId string, regi
 }
 
 // NewHeadGenericFileAtPathRequest generates requests for HeadGenericFileAtPath
-func NewHeadGenericFileAtPathRequest(server string, accountId string, registry string, pPackage string, version string, filepath string) (*http.Request, error) {
+func NewHeadGenericFileAtPathRequest(server string, accountId string, registry string, filepath string) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -731,21 +727,7 @@ func NewHeadGenericFileAtPathRequest(server string, accountId string, registry s
 
 	var pathParam2 string
 
-	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "package", runtime.ParamLocationPath, pPackage)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam3 string
-
-	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "version", runtime.ParamLocationPath, version)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam4 string
-
-	pathParam4, err = runtime.StyleParamWithLocation("simple", false, "filepath", runtime.ParamLocationPath, filepath)
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "filepath", runtime.ParamLocationPath, filepath)
 	if err != nil {
 		return nil, err
 	}
@@ -755,7 +737,7 @@ func NewHeadGenericFileAtPathRequest(server string, accountId string, registry s
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/pkg/%s/%s/files/%s/%s/%s", pathParam0, pathParam1, pathParam2, pathParam3, pathParam4)
+	operationPath := fmt.Sprintf("/pkg/%s/%s/files/%s", pathParam0, pathParam1, pathParam2)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -774,7 +756,7 @@ func NewHeadGenericFileAtPathRequest(server string, accountId string, registry s
 }
 
 // NewUploadGenericFileToPathRequestWithBody generates requests for UploadGenericFileToPath with any type of body
-func NewUploadGenericFileToPathRequestWithBody(server string, accountId string, registry string, pPackage string, version string, filepath string, contentType string, body io.Reader) (*http.Request, error) {
+func NewUploadGenericFileToPathRequestWithBody(server string, accountId string, registry string, filepath string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -793,21 +775,7 @@ func NewUploadGenericFileToPathRequestWithBody(server string, accountId string, 
 
 	var pathParam2 string
 
-	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "package", runtime.ParamLocationPath, pPackage)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam3 string
-
-	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "version", runtime.ParamLocationPath, version)
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam4 string
-
-	pathParam4, err = runtime.StyleParamWithLocation("simple", false, "filepath", runtime.ParamLocationPath, filepath)
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "filepath", runtime.ParamLocationPath, filepath)
 	if err != nil {
 		return nil, err
 	}
@@ -817,7 +785,7 @@ func NewUploadGenericFileToPathRequestWithBody(server string, accountId string, 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/pkg/%s/%s/files/%s/%s/%s", pathParam0, pathParam1, pathParam2, pathParam3, pathParam4)
+	operationPath := fmt.Sprintf("/pkg/%s/%s/files/%s", pathParam0, pathParam1, pathParam2)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1484,6 +1452,70 @@ func NewUploadRpmPackageRequestWithBody(server string, accountId string, registr
 	return req, nil
 }
 
+// NewUploadSwiftPackageRequestWithBody generates requests for UploadSwiftPackage with any type of body
+func NewUploadSwiftPackageRequestWithBody(server string, accountId string, registry string, scope string, name string, version string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "registry", runtime.ParamLocationPath, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "scope", runtime.ParamLocationPath, scope)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "name", runtime.ParamLocationPath, name)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam4 string
+
+	pathParam4, err = runtime.StyleParamWithLocation("simple", false, "version", runtime.ParamLocationPath, version)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pkg/%s/%s/swift/%s/%s/%s", pathParam0, pathParam1, pathParam2, pathParam3, pathParam4)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -1537,16 +1569,16 @@ type ClientWithResponsesInterface interface {
 	UploadCondaPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadCondaPackageResp, error)
 
 	// DeleteGenericFileFromPathWithResponse request
-	DeleteGenericFileFromPathWithResponse(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, reqEditors ...RequestEditorFn) (*DeleteGenericFileFromPathResp, error)
+	DeleteGenericFileFromPathWithResponse(ctx context.Context, accountId string, registry string, filepath string, reqEditors ...RequestEditorFn) (*DeleteGenericFileFromPathResp, error)
 
 	// DownloadGenericFileFromPathWithResponse request
-	DownloadGenericFileFromPathWithResponse(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, reqEditors ...RequestEditorFn) (*DownloadGenericFileFromPathResp, error)
+	DownloadGenericFileFromPathWithResponse(ctx context.Context, accountId string, registry string, filepath string, reqEditors ...RequestEditorFn) (*DownloadGenericFileFromPathResp, error)
 
 	// HeadGenericFileAtPathWithResponse request
-	HeadGenericFileAtPathWithResponse(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, reqEditors ...RequestEditorFn) (*HeadGenericFileAtPathResp, error)
+	HeadGenericFileAtPathWithResponse(ctx context.Context, accountId string, registry string, filepath string, reqEditors ...RequestEditorFn) (*HeadGenericFileAtPathResp, error)
 
 	// UploadGenericFileToPathWithBodyWithResponse request with any body
-	UploadGenericFileToPathWithBodyWithResponse(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadGenericFileToPathResp, error)
+	UploadGenericFileToPathWithBodyWithResponse(ctx context.Context, accountId string, registry string, filepath string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadGenericFileToPathResp, error)
 
 	// DownloadGenericPackageWithResponse request
 	DownloadGenericPackageWithResponse(ctx context.Context, accountId string, registry string, pPackage string, version string, params *DownloadGenericPackageParams, reqEditors ...RequestEditorFn) (*DownloadGenericPackageResp, error)
@@ -1583,6 +1615,9 @@ type ClientWithResponsesInterface interface {
 
 	// UploadRpmPackageWithBodyWithResponse request with any body
 	UploadRpmPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadRpmPackageResp, error)
+
+	// UploadSwiftPackageWithBodyWithResponse request with any body
+	UploadSwiftPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, scope string, name string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSwiftPackageResp, error)
 }
 
 type UploadCargoPackageResp struct {
@@ -1984,6 +2019,27 @@ func (r UploadRpmPackageResp) StatusCode() int {
 	return 0
 }
 
+type UploadSwiftPackageResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadSwiftPackageResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadSwiftPackageResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // UploadCargoPackageWithBodyWithResponse request with arbitrary body returning *UploadCargoPackageResp
 func (c *ClientWithResponses) UploadCargoPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadCargoPackageResp, error) {
 	rsp, err := c.UploadCargoPackageWithBody(ctx, accountId, registry, contentType, body, reqEditors...)
@@ -2012,8 +2068,8 @@ func (c *ClientWithResponses) UploadCondaPackageWithBodyWithResponse(ctx context
 }
 
 // DeleteGenericFileFromPathWithResponse request returning *DeleteGenericFileFromPathResp
-func (c *ClientWithResponses) DeleteGenericFileFromPathWithResponse(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, reqEditors ...RequestEditorFn) (*DeleteGenericFileFromPathResp, error) {
-	rsp, err := c.DeleteGenericFileFromPath(ctx, accountId, registry, pPackage, version, filepath, reqEditors...)
+func (c *ClientWithResponses) DeleteGenericFileFromPathWithResponse(ctx context.Context, accountId string, registry string, filepath string, reqEditors ...RequestEditorFn) (*DeleteGenericFileFromPathResp, error) {
+	rsp, err := c.DeleteGenericFileFromPath(ctx, accountId, registry, filepath, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2021,8 +2077,8 @@ func (c *ClientWithResponses) DeleteGenericFileFromPathWithResponse(ctx context.
 }
 
 // DownloadGenericFileFromPathWithResponse request returning *DownloadGenericFileFromPathResp
-func (c *ClientWithResponses) DownloadGenericFileFromPathWithResponse(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, reqEditors ...RequestEditorFn) (*DownloadGenericFileFromPathResp, error) {
-	rsp, err := c.DownloadGenericFileFromPath(ctx, accountId, registry, pPackage, version, filepath, reqEditors...)
+func (c *ClientWithResponses) DownloadGenericFileFromPathWithResponse(ctx context.Context, accountId string, registry string, filepath string, reqEditors ...RequestEditorFn) (*DownloadGenericFileFromPathResp, error) {
+	rsp, err := c.DownloadGenericFileFromPath(ctx, accountId, registry, filepath, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2030,8 +2086,8 @@ func (c *ClientWithResponses) DownloadGenericFileFromPathWithResponse(ctx contex
 }
 
 // HeadGenericFileAtPathWithResponse request returning *HeadGenericFileAtPathResp
-func (c *ClientWithResponses) HeadGenericFileAtPathWithResponse(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, reqEditors ...RequestEditorFn) (*HeadGenericFileAtPathResp, error) {
-	rsp, err := c.HeadGenericFileAtPath(ctx, accountId, registry, pPackage, version, filepath, reqEditors...)
+func (c *ClientWithResponses) HeadGenericFileAtPathWithResponse(ctx context.Context, accountId string, registry string, filepath string, reqEditors ...RequestEditorFn) (*HeadGenericFileAtPathResp, error) {
+	rsp, err := c.HeadGenericFileAtPath(ctx, accountId, registry, filepath, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2039,8 +2095,8 @@ func (c *ClientWithResponses) HeadGenericFileAtPathWithResponse(ctx context.Cont
 }
 
 // UploadGenericFileToPathWithBodyWithResponse request with arbitrary body returning *UploadGenericFileToPathResp
-func (c *ClientWithResponses) UploadGenericFileToPathWithBodyWithResponse(ctx context.Context, accountId string, registry string, pPackage string, version string, filepath string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadGenericFileToPathResp, error) {
-	rsp, err := c.UploadGenericFileToPathWithBody(ctx, accountId, registry, pPackage, version, filepath, contentType, body, reqEditors...)
+func (c *ClientWithResponses) UploadGenericFileToPathWithBodyWithResponse(ctx context.Context, accountId string, registry string, filepath string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadGenericFileToPathResp, error) {
+	rsp, err := c.UploadGenericFileToPathWithBody(ctx, accountId, registry, filepath, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2153,6 +2209,15 @@ func (c *ClientWithResponses) UploadRpmPackageWithBodyWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseUploadRpmPackageResp(rsp)
+}
+
+// UploadSwiftPackageWithBodyWithResponse request with arbitrary body returning *UploadSwiftPackageResp
+func (c *ClientWithResponses) UploadSwiftPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, scope string, name string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSwiftPackageResp, error) {
+	rsp, err := c.UploadSwiftPackageWithBody(ctx, accountId, registry, scope, name, version, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadSwiftPackageResp(rsp)
 }
 
 // ParseUploadCargoPackageResp parses an HTTP response from a UploadCargoPackageWithResponse call
@@ -2452,6 +2517,22 @@ func ParseUploadRpmPackageResp(rsp *http.Response) (*UploadRpmPackageResp, error
 	}
 
 	response := &UploadRpmPackageResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseUploadSwiftPackageResp parses an HTTP response from a UploadSwiftPackageWithResponse call
+func ParseUploadSwiftPackageResp(rsp *http.Response) (*UploadSwiftPackageResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadSwiftPackageResp{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

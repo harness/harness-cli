@@ -17,6 +17,7 @@ import (
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/module/ar/migrate/types/dart"
+	"github.com/harness/harness-cli/util"
 	"github.com/harness/harness-cli/util/common/auth"
 	p "github.com/harness/harness-cli/util/common/progress"
 
@@ -36,7 +37,9 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 		Long:  "Push a Dart .tar.gz package to Harness Artifact Registry (HAR)",
 		Args:  cobra.ExactArgs(2),
 		PreRun: func(cmd *cobra.Command, args []string) {
-			config.Global.Registry.PkgURL = pkgURL
+			if pkgURL != "" {
+				config.Global.Registry.PkgURL = util.GetPkgUrl(pkgURL)
+			}
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]
@@ -186,7 +189,6 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages service")
-	cmd.MarkFlagRequired("pkg-url")
 
 	return cmd
 }

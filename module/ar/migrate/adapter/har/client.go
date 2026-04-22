@@ -78,18 +78,63 @@ type client struct {
 }
 
 func (c *client) uploadGenericFile(registry, artifactName, version string, f *types.File, file io.ReadCloser) error {
+	// For generic, include package/version as path segments: {package}/{version}/{filepath}
 	fileUri := strings.TrimPrefix(f.Uri, "/")
+	fullPath := fmt.Sprintf("%s/%s/%s", artifactName, version, fileUri)
 	defer file.Close()
 
 	_, err2 := c.pkgClient.UploadGenericFileToPathWithBodyWithResponse(
 		context.Background(),
 		config.Global.AccountID,
 		registry,
-		artifactName,
-		version, fileUri, "application/octet-stream", file)
+		fullPath,
+		"application/octet-stream",
+		file)
 
 	if err2 != nil {
 		return fmt.Errorf("failed to upload file '%s/%s': %w", artifactName, version, err2)
+	}
+
+	return nil
+}
+
+func (c *client) headRawFile(registryRef string, fileUri string) (bool, error) {
+	fileUri = strings.TrimPrefix(fileUri, "/")
+	parts := strings.Split(registryRef, "/")
+	registry := parts[len(parts)-1]
+	resp, err := c.pkgClient.HeadGenericFileAtPathWithResponse(
+		context.Background(),
+		config.Global.AccountID,
+		registry,
+		fileUri,
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to HEAD raw file '%s': %w", fileUri, err)
+	}
+
+	if resp.StatusCode() == http2.StatusOK {
+		return true, nil
+	}
+	if resp.StatusCode() == http2.StatusNotFound {
+		return false, nil
+	}
+	return false, fmt.Errorf("unexpected status code %d for HEAD on raw file '%s'", resp.StatusCode(), fileUri)
+}
+
+func (c *client) uploadRawFile(registry string, f *types.File, file io.ReadCloser) error {
+	fileUri := strings.TrimPrefix(f.Uri, "/")
+	defer file.Close()
+
+	_, err := c.pkgClient.UploadGenericFileToPathWithBodyWithResponse(
+		context.Background(),
+		config.Global.AccountID,
+		registry,
+		fileUri,
+		"application/octet-stream",
+		file,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to upload raw file '%s': %w", fileUri, err)
 	}
 
 	return nil
@@ -366,6 +411,71 @@ func (c *client) uploadComposerFile(
 	return nil
 }
 
+func (c *client) uploadSwiftFile(
+	registry string,
+	filename string,
+	file io.ReadCloser,
+	packageName string,
+	version string,
+) error {
+
+	// Parse package name to extract scope, name
+	// packageName is in scope.name format (e.g., "myscope.harness")
+	parts := strings.SplitN(packageName, ".", 2)
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid Swift package name format: %s, expected format: scope.name", packageName)
+	}
+
+	scope := parts[0]
+	name := parts[1]
+
+	url := fmt.Sprintf("%s/pkg/%s/%s/swift/%s/%s/%s",
+		c.url, config.Global.AccountID, registry, scope, name, version)
+
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+
+	go func() {
+		defer pw.Close()
+		defer writer.Close()
+
+		// Create the form field "source-archive" to match Swift upload API
+		part, err := writer.CreateFormFile("source-archive", filename)
+		if err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+
+		// Copy the file into the multipart field
+		if _, err := io.Copy(part, file); err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+	}()
+
+	req, err := http2.NewRequest(http2.MethodPut, url, pr)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Accept", "application/vnd.swift.registry.v1+json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to upload Swift file '%s': %w", filename, err)
+	}
+	defer resp.Body.Close()
+
+	// Check for successful response
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to upload Swift file '%s', status code: %d, response: %s",
+			filename, resp.StatusCode, string(body))
+	}
+	return nil
+}
+
 func (c *client) AddNPMTag(registry string, name string, version string, tagUri string) error {
 	url := fmt.Sprintf("%s/pkg/%s/%s/npm", c.url, config.Global.AccountID, registry)
 	url = url + tagUri
@@ -551,7 +661,7 @@ func (c *client) artifactFileExists(
 	page := int64(0)
 	size := int64(100)
 	fileURI := file.Name
-	if artifactType == types.GENERIC {
+	if artifactType == types.GENERIC || artifactType == types.RAW {
 		fileURI = strings.TrimPrefix(file.Uri, "/")
 	} else {
 		fileURI = strings.TrimPrefix(fileURI, "/")

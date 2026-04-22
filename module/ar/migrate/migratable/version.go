@@ -107,7 +107,9 @@ func (r *Version) Pre(ctx context.Context) error {
 	// reading all existing files for this version from destination
 
 	if !r.config.Overwrite && (r.artifactType != types.MAVEN && r.artifactType != types.NPM && r.pkg.Name != "" && r.version.Name != "") {
+
 		existingFiles, err := r.getAllExistingFilesForThisVersion(ctx)
+
 		if err != nil {
 			logger.Warn().Err(err).Msg("Failed to get existing files, will proceed with migration")
 		} else {
@@ -141,7 +143,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 
 	var jobs []engine.Job
 
-	if r.artifactType == types.GENERIC || r.artifactType == types.MAVEN || r.artifactType == types.PYTHON ||
+	if r.artifactType == types.GENERIC || r.artifactType == types.RAW || r.artifactType == types.MAVEN || r.artifactType == types.PYTHON ||
 		r.artifactType == types.NUGET || r.artifactType == types.NPM || r.artifactType == types.DART {
 		files, err := tree.GetAllFiles(r.node)
 		if err != nil {
@@ -154,8 +156,20 @@ func (r *Version) Migrate(ctx context.Context) error {
 				logger.Debug().Msgf("Skipping non-tgz file %s for NPM migration", file.Name)
 				continue
 			}
+			// For NUGET, skip files that don't match current package and version
+			if r.artifactType == types.NUGET {
+				//pkgName, version, ok := parseNugetFilePathFromName(file.Name)
+				pkgName, version, ok := util.ParseNugetFileNameWithPath(file.Name)
+				if !ok || pkgName != r.pkg.Name || version != r.version.Name {
+					logger.Debug().Msgf("Skipping file %s (pkg=%s, ver=%s) - doesn't match current package %s version %s",
+						file.Name, pkgName, version, r.pkg.Name, r.version.Name)
+					continue
+				}
+			}
 			// Check if file already exists in destination
-			if r.existingFileMap[file.Name] {
+
+			lowerCaseNormalizeFileName := strings.ToLower(file.Name)
+			if r.existingFileMap[lowerCaseNormalizeFileName] {
 				util.GetSkipPrinter().Println(fmt.Sprintf("Registry [%s], Package [%s/%s], File [%s] already exists",
 					r.destRegistry,
 					r.pkg.Name, r.version.Name, file.Name))

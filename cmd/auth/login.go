@@ -2,6 +2,7 @@ package auth
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,7 +13,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
+	"github.com/harness/harness-cli/internal/api/ar_v3"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -20,11 +23,12 @@ import (
 
 // AuthConfig represents authentication configuration for saving to disk
 type AuthConfig struct {
-	BaseURL   string `json:"base_url"`
-	Token     string `json:"token"`
-	AccountID string `json:"account_id"`
-	OrgID     string `json:"org_id,omitempty"`
-	ProjectID string `json:"project_id,omitempty"`
+	BaseURL     string `json:"base_url"`
+	Token       string `json:"token"`
+	AccountID   string `json:"account_id"`
+	OrgID       string `json:"org_id,omitempty"`
+	ProjectID   string `json:"project_id,omitempty"`
+	RegistryURL string `json:"registry_url,omitempty"`
 }
 
 // getAuthConfigPath returns the path to the auth config file
@@ -247,13 +251,24 @@ func getLoginCmd() *cobra.Command {
 			}
 			fmt.Println("✓ Credentials validated successfully")
 
+			// Fetch registry URL from system/info API
+			fmt.Println("Fetching registry configuration...")
+			registryURL, err := fetchRegistryURL(apiURL, token, accountID)
+
+			if err != nil {
+				fmt.Printf("Warning: Failed to fetch registry URL: %v\n", err)
+			} else {
+				fmt.Println("✓ Registry configuration fetched successfully")
+			}
+
 			// Create auth config struct for saving to file
 			authConfig := AuthConfig{
-				BaseURL:   apiURL,
-				Token:     token,
-				AccountID: accountID,
-				OrgID:     orgID,
-				ProjectID: projectID,
+				BaseURL:     apiURL,
+				Token:       token,
+				AccountID:   accountID,
+				OrgID:       orgID,
+				ProjectID:   projectID,
+				RegistryURL: registryURL,
 			}
 
 			// Save config to disk
@@ -267,6 +282,7 @@ func getLoginCmd() *cobra.Command {
 			config.Global.AccountID = accountID
 			config.Global.OrgID = orgID
 			config.Global.ProjectID = projectID
+			config.Global.Registry.PkgURL = registryURL
 
 			// Print confirmation message
 			fmt.Println("Successfully logged into Harness")
@@ -296,4 +312,36 @@ func getLoginCmd() *cobra.Command {
 	// We'll validate the values in the RunE function instead
 
 	return cmd
+}
+
+// FetchRegistryURL fetches the registry URL from the system/info API
+func fetchRegistryURL(apiURL, token, accountID string) (string, error) {
+	// Set up temporary config for the API call
+	config.Global.APIBaseURL = apiURL
+	config.Global.AuthToken = token
+	config.Global.AccountID = accountID
+
+	factory := cmdutils.NewFactory()
+
+	params := &ar_v3.GetSystemInfoParams{
+		AccountIdentifier: accountID,
+	}
+
+	resp, err := factory.RegistryV3HttpClient().GetSystemInfoWithResponse(context.Background(), params)
+	if err != nil {
+		return "", fmt.Errorf("failed to call /system/info: %w", err)
+	}
+
+	// Extract registryUrl from response
+	if resp.JSON200 != nil {
+		if data, ok := (*resp.JSON200)["data"].(map[string]interface{}); ok {
+			if registryURL, ok := data["registryUrl"].(string); ok {
+				if registryURL != "" {
+					return registryURL, nil
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("failed to extract registryUrl from /system/info response")
 }

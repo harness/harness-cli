@@ -22,6 +22,7 @@ import (
 	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	p "github.com/harness/harness-cli/util/common/progress"
+	"github.com/harness/harness-cli/util/common/upload"
 
 	"github.com/spf13/cobra"
 )
@@ -34,6 +35,7 @@ const (
 
 func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 	var pkgURL string
+	var maxConcurrentUploads int = upload.DefaultUploadWorker
 	cmd := &cobra.Command{
 		Use:   "python <registry_name> <file/folder_path>",
 		Short: "Push Python Artifacts",
@@ -50,10 +52,7 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 		PreRun: func(cmd *cobra.Command, args []string) {
 			if pkgURL != "" {
 				config.Global.Registry.PkgURL = util.GetPkgUrl(pkgURL)
-			} else {
-				config.Global.Registry.PkgURL = util.GetPkgUrl(config.Global.APIBaseURL)
 			}
-
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]
@@ -88,13 +87,45 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Success("Input parameters validated")
 
+			progress.Step("Preparing python upload jobs")
+			jobs := make([]upload.FileUploadJob, 0, len(pythonPkgFiles))
 			for _, fileNameWithPath := range pythonPkgFiles {
-				progress.Step(fmt.Sprintf("Processing %s ", filepath.Base(fileNameWithPath)))
-				err := uploadSinglePythonPackageFile(fileNameWithPath, registryName, progress)
+				progress.Step(fmt.Sprintf("Processing job for %s ", filepath.Base(fileNameWithPath)))
+				metadata, err := extractPythonPackageMetadata(fileNameWithPath)
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to extract metadata from %s: %w", filepath.Base(fileNameWithPath), err)
 				}
+
+				fileInfo, err := os.Stat(fileNameWithPath)
+				if err != nil {
+					return fmt.Errorf("failed to stat file %s: %w", fileNameWithPath, err)
+				}
+
+				job := upload.NewPythonUploadJob(
+					fileNameWithPath,
+					registryName,
+					metadata.Name,
+					metadata.Version,
+					fileInfo.Size(),
+				)
+				jobs = append(jobs, job)
 			}
+
+			progress.Success(fmt.Sprintf("Prepared %d upload jobs", len(jobs)))
+
+			// uploading concurrently
+			engine := upload.NewFileUploadEngine(maxConcurrentUploads, progress)
+			results := engine.Execute(context.Background(), jobs)
+
+			//error fail check
+			if upload.HasUploadErrors(results) {
+				uploadErrors := upload.GetUploadErrors(results)
+				for jobID, err := range uploadErrors {
+					progress.Error(fmt.Sprintf("Failed to upload %s: %v", jobID, err))
+				}
+				return fmt.Errorf("failed to upload %d files", len(uploadErrors))
+			}
+
 			progress.Success(fmt.Sprintf("Successfully uploaded package %s", filePath))
 			return nil
 
@@ -102,7 +133,8 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
-	cmd.MarkFlagRequired("pkg-url")
+	cmd.Flags().IntVar(&maxConcurrentUploads, "max-concurrent-uploads", upload.DefaultUploadWorker, "Maximum number of concurrent file uploads, 1 for sequential")
+
 	return cmd
 }
 

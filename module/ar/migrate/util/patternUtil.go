@@ -122,7 +122,7 @@ func FilterFilesByPatternsPackageName(packages []types.Package, includePatterns,
 
 func IsFileLevelFilterableArtifact(artifactType types.ArtifactType) bool {
 	switch artifactType {
-	case types.GENERIC, types.PYTHON, types.MAVEN, types.NUGET, types.NPM, types.DART, types.GO:
+	case types.GENERIC, types.RAW, types.PYTHON, types.MAVEN, types.NUGET, types.NPM, types.DART, types.GO:
 		return true
 	default:
 		return false
@@ -132,7 +132,7 @@ func IsFileLevelFilterableArtifact(artifactType types.ArtifactType) bool {
 func IsPackageLevelFilterableArtifact(artifactType types.ArtifactType) bool {
 
 	switch artifactType {
-	case types.DOCKER, types.HELM, types.HELM_LEGACY, types.RPM, types.CONDA, types.COMPOSER:
+	case types.DOCKER, types.HELM, types.HELM_LEGACY, types.RPM, types.CONDA, types.COMPOSER, types.SWIFT:
 		return true
 	default:
 		return false
