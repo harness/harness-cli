@@ -83,7 +83,7 @@ func ExecuteWithFirewall(
 	depResult, err := client.ResolveDependencies(progress)
 	if err != nil {
 		progress.Error(fmt.Sprintf("Failed to resolve dependencies: %s", err))
-		return fmt.Errorf("%s %s failed", clientName, command)
+		return fmt.Errorf("%s %s failed: dependency resolution error: %w", clientName, command, err)
 	}
 	if depResult.Cleanup != nil {
 		defer depResult.Cleanup()

@@ -229,13 +229,7 @@ func backupNpmrc(npmrcPath string) (string, error) {
 		return "", fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
-	backupPath := filepath.Join(backupDir, "npmrc-backup")
-
-	// Don't overwrite an existing backup — the first backup is the user's original
-	if _, err := os.Stat(backupPath); err == nil {
-		log.Info().Str("backupPath", backupPath).Msg("Backup already exists, skipping to preserve original .npmrc")
-		return backupPath, nil
-	}
+	backupPath := filepath.Join(backupDir, fmt.Sprintf("npmrc-backup-%s", time.Now().Format("20060102-150405")))
 
 	if err := os.WriteFile(backupPath, data, 0600); err != nil {
 		return "", fmt.Errorf("failed to write backup: %w", err)
@@ -399,15 +393,70 @@ func configureNpmProject(registryURL, scope, authToken, registryHost string) err
 }
 
 func writeNpmrcConfig(npmrcPath, registryURL, scope, authToken, registryHost string) error {
-	var registryLine string
-	if scope != "" {
-		registryLine = fmt.Sprintf("%s:registry=%s/", scope, registryURL)
-	} else {
-		registryLine = fmt.Sprintf("registry=%s/", registryURL)
+	var existingContent []byte
+	hasExistingContent := false
+
+	if _, err := os.Stat(npmrcPath); err == nil {
+		var readErr error
+		existingContent, readErr = os.ReadFile(npmrcPath)
+		if readErr != nil {
+			return fmt.Errorf("failed to read existing .npmrc: %w", readErr)
+		}
+		if len(strings.TrimSpace(string(existingContent))) > 0 {
+			hasExistingContent = true
+		}
 	}
 
-	content := fmt.Sprintf("%s\n//%s/:_authToken=%s\nalways-auth=true\n",
-		registryLine, registryHost, authToken)
+	var scopeRegistryLine string
+	if scope != "" {
+		scopeRegistryLine = fmt.Sprintf("%s:registry=%s/", scope, registryURL)
+	} else {
+		scopeRegistryLine = fmt.Sprintf("registry=%s/", registryURL)
+	}
+	authTokenLine := fmt.Sprintf("//%s/:_authToken=%s", registryHost, authToken)
+	alwaysAuthLine := "always-auth=true"
+
+	scopeFound := false
+	authFound := false
+	var newLines []string
+
+	if hasExistingContent {
+		existingLines := strings.Split(string(existingContent), "\n")
+
+		for _, line := range existingLines {
+			trimmedLine := strings.TrimSpace(line)
+			if scope != "" && strings.HasPrefix(trimmedLine, scope+":registry=") {
+				newLines = append(newLines, scopeRegistryLine)
+				scopeFound = true
+			} else if scope == "" && strings.HasPrefix(trimmedLine, "registry=") && !strings.Contains(trimmedLine, ":") {
+				newLines = append(newLines, scopeRegistryLine)
+				scopeFound = true
+			} else if strings.HasPrefix(trimmedLine, "//"+registryHost+"/:_authToken=") {
+				newLines = append(newLines, authTokenLine)
+				authFound = true
+			} else if trimmedLine != "" {
+				newLines = append(newLines, line)
+			}
+		}
+	}
+
+	if !scopeFound || !authFound {
+		if hasExistingContent && len(newLines) > 0 {
+			newLines = append(newLines, "")
+		}
+		if !scopeFound {
+			newLines = append(newLines, scopeRegistryLine)
+		}
+		if !authFound {
+			newLines = append(newLines, authTokenLine)
+		}
+		newLines = append(newLines, alwaysAuthLine)
+	}
+
+	content := strings.Join(newLines, "\n")
+	if !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
 
 	if err := os.WriteFile(npmrcPath, []byte(content), 0600); err != nil {
 		return fmt.Errorf("failed to write .npmrc: %w", err)

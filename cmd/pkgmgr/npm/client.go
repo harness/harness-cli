@@ -23,8 +23,8 @@ import (
 // Path:      https://host.io/pkg/{account_id}/{registry_name}/npm
 var harURLPattern = regexp.MustCompile(`(?:https?://[^/]+)/(?:pkg/)?([^/]+)/([^/]+)/npm/?$`)
 
-// has403Pattern detects 403 Forbidden in npm stderr.
-var has403Pattern = regexp.MustCompile(`(?i)403\s*[Ff]orbidden`)
+// has403Pattern detects 403 errors in npm stderr (covers "403 Forbidden", "E403", "status 403").
+var has403Pattern = regexp.MustCompile(`(?i)(403\s*forbidden|E403|\bstatus\s+403\b)`)
 
 // lockFileSearchOrder lists lock files to check for dependency resolution.
 var lockFileSearchOrder = []string{
