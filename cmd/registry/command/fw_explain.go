@@ -197,13 +197,13 @@ func NewFirewallExplainCmd(f *cmdutils.Factory) *cobra.Command {
 				status = *statusResp.JSON200.Data.Status
 				log.Debug().Str("status", string(status)).Int("poll", pollCount).Msg("Evaluation status")
 
-				if status == ar_v3.BulkScanEvaluationStatusDataStatusSUCCESS {
+				if status == ar_v3.SUCCESS {
 					p.Success("Evaluation completed successfully")
 					log.Info().Msg("Evaluation completed successfully")
 					break
 				}
 
-				if status == ar_v3.BulkScanEvaluationStatusDataStatusFAILURE {
+				if status == ar_v3.FAILURE {
 					errMsg := "Evaluation failed"
 					if statusResp.JSON200.Data.Error != nil {
 						errMsg = *statusResp.JSON200.Data.Error

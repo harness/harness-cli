@@ -26,9 +26,10 @@ import (
 )
 
 type Dependency struct {
-	Name    string
-	Version string
-	Source  string
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	Source  string `json:"source"`
+	Parent  string `json:"parent,omitempty"`
 }
 
 type ScanResult struct {
@@ -200,13 +201,13 @@ func pollBatchEvaluation(ctx *auditContext, evaluationID string, info batchInfo)
 		status := *statusResp.JSON200.Data.Status
 		log.Debug().Str("status", string(status)).Int("poll", pollCount).Int("batch", info.batchIdx+1).Msg("Bulk evaluation status")
 
-		if status == ar_v3.BulkScanEvaluationStatusDataStatusSUCCESS {
+		if status == ar_v3.SUCCESS {
 			ctx.p.Success(fmt.Sprintf("Batch %d/%d evaluation completed successfully", info.batchIdx+1, info.totalBatches))
 			log.Info().Int("batch", info.batchIdx+1).Msg("Bulk evaluation completed successfully")
 			return statusResp, nil
 		}
 
-		if status == ar_v3.BulkScanEvaluationStatusDataStatusFAILURE {
+		if status == ar_v3.FAILURE {
 			errMsg := fmt.Sprintf("Batch %d/%d evaluation failed", info.batchIdx+1, info.totalBatches)
 			if statusResp.JSON200.Data.Error != nil {
 				errMsg = *statusResp.JSON200.Data.Error
@@ -386,7 +387,7 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 			p.Start(fmt.Sprintf("Parsing dependency file: %s", fileName))
 			log.Info().Str("file", filePath).Msg("Parsing dependency file")
 
-			dependencies, err := parseLockFile(filePath)
+			dependencies, err := ParseLockFile(filePath)
 			if err != nil {
 				p.Error("Failed to parse dependency file")
 				log.Error().Err(err).Msg("Failed to parse dependency file")
@@ -469,7 +470,7 @@ func validateFileForPackageType(fileName, packageType string) error {
 		fileName, packageType, packageType, strings.Join(validFilesList, ", "))
 }
 
-func parseLockFile(filePath string) ([]Dependency, error) {
+func ParseLockFile(filePath string) ([]Dependency, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
@@ -603,20 +604,38 @@ func parsePackageLock(data []byte) ([]Dependency, error) {
 	seen := make(map[string]bool)
 
 	if lockFile.LockfileVersion >= 2 && len(lockFile.Packages) > 0 {
+		// Build a version map for parent key resolution
+		versionMap := make(map[string]string)
 		for pkgPath, pkg := range lockFile.Packages {
 			if pkgPath == "" {
 				continue
 			}
-			name := strings.TrimPrefix(pkgPath, "node_modules/")
+			name := extractPackageName(pkgPath)
+			if name != "" {
+				versionMap[name] = pkg.Version
+			}
+		}
+
+		for pkgPath, pkg := range lockFile.Packages {
+			if pkgPath == "" {
+				continue
+			}
+			name := extractPackageName(pkgPath)
 			if name == "" || seen[name] {
 				continue
 			}
 			seen[name] = true
-			deps = append(deps, Dependency{
+			dep := Dependency{
 				Name:    name,
 				Version: pkg.Version,
 				Source:  "package-lock.json",
-			})
+			}
+			if parentName := extractParentFromPath(pkgPath); parentName != "" {
+				if parentVer, ok := versionMap[parentName]; ok {
+					dep.Parent = parentName + "@" + parentVer
+				}
+			}
+			deps = append(deps, dep)
 		}
 	} else if len(lockFile.Dependencies) > 0 {
 		for name, dep := range lockFile.Dependencies {
@@ -633,6 +652,43 @@ func parsePackageLock(data []byte) ([]Dependency, error) {
 	}
 
 	return deps, nil
+}
+
+// extractPackageName extracts the package name from a node_modules path.
+// e.g. "node_modules/@scope/pkg" -> "@scope/pkg"
+// e.g. "node_modules/express/node_modules/debug" -> "debug"
+func extractPackageName(pkgPath string) string {
+	const prefix = "node_modules/"
+	// Find the last "node_modules/" segment to get the actual package name
+	idx := strings.LastIndex(pkgPath, prefix)
+	if idx == -1 {
+		return ""
+	}
+	return pkgPath[idx+len(prefix):]
+}
+
+// extractParentFromPath extracts the parent package name from a nested node_modules path.
+// e.g. "node_modules/express/node_modules/debug" -> "express"
+// e.g. "node_modules/debug" -> "" (top-level, no parent)
+func extractParentFromPath(pkgPath string) string {
+	const prefix = "node_modules/"
+	if !strings.HasPrefix(pkgPath, prefix) {
+		return ""
+	}
+	// Remove the leading "node_modules/"
+	rest := pkgPath[len(prefix):]
+	// Find if there's a nested "node_modules/" indicating a parent
+	idx := strings.Index(rest, "/"+prefix)
+	if idx == -1 {
+		return ""
+	}
+	parentName := rest[:idx]
+	// Handle scoped packages like @scope/pkg/node_modules/child
+	if strings.HasPrefix(parentName, "@") && !strings.Contains(parentName, "/node_modules/") {
+		// Already correct for scoped packages
+		return parentName
+	}
+	return parentName
 }
 
 func parsePnpmLock(data []byte) ([]Dependency, error) {
