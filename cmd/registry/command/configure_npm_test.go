@@ -707,7 +707,9 @@ func TestGetRegistryBaseURL(t *testing.T) {
 
 	t.Run("non-200 response returns error", func(t *testing.T) {
 		f := &cmdutils.Factory{
-			RegistryV3HttpClient: func() *ar_v3.ClientWithResponses { return newMockV3Client(500, `{"error":{"errors":[{"message":"internal"}]}}`) },
+			RegistryV3HttpClient: func() *ar_v3.ClientWithResponses {
+				return newMockV3Client(500, `{"error":{"errors":[{"message":"internal"}]}}`)
+			},
 		}
 
 		_, err := getRegistryBaseURL(f, "test-account")
