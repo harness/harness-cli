@@ -99,7 +99,7 @@ func TestDetectRootPackage(t *testing.T) {
 func TestBuildPipelineContext(t *testing.T) {
 	t.Run("returns nil when pipeline env vars missing", func(t *testing.T) {
 		t.Setenv("HARNESS_PIPELINE_ID", "")
-		t.Setenv("HARNESS_BUILD_ID", "")
+		t.Setenv("HARNESS_EXECUTION_ID", "")
 
 		ctx := buildPipelineContext("org", "project")
 		assert.Nil(t, ctx)
@@ -107,7 +107,7 @@ func TestBuildPipelineContext(t *testing.T) {
 
 	t.Run("returns nil when only pipeline ID set", func(t *testing.T) {
 		t.Setenv("HARNESS_PIPELINE_ID", "pipe-1")
-		t.Setenv("HARNESS_BUILD_ID", "")
+		t.Setenv("HARNESS_EXECUTION_ID", "")
 
 		ctx := buildPipelineContext("org", "project")
 		assert.Nil(t, ctx)
@@ -115,7 +115,7 @@ func TestBuildPipelineContext(t *testing.T) {
 
 	t.Run("returns context with defaults", func(t *testing.T) {
 		t.Setenv("HARNESS_PIPELINE_ID", "pipe-1")
-		t.Setenv("HARNESS_BUILD_ID", "build-123")
+		t.Setenv("HARNESS_EXECUTION_ID", "build-123")
 		t.Setenv("HARNESS_STAGE_ID", "")
 		t.Setenv("HARNESS_STEP_ID", "")
 
@@ -131,7 +131,7 @@ func TestBuildPipelineContext(t *testing.T) {
 
 	t.Run("includes stage and step when set", func(t *testing.T) {
 		t.Setenv("HARNESS_PIPELINE_ID", "pipe-1")
-		t.Setenv("HARNESS_BUILD_ID", "build-123")
+		t.Setenv("HARNESS_EXECUTION_ID", "build-123")
 		t.Setenv("HARNESS_STAGE_ID", "stage-1")
 		t.Setenv("HARNESS_STEP_ID", "step-1")
 

@@ -52,7 +52,6 @@ func TestRunFirewallExplainEmptyArtifacts(t *testing.T) {
 	assert.Equal(t, 0, count)
 }
 
-
 func TestDisplayScanDetails(t *testing.T) {
 	t.Run("nil policy details", func(t *testing.T) {
 		details := &ar_v3.ArtifactScanDetails{
