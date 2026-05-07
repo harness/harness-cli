@@ -248,6 +248,24 @@ type BuildInfoRequestInput struct {
 // BuildInfoRequestInputStatus Status of the install
 type BuildInfoRequestInputStatus string
 
+// BulkDeleteRequest Request to bulk delete artifacts
+type BulkDeleteRequest struct {
+	// DryRun If true, only simulates deletion without actually deleting
+	DryRun *bool `json:"dryRun,omitempty"`
+
+	// Force Force delete even if artifact is in use
+	Force *bool `json:"force,omitempty"`
+
+	// Packages Package name pattern (supports wildcards)
+	Packages string `json:"packages"`
+
+	// Registry Registry name
+	Registry string `json:"registry"`
+
+	// Versions Version pattern (supports wildcards)
+	Versions string `json:"versions"`
+}
+
 // BulkScanEvaluationAcceptedData Response data for bulk evaluation request
 type BulkScanEvaluationAcceptedData struct {
 	// EvaluationId Unique evaluation ID for tracking the bulk evaluation
@@ -535,6 +553,22 @@ type AddBuildInfoParams struct {
 	AccountIdentifier AccountIdentifier `form:"account_identifier" json:"account_identifier"`
 }
 
+// BulkDeleteArtifactsParams defines parameters for BulkDeleteArtifacts.
+type BulkDeleteArtifactsParams struct {
+	// AccountIdentifier Unique identifier for the Harness account.
+	AccountIdentifier AccountIdentifier `form:"account_identifier" json:"account_identifier"`
+
+	// OrgIdentifier Unique identifier for the organization within the account.
+	//
+	// Example: `default` or `engineering_org`
+	OrgIdentifier *OrgIdentifier `form:"org_identifier,omitempty" json:"org_identifier,omitempty"`
+
+	// ProjectIdentifier Unique identifier for the project within the organization.
+	//
+	// Example: `my_project` or `frontend_services`
+	ProjectIdentifier *ProjectIdentifier `form:"project_identifier,omitempty" json:"project_identifier,omitempty"`
+}
+
 // GetArtifactScansParams defines parameters for GetArtifactScans.
 type GetArtifactScansParams struct {
 	// AccountIdentifier Unique identifier for the Harness account.
@@ -669,6 +703,9 @@ type GetSystemInfoParams struct {
 
 // AddBuildInfoJSONRequestBody defines body for AddBuildInfo for application/json ContentType.
 type AddBuildInfoJSONRequestBody = BuildInfoRequestInput
+
+// BulkDeleteArtifactsJSONRequestBody defines body for BulkDeleteArtifacts for application/json ContentType.
+type BulkDeleteArtifactsJSONRequestBody = BulkDeleteRequest
 
 // InitiateBulkScanEvaluationJSONRequestBody defines body for InitiateBulkScanEvaluation for application/json ContentType.
 type InitiateBulkScanEvaluationJSONRequestBody = BulkScanEvaluationRequest
@@ -936,6 +973,11 @@ type ClientInterface interface {
 
 	AddBuildInfo(ctx context.Context, params *AddBuildInfoParams, body AddBuildInfoJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// BulkDeleteArtifactsWithBody request with any body
+	BulkDeleteArtifactsWithBody(ctx context.Context, params *BulkDeleteArtifactsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	BulkDeleteArtifacts(ctx context.Context, params *BulkDeleteArtifactsParams, body BulkDeleteArtifactsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetArtifactScans request
 	GetArtifactScans(ctx context.Context, params *GetArtifactScansParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -973,6 +1015,30 @@ func (c *Client) AddBuildInfoWithBody(ctx context.Context, params *AddBuildInfoP
 
 func (c *Client) AddBuildInfo(ctx context.Context, params *AddBuildInfoParams, body AddBuildInfoJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewAddBuildInfoRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) BulkDeleteArtifactsWithBody(ctx context.Context, params *BulkDeleteArtifactsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBulkDeleteArtifactsRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) BulkDeleteArtifacts(ctx context.Context, params *BulkDeleteArtifactsParams, body BulkDeleteArtifactsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBulkDeleteArtifactsRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1122,6 +1188,96 @@ func NewAddBuildInfoRequestWithBody(server string, params *AddBuildInfoParams, c
 					queryValues.Add(k, v2)
 				}
 			}
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewBulkDeleteArtifactsRequest calls the generic BulkDeleteArtifacts builder with application/json body
+func NewBulkDeleteArtifactsRequest(server string, params *BulkDeleteArtifactsParams, body BulkDeleteArtifactsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewBulkDeleteArtifactsRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewBulkDeleteArtifactsRequestWithBody generates requests for BulkDeleteArtifacts with any type of body
+func NewBulkDeleteArtifactsRequestWithBody(server string, params *BulkDeleteArtifactsParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/bulkdelete")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "account_identifier", runtime.ParamLocationQuery, params.AccountIdentifier); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if params.OrgIdentifier != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "org_identifier", runtime.ParamLocationQuery, *params.OrgIdentifier); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ProjectIdentifier != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "project_identifier", runtime.ParamLocationQuery, *params.ProjectIdentifier); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
 		}
 
 		queryURL.RawQuery = queryValues.Encode()
@@ -1783,6 +1939,11 @@ type ClientWithResponsesInterface interface {
 
 	AddBuildInfoWithResponse(ctx context.Context, params *AddBuildInfoParams, body AddBuildInfoJSONRequestBody, reqEditors ...RequestEditorFn) (*AddBuildInfoResp, error)
 
+	// BulkDeleteArtifactsWithBodyWithResponse request with any body
+	BulkDeleteArtifactsWithBodyWithResponse(ctx context.Context, params *BulkDeleteArtifactsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BulkDeleteArtifactsResp, error)
+
+	BulkDeleteArtifactsWithResponse(ctx context.Context, params *BulkDeleteArtifactsParams, body BulkDeleteArtifactsJSONRequestBody, reqEditors ...RequestEditorFn) (*BulkDeleteArtifactsResp, error)
+
 	// GetArtifactScansWithResponse request
 	GetArtifactScansWithResponse(ctx context.Context, params *GetArtifactScansParams, reqEditors ...RequestEditorFn) (*GetArtifactScansResp, error)
 
@@ -1822,6 +1983,29 @@ func (r AddBuildInfoResp) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r AddBuildInfoResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type BulkDeleteArtifactsResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *map[string]interface{}
+	JSONDefault  *V3Error
+}
+
+// Status returns HTTPResponse.Status
+func (r BulkDeleteArtifactsResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r BulkDeleteArtifactsResp) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1983,6 +2167,23 @@ func (c *ClientWithResponses) AddBuildInfoWithResponse(ctx context.Context, para
 	return ParseAddBuildInfoResp(rsp)
 }
 
+// BulkDeleteArtifactsWithBodyWithResponse request with arbitrary body returning *BulkDeleteArtifactsResp
+func (c *ClientWithResponses) BulkDeleteArtifactsWithBodyWithResponse(ctx context.Context, params *BulkDeleteArtifactsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BulkDeleteArtifactsResp, error) {
+	rsp, err := c.BulkDeleteArtifactsWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseBulkDeleteArtifactsResp(rsp)
+}
+
+func (c *ClientWithResponses) BulkDeleteArtifactsWithResponse(ctx context.Context, params *BulkDeleteArtifactsParams, body BulkDeleteArtifactsJSONRequestBody, reqEditors ...RequestEditorFn) (*BulkDeleteArtifactsResp, error) {
+	rsp, err := c.BulkDeleteArtifacts(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseBulkDeleteArtifactsResp(rsp)
+}
+
 // GetArtifactScansWithResponse request returning *GetArtifactScansResp
 func (c *ClientWithResponses) GetArtifactScansWithResponse(ctx context.Context, params *GetArtifactScansParams, reqEditors ...RequestEditorFn) (*GetArtifactScansResp, error) {
 	rsp, err := c.GetArtifactScans(ctx, params, reqEditors...)
@@ -2067,6 +2268,39 @@ func ParseAddBuildInfoResp(rsp *http.Response) (*AddBuildInfoResp, error) {
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest V3Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseBulkDeleteArtifactsResp parses an HTTP response from a BulkDeleteArtifactsWithResponse call
+func ParseBulkDeleteArtifactsResp(rsp *http.Response) (*BulkDeleteArtifactsResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &BulkDeleteArtifactsResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
 		var dest V3Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

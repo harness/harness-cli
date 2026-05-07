@@ -61,6 +61,29 @@ func containsUnsupportedWildcards(pattern string) bool {
 	return false
 }
 
+func IsWildCardExpression(pattern string) (bool, error) {
+	unsupportedChars := []rune{'[', ']', '{', '}'}
+	supportedChars := []rune{'?', '*'}
+
+	for _, char := range unsupportedChars {
+		if strings.ContainsRune(pattern, char) {
+			return false, fmt.Errorf(
+				"unsupported wildcard character %q found in pattern %q; only '*' and '?' are supported",
+				char,
+				pattern,
+			)
+		}
+	}
+
+	for _, char := range supportedChars {
+		if strings.ContainsRune(pattern, char) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // FilterFilesByPatterns filters a list of files based on include and exclude patterns.
 // Include patterns are applied first (if any), then exclude patterns are applied.
 // If no include patterns are specified, all files are included by default.
@@ -137,4 +160,13 @@ func IsPackageLevelFilterableArtifact(artifactType types.ArtifactType) bool {
 	default:
 		return false
 	}
+}
+
+// support * and ?
+func MatchesWildCardPattern(packageName string, pattern string) bool {
+	g, err := glob.Compile(pattern)
+	if err != nil {
+		return false
+	}
+	return g.Match(packageName)
 }
