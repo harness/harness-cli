@@ -40,8 +40,8 @@ func NewClient() *NpmClient {
 	return &NpmClient{}
 }
 
-func (c *NpmClient) Name() string        { return "npm" }
-func (c *NpmClient) PackageType() string { return "npm" }
+func (c *NpmClient) Name() string        { return pkgmgr.CommandNpm }
+func (c *NpmClient) PackageType() string { return pkgmgr.PackageTypeNpm }
 
 func (c *NpmClient) FallbackOrgProject() (string, string) {
 	savedCfg, err := regcmd.LoadNpmRegistryConfig()

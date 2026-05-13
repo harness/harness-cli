@@ -3,7 +3,10 @@ package artifact
 import (
 	"github.com/harness/harness-cli/cmd/artifact/command"
 	"github.com/harness/harness-cli/cmd/cmdutils"
+	"github.com/harness/harness-cli/cmd/dotnet"
+	"github.com/harness/harness-cli/cmd/mvn"
 	"github.com/harness/harness-cli/cmd/npm"
+	"github.com/harness/harness-cli/cmd/pip"
 
 	"github.com/spf13/cobra"
 )
@@ -25,6 +28,9 @@ func GetRootCmd(f *cmdutils.Factory) *cobra.Command {
 	rootCmd.AddCommand(command.NewMetadataCmd(f))
 	rootCmd.AddCommand(command.NewCopyArtifactCmd(f))
 	rootCmd.AddCommand(npm.GetRootCmd(f))
+	rootCmd.AddCommand(mvn.GetRootCmd(f))
+	rootCmd.AddCommand(pip.GetRootCmd(f))
+	rootCmd.AddCommand(dotnet.GetRootCmd(f))
 
 	return rootCmd
 }

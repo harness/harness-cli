@@ -3,8 +3,11 @@ package pkgmgr
 import (
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	regcmd "github.com/harness/harness-cli/cmd/registry/command"
@@ -101,8 +104,14 @@ type rootPackageInfo struct {
 
 func detectRootPackage(client Client) rootPackageInfo {
 	switch client.PackageType() {
-	case "npm":
+	case PackageTypeNpm:
 		return detectNpmRootPackage()
+	case PackageTypeMaven:
+		return detectMavenRootPackage()
+	case PackageTypePyPI:
+		return detectPythonRootPackage()
+	case PackageTypeNuGet:
+		return detectNugetRootPackage()
 	default:
 		return rootPackageInfo{Name: "unknown", Version: "0.0.0"}
 	}
@@ -132,15 +141,151 @@ func detectNpmRootPackage() rootPackageInfo {
 	return rootPackageInfo{Name: pkg.Name, Version: pkg.Version}
 }
 
+func detectMavenRootPackage() rootPackageInfo {
+	data, err := os.ReadFile("pom.xml")
+	if err != nil {
+		return rootPackageInfo{Name: "unknown", Version: "0.0.0"}
+	}
+
+	var pom struct {
+		XMLName    xml.Name `xml:"project"`
+		GroupID    string   `xml:"groupId"`
+		ArtifactID string   `xml:"artifactId"`
+		Version    string   `xml:"version"`
+		Parent     struct {
+			GroupID string `xml:"groupId"`
+			Version string `xml:"version"`
+		} `xml:"parent"`
+	}
+	if err := xml.Unmarshal(data, &pom); err != nil {
+		return rootPackageInfo{Name: "unknown", Version: "0.0.0"}
+	}
+
+	groupID := pom.GroupID
+	if groupID == "" {
+		groupID = pom.Parent.GroupID
+	}
+	version := pom.Version
+	if version == "" {
+		version = pom.Parent.Version
+	}
+	if groupID == "" || pom.ArtifactID == "" {
+		return rootPackageInfo{Name: "unknown", Version: "0.0.0"}
+	}
+	if version == "" {
+		version = "0.0.0"
+	}
+
+	return rootPackageInfo{Name: groupID + ":" + pom.ArtifactID, Version: version}
+}
+
+func detectPythonRootPackage() rootPackageInfo {
+	// Try pyproject.toml first
+	if data, err := os.ReadFile("pyproject.toml"); err == nil {
+		// Simple TOML parsing for name and version
+		var name, version string
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "name") && strings.Contains(line, "=") {
+				parts := strings.SplitN(line, "=", 2)
+				name = strings.Trim(strings.TrimSpace(parts[1]), "\"'")
+			}
+			if strings.HasPrefix(line, "version") && strings.Contains(line, "=") {
+				parts := strings.SplitN(line, "=", 2)
+				version = strings.Trim(strings.TrimSpace(parts[1]), "\"'")
+			}
+		}
+		if name != "" {
+			if version == "" {
+				version = "0.0.0"
+			}
+			return rootPackageInfo{Name: name, Version: version}
+		}
+	}
+
+	// Try setup.py / setup.cfg
+	if data, err := os.ReadFile("setup.cfg"); err == nil {
+		var name, version string
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "name") && strings.Contains(line, "=") {
+				parts := strings.SplitN(line, "=", 2)
+				name = strings.TrimSpace(parts[1])
+			}
+			if strings.HasPrefix(line, "version") && strings.Contains(line, "=") {
+				parts := strings.SplitN(line, "=", 2)
+				version = strings.TrimSpace(parts[1])
+			}
+		}
+		if name != "" {
+			if version == "" {
+				version = "0.0.0"
+			}
+			return rootPackageInfo{Name: name, Version: version}
+		}
+	}
+
+	return rootPackageInfo{Name: "unknown", Version: "0.0.0"}
+}
+
+func detectNugetRootPackage() rootPackageInfo {
+	csprojFiles, _ := filepath.Glob("*.csproj")
+	if len(csprojFiles) == 0 {
+		return rootPackageInfo{Name: "unknown", Version: "0.0.0"}
+	}
+
+	data, err := os.ReadFile(csprojFiles[0])
+	if err != nil {
+		return rootPackageInfo{Name: "unknown", Version: "0.0.0"}
+	}
+
+	type PropertyGroup struct {
+		AssemblyName string `xml:"AssemblyName"`
+		Version      string `xml:"Version"`
+		PackageId    string `xml:"PackageId"`
+	}
+	type Project struct {
+		PropertyGroups []PropertyGroup `xml:"PropertyGroup"`
+	}
+
+	var proj Project
+	if err := xml.Unmarshal(data, &proj); err != nil {
+		// Use filename as fallback
+		name := strings.TrimSuffix(filepath.Base(csprojFiles[0]), ".csproj")
+		return rootPackageInfo{Name: name, Version: "0.0.0"}
+	}
+
+	var name, version string
+	for _, pg := range proj.PropertyGroups {
+		if pg.PackageId != "" {
+			name = pg.PackageId
+		} else if pg.AssemblyName != "" && name == "" {
+			name = pg.AssemblyName
+		}
+		if pg.Version != "" {
+			version = pg.Version
+		}
+	}
+
+	if name == "" {
+		name = strings.TrimSuffix(filepath.Base(csprojFiles[0]), ".csproj")
+	}
+	if version == "" {
+		version = "0.0.0"
+	}
+
+	return rootPackageInfo{Name: name, Version: version}
+}
+
 func packageTypeToAPI(pkgType string) ar_v3.PackageType {
 	switch pkgType {
-	case "npm":
+	case PackageTypeNpm:
 		return "NPM"
-	case "maven":
+	case PackageTypeMaven:
 		return "MAVEN"
-	case "pypi", "pip":
+	case PackageTypePyPI:
 		return "PYTHON"
-	case "nuget":
+	case PackageTypeNuGet:
 		return "NUGET"
 	default:
 		return ar_v3.PackageType(pkgType)
