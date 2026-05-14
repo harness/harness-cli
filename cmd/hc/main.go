@@ -8,8 +8,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"strings"
 	"time"
 
+	"github.com/harness/harness-cli/cmd/act"
 	"github.com/harness/harness-cli/cmd/artifact"
 	"github.com/harness/harness-cli/cmd/auth"
 	"github.com/harness/harness-cli/cmd/cmdutils"
@@ -41,13 +43,14 @@ func main() {
       Find more information at:
             https://developer.harness.io/docs/platform/automation/cli/reference/#v1.0.0-hc`),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// Skip loading config for auth commands, version, and upgrade
+			// Skip loading config for auth commands, version, upgrade, and act
 			if cmd.CommandPath() == "hc auth" ||
 				cmd.CommandPath() == "hc auth login" ||
 				cmd.CommandPath() == "hc auth logout" ||
 				cmd.CommandPath() == "hc auth status" ||
 				cmd.CommandPath() == "hc version" ||
-				cmd.CommandPath() == "hc upgrade" {
+				cmd.CommandPath() == "hc upgrade" ||
+				strings.HasPrefix(cmd.CommandPath(), "hc act") {
 				return nil
 			}
 
@@ -140,6 +143,7 @@ func main() {
 	}
 
 	// Add main command groups
+	rootCmd.AddCommand(act.GetRootCmd())
 	rootCmd.AddCommand(auth.GetRootCmd())
 	rootCmd.AddCommand(registry.GetRootCmd(factory))
 	rootCmd.AddCommand(artifact.GetRootCmd(factory))

@@ -1,0 +1,21 @@
+pipeline:
+  name: failure-test
+  stages:
+  - name: will-fail
+    steps:
+    - name: success-step
+      run:
+        container: alpine:3.19
+        script:
+        - echo "This step succeeds"
+    - name: failing-step
+      run:
+        container: alpine:3.19
+        script:
+        - echo "About to fail..."
+        - exit 1
+    - name: never-reached
+      run:
+        container: alpine:3.19
+        script:
+        - echo "This should never run"

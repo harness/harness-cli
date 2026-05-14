@@ -1,0 +1,30 @@
+pipeline:
+  name: parallel-stages
+  stages:
+  - name: frontend
+    parallel:
+      stages:
+      - name: react-build
+        steps:
+        - name: build-react
+          run:
+            container: node:20-alpine
+            script:
+            - echo "Building React app..."
+            - node --version
+      - name: vue-build
+        steps:
+        - name: build-vue
+          run:
+            container: node:20-alpine
+            script:
+            - echo "Building Vue app..."
+            - node --version
+  - name: backend
+    steps:
+    - name: build-go
+      run:
+        container: golang:1.22-alpine
+        script:
+        - echo "Building Go service..."
+        - go version

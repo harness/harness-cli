@@ -1,0 +1,18 @@
+jobs:
+  test:
+    steps:
+    - name: run-tests
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Running tests in job syntax..."
+        - echo "Tests passed"
+  build:
+    needs: [test]
+    steps:
+    - name: compile
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Building after tests..."
+        - echo "Build complete"

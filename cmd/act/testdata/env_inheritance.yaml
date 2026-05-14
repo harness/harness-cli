@@ -1,0 +1,23 @@
+pipeline:
+  name: env-inheritance
+  env:
+    PIPELINE_VAR: from-pipeline
+    SHARED_VAR: pipeline-level
+  stages:
+  - name: check-env
+    env:
+      STAGE_VAR: from-stage
+      SHARED_VAR: stage-level
+    steps:
+    - name: verify
+      run:
+        container: alpine:3.19
+        env:
+          STEP_VAR: from-step
+          SHARED_VAR: step-level
+        script:
+        - echo "PIPELINE_VAR=$PIPELINE_VAR"
+        - echo "STAGE_VAR=$STAGE_VAR"
+        - echo "STEP_VAR=$STEP_VAR"
+        - echo "SHARED_VAR=$SHARED_VAR (should be step-level)"
+        - "[ \"$SHARED_VAR\" = \"step-level\" ] && echo PASS || (echo FAIL && exit 1)"

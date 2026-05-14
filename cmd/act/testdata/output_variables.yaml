@@ -1,0 +1,37 @@
+pipeline:
+  name: output-variables
+  stages:
+  - name: build
+    steps:
+    - name: generate-version
+      id: version
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Generating version..."
+        - VERSION="1.2.3-$(date +%s)"
+        - echo "VERSION=$VERSION" >> $HARNESS_OUTPUT
+        - echo "COMMIT=abc123" >> $HARNESS_OUTPUT
+    - name: use-version
+      run:
+        container: alpine:3.19
+        env:
+          BUILD_VERSION: ${{ steps.version.outputs.VERSION }}
+          BUILD_COMMIT: ${{ steps.version.outputs.COMMIT }}
+        script:
+        - echo "Building version $BUILD_VERSION"
+        - echo "Commit is $BUILD_COMMIT"
+    - name: multi-output
+      id: meta
+      run:
+        container: alpine:3.19
+        script:
+        - echo "STATUS=success" >> $HARNESS_OUTPUT
+        - echo "ARTIFACT=myapp-linux-amd64" >> $HARNESS_OUTPUT
+    - name: final
+      run:
+        container: alpine:3.19
+        env:
+          STATUS: ${{ steps.meta.outputs.STATUS }}
+        script:
+        - echo "Final status = $STATUS"

@@ -1,0 +1,18 @@
+pipeline:
+  name: simple-build
+  stages:
+  - name: build
+    steps:
+    - name: hello
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Hello from Harness CI local!"
+        - echo "Working directory is $(pwd)"
+    - name: env-check
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Pipeline env var = $MY_VAR"
+        env:
+          MY_VAR: hello-world

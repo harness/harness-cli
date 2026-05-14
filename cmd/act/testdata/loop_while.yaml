@@ -1,0 +1,23 @@
+pipeline:
+  name: while-loop
+  stages:
+  - name: poll
+    steps:
+    - name: wait-for-ready
+      strategy:
+        while:
+          condition: ${{ steps.wait-for-ready.outputs.READY != "true" }}
+          iterations: 5
+      run:
+        container: alpine:3.19
+        script:
+        - ITER=${HARNESS_ITERATION:-0}
+        - echo "Polling attempt $ITER..."
+        - |
+          if [ "$ITER" -ge "3" ]; then
+            echo "READY=true" >> $HARNESS_OUTPUT
+            echo "Service is ready!"
+          else
+            echo "READY=false" >> $HARNESS_OUTPUT
+            echo "Not ready yet, will retry..."
+          fi

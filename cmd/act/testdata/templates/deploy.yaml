@@ -1,0 +1,17 @@
+template:
+  inputs:
+    environment:
+      type: string
+      default: staging
+    version:
+      type: string
+      required: true
+  stage:
+    name: deploy-stage
+    steps:
+    - name: deploy-step
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Deploying version $version to $environment"
+        - echo "Deploy complete"

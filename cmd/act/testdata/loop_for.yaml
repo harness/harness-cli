@@ -1,0 +1,14 @@
+pipeline:
+  name: for-loop
+  stages:
+  - name: retry-build
+    steps:
+    - name: attempt
+      strategy:
+        for:
+          iterations: 3
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Attempt iteration $HARNESS_ITERATION of build"
+        - echo "Iteration complete"

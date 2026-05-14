@@ -1,0 +1,16 @@
+template:
+  inputs:
+    go_version:
+      type: string
+      default: "1.22"
+    run_tests:
+      type: string
+      default: "true"
+  step:
+    name: go-build
+    run:
+      container: alpine:3.19
+      script:
+      - echo "Go version is $go_version"
+      - echo "Run tests = $run_tests"
+      - echo "Template step executed successfully"

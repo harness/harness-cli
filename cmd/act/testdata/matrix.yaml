@@ -1,0 +1,17 @@
+pipeline:
+  name: matrix-build
+  stages:
+  - name: test-matrix
+    strategy:
+      matrix:
+        go_version: ["1.21", "1.22", "1.23"]
+        os: ["linux", "darwin"]
+      fail-fast: true
+      max-parallel: 2
+    steps:
+    - name: build
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Building for Go $go_version on $os"
+        - echo "Combination completed successfully"

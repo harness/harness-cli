@@ -1,0 +1,29 @@
+pipeline:
+  name: shell-variants
+  stages:
+  - name: shells
+    steps:
+    - name: sh-default
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Default shell (sh)"
+        - "[ -n \"$0\" ] && echo Shell is $0"
+    - name: bash-shell
+      run:
+        container: bash:5
+        shell: bash
+        script:
+        - echo "Running in bash"
+        - 'echo "Bash version: $BASH_VERSION"'
+    - name: multiline-script
+      run:
+        container: alpine:3.19
+        script:
+        - |
+          echo "Line 1"
+          echo "Line 2"
+          echo "Line 3"
+          for i in 1 2 3; do
+            echo "  iteration $i"
+          done

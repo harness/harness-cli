@@ -1,0 +1,41 @@
+pipeline:
+  name: stage-dependencies
+  stages:
+  - name: setup
+    steps:
+    - name: init
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Initializing workspace..."
+        - echo "Done"
+
+  - name: build
+    needs: [setup]
+    steps:
+    - name: compile
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Compiling (after setup)..."
+        - echo "Build artifact created"
+
+  - name: lint
+    needs: [setup]
+    steps:
+    - name: check
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Linting (after setup, parallel with build)..."
+        - echo "No issues found"
+
+  - name: deploy
+    needs: [build, lint]
+    steps:
+    - name: publish
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Deploying (after build AND lint)..."
+        - echo "Deployed!"

@@ -1,0 +1,52 @@
+pipeline:
+  name: cel-expressions
+  env:
+    DEPLOY_ENV: production
+  stages:
+  - name: conditional-steps
+    steps:
+    - name: always-run
+      run:
+        container: alpine:3.19
+        script:
+        - echo "This always runs"
+
+    - name: run-on-production
+      if: ${{ env.DEPLOY_ENV == "production" }}
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Running in production mode"
+
+    - name: skip-on-production
+      if: ${{ env.DEPLOY_ENV == "staging" }}
+      run:
+        container: alpine:3.19
+        script:
+        - echo "This should be SKIPPED in production"
+
+    - name: complex-condition
+      if: ${{ env.DEPLOY_ENV == "production" && env.DEPLOY_ENV != "test" }}
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Complex condition passed"
+
+  - name: conditional-stage
+    if: ${{ env.DEPLOY_ENV == "production" }}
+    steps:
+    - name: deploy
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Deploying to production..."
+        - echo "Stage-level condition passed"
+
+  - name: skipped-stage
+    if: ${{ env.DEPLOY_ENV == "development" }}
+    steps:
+    - name: dev-only
+      run:
+        container: alpine:3.19
+        script:
+        - echo "THIS SHOULD NOT RUN"

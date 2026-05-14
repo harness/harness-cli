@@ -1,0 +1,54 @@
+pipeline:
+  name: failure-strategies
+  stages:
+  - name: retry-on-failure
+    steps:
+    - name: flaky-test
+      on-failure:
+        action:
+          retry:
+            attempts: 3
+            interval: ["1s"]
+      run:
+        container: alpine:3.19
+        script:
+        - ITER=${HARNESS_RETRY:-0}
+        - echo "Attempt $ITER"
+        - |
+          if [ "$ITER" -lt "2" ]; then
+            echo "Simulating flaky failure..."
+            exit 1
+          fi
+        - echo "Finally succeeded on attempt $ITER!"
+
+  - name: ignore-failure
+    steps:
+    - name: optional-step
+      on-failure:
+        action: ignore
+      run:
+        container: alpine:3.19
+        script:
+        - echo "This step fails but is ignored"
+        - exit 1
+    - name: continues-after-ignored
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Pipeline continues because failure was ignored"
+
+  - name: abort-on-failure
+    steps:
+    - name: critical-step
+      on-failure:
+        errors: [unknown]
+        action: abort
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Critical step that succeeds"
+    - name: after-critical
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Runs because critical step passed"

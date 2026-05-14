@@ -1,0 +1,19 @@
+pipeline:
+  name: template-step-resolution
+  stages:
+  - name: build
+    steps:
+    - name: setup
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Setting up workspace"
+    - name: go-build
+      template:
+        uses: templates/golang.yaml
+        with:
+          go_version: "1.23"
+          run_tests: "false"
+    - name: go-build-defaults
+      template:
+        uses: templates/golang.yaml

@@ -1,0 +1,22 @@
+pipeline:
+  name: template-stage-resolution
+  stages:
+  - name: build
+    steps:
+    - name: compile
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Compiling..."
+  - name: deploy-to-staging
+    template:
+      uses: templates/deploy.yaml
+      with:
+        environment: staging
+        version: "2.1.0"
+  - name: deploy-to-prod
+    template:
+      uses: templates/deploy.yaml
+      with:
+        environment: production
+        version: "2.1.0"

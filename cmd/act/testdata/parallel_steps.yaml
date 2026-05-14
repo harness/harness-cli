@@ -1,0 +1,33 @@
+pipeline:
+  name: parallel-steps
+  stages:
+  - name: test
+    steps:
+    - name: lint
+      run:
+        container: alpine:3.19
+        script:
+        - echo "Running lint..."
+        - sleep 1
+        - echo "Lint passed"
+    - parallel:
+        steps:
+        - name: unit-tests
+          run:
+            container: alpine:3.19
+            script:
+            - echo "Running unit tests..."
+            - sleep 2
+            - echo "Unit tests passed"
+        - name: integration-tests
+          run:
+            container: alpine:3.19
+            script:
+            - echo "Running integration tests..."
+            - sleep 2
+            - echo "Integration tests passed"
+    - name: report
+      run:
+        container: alpine:3.19
+        script:
+        - echo "All tests passed!"
