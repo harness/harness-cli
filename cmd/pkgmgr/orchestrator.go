@@ -11,7 +11,7 @@ import (
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	regcmd "github.com/harness/harness-cli/cmd/registry/command"
 	"github.com/harness/harness-cli/config"
-	ar_v3 "github.com/harness/harness-cli/internal/api/ar_v3"
+	ar_v3 "github.com/harness/harness-cli/pkg/api/ar_v3"
 	client2 "github.com/harness/harness-cli/util/client"
 	p "github.com/harness/harness-cli/util/common/progress"
 

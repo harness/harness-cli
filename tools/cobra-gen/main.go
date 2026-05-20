@@ -48,7 +48,7 @@ func main() {
 // -------------------------------------------------------------------------
 // 1. Generate REST client with oapi-codegen
 func genClient(pkg, spec string) {
-	targetDir := filepath.Join("internal", "api", pkg)
+	targetDir := filepath.Join("pkg", "api", pkg)
 	must(os.MkdirAll(targetDir, 0o755))
 
 	args := []string{
@@ -243,7 +243,7 @@ import (
 	"errors"
 
 	"github.com/spf13/cobra"
-	client "github.com/harness/harness-cli/internal/api/{{ .Pkg }}"
+	client "github.com/harness/harness-cli/pkg/api/{{ .Pkg }}"
 )
 
 // new{{ .Act | title }}{{ .Res | title }}Cmd wires up:

@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"github.com/harness/harness-cli/config"
-	"github.com/harness/harness-cli/internal/api/ar"
-	"github.com/harness/harness-cli/internal/api/ar_pkg"
-	"github.com/harness/harness-cli/internal/api/ar_v2"
-	"github.com/harness/harness-cli/internal/api/ar_v3"
+	"github.com/harness/harness-cli/pkg/api/ar"
+	"github.com/harness/harness-cli/pkg/api/ar_pkg"
+	"github.com/harness/harness-cli/pkg/api/ar_v2"
+	"github.com/harness/harness-cli/pkg/api/ar_v3"
 )
 
 const (

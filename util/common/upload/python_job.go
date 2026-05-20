@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/harness/harness-cli/config"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
+	pkgclient "github.com/harness/harness-cli/pkg/api/ar_pkg"
 	"github.com/harness/harness-cli/util/common/auth"
 )
 

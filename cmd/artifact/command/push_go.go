@@ -12,7 +12,7 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
+	pkgclient "github.com/harness/harness-cli/pkg/api/ar_pkg"
 	"github.com/harness/harness-cli/module/ar/packages/gopkg"
 	"github.com/harness/harness-cli/util"
 	"github.com/harness/harness-cli/util/common/auth"

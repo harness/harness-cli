@@ -13,8 +13,8 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	"github.com/harness/harness-cli/internal/api/ar"
-	"github.com/harness/harness-cli/internal/api/ar_v3"
+	"github.com/harness/harness-cli/pkg/api/ar"
+	"github.com/harness/harness-cli/pkg/api/ar_v3"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

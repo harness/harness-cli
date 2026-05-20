@@ -8,7 +8,7 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	"github.com/harness/harness-cli/internal/api/ar_v2"
+	"github.com/harness/harness-cli/pkg/api/ar_v2"
 )
 
 type mockTransport struct {

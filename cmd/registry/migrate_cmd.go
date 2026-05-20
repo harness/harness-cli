@@ -10,7 +10,7 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	"github.com/harness/harness-cli/internal/api/ar"
+	"github.com/harness/harness-cli/pkg/api/ar"
 	ar2 "github.com/harness/harness-cli/module/ar/migrate"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/util"

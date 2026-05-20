@@ -15,7 +15,7 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	"github.com/harness/harness-cli/internal/api/ar_v3"
+	"github.com/harness/harness-cli/pkg/api/ar_v3"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"

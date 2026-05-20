@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
-	client "github.com/harness/harness-cli/internal/api/ar"
+	client "github.com/harness/harness-cli/pkg/api/ar"
 	client2 "github.com/harness/harness-cli/util/client"
 	"github.com/harness/harness-cli/util/common/printer"
 

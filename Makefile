@@ -38,7 +38,7 @@ build: generate format
 
 # Remove generated artifacts
 clean:
-	rm -rf internal/api/*
+	rm -rf pkg/api/*
 	rm -f  cmd/*/*_gen.go
 
 format: tools # Format go code and error if any changes are made

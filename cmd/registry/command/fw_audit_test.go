@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	ar_v3 "github.com/harness/harness-cli/internal/api/ar_v3"
+	ar_v3 "github.com/harness/harness-cli/pkg/api/ar_v3"
 	"github.com/harness/harness-cli/util/common/progress"
 	"github.com/stretchr/testify/assert"
 )

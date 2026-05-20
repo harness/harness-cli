@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/harness/harness-cli/internal/api/ar_v2"
+	"github.com/harness/harness-cli/pkg/api/ar_v2"
 )
 
 func ParseMetadataString(metadataStr string) ([]ar_v2.MetadataItemInput, error) {

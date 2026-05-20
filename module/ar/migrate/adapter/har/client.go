@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/harness/harness-cli/config"
-	"github.com/harness/harness-cli/internal/api/ar"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
+	"github.com/harness/harness-cli/pkg/api/ar"
+	pkgclient "github.com/harness/harness-cli/pkg/api/ar_pkg"
 	"github.com/harness/harness-cli/module/ar/migrate/http"
 	"github.com/harness/harness-cli/module/ar/migrate/http/auth/xApiKey"
 	"github.com/harness/harness-cli/module/ar/migrate/types"

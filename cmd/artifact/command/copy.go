@@ -8,7 +8,7 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	v2client "github.com/harness/harness-cli/internal/api/ar_v2"
+	v2client "github.com/harness/harness-cli/pkg/api/ar_v2"
 	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/spf13/cobra"

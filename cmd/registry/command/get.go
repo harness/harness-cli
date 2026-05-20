@@ -5,7 +5,7 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	ar "github.com/harness/harness-cli/internal/api/ar"
+	ar "github.com/harness/harness-cli/pkg/api/ar"
 	client2 "github.com/harness/harness-cli/util/client"
 	"github.com/harness/harness-cli/util/common/printer"
 
