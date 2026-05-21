@@ -112,10 +112,18 @@ func printJSON(data interface{}, fields string) error {
 		return err
 	}
 
+	if string(raw) == "null" {
+		raw = []byte("[]")
+	}
+
 	if fields == "" {
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		return enc.Encode(data)
+		var indented []byte
+		indented, err = json.MarshalIndent(json.RawMessage(raw), "", "  ")
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(os.Stdout, "%s\n", indented)
+		return err
 	}
 
 	fieldList := strings.Split(fields, ",")
@@ -136,7 +144,7 @@ func printJSON(data interface{}, fields string) error {
 		return enc.Encode(filtered)
 	}
 
-	var result []map[string]interface{}
+	result := make([]map[string]interface{}, 0, len(items))
 	for _, item := range items {
 		if obj, ok := item.(map[string]interface{}); ok {
 			result = append(result, filterFields(obj, fieldList))

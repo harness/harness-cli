@@ -655,6 +655,18 @@ func TestResolveRepoRef_AutoDetect(t *testing.T) {
 	assert.NotEmpty(t, ref)
 }
 
+func TestPrintJSON_NilSliceOutputsEmptyArray(t *testing.T) {
+	var nilChecks []code.Check
+	err := printJSON(nilChecks, "")
+	assert.NoError(t, err)
+}
+
+func TestPrintJSON_NilSliceWithFieldsOutputsEmptyArray(t *testing.T) {
+	var nilChecks []code.Check
+	err := printJSON(nilChecks, "check.identifier")
+	assert.NoError(t, err)
+}
+
 func TestFilterFields_NestedField(t *testing.T) {
 	obj := map[string]interface{}{
 		"author": map[string]interface{}{
