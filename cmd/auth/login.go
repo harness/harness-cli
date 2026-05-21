@@ -88,11 +88,21 @@ func readInput(prompt string) (string, error) {
 	return strings.TrimSpace(input), nil
 }
 
-// GetAccountIDFromToken gets the account ID from the token
-// Token format: pat.AccountID.Random.Random
+// GetAccountIDFromToken gets the account ID from the token.
+// Token format: pat.AccountID.Random or sat.AccountID.Random
 func GetAccountIDFromToken(token string) (string, error) {
-	splitN := strings.SplitN(token, ".", 3)
-	return splitN[1], nil
+	parts := strings.SplitN(token, ".", 3)
+	if len(parts) < 2 {
+		return "", fmt.Errorf("invalid token format: expected at least 2 dot-separated segments")
+	}
+	prefix := parts[0]
+	if prefix != "pat" && prefix != "sat" {
+		return "", fmt.Errorf("invalid token prefix %q: expected \"pat\" or \"sat\"", prefix)
+	}
+	if parts[1] == "" {
+		return "", fmt.Errorf("invalid token: account ID segment is empty")
+	}
+	return parts[1], nil
 }
 
 // accountResponse represents the response from the account API

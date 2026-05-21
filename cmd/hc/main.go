@@ -14,6 +14,7 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact"
 	"github.com/harness/harness-cli/cmd/auth"
 	"github.com/harness/harness-cli/cmd/cmdutils"
+	"github.com/harness/harness-cli/cmd/code"
 	"github.com/harness/harness-cli/cmd/iacm"
 	"github.com/harness/harness-cli/cmd/registry"
 	"github.com/harness/harness-cli/config"
@@ -152,6 +153,9 @@ func main() {
 	if envVal := os.Getenv("HARNESS_ORG_ID"); envVal != "" {
 		config.Global.OrgID = envVal
 	}
+	if envVal := os.Getenv("HARNESS_ACCOUNT_ID"); envVal != "" {
+		config.Global.AccountID = envVal
+	}
 	if envVal := os.Getenv("HARNESS_PROJECT_ID"); envVal != "" {
 		config.Global.ProjectID = envVal
 	}
@@ -176,6 +180,15 @@ func main() {
 	//rootCmd.AddCommand(project.GetRootCmd())
 	//rootCmd.AddCommand(organisation.GetRootCmd())
 	//rootCmd.AddCommand(api.GetRootCmd())
+
+	// Harness Code commands
+	codeCmd := code.GetRootCmd(factory)
+	rootCmd.AddCommand(codeCmd)
+
+	// Top-level alias: hc pr -> hc code pr
+	prCmd := code.GetPrAliasCmd(factory)
+	rootCmd.AddCommand(prCmd)
+
 	rootCmd.AddCommand(versionCmd())
 	rootCmd.AddCommand(upgradeCmd())
 

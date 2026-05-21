@@ -13,12 +13,40 @@ func Test_getAccountIDFromToken(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "test",
-			args: args{
-				token: "pat.AccountID.Random.Random",
-			},
+			name:    "valid pat token",
+			args:    args{token: "pat.AccountID.Random.Random"},
 			want:    "AccountID",
 			wantErr: false,
+		},
+		{
+			name:    "valid sat token",
+			args:    args{token: "sat.AccountID.Random"},
+			want:    "AccountID",
+			wantErr: false,
+		},
+		{
+			name:    "no dots",
+			args:    args{token: "invalidtoken"},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name:    "empty string",
+			args:    args{token: ""},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name:    "wrong prefix",
+			args:    args{token: "jwt.AccountID.Random"},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name:    "empty account segment",
+			args:    args{token: "pat..Random"},
+			want:    "",
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
