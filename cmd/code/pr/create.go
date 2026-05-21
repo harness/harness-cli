@@ -2,6 +2,7 @@ package pr
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -14,6 +15,7 @@ func newCreateCmd(f *cmdutils.Factory) *cobra.Command {
 	var (
 		title      string
 		body       string
+		bodyFile   string
 		head       string
 		base       string
 		draft      bool
@@ -32,6 +34,14 @@ func newCreateCmd(f *cmdutils.Factory) *cobra.Command {
 			}
 			if head == "" {
 				return fmt.Errorf("--head is required")
+			}
+
+			if bodyFile != "" {
+				content, err := readBodyFile(bodyFile)
+				if err != nil {
+					return err
+				}
+				body = content
 			}
 
 			repoRef, err := resolveRepoRef(repo)
@@ -77,6 +87,7 @@ func newCreateCmd(f *cmdutils.Factory) *cobra.Command {
 
 	cmd.Flags().StringVar(&title, "title", "", "Title for the pull request (required)")
 	cmd.Flags().StringVar(&body, "body", "", "Description body for the pull request")
+	cmd.Flags().StringVar(&bodyFile, "body-file", "", "Read body from file (use - for stdin)")
 	cmd.Flags().StringVar(&head, "head", "", "Source branch name (required)")
 	cmd.Flags().StringVar(&base, "base", "", "Target branch name (defaults to repo default branch)")
 	cmd.Flags().BoolVar(&draft, "draft", false, "Create as a draft pull request")
@@ -85,5 +96,24 @@ func newCreateCmd(f *cmdutils.Factory) *cobra.Command {
 	cmd.Flags().StringVar(&jsonFields, "json", "", "Output JSON with selected fields (e.g. number,url)")
 
 	return cmd
+}
+
+func readBodyFile(path string) (string, error) {
+	var r io.Reader
+	if path == "-" {
+		r = os.Stdin
+	} else {
+		f, err := os.Open(path)
+		if err != nil {
+			return "", fmt.Errorf("could not open body file: %w", err)
+		}
+		defer f.Close()
+		r = f
+	}
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return "", fmt.Errorf("could not read body file: %w", err)
+	}
+	return string(data), nil
 }
 

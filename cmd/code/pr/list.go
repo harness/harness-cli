@@ -54,11 +54,31 @@ func newListCmd(f *cmdutils.Factory) *cobra.Command {
 				return printJSON(prs, jsonFields)
 			}
 
-			return printer.Print(prs, int64(page), 0, int64(len(prs)), false, [][]string{
+			type prRow struct {
+				Number       int64  `json:"number"`
+				Title        string `json:"title"`
+				State        string `json:"state"`
+				Author       string `json:"author"`
+				SourceBranch string `json:"source_branch"`
+				TargetBranch string `json:"target_branch"`
+			}
+			rows := make([]prRow, len(prs))
+			for i, p := range prs {
+				rows[i] = prRow{
+					Number:       p.Number,
+					Title:        p.Title,
+					State:        p.State,
+					Author:       p.Author.DisplayName,
+					SourceBranch: p.SourceBranch,
+					TargetBranch: p.TargetBranch,
+				}
+			}
+
+			return printer.Print(rows, int64(page), 0, int64(len(prs)), false, [][]string{
 				{"number", "Number"},
 				{"title", "Title"},
 				{"state", "State"},
-				{"author.display_name", "Author"},
+				{"author", "Author"},
 				{"source_branch", "Source"},
 				{"target_branch", "Target"},
 			})

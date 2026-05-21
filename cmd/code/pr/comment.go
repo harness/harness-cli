@@ -14,6 +14,7 @@ import (
 func newCommentCmd(f *cmdutils.Factory) *cobra.Command {
 	var (
 		body       string
+		bodyFile   string
 		dryRun     bool
 		repo       string
 		jsonFields string
@@ -30,8 +31,16 @@ func newCommentCmd(f *cmdutils.Factory) *cobra.Command {
 				return fmt.Errorf("invalid PR number %q: %w", args[0], err)
 			}
 
+			if bodyFile != "" {
+				content, err := readBodyFile(bodyFile)
+				if err != nil {
+					return err
+				}
+				body = content
+			}
+
 			if body == "" {
-				return fmt.Errorf("--body is required")
+				return fmt.Errorf("--body or --body-file is required")
 			}
 
 			repoRef, err := resolveRepoRef(repo)
@@ -66,7 +75,8 @@ func newCommentCmd(f *cmdutils.Factory) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&body, "body", "", "Comment text (required)")
+	cmd.Flags().StringVar(&body, "body", "", "Comment text (required unless --body-file is used)")
+	cmd.Flags().StringVar(&bodyFile, "body-file", "", "Read comment body from file (use - for stdin)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be posted without executing")
 	cmd.Flags().StringVar(&repo, "repo", "", "Repository (account/org/project/repo)")
 	cmd.Flags().StringVar(&jsonFields, "json", "", "Output JSON with selected fields (e.g. id,body,author)")
