@@ -22,8 +22,12 @@ type Client struct {
 }
 
 func NewClient() *Client {
+	return NewClientWithBaseURL(config.Global.APIBaseURL+basePath, config.Global.AuthToken, config.Global.AccountID)
+}
+
+func NewClientWithBaseURL(baseURL, authToken, accountID string) *Client {
 	r := resty.New()
-	r.SetBaseURL(config.Global.APIBaseURL + basePath)
+	r.SetBaseURL(baseURL)
 	r.SetTimeout(30 * time.Second)
 	if config.Global.TimeoutSeconds > 0 {
 		r.SetTimeout(time.Duration(config.Global.TimeoutSeconds) * time.Second)
@@ -38,13 +42,17 @@ func NewClient() *Client {
 		return resp.StatusCode() == http.StatusTooManyRequests ||
 			resp.StatusCode() >= http.StatusInternalServerError
 	})
-	r.SetHeader(apiKeyHeader, config.Global.AuthToken)
-	r.SetQueryParam(accountParam, config.Global.AccountID)
+	r.SetHeader(apiKeyHeader, authToken)
+	r.SetQueryParam(accountParam, accountID)
 
 	return &Client{
 		resty:     r,
-		accountID: config.Global.AccountID,
+		accountID: accountID,
 	}
+}
+
+func (c *Client) SetRetryCount(count int) {
+	c.resty.SetRetryCount(count)
 }
 
 func repoPath(repoRef string) string {
