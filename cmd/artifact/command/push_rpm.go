@@ -20,7 +20,6 @@ import (
 	"github.com/harness/harness-cli/util/common/fileutil"
 	p "github.com/harness/harness-cli/util/common/progress"
 
-	"github.com/hashicorp/go-retryablehttp"
 	"github.com/spf13/cobra"
 )
 
@@ -87,18 +86,9 @@ func NewPushRpmCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Success("Input parameters validated")
 
-			// Initialize the package client
-			retryClient := retryablehttp.NewClient()
-			retryClient.RetryMax = 3
-			retryClient.Logger = nil
-			retryClient.RequestLogHook = func(_ retryablehttp.Logger, _ *http.Request, retryNumber int) {
-				if retryNumber > 0 {
-					progress.Step(fmt.Sprintf("Retrying... attempt %d/%d", retryNumber, retryClient.RetryMax))
-				}
-			}
-
+			// Initialize the package client with retry support
 			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-				pkgclient.WithHTTPClient(retryClient.StandardClient()),
+				utils.GetRetryClient(progress),
 				auth.GetAuthOptionARPKG())
 			if err != nil {
 				return fmt.Errorf("failed to create package client: %w", err)
