@@ -40,7 +40,7 @@ type FileStore struct {
 
 func NewFileStore() *FileStore {
 	homeDir, _ := os.UserHomeDir()
-	return &FileStore{path: filepath.Join(homeDir, ".harness", "auth.json")}
+	return &FileStore{path: filepath.Join(homeDir, ".harness", "credentials.json")}
 }
 
 func (f *FileStore) Set(accountID, token string) error {
@@ -112,6 +112,6 @@ func IsKeyringAvailable() bool {
 	if err != nil {
 		return false
 	}
-	_ = keyring.Delete(serviceName, "__probe__")
+	defer keyring.Delete(serviceName, "__probe__") //nolint:errcheck
 	return true
 }

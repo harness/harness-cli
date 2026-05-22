@@ -9,6 +9,7 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/util/client/code"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -139,6 +140,12 @@ func TestList_TransportError(t *testing.T) {
 }
 
 func TestList_AutoDetectsRepo(t *testing.T) {
+	ctx, err := cmdutils.ResolveRepo()
+	if err != nil {
+		t.Skip("skipping: not running inside a Harness Code git repo")
+	}
+	_ = ctx
+
 	ts := scriptedServer(t, []scriptedResponse{
 		{200, `[]`},
 	})
@@ -148,7 +155,6 @@ func TestList_AutoDetectsRepo(t *testing.T) {
 	cmd.SetArgs([]string{})
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
-	// When run inside a harness git repo, auto-detection succeeds
 	assert.NoError(t, cmd.Execute())
 }
 
@@ -649,7 +655,10 @@ func TestResolveRepoRef_Explicit(t *testing.T) {
 }
 
 func TestResolveRepoRef_AutoDetect(t *testing.T) {
-	// When run inside a Harness Code git repo, auto-detection succeeds
+	_, err := cmdutils.ResolveRepo()
+	if err != nil {
+		t.Skip("skipping: not running inside a Harness Code git repo")
+	}
 	ref, err := resolveRepoRef("")
 	require.NoError(t, err)
 	assert.NotEmpty(t, ref)

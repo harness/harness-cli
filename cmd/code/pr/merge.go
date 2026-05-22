@@ -72,8 +72,7 @@ func newMergeCmd(f *cmdutils.Factory) *cobra.Command {
 					return err
 				}
 				if !result.Mergeable {
-					fmt.Fprintf(os.Stdout, "PR #%d is NOT mergeable. Conflicts: %v\n", number, result.ConflictFiles)
-					os.Exit(1)
+					return fmt.Errorf("PR #%d is not mergeable, conflicts: %v", number, result.ConflictFiles)
 				}
 				fmt.Fprintf(os.Stdout, "PR #%d is mergeable (method: %s)\n", number, method)
 				return nil
@@ -92,8 +91,7 @@ func newMergeCmd(f *cmdutils.Factory) *cobra.Command {
 			}
 
 			if !result.Mergeable && len(result.ConflictFiles) > 0 {
-				fmt.Fprintf(os.Stdout, "Merge failed: conflicts in %v\n", result.ConflictFiles)
-				os.Exit(1)
+				return fmt.Errorf("merge failed: conflicts in %v", result.ConflictFiles)
 			}
 
 			fmt.Fprintf(os.Stdout, "Merged PR #%d (method: %s)\n", number, method)

@@ -2,7 +2,6 @@ package pr
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"time"
 
@@ -10,6 +9,17 @@ import (
 	"github.com/harness/harness-cli/util/common/printer"
 	"github.com/spf13/cobra"
 )
+
+type checksExitError struct {
+	code int
+}
+
+func (e *checksExitError) Error() string {
+	if e.code == 1 {
+		return "some checks have failed"
+	}
+	return "some checks are still running"
+}
 
 func newChecksCmd(f *cmdutils.Factory) *cobra.Command {
 	var (
@@ -45,11 +55,6 @@ func newChecksCmd(f *cmdutils.Factory) *cobra.Command {
 					return err
 				}
 
-				if jsonFields != "" {
-					return printJSON(checks.Checks, jsonFields)
-				}
-
-				allPassed := true
 				anyFailed := false
 				anyRunning := false
 
@@ -59,16 +64,18 @@ func newChecksCmd(f *cmdutils.Factory) *cobra.Command {
 						// ok
 					case "failure", "error":
 						anyFailed = true
-						allPassed = false
 					case "pending", "running":
 						anyRunning = true
-						allPassed = false
 					default:
-						allPassed = false
+						anyFailed = true
 					}
 				}
 
-				if !wait || (!anyRunning) || time.Now().After(deadline) {
+				if !wait || !anyRunning || time.Now().After(deadline) {
+					if jsonFields != "" {
+						return printJSON(checks.Checks, jsonFields)
+					}
+
 					err = printer.Print(checks.Checks, 0, 0, int64(len(checks.Checks)), false, [][]string{
 						{"check.identifier", "Name"},
 						{"check.status", "Status"},
@@ -80,13 +87,10 @@ func newChecksCmd(f *cmdutils.Factory) *cobra.Command {
 					}
 
 					if anyFailed {
-						os.Exit(1)
+						return &checksExitError{code: 1}
 					}
 					if anyRunning {
-						os.Exit(2)
-					}
-					if allPassed {
-						return nil
+						return &checksExitError{code: 2}
 					}
 					return nil
 				}

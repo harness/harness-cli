@@ -43,13 +43,14 @@ func getLogoutCmd() *cobra.Command {
 				return nil
 			}
 
-			// Read config to get account ID for keychain cleanup
+			// Read config to get account ID and storage mode for credential cleanup
 			if data, err := os.ReadFile(configPath); err == nil {
 				var cfg struct {
-					AccountID string `json:"account_id"`
+					AccountID       string `json:"account_id"`
+					InsecureStorage bool   `json:"insecure_storage"`
 				}
 				if json.Unmarshal(data, &cfg) == nil && cfg.AccountID != "" {
-					store := credential.NewStore(false)
+					store := credential.NewStore(cfg.InsecureStorage)
 					_ = store.Delete(cfg.AccountID)
 				}
 			}

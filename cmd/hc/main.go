@@ -134,15 +134,11 @@ func main() {
 			config.Global.Registry.PkgURL = authConfig.RegistryURL
 		}
 
-		// Load token: try keychain first, then fall back to file
-		if config.Global.AuthToken == "" {
-			if authConfig.Token != "" {
-				config.Global.AuthToken = authConfig.Token
-			} else if authConfig.AccountID != "" {
-				store := credential.NewStore(false)
-				if tok, err := store.Get(authConfig.AccountID); err == nil {
-					config.Global.AuthToken = tok
-				}
+		// Load token from credential store (keychain or file, based on login mode)
+		if config.Global.AuthToken == "" && authConfig.AccountID != "" {
+			store := credential.NewStore(authConfig.InsecureStorage)
+			if tok, err := store.Get(authConfig.AccountID); err == nil {
+				config.Global.AuthToken = tok
 			}
 		}
 	}
@@ -220,10 +216,10 @@ func versionCmd() *cobra.Command {
 	}
 }
 
-// AuthConfig represents authentication configuration
+// AuthConfig represents authentication configuration.
+// Tokens are stored separately via the credential store (keychain or credentials.json).
 type AuthConfig struct {
 	BaseURL         string `json:"base_url"`
-	Token           string `json:"token,omitempty"`
 	AccountID       string `json:"account_id"`
 	OrgID           string `json:"org_id,omitempty"`
 	ProjectID       string `json:"project_id,omitempty"`

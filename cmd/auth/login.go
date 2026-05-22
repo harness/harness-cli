@@ -23,10 +23,9 @@ import (
 )
 
 // AuthConfig represents authentication configuration for saving to disk.
-// The token is stored separately in the system keychain (or insecure file).
+// Tokens are stored separately via the credential store (keychain or credentials.json).
 type AuthConfig struct {
 	BaseURL         string `json:"base_url"`
-	Token           string `json:"token,omitempty"`
 	AccountID       string `json:"account_id"`
 	OrgID           string `json:"org_id,omitempty"`
 	ProjectID       string `json:"project_id,omitempty"`
@@ -292,7 +291,7 @@ func getLoginCmd() *cobra.Command {
 				fmt.Println("✓ Token stored in system keychain")
 			}
 
-			// Save non-secret metadata to disk
+			// Save non-secret metadata to disk (token stored separately)
 			authConfig := AuthConfig{
 				BaseURL:         apiURL,
 				AccountID:       accountID,
@@ -300,9 +299,6 @@ func getLoginCmd() *cobra.Command {
 				ProjectID:       projectID,
 				RegistryURL:     registryURL,
 				InsecureStorage: useInsecure,
-			}
-			if useInsecure {
-				authConfig.Token = token
 			}
 
 			if err := saveAuthConfig(authConfig); err != nil {
