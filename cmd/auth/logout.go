@@ -50,8 +50,9 @@ func getLogoutCmd() *cobra.Command {
 					InsecureStorage bool   `json:"insecure_storage"`
 				}
 				if json.Unmarshal(data, &cfg) == nil && cfg.AccountID != "" {
-					store := credential.NewStore(cfg.InsecureStorage)
-					_ = store.Delete(cfg.AccountID)
+					if store, err := credential.NewStore(cfg.InsecureStorage); err == nil {
+						_ = store.Delete(cfg.AccountID)
+					}
 				}
 			}
 

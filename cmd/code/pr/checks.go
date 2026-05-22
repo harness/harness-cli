@@ -21,6 +21,10 @@ func (e *checksExitError) Error() string {
 	return "some checks are still running"
 }
 
+func (e *checksExitError) ExitCode() int {
+	return e.code
+}
+
 func newChecksCmd(f *cmdutils.Factory) *cobra.Command {
 	var (
 		wait       bool

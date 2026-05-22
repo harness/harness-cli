@@ -52,7 +52,11 @@ func newViewCmd(f *cmdutils.Factory) *cobra.Command {
 			fmt.Fprintf(os.Stdout, "\nStats: +%d -%d across %d files, %d commits\n",
 				pr.Stats.Additions, pr.Stats.Deletions, pr.Stats.FilesChanged, pr.Stats.Commits)
 			if pr.Created > 0 {
-				fmt.Fprintf(os.Stdout, "Created: %s\n", time.Unix(pr.Created/1000, 0).Format(time.RFC3339))
+				created := pr.Created
+				if created > 1e12 {
+					created = created / 1000
+				}
+				fmt.Fprintf(os.Stdout, "Created: %s\n", time.Unix(created, 0).Format(time.RFC3339))
 			}
 
 			return nil

@@ -38,9 +38,12 @@ type FileStore struct {
 	path string
 }
 
-func NewFileStore() *FileStore {
-	homeDir, _ := os.UserHomeDir()
-	return &FileStore{path: filepath.Join(homeDir, ".harness", "credentials.json")}
+func NewFileStore() (*FileStore, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("cannot determine home directory: %w", err)
+	}
+	return &FileStore{path: filepath.Join(homeDir, ".harness", "credentials.json")}, nil
 }
 
 func (f *FileStore) Set(accountID, token string) error {
@@ -100,11 +103,11 @@ func (f *FileStore) writeAll(data map[string]string) error {
 	return os.WriteFile(f.path, raw, 0600)
 }
 
-func NewStore(insecure bool) Store {
+func NewStore(insecure bool) (Store, error) {
 	if insecure {
 		return NewFileStore()
 	}
-	return &KeychainStore{}
+	return &KeychainStore{}, nil
 }
 
 func IsKeyringAvailable() bool {

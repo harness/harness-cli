@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -136,9 +137,10 @@ func main() {
 
 		// Load token from credential store (keychain or file, based on login mode)
 		if config.Global.AuthToken == "" && authConfig.AccountID != "" {
-			store := credential.NewStore(authConfig.InsecureStorage)
-			if tok, err := store.Get(authConfig.AccountID); err == nil {
-				config.Global.AuthToken = tok
+			if store, err := credential.NewStore(authConfig.InsecureStorage); err == nil {
+				if tok, err := store.Get(authConfig.AccountID); err == nil {
+					config.Global.AuthToken = tok
+				}
 			}
 		}
 	}
@@ -199,6 +201,10 @@ func main() {
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
+		var coder interface{ ExitCode() int }
+		if errors.As(err, &coder) {
+			os.Exit(coder.ExitCode())
+		}
 		os.Exit(1)
 	}
 }

@@ -282,7 +282,10 @@ func getLoginCmd() *cobra.Command {
 				useInsecure = true
 			}
 
-			store := credential.NewStore(useInsecure)
+			store, err := credential.NewStore(useInsecure)
+			if err != nil {
+				return fmt.Errorf("failed to initialize credential store: %w", err)
+			}
 			if err := store.Set(accountID, token); err != nil {
 				return fmt.Errorf("failed to save token: %w", err)
 			}

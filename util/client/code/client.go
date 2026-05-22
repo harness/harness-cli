@@ -37,10 +37,16 @@ func NewClientWithBaseURL(baseURL, authToken, accountID string) *Client {
 	r.SetRetryMaxWaitTime(30 * time.Second)
 	r.AddRetryCondition(func(resp *resty.Response, err error) bool {
 		if err != nil {
+			if resp == nil || resp.Request == nil {
+				return true
+			}
+			return resp.Request.Method == http.MethodGet
+		}
+		if resp.StatusCode() == http.StatusTooManyRequests {
 			return true
 		}
-		return resp.StatusCode() == http.StatusTooManyRequests ||
-			resp.StatusCode() >= http.StatusInternalServerError
+		return resp.StatusCode() >= http.StatusInternalServerError &&
+			resp.Request.Method == http.MethodGet
 	})
 	r.SetHeader(apiKeyHeader, authToken)
 	r.SetQueryParam(accountParam, accountID)

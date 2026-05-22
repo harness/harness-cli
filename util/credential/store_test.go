@@ -73,13 +73,15 @@ func TestFileStore_Permissions(t *testing.T) {
 }
 
 func TestNewStore_Insecure(t *testing.T) {
-	store := NewStore(true)
+	store, err := NewStore(true)
+	require.NoError(t, err)
 	_, ok := store.(*FileStore)
 	assert.True(t, ok)
 }
 
 func TestNewStore_Secure(t *testing.T) {
-	store := NewStore(false)
+	store, err := NewStore(false)
+	require.NoError(t, err)
 	_, ok := store.(*KeychainStore)
 	assert.True(t, ok)
 }
