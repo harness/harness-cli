@@ -10,7 +10,6 @@ import (
 
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
-	"github.com/harness/harness-cli/util/common/auth"
 )
 
 type MavenUploadJob struct {
@@ -21,10 +20,11 @@ type MavenUploadJob struct {
 	Version      string
 	FileName     string
 	FileContent  *FileContent
+	PkgClient    *pkgclient.ClientWithResponses
 }
 
 // creates a Maven upload job from a file on disk
-func NewMavenUploadJobFromDisk(filePath, fileName, registryName, groupID, artifactID, version string, fileSize int64) *MavenUploadJob {
+func NewMavenUploadJobFromDisk(filePath, fileName, registryName, groupID, artifactID, version string, fileSize int64, client *pkgclient.ClientWithResponses) *MavenUploadJob {
 	return &MavenUploadJob{
 		BaseFileUploadJob: BaseFileUploadJob{
 			ID:       fileName,
@@ -37,11 +37,12 @@ func NewMavenUploadJobFromDisk(filePath, fileName, registryName, groupID, artifa
 		Version:      version,
 		FileName:     fileName,
 		FileContent:  nil,
+		PkgClient:    client,
 	}
 }
 
 // using for checkusm , as that is inMemory
-func NewMavenUploadJobFromMemory(fileName, registryName, groupID, artifactID, version string, data []byte) *MavenUploadJob {
+func NewMavenUploadJobFromMemory(fileName, registryName, groupID, artifactID, version string, data []byte, client *pkgclient.ClientWithResponses) *MavenUploadJob {
 	return &MavenUploadJob{
 		BaseFileUploadJob: BaseFileUploadJob{
 			ID:       fileName,
@@ -54,15 +55,15 @@ func NewMavenUploadJobFromMemory(fileName, registryName, groupID, artifactID, ve
 		Version:      version,
 		FileName:     fileName,
 		FileContent:  NewFileContentFromMemory(data),
+		PkgClient:    client,
 	}
 }
 
 // performs the Maven artifact upload
 func (j *MavenUploadJob) Upload(ctx context.Context) error {
-	pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-		auth.GetAuthOptionARPKG())
-	if err != nil {
-		return fmt.Errorf("failed to create package client: %w", err)
+	pkgClient := j.PkgClient
+	if pkgClient == nil {
+		return fmt.Errorf("package client not initialized")
 	}
 
 	var reader io.Reader

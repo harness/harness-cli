@@ -87,6 +87,8 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Success("Input parameters validated")
 
+			pkgClient := c.PkgHttpClient()
+
 			progress.Step("Preparing python upload jobs")
 			jobs := make([]upload.FileUploadJob, 0, len(pythonPkgFiles))
 			for _, fileNameWithPath := range pythonPkgFiles {
@@ -107,6 +109,7 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 					metadata.Name,
 					metadata.Version,
 					fileInfo.Size(),
+					pkgClient,
 				)
 				jobs = append(jobs, job)
 			}
@@ -138,9 +141,10 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 	return cmd
 }
 
+
 func uploadSinglePythonPackageFile(fileNameWithPath string, registryName string, progress *p.ConsoleReporter) error {
-	// Initialize the package client
 	pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
+		pkgclient.WithHTTPClient(auth.NewRetryableHTTPClient()),
 		auth.GetAuthOptionARPKG())
 	if err != nil {
 		return fmt.Errorf("failed to create package client: %w", err)

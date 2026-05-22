@@ -12,10 +12,8 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/module/ar/packages/gopkg"
 	"github.com/harness/harness-cli/util"
-	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	p "github.com/harness/harness-cli/util/common/progress"
 
@@ -117,11 +115,7 @@ func NewPushGoCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 
 			// Initialize the package client
-			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-				auth.GetAuthOptionARPKG())
-			if err != nil {
-				return fmt.Errorf("failed to create package client: %w", err)
-			}
+			pkgClient := c.PkgHttpClient()
 
 			// Upload package
 			progress.Step("Uploading package to registry")

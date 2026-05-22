@@ -20,7 +20,6 @@ import (
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util"
-	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	p "github.com/harness/harness-cli/util/common/progress"
 	"github.com/harness/harness-cli/util/common/upload"
@@ -144,6 +143,8 @@ func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Success("Checksum files generated")
 
+			pkgClient := c.PkgHttpClient()
+
 			progress.Step("Preparing upload jobs")
 			jobs := make([]upload.FileUploadJob, 0, len(mavenFilesToUpload)+len(checksumFiles))
 
@@ -164,6 +165,7 @@ func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 					coordsFromPom.ArtifactID,
 					coordsFromPom.Version,
 					fileInfo.Size(),
+					pkgClient,
 				)
 				jobs = append(jobs, job)
 			}
@@ -178,6 +180,7 @@ func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 					coordsFromPom.ArtifactID,
 					coordsFromPom.Version,
 					checksumFile.Content,
+					pkgClient,
 				)
 				jobs = append(jobs, job)
 			}
@@ -194,13 +197,6 @@ func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 					progress.Error(fmt.Sprintf("Failed to upload %s: %v", jobID, err))
 				}
 				return fmt.Errorf("failed to upload %d files", len(errors))
-			}
-
-			// Initialize the package client for metadata operations
-			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-				auth.GetAuthOptionARPKG())
-			if err != nil {
-				return fmt.Errorf("failed to create package client: %w", err)
 			}
 
 			progress.Step("Downloading maven-metadata.xml")
