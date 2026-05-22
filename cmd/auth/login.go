@@ -16,19 +16,22 @@ import (
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/internal/api/ar_v3"
+	"github.com/harness/harness-cli/util/credential"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
 
-// AuthConfig represents authentication configuration for saving to disk
+// AuthConfig represents authentication configuration for saving to disk.
+// The token is stored separately in the system keychain (or insecure file).
 type AuthConfig struct {
-	BaseURL     string `json:"base_url"`
-	Token       string `json:"token"`
-	AccountID   string `json:"account_id"`
-	OrgID       string `json:"org_id,omitempty"`
-	ProjectID   string `json:"project_id,omitempty"`
-	RegistryURL string `json:"registry_url,omitempty"`
+	BaseURL         string `json:"base_url"`
+	Token           string `json:"token,omitempty"`
+	AccountID       string `json:"account_id"`
+	OrgID           string `json:"org_id,omitempty"`
+	ProjectID       string `json:"project_id,omitempty"`
+	RegistryURL     string `json:"registry_url,omitempty"`
+	InsecureStorage bool   `json:"insecure_storage,omitempty"`
 }
 
 // getAuthConfigPath returns the path to the auth config file
@@ -162,12 +165,13 @@ func validateCredentials(apiURL, token, accountID string) error {
 
 func getLoginCmd() *cobra.Command {
 	var (
-		apiURL         string
-		token          string
-		accountID      string
-		orgID          string
-		projectID      string
-		nonInteractive bool
+		apiURL          string
+		token           string
+		accountID       string
+		orgID           string
+		projectID       string
+		nonInteractive  bool
+		insecureStorage bool
 	)
 
 	cmd := &cobra.Command{
@@ -271,17 +275,36 @@ func getLoginCmd() *cobra.Command {
 				fmt.Println("✓ Registry configuration fetched successfully")
 			}
 
-			// Create auth config struct for saving to file
-			authConfig := AuthConfig{
-				BaseURL:     apiURL,
-				Token:       token,
-				AccountID:   accountID,
-				OrgID:       orgID,
-				ProjectID:   projectID,
-				RegistryURL: registryURL,
+			// Store token securely
+			useInsecure := insecureStorage
+			if !useInsecure && !credential.IsKeyringAvailable() {
+				fmt.Println("Warning: system keychain is not available. Falling back to insecure file storage.")
+				fmt.Println("         Use --insecure-storage to suppress this warning.")
+				useInsecure = true
 			}
 
-			// Save config to disk
+			store := credential.NewStore(useInsecure)
+			if err := store.Set(accountID, token); err != nil {
+				return fmt.Errorf("failed to save token: %w", err)
+			}
+
+			if !useInsecure {
+				fmt.Println("✓ Token stored in system keychain")
+			}
+
+			// Save non-secret metadata to disk
+			authConfig := AuthConfig{
+				BaseURL:         apiURL,
+				AccountID:       accountID,
+				OrgID:           orgID,
+				ProjectID:       projectID,
+				RegistryURL:     registryURL,
+				InsecureStorage: useInsecure,
+			}
+			if useInsecure {
+				authConfig.Token = token
+			}
+
 			if err := saveAuthConfig(authConfig); err != nil {
 				return fmt.Errorf("failed to save authentication config: %w", err)
 			}
@@ -317,6 +340,8 @@ func getLoginCmd() *cobra.Command {
 	cmd.Flags().StringVar(&projectID, "project", "", "Project ID")
 	cmd.Flags().BoolVar(&nonInteractive, "non-interactive", false,
 		"Disable interactive prompts (requires all mandatory flags)")
+	cmd.Flags().BoolVar(&insecureStorage, "insecure-storage", false,
+		"Store token in plaintext file instead of system keychain")
 
 	// Don't mark flags as required as we'll handle missing flags in interactive mode
 	// We'll validate the values in the RunE function instead

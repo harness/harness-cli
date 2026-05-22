@@ -18,6 +18,7 @@ import (
 	"github.com/harness/harness-cli/cmd/iacm"
 	"github.com/harness/harness-cli/cmd/registry"
 	"github.com/harness/harness-cli/config"
+	"github.com/harness/harness-cli/util/credential"
 	"github.com/harness/harness-cli/util/templates"
 
 	"github.com/rs/zerolog"
@@ -117,12 +118,8 @@ func main() {
 	// Load auth config
 	authConfig, err := loadAuthConfig()
 	if err == nil {
-		// Use config values if not overridden by flags
 		if config.Global.APIBaseURL == "" {
 			config.Global.APIBaseURL = authConfig.BaseURL
-		}
-		if config.Global.AuthToken == "" {
-			config.Global.AuthToken = authConfig.Token
 		}
 		if config.Global.AccountID == "" {
 			config.Global.AccountID = authConfig.AccountID
@@ -133,13 +130,20 @@ func main() {
 		if config.Global.ProjectID == "" {
 			config.Global.ProjectID = authConfig.ProjectID
 		}
-		if config.Global.Registry.PkgURL == "" {
-			if authConfig.RegistryURL == "" {
-				fmt.Println("RegistryURL missing , Please logout and login again")
-
-			}
+		if config.Global.Registry.PkgURL == "" && authConfig.RegistryURL != "" {
 			config.Global.Registry.PkgURL = authConfig.RegistryURL
+		}
 
+		// Load token: try keychain first, then fall back to file
+		if config.Global.AuthToken == "" {
+			if authConfig.Token != "" {
+				config.Global.AuthToken = authConfig.Token
+			} else if authConfig.AccountID != "" {
+				store := credential.NewStore(false)
+				if tok, err := store.Get(authConfig.AccountID); err == nil {
+					config.Global.AuthToken = tok
+				}
+			}
 		}
 	}
 
@@ -218,12 +222,13 @@ func versionCmd() *cobra.Command {
 
 // AuthConfig represents authentication configuration
 type AuthConfig struct {
-	BaseURL     string `json:"base_url"`
-	Token       string `json:"token"`
-	AccountID   string `json:"account_id"`
-	OrgID       string `json:"org_id,omitempty"`
-	ProjectID   string `json:"project_id,omitempty"`
-	RegistryURL string `json:"registry_url,omitempty"`
+	BaseURL         string `json:"base_url"`
+	Token           string `json:"token,omitempty"`
+	AccountID       string `json:"account_id"`
+	OrgID           string `json:"org_id,omitempty"`
+	ProjectID       string `json:"project_id,omitempty"`
+	RegistryURL     string `json:"registry_url,omitempty"`
+	InsecureStorage bool   `json:"insecure_storage,omitempty"`
 }
 
 // getAuthConfigPath returns the path to the auth config file

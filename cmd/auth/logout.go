@@ -1,11 +1,13 @@
 package auth
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/harness/harness-cli/config"
+	"github.com/harness/harness-cli/util/credential"
 
 	"github.com/spf13/cobra"
 )
@@ -39,6 +41,17 @@ func getLogoutCmd() *cobra.Command {
 				}
 				fmt.Println("No authentication file found. Already logged out.")
 				return nil
+			}
+
+			// Read config to get account ID for keychain cleanup
+			if data, err := os.ReadFile(configPath); err == nil {
+				var cfg struct {
+					AccountID string `json:"account_id"`
+				}
+				if json.Unmarshal(data, &cfg) == nil && cfg.AccountID != "" {
+					store := credential.NewStore(false)
+					_ = store.Delete(cfg.AccountID)
+				}
 			}
 
 			// Delete the config file
