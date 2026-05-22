@@ -73,7 +73,7 @@ func uploadBuildInfo(
 	v3Client := f.RegistryV3HttpClient()
 	if overrideURL := os.Getenv("BUILD_INFO_URL"); overrideURL != "" {
 		log.Info().Str("url", overrideURL).Msg("Using BUILD_INFO_URL override for build info upload")
-		override, oErr := ar_v3.NewClientWithResponses(overrideURL)
+		override, oErr := f.NewRegistryV3HttpClientWithURL(overrideURL)
 		if oErr == nil {
 			v3Client = override
 		}

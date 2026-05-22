@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/hashicorp/go-retryablehttp"
+
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/internal/api/ar"
 	"github.com/harness/harness-cli/internal/api/ar_pkg"
@@ -15,6 +17,12 @@ import (
 const (
 	JWTTokenPrefix = "CIManager"
 )
+
+// NewRetryableHTTPClient creates a hashicorp retryable HTTP client
+func NewRetryableHTTPClient() *http.Client {
+	retryableClient := retryablehttp.NewClient()
+	return retryableClient.StandardClient()
+}
 
 // GetXApiKeyOptionAR
 // TODO Generics will be difficult coz of RequestEditors but there are possibility of optimisations

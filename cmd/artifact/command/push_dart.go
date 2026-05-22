@@ -15,10 +15,8 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/module/ar/migrate/types/dart"
 	"github.com/harness/harness-cli/util"
-	"github.com/harness/harness-cli/util/common/auth"
 	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/google/uuid"
@@ -114,12 +112,7 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 
 			// Initialize the package client
 			progress.Step("Initializing package client")
-			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-				auth.GetAuthOptionARPKG())
-			if err != nil {
-				progress.Error("Failed to create package client")
-				return fmt.Errorf("failed to create package client: %w", err)
-			}
+			pkgClient := f.PkgHttpClient()
 
 			// Open the tar.gz file for upload
 			progress.Step("Preparing package file for upload")

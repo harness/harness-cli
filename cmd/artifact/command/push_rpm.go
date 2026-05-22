@@ -13,9 +13,7 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util"
-	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	"github.com/harness/harness-cli/util/common/fileutil"
 	p "github.com/harness/harness-cli/util/common/progress"
@@ -87,11 +85,7 @@ func NewPushRpmCmd(c *cmdutils.Factory) *cobra.Command {
 			progress.Success("Input parameters validated")
 
 			// Initialize the package client
-			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-				auth.GetAuthOptionARPKG())
-			if err != nil {
-				return fmt.Errorf("failed to create package client: %w", err)
-			}
+			pkgClient := c.PkgHttpClient()
 
 			file, err := os.Open(filePath)
 			if err != nil {
