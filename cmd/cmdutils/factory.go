@@ -1,6 +1,7 @@
 package cmdutils
 
 import (
+	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/internal/api/ar"
 	"github.com/harness/harness-cli/internal/api/ar_pkg"
@@ -21,7 +22,7 @@ type Factory struct {
 
 func (f *Factory) NewRegistryV3HttpClientWithURL(url string) (*ar_v3.ClientWithResponses, error) {
 	return ar_v3.NewClientWithResponses(url,
-		ar_v3.WithHTTPClient(auth.NewRetryableHTTPClient()),
+		ar_v3.WithHTTPClient(utils.NewRetryClientWithoutProgress()),
 		auth.GetXApiKeyOptionARV3())
 }
 
@@ -29,7 +30,7 @@ func NewFactory() *Factory {
 	return &Factory{
 		RegistryHttpClient: func() *ar.ClientWithResponses {
 			client, err := ar.NewClientWithResponses(config.Global.APIBaseURL+"/gateway/har/api/v1",
-				ar.WithHTTPClient(auth.NewRetryableHTTPClient()),
+				ar.WithHTTPClient(utils.NewRetryClientWithoutProgress()),
 				auth.GetXApiKeyOptionAR())
 			if err != nil {
 				log.Fatal().Msgf("Error creating client: %v", err)
@@ -38,7 +39,7 @@ func NewFactory() *Factory {
 		},
 		RegistryV2HttpClient: func() *ar_v2.ClientWithResponses {
 			client, err := ar_v2.NewClientWithResponses(config.Global.APIBaseURL+"/gateway/har/api/v2",
-				ar_v2.WithHTTPClient(auth.NewRetryableHTTPClient()),
+				ar_v2.WithHTTPClient(utils.NewRetryClientWithoutProgress()),
 				auth.GetXApiKeyOptionARV2())
 			if err != nil {
 				log.Fatal().Msgf("Error creating client: %v", err)
@@ -47,7 +48,7 @@ func NewFactory() *Factory {
 		},
 		RegistryV3HttpClient: func() *ar_v3.ClientWithResponses {
 			client, err := ar_v3.NewClientWithResponses(config.Global.APIBaseURL+"/gateway/har/api/v3",
-				ar_v3.WithHTTPClient(auth.NewRetryableHTTPClient()),
+				ar_v3.WithHTTPClient(utils.NewRetryClientWithoutProgress()),
 				auth.GetXApiKeyOptionARV3())
 			if err != nil {
 				log.Fatal().Msgf("Error creating client: %v", err)
@@ -56,7 +57,7 @@ func NewFactory() *Factory {
 		},
 		PkgHttpClient: func() *ar_pkg.ClientWithResponses {
 			client, err := ar_pkg.NewClientWithResponses(config.Global.Registry.PkgURL,
-				ar_pkg.WithHTTPClient(auth.NewRetryableHTTPClient()),
+				ar_pkg.WithHTTPClient(utils.NewRetryClientWithoutProgress()),
 				auth.GetAuthOptionARPKG())
 			if err != nil {
 				log.Fatal().Msgf("Error creating pkg client: %v", err)
