@@ -66,6 +66,12 @@ type UploadDartPackageMultipartBody struct {
 	File openapi_types.File `json:"file"`
 }
 
+// UploadPuppetPackageMultipartBody defines parameters for UploadPuppetPackage.
+type UploadPuppetPackageMultipartBody struct {
+	// File Puppet module .tar.gz tarball
+	File *openapi_types.File `json:"file,omitempty"`
+}
+
 // UploadPythonPackageMultipartBody defines parameters for UploadPythonPackage.
 type UploadPythonPackageMultipartBody struct {
 	// File Package .whl or .tar.gz file to upload
@@ -98,6 +104,9 @@ type UploadNugetPackageMultipartRequestBody UploadNugetPackageMultipartBody
 
 // UploadDartPackageMultipartRequestBody defines body for UploadDartPackage for multipart/form-data ContentType.
 type UploadDartPackageMultipartRequestBody UploadDartPackageMultipartBody
+
+// UploadPuppetPackageMultipartRequestBody defines body for UploadPuppetPackage for multipart/form-data ContentType.
+type UploadPuppetPackageMultipartRequestBody UploadPuppetPackageMultipartBody
 
 // UploadPythonPackageMultipartRequestBody defines body for UploadPythonPackage for multipart/form-data ContentType.
 type UploadPythonPackageMultipartRequestBody UploadPythonPackageMultipartBody
@@ -231,6 +240,9 @@ type ClientInterface interface {
 
 	// UploadDartPackageWithBody request with any body
 	UploadDartPackageWithBody(ctx context.Context, accountId string, registry string, uploadId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadPuppetPackageWithBody request with any body
+	UploadPuppetPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UploadPythonPackageWithBody request with any body
 	UploadPythonPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -436,6 +448,18 @@ func (c *Client) UploadNugetPackageWithBody(ctx context.Context, accountId strin
 
 func (c *Client) UploadDartPackageWithBody(ctx context.Context, accountId string, registry string, uploadId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadDartPackageRequestWithBody(c.Server, accountId, registry, uploadId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadPuppetPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadPuppetPackageRequestWithBody(c.Server, accountId, registry, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1366,6 +1390,49 @@ func NewUploadDartPackageRequestWithBody(server string, accountId string, regist
 	return req, nil
 }
 
+// NewUploadPuppetPackageRequestWithBody generates requests for UploadPuppetPackage with any type of body
+func NewUploadPuppetPackageRequestWithBody(server string, accountId string, registry string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "registry", runtime.ParamLocationPath, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pkg/%s/%s/puppet/upload", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewUploadPythonPackageRequestWithBody generates requests for UploadPythonPackage with any type of body
 func NewUploadPythonPackageRequestWithBody(server string, accountId string, registry string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -1609,6 +1676,9 @@ type ClientWithResponsesInterface interface {
 
 	// UploadDartPackageWithBodyWithResponse request with any body
 	UploadDartPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, uploadId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadDartPackageResp, error)
+
+	// UploadPuppetPackageWithBodyWithResponse request with any body
+	UploadPuppetPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadPuppetPackageResp, error)
 
 	// UploadPythonPackageWithBodyWithResponse request with any body
 	UploadPythonPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadPythonPackageResp, error)
@@ -1977,6 +2047,27 @@ func (r UploadDartPackageResp) StatusCode() int {
 	return 0
 }
 
+type UploadPuppetPackageResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadPuppetPackageResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadPuppetPackageResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type UploadPythonPackageResp struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2191,6 +2282,15 @@ func (c *ClientWithResponses) UploadDartPackageWithBodyWithResponse(ctx context.
 		return nil, err
 	}
 	return ParseUploadDartPackageResp(rsp)
+}
+
+// UploadPuppetPackageWithBodyWithResponse request with arbitrary body returning *UploadPuppetPackageResp
+func (c *ClientWithResponses) UploadPuppetPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadPuppetPackageResp, error) {
+	rsp, err := c.UploadPuppetPackageWithBody(ctx, accountId, registry, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadPuppetPackageResp(rsp)
 }
 
 // UploadPythonPackageWithBodyWithResponse request with arbitrary body returning *UploadPythonPackageResp
@@ -2485,6 +2585,22 @@ func ParseUploadDartPackageResp(rsp *http.Response) (*UploadDartPackageResp, err
 	}
 
 	response := &UploadDartPackageResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseUploadPuppetPackageResp parses an HTTP response from a UploadPuppetPackageWithResponse call
+func ParseUploadPuppetPackageResp(rsp *http.Response) (*UploadPuppetPackageResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadPuppetPackageResp{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
