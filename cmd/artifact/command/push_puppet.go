@@ -17,8 +17,6 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
-	"github.com/harness/harness-cli/util/common/auth"
 	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/spf13/cobra"
@@ -100,13 +98,8 @@ func NewPushPuppetCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 			progress.Success(fmt.Sprintf("Module metadata extracted: %s@%s", metadata.Name, metadata.Version))
 
-			pkgClient, err := pkgclient.NewClientWithResponses(
-				config.Global.Registry.PkgURL,
-				auth.GetAuthOptionARPKG(),
-			)
-			if err != nil {
-				return fmt.Errorf("failed to create package client: %w", err)
-			}
+			// Initialize the package client
+			pkgClient := c.PkgHttpClient()
 
 			file, err := os.Open(packageFilePath)
 			if err != nil {
@@ -220,4 +213,3 @@ func extractPuppetMetadata(path string) (*puppetMetadata, error) {
 	}
 	return nil, fmt.Errorf("%s not found at top level of tarball", puppetMetadataKey)
 }
-

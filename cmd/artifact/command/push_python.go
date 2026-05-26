@@ -141,10 +141,9 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 	return cmd
 }
 
-
 func uploadSinglePythonPackageFile(fileNameWithPath string, registryName string, progress *p.ConsoleReporter) error {
+	// Initialize the package client
 	pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-		pkgclient.WithHTTPClient(auth.NewRetryableHTTPClient()),
 		auth.GetAuthOptionARPKG())
 	if err != nil {
 		return fmt.Errorf("failed to create package client: %w", err)
