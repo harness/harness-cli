@@ -1,4 +1,4 @@
-package utils
+package auth
 
 import (
 	"fmt"
@@ -15,18 +15,18 @@ func NewRetryClientWithoutProgress() *http.Client {
 	retryClient := retryablehttp.NewClient()
 	retryClient.RetryMax = 3
 	retryClient.Logger = nil
+	// Create progress reporter
 	progress := p.NewConsoleReporter()
+
 	retryClient.RequestLogHook = func(
 		_ retryablehttp.Logger,
 		req *http.Request,
 		retryNumber int,
 	) {
 		if retryNumber > 0 {
-			//TODO format message
+			fmt.Println()
 			progress.Step(fmt.Sprintf(
-				"Retrying request: %s %s (attempt %d/%d)",
-				req.Method,
-				req.URL.String(),
+				"Retrying request: (attempt %d/%d)",
 				retryNumber,
 				retryClient.RetryMax,
 			))
@@ -38,11 +38,13 @@ func NewRetryClientWithoutProgress() *http.Client {
 		resp *http.Response,
 	) {
 		if resp != nil {
-			//TODO switch statusCode and print message as per response
+			result := "Request Failed"
+			if resp.StatusCode == 201 || resp.StatusCode == 200 {
+				result = "Request succeeded"
+			}
 			progress.Step(fmt.Sprintf(
-				"Request failed: %s %s -> status %d",
-				resp.Request.Method,
-				resp.Request.URL.String(),
+				"%s : -> status %d",
+				result,
 				resp.StatusCode,
 			))
 		}
@@ -50,7 +52,7 @@ func NewRetryClientWithoutProgress() *http.Client {
 	return retryClient.StandardClient()
 }
 
-// NewRetryClient creates a new retryable HTTP client with progress reporting hooks.
+// creates a new retryable HTTP client with progress reporting hooks.
 // It returns a standard *http.Client that can be used with pkgclient.WithHTTPClient().
 func NewRetryClient(progress p.Reporter) *http.Client {
 	retryClient := retryablehttp.NewClient()
