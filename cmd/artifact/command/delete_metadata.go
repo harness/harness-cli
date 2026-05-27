@@ -77,6 +77,10 @@ func NewMetadataDeleteCmd(f *cmdutils.Factory) *cobra.Command {
 				return fmt.Errorf("request failed with status: %d", response.StatusCode())
 			}
 
+			if response.JSON200 != nil && len(metadataItems) > 0 {
+				return metadata.PrintMetadataInput(metadataItems)
+			}
+
 			p.Success("Metadata deleted successfully")
 			return nil
 		},

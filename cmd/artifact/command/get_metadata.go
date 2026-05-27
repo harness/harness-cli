@@ -7,8 +7,8 @@ import (
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/internal/api/ar_v2"
-	"github.com/harness/harness-cli/util/common/printer"
 	"github.com/harness/harness-cli/util/common/progress"
+	"github.com/harness/harness-cli/util/metadata"
 
 	"github.com/spf13/cobra"
 )
@@ -66,10 +66,7 @@ func NewMetadataGetCmd(f *cmdutils.Factory) *cobra.Command {
 			p.Success("Metadata fetched")
 
 			if response.JSON200 != nil && len(response.JSON200.Data.Metadata) > 0 {
-				return printer.Print(response.JSON200.Data.Metadata, 0, 1, int64(len(response.JSON200.Data.Metadata)), false, [][]string{
-					{"key", "Key"},
-					{"value", "Value"},
-				})
+				return metadata.PrintMetadataOutput(response.JSON200.Data.Metadata)
 			}
 
 			fmt.Println("No metadata found")

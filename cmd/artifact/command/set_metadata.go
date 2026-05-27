@@ -77,6 +77,10 @@ func NewMetadataSetCmd(f *cmdutils.Factory) *cobra.Command {
 				return fmt.Errorf("request failed with status: %d", response.StatusCode())
 			}
 
+			if response.JSON200 != nil && len(response.JSON200.Data.Metadata) > 0 {
+				return metadata.PrintMetadataOutput(response.JSON200.Data.Metadata)
+			}
+
 			p.Success("Metadata updated successfully")
 			return nil
 		},
