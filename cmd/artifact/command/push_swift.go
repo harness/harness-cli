@@ -50,8 +50,9 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 			filePath := args[1]
 			targetPackagePath := args[2]
 
+			verbose, _ := cmd.Flags().GetBool("verbose")
 			// Create progress reporter
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporter(verbose)
 
 			// Validate Registry Name and file_path
 			progress.Start("Validating input parameters")

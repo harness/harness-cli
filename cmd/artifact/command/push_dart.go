@@ -45,8 +45,9 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 			registryName := args[0]
 			packageFilePath := args[1]
 
+			verbose, _ := cmd.Flags().GetBool("verbose")
 			// Create progress reporter
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporter(verbose)
 
 			// Validate input parameters
 			progress.Start("Validating input parameters")

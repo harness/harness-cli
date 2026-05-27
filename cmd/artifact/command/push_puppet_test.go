@@ -266,4 +266,3 @@ func TestNewPushPuppetCmd_WrongArgCount(t *testing.T) {
 		t.Fatal("expected error for missing second arg")
 	}
 }
-

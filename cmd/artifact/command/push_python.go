@@ -58,8 +58,9 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 			registryName := args[0]
 			filePath := args[1]
 
+			verbose, _ := cmd.Flags().GetBool("verbose")
 			// Create progress reporter
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporter(verbose)
 
 			// Validate file exists
 			fileInfo, err := os.Stat(filePath)
@@ -138,7 +139,7 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 	return cmd
 }
 
-func uploadSinglePythonPackageFile(fileNameWithPath string, registryName string, progress *p.ConsoleReporter) error {
+func uploadSinglePythonPackageFile(fileNameWithPath string, registryName string, progress p.Reporter) error {
 	// Initialize the package client
 	pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
 		auth.GetAuthOptionARPKG())
@@ -337,7 +338,7 @@ func isValidPythonPackageFile(fileName string) (bool, error) {
 }
 
 // scanFolderForPackages scans a folder and returns all .tar.gz and .whl files
-func scanFolderForPackages(folderPath string, progress *p.ConsoleReporter) ([]string, error) {
+func scanFolderForPackages(folderPath string, progress p.Reporter) ([]string, error) {
 	entries, err := os.ReadDir(folderPath)
 	if err != nil {
 		return nil, err

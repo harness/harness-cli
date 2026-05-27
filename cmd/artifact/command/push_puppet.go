@@ -61,7 +61,9 @@ func NewPushPuppetCmd(c *cmdutils.Factory) *cobra.Command {
 			registryName := args[0]
 			packageFilePath := args[1]
 
-			progress := p.NewConsoleReporter()
+			verbose, _ := cmd.Flags().GetBool("verbose")
+			// Create progress reporter
+			progress := p.NewReporter(verbose)
 
 			progress.Start("Validating input parameters")
 
@@ -220,4 +222,3 @@ func extractPuppetMetadata(path string) (*puppetMetadata, error) {
 	}
 	return nil, fmt.Errorf("%s not found at top level of tarball", puppetMetadataKey)
 }
-

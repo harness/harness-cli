@@ -62,8 +62,9 @@ func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 			registryName := args[0]
 			pkgFilePath := args[1]
 
+			verbose, _ := cmd.Flags().GetBool("verbose")
 			// Create progress reporter
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporter(verbose)
 			var mavenFilesToUpload []string
 
 			packageFileName := filepath.Base(pkgFilePath)
@@ -242,7 +243,7 @@ func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 	return cmd
 }
 
-func uploadSingleMavenPackageFile(pkgClient *pkgclient.ClientWithResponses, fileNameWithPath string, registryName string, progress *p.ConsoleReporter, coords *mavenPackageMetadata) error {
+func uploadSingleMavenPackageFile(pkgClient *pkgclient.ClientWithResponses, fileNameWithPath string, registryName string, progress p.Reporter, coords *mavenPackageMetadata) error {
 
 	file, err := os.Open(fileNameWithPath)
 	if err != nil {
@@ -641,7 +642,7 @@ func uploadInMemoryMavenFile(
 	pkgClient *pkgclient.ClientWithResponses,
 	checkSumfile InMemoryUploadFile,
 	registryName string,
-	progress *p.ConsoleReporter,
+	progress p.Reporter,
 	coords *mavenPackageMetadata,
 ) error {
 
@@ -781,7 +782,7 @@ func newMavenMetadataXml(groupID string, artifactID string, version string) *Mav
 func uploadMavenMetadataXML(
 	pkgClient *pkgclient.ClientWithResponses,
 	registryName string,
-	progress *p.ConsoleReporter,
+	progress p.Reporter,
 	coords *mavenPackageMetadata,
 	metadata *MavenMetadataXMLStruct,
 ) error {

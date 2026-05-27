@@ -39,9 +39,9 @@ func NewPushGoCmd(c *cmdutils.Factory) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]
 			dir := args[1]
-
+			verbose, _ := cmd.Flags().GetBool("verbose")
 			// Create progress reporter
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporter(verbose)
 
 			// Validate Registry Name and Version
 			progress.Start("Validating input parameters")
