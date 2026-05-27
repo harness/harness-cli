@@ -1,4 +1,4 @@
-package auth
+package httpclient
 
 import (
 	"fmt"
@@ -8,49 +8,6 @@ import (
 
 	retryablehttp "github.com/hashicorp/go-retryablehttp"
 )
-
-// creates a retryable HTTP client without progress reporting hooks.
-// Use this when you don't have access to a progress reporter.
-func NewRetryClientWithoutProgress() *http.Client {
-	retryClient := retryablehttp.NewClient()
-	retryClient.RetryMax = 3
-	retryClient.Logger = nil
-	// Create progress reporter
-	progress := p.NewConsoleReporter()
-
-	retryClient.RequestLogHook = func(
-		_ retryablehttp.Logger,
-		req *http.Request,
-		retryNumber int,
-	) {
-		if retryNumber > 0 {
-			fmt.Println()
-			progress.Step(fmt.Sprintf(
-				"Retrying request: (attempt %d/%d)",
-				retryNumber,
-				retryClient.RetryMax,
-			))
-		}
-	}
-
-	retryClient.ResponseLogHook = func(
-		_ retryablehttp.Logger,
-		resp *http.Response,
-	) {
-		if resp != nil {
-			result := "Request Failed"
-			if resp.StatusCode == 201 || resp.StatusCode == 200 {
-				result = "Request succeeded"
-			}
-			progress.Step(fmt.Sprintf(
-				"%s : -> status %d",
-				result,
-				resp.StatusCode,
-			))
-		}
-	}
-	return retryClient.StandardClient()
-}
 
 // creates a new retryable HTTP client with progress reporting hooks.
 // It returns a standard *http.Client that can be used with pkgclient.WithHTTPClient().

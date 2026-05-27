@@ -85,12 +85,11 @@ func NewPushCondaCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Success("Input parameters validated")
 
-			// Initialize the package client
-			pkgClient := c.PkgHttpClient()
+			// Initialize the package client with retry and progress support
+			pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), "conda")
 
 			// Upload package
 			progress.Step("Uploading package to registry")
-			// upload file from filepath to registry using pkgClient.UploadCondaPackageWithBodyWithResponse
 
 			file, err := os.Open(filePath)
 			if err != nil {
@@ -98,11 +97,6 @@ func NewPushCondaCmd(c *cmdutils.Factory) *cobra.Command {
 				return err
 			}
 			defer file.Close()
-
-			// Initialize progress reader
-			bufferSize := int64(fileInfo.Size())
-			reader, closer := p.Reader(bufferSize, file, "conda")
-			defer closer()
 
 			// Initialize customHeaders if nil
 			if customHeaders == nil {
@@ -129,7 +123,7 @@ func NewPushCondaCmd(c *cmdutils.Factory) *cobra.Command {
 				config.Global.AccountID,
 				registryName,
 				"application/octet-stream",
-				reader,
+				file,
 				customHeaderEditor,
 			)
 

@@ -85,7 +85,7 @@ func NewPushRpmCmd(c *cmdutils.Factory) *cobra.Command {
 			progress.Success("Input parameters validated")
 
 			// Initialize the package client
-			pkgClient := c.PkgHttpClient()
+			//pkgClient := c.PkgHttpClient()
 
 			file, err := os.Open(filePath)
 			if err != nil {
@@ -110,19 +110,18 @@ func NewPushRpmCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 
 			fileWriter.Close()
-
-			// Initialize progress reader
-			progress.Step("Uploading package to registry")
 			bufferSize := int64(formData.Len())
-			reader, closer := p.Reader(bufferSize, &formData, "rpm")
-			defer closer()
+			pkgClient := c.PkgHttpClientWithProgress(progress, bufferSize, "rpm")
+
+			// Upload package
+			progress.Step("Uploading package to registry")
 
 			resp, err := pkgClient.UploadRpmPackageWithBodyWithResponse(
 				context.Background(),
 				config.Global.AccountID,
 				registryName,
 				fileWriter.FormDataContentType(),
-				reader,
+				&formData,
 			)
 
 			if err != nil {
