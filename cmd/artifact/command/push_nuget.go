@@ -114,8 +114,6 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 			// Initialize progress reader
 			progress.Step("Uploading package to registry")
 			bufferSize := int64(formData.Len())
-			reader, closer := p.Reader(bufferSize, &formData, "nupkg")
-			defer closer()
 
 			if len(path) > 0 {
 				//This section will get executed only when a nested path is provided via flag
@@ -124,7 +122,7 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 					context.Background(),
 					apiUrlForNestedDirectory,
 					fileWriter.FormDataContentType(),
-					reader,
+					&formData,
 					config.Global.AuthToken,
 					progress,
 					bufferSize,
