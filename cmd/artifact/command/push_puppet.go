@@ -98,9 +98,6 @@ func NewPushPuppetCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 			progress.Success(fmt.Sprintf("Module metadata extracted: %s@%s", metadata.Name, metadata.Version))
 
-			// Initialize the package client
-			pkgClient := c.PkgHttpClient()
-
 			file, err := os.Open(packageFilePath)
 			if err != nil {
 				progress.Error("Failed to open package file")
@@ -125,15 +122,14 @@ func NewPushPuppetCmd(c *cmdutils.Factory) *cobra.Command {
 			}()
 
 			progress.Step("Uploading module to registry")
-			reader, closer := p.Reader(fileInfo.Size(), pr, fileInfo.Name())
-			defer closer()
 
+			pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), fileInfo.Name())
 			resp, err := pkgClient.UploadPuppetPackageWithBodyWithResponse(
 				context.Background(),
 				config.Global.AccountID,
 				registryName,
 				writer.FormDataContentType(),
-				reader,
+				pr,
 			)
 			if err != nil {
 				progress.Error("Failed to upload Puppet module")

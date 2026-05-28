@@ -16,6 +16,7 @@ import (
 	"github.com/harness/harness-cli/util"
 	"github.com/harness/harness-cli/util/common/errors"
 	"github.com/harness/harness-cli/util/common/fileutil"
+	"github.com/harness/harness-cli/util/common/httpclient"
 	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/spf13/cobra"
@@ -86,9 +87,6 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Success("Input parameters validated")
 
-			// Initialize the package client
-			pkgClient := c.PkgHttpClient()
-
 			file, err := os.Open(filePath)
 			if err != nil {
 				progress.Error("Failed to open package file")
@@ -128,18 +126,21 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 					fileWriter.FormDataContentType(),
 					reader,
 					config.Global.AuthToken,
+					progress,
+					bufferSize,
 				)
 				if err != nil {
 					return err
 				}
 
 			} else {
+				pkgClient := c.PkgHttpClientWithProgress(progress, bufferSize, "nupkg")
 				resp, err := pkgClient.UploadNugetPackageWithBodyWithResponse(
 					context.Background(),
 					config.Global.AccountID,
 					registryName,
 					fileWriter.FormDataContentType(),
-					reader,
+					&formData,
 				)
 
 				if err != nil {
@@ -164,7 +165,7 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 	return cmd
 }
 
-func uploadNugetPackageDirect(ctx context.Context, url string, contentType string, body io.Reader, apiKey string) error {
+func uploadNugetPackageDirect(ctx context.Context, url string, contentType string, body io.Reader, apiKey string, progress p.Reporter, bufferSize int64) error {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, body)
 	if err != nil {
@@ -175,7 +176,8 @@ func uploadNugetPackageDirect(ctx context.Context, url string, contentType strin
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("x-api-key", apiKey)
 
-	client := &http.Client{}
+	//creating retry client
+	client := httpclient.NewRetryClientWithProgress(progress, bufferSize, "nupkg")
 
 	resp, err := client.Do(req)
 	if err != nil {

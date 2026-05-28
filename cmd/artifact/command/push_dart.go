@@ -110,10 +110,6 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 			}
 			progress.Success(fmt.Sprintf("Package metadata extracted: %s@%s", pubspec.Name, pubspec.Version))
 
-			// Initialize the package client
-			progress.Step("Initializing package client")
-			pkgClient := f.PkgHttpClient()
-
 			// Open the tar.gz file for upload
 			progress.Step("Preparing package file for upload")
 			file, err := os.Open(packageFilePath)
@@ -154,8 +150,10 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 
 			// Initialize progress reader for upload tracking
 			bufferSize := fileInfo.Size()
-			reader, closer := p.Reader(bufferSize, pr, fileInfo.Name())
-			defer closer()
+
+			// Initialize the package client
+			progress.Step("Initializing package client")
+			pkgClient := f.PkgHttpClientWithProgress(progress, bufferSize, fileInfo.Name())
 
 			resp, err := pkgClient.UploadDartPackageWithBodyWithResponse(
 				context.Background(),
@@ -163,7 +161,7 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 				registryName,
 				uploadID,
 				writer.FormDataContentType(),
-				reader,
+				pr,
 			)
 			if err != nil {
 				progress.Error("Failed to upload Dart package")

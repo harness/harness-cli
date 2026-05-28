@@ -126,9 +126,6 @@ func NewPushCargoCmd(f *cmdutils.Factory) *cobra.Command {
 
 			progress.Success("Input parameters validated")
 
-			// Initialize the package client
-			pkgClient := f.PkgHttpClient()
-
 			defer file.Close()
 
 			var formData bytes.Buffer
@@ -145,20 +142,18 @@ func NewPushCargoCmd(f *cmdutils.Factory) *cobra.Command {
 			}
 
 			fileWriter.Close()
+			bufferSize := int64(len(payload))
+			pkgClient := f.PkgHttpClientWithProgress(progress, bufferSize, "cargo")
 
 			// Initialize progress reader
 			progress.Step("Uploading package to registry")
-			bufferSize := int64(len(payload))
-
-			reader, closer := p.Reader(bufferSize, bytes.NewReader(payload), "cargo")
-			defer closer()
 
 			resp, err := pkgClient.UploadCargoPackageWithBodyWithResponse(
 				context.Background(),
 				config.Global.AccountID,
 				registryName,
 				fileWriter.FormDataContentType(),
-				reader,
+				&formData,
 			)
 
 			if err != nil {

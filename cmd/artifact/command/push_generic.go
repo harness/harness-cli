@@ -12,7 +12,7 @@ import (
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/util"
 	"github.com/harness/harness-cli/util/common/printer"
-	"github.com/harness/harness-cli/util/common/progress"
+	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/spf13/cobra"
 )
@@ -36,6 +36,8 @@ func NewPushGenericCmd(c *cmdutils.Factory) *cobra.Command {
 			registryName := args[0]
 			packageFilePath := args[1]
 
+			// Create progress reporter
+			progress := p.NewConsoleReporter()
 			// Resolve file path (supports glob patterns like *.zip)
 			files, err := utils.ResolveFilePath(packageFilePath)
 			if err != nil {
@@ -63,9 +65,6 @@ func NewPushGenericCmd(c *cmdutils.Factory) *cobra.Command {
 				filename = filepath.Base(packageFilePath)
 			}
 
-			// Initialize the package client
-			pkgClient := c.PkgHttpClient()
-
 			if path == "" {
 				path = filename
 			}
@@ -80,9 +79,8 @@ func NewPushGenericCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 			defer file.Close()
 
-			bufferSize := int64(fileInfo.Size())
-			reader, closer := progress.Reader(bufferSize, file, filename)
-			defer closer()
+			pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), filename)
+			progress.Step("Uploading package to registry")
 
 			fullPath := fmt.Sprintf("%s/%s/%s", packageName, version, path)
 			response, err := pkgClient.UploadGenericFileToPathWithBodyWithResponse(
@@ -91,7 +89,7 @@ func NewPushGenericCmd(c *cmdutils.Factory) *cobra.Command {
 				registryName,               // registry
 				fullPath,                   // filepath (package/version/path)
 				"application/octet-stream", // content type
-				reader,                     // file content as io.Reader with progress tracking
+				file,                       // file content as io.Reader with progress tracking
 			)
 			if err != nil {
 				return fmt.Errorf("failed to upload file: %w", err)

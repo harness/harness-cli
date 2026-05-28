@@ -83,9 +83,6 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Success("Input parameters validated")
 
-			// Initialize the package client
-			pkgClient := c.PkgHttpClient()
-
 			file, err := os.Open(filePath)
 			if err != nil {
 				progress.Error("Failed to open package file")
@@ -136,8 +133,8 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 			// Initialize progress reader
 			progress.Step("Uploading package to registry")
 			bufferSize := int64(formData.Len())
-			reader, closer := p.Reader(bufferSize, &formData, "swift")
-			defer closer()
+
+			pkgClient := c.PkgHttpClientWithProgress(progress, bufferSize, "swift")
 
 			resp, err := pkgClient.UploadSwiftPackageWithBodyWithResponse(
 				context.Background(),
@@ -147,7 +144,7 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 				packageName,
 				version,
 				fileWriter.FormDataContentType(),
-				reader,
+				&formData,
 				additionalHeader,
 			)
 

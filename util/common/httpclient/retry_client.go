@@ -107,20 +107,6 @@ func NewRetryClientWithProgress(prog progress.Reporter, fileSize int64, saveFile
 				resp.StatusCode,
 			))
 		}
-		/*
-			if resp != nil {
-				result := "Request Failed"
-				if resp.StatusCode == 201 || resp.StatusCode == 200 {
-					result = "Request succeeded"
-				}
-				prog.Step(fmt.Sprintf(
-					"%s : -> status %d",
-					result,
-					resp.StatusCode,
-				))
-			}
-
-		*/
 	}
 
 	return retryClient.StandardClient()

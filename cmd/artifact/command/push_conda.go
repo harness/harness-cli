@@ -85,9 +85,6 @@ func NewPushCondaCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Success("Input parameters validated")
 
-			// Initialize the package client with retry and progress support
-			pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), "conda")
-
 			// Upload package
 			progress.Step("Uploading package to registry")
 
@@ -117,6 +114,9 @@ func NewPushCondaCmd(c *cmdutils.Factory) *cobra.Command {
 				}
 				return nil
 			}
+
+			// Initialize the package client with retry and progress support
+			pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), "conda")
 
 			resp, err := pkgClient.UploadCondaPackageWithBodyWithResponse(
 				context.Background(),

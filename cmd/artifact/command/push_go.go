@@ -113,22 +113,19 @@ func NewPushGoCmd(c *cmdutils.Factory) *cobra.Command {
 				progress.Error("Failed to finalize form data")
 				return closeErr
 			}
-
-			// Initialize the package client
-			pkgClient := c.PkgHttpClient()
-
 			// Upload package
 			progress.Step("Uploading package to registry")
 			bufferSize := int64(formData.Len())
-			reader, closer := p.Reader(bufferSize, &formData, "go")
-			defer closer()
+
+			// Initialize the package client
+			pkgClient := c.PkgHttpClientWithProgress(progress, bufferSize, "go")
 
 			resp, err := pkgClient.UploadGoPackageWithBodyWithResponse(
 				context.Background(),
 				config.Global.AccountID,
 				registryName,
 				formWriter.FormDataContentType(),
-				reader,
+				&formData,
 			)
 			if err != nil {
 				progress.Error("Failed to upload package")

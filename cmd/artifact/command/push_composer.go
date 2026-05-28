@@ -70,9 +70,6 @@ func NewPushComposerCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Success("Input parameters validated")
 
-			// Initialize the package client
-			pkgClient := c.PkgHttpClient()
-
 			// Upload package
 			progress.Step("Uploading package to registry")
 
@@ -83,17 +80,14 @@ func NewPushComposerCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 			defer file.Close()
 
-			// Initialize progress reader
-			bufferSize := int64(fileInfo.Size())
-			reader, closer := p.Reader(bufferSize, file, "composer")
-			defer closer()
+			pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), "composer")
 
 			resp, err := pkgClient.UploadComposerPackageWithBodyWithResponse(
 				context.Background(),
 				config.Global.AccountID,
 				registryName,
 				"application/octet-stream",
-				reader,
+				file,
 			)
 
 			if err != nil {

@@ -137,7 +137,13 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 			// Check response
 			if metadataResp.StatusCode() != http.StatusOK && metadataResp.StatusCode() != http.StatusNotFound {
 				progress.Error("download of metadata  failed")
-				return fmt.Errorf("failed to downlad NPM metadata: %s \n response: %s", metadataResp.Status(), metadataResp.Body)
+				status := ""
+				var body []byte
+				if metadataResp != nil {
+					status = metadataResp.Status()
+					body = metadataResp.Body
+				}
+				return fmt.Errorf("failed to download NPM metadata: %s \n response: %s", status, body)
 			}
 			//Check for pre exist only if success response came
 			if metadataResp.StatusCode() == http.StatusOK {
@@ -175,8 +181,9 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 
 			// Initialize progress reader for upload tracking
 			bufferSize := fileInfo.Size()
-			reader, closer := p.Reader(bufferSize, pr, fileInfo.Name())
-			defer closer()
+
+			//Re-initializing pkgClient with progress reader for upload tracking
+			pkgClient = f.PkgHttpClientWithProgress(progress, bufferSize, fileInfo.Name())
 
 			resp, err := pkgClient.UploadNPMPackageWithBodyWithResponse(
 				context.Background(),
@@ -184,7 +191,7 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 				registryName,
 				pkgName,
 				"application/json",
-				reader,
+				pr,
 			)
 			if err != nil {
 				progress.Error("Failed to upload NPM package")
