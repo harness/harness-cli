@@ -18,40 +18,14 @@ func NewRetryClientWithoutProgress() *http.Client {
 	retryClient := retryablehttp.NewClient()
 	retryClient.RetryMax = 3
 	retryClient.Logger = nil
-	// Create progress reporter
+
 	p := progress.NewConsoleReporter()
 
-	retryClient.RequestLogHook = func(
-		_ retryablehttp.Logger,
-		req *http.Request,
-		retryNumber int,
-	) {
-		if retryNumber > 0 {
-			fmt.Println()
-			p.Step(fmt.Sprintf(
-				"Retrying request: (attempt %d/%d)",
-				retryNumber,
-				retryClient.RetryMax,
-			))
-		}
-	}
+	retryClient.RequestLogHook =
+		requestLogHook(p, retryClient.RetryMax, 0, "")
 
-	retryClient.ResponseLogHook = func(
-		_ retryablehttp.Logger,
-		resp *http.Response,
-	) {
-		if resp != nil {
-			result := "Request Failed"
-			if resp.StatusCode == 201 || resp.StatusCode == 200 {
-				result = "Request succeeded"
-			}
-			p.Step(fmt.Sprintf(
-				"%s : -> status %d",
-				result,
-				resp.StatusCode,
-			))
-		}
-	}
+	retryClient.ResponseLogHook =
+		responseLogHookWithoutProgress(p)
 
 	return retryClient.StandardClient()
 }
@@ -62,7 +36,22 @@ func NewRetryClientWithProgress(prog progress.Reporter, fileSize int64, saveFile
 	retryClient.RetryMax = 3
 	retryClient.Logger = nil
 
-	retryClient.RequestLogHook = func(
+	retryClient.RequestLogHook =
+		requestLogHook(prog, retryClient.RetryMax, fileSize, saveFilename)
+
+	retryClient.ResponseLogHook =
+		responseLogHook(prog)
+
+	return retryClient.StandardClient()
+}
+
+func requestLogHook(
+	prog progress.Reporter,
+	retryMax int,
+	fileSize int64,
+	saveFilename string,
+) func(retryablehttp.Logger, *http.Request, int) {
+	return func(
 		_ retryablehttp.Logger,
 		req *http.Request,
 		retryNumber int,
@@ -71,11 +60,10 @@ func NewRetryClientWithProgress(prog progress.Reporter, fileSize int64, saveFile
 			prog.Step(fmt.Sprintf(
 				"Retrying request: (attempt %d/%d)",
 				retryNumber,
-				retryClient.RetryMax,
+				retryMax,
 			))
 		}
 
-		// Wrap the request body with progress bar for each attempt
 		if req.Body != nil && fileSize > 0 {
 			title := fmt.Sprintf("%s (%s)", saveFilename, common.GetSize(fileSize))
 			bar := pterm.DefaultProgressbar.
@@ -83,33 +71,52 @@ func NewRetryClientWithProgress(prog progress.Reporter, fileSize int64, saveFile
 				WithTotal(int(fileSize)).
 				WithRemoveWhenDone(false)
 
-			//TODO may be error handling required here
-			//TODO check for defer too as used in old call
 			pb, _ := bar.Start()
 
-			wrapped := &progressReadCloser{
+			req.Body = &progressReadCloser{
 				reader:   req.Body,
 				bar:      pb,
 				progress: prog,
 			}
-			req.Body = wrapped
 		}
 	}
+}
 
-	retryClient.ResponseLogHook = func(
+func responseLogHook(
+	prog progress.Reporter,
+) func(retryablehttp.Logger, *http.Response) {
+	return func(
 		_ retryablehttp.Logger,
 		resp *http.Response,
 	) {
 		if resp != nil && resp.StatusCode >= 400 {
-			//fmt.Println()
 			prog.Error(fmt.Sprintf(
 				"Request failed : -> status %d",
 				resp.StatusCode,
 			))
 		}
 	}
+}
+func responseLogHookWithoutProgress(
+	prog progress.Reporter,
+) func(retryablehttp.Logger, *http.Response) {
+	return func(
+		_ retryablehttp.Logger,
+		resp *http.Response,
+	) {
+		if resp != nil {
+			result := "Request Failed"
+			if resp.StatusCode == 200 || resp.StatusCode == 201 {
+				result = "Request succeeded"
+			}
 
-	return retryClient.StandardClient()
+			prog.Step(fmt.Sprintf(
+				"%s : -> status %d",
+				result,
+				resp.StatusCode,
+			))
+		}
+	}
 }
 
 // progress Read Closer wraps an io.ReadCloser with progress bar reporting
