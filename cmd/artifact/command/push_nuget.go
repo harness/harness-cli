@@ -88,6 +88,13 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Success("Input parameters validated")
 
+			// Compute checksums of the file for X-Checksum-* headers
+			checksums, err := utils.ComputeFileChecksums(filePath)
+			if err != nil {
+				progress.Error("Failed to compute file checksums")
+				return fmt.Errorf("failed to compute checksums for %s: %w", filePath, err)
+			}
+
 			// Initialize the package client
 			pkgClient, err := pkgclient.NewClientWithResponses(
 				config.Global.Registry.PkgURL,
@@ -136,6 +143,7 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 					fileWriter.FormDataContentType(),
 					reader,
 					config.Global.AuthToken,
+					checksums,
 				)
 				if err != nil {
 					return err
@@ -148,6 +156,10 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 					registryName,
 					fileWriter.FormDataContentType(),
 					reader,
+					func(ctx context.Context, req *http.Request) error {
+						utils.SetChecksumHeaders(req.Header, checksums)
+						return nil
+					},
 				)
 
 				if err != nil {
@@ -172,7 +184,7 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 	return cmd
 }
 
-func uploadNugetPackageDirect(ctx context.Context, url string, contentType string, body io.Reader, apiKey string) error {
+func uploadNugetPackageDirect(ctx context.Context, url string, contentType string, body io.Reader, apiKey string, checksums utils.FileChecksums) error {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, body)
 	if err != nil {
@@ -182,6 +194,8 @@ func uploadNugetPackageDirect(ctx context.Context, url string, contentType strin
 	// Required headers
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("x-api-key", apiKey)
+
+	utils.SetChecksumHeaders(req.Header, checksums)
 
 	client := &http.Client{}
 

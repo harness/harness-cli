@@ -634,3 +634,37 @@ func TestCollectFromPath_IrregularFileRejected(t *testing.T) {
 		t.Errorf("expected 'not a regular file or directory' error, got: %v", err)
 	}
 }
+
+func TestNewPushGenericCmd_ChecksumHeadersSet(t *testing.T) {
+	receivedHeaders := make(http.Header)
+	withGenericServer(t, func(w http.ResponseWriter, r *http.Request) {
+		// Capture all headers
+		for key, values := range r.Header {
+			for _, value := range values {
+				receivedHeaders.Add(key, value)
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	dir := t.TempDir()
+	file := writeFile(t, dir, "blob.bin", "test content for checksums")
+
+	if _, err := runGenericCmd(t, "myreg", file, "--name", "web", "--version", "1.0.0"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify checksum headers are set
+	if receivedHeaders.Get("X-Checksum-Md5") == "" {
+		t.Error("X-Checksum-Md5 header was not set")
+	}
+	if receivedHeaders.Get("X-Checksum-Sha1") == "" {
+		t.Error("X-Checksum-Sha1 header was not set")
+	}
+	if receivedHeaders.Get("X-Checksum-Sha256") == "" {
+		t.Error("X-Checksum-Sha256 header was not set")
+	}
+	if receivedHeaders.Get("X-Checksum-Sha512") == "" {
+		t.Error("X-Checksum-Sha512 header was not set")
+	}
+}

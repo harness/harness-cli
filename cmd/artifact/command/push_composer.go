@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
@@ -72,6 +73,13 @@ func NewPushComposerCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Success("Input parameters validated")
 
+			// Compute checksums of the file for X-Checksum-* headers
+			checksums, err := utils.ComputeFileChecksums(filePath)
+			if err != nil {
+				progress.Error("Failed to compute file checksums")
+				return fmt.Errorf("failed to compute checksums for %s: %w", filePath, err)
+			}
+
 			// Initialize the package client
 			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
 				auth.GetAuthOptionARPKG())
@@ -100,6 +108,10 @@ func NewPushComposerCmd(c *cmdutils.Factory) *cobra.Command {
 				registryName,
 				"application/octet-stream",
 				reader,
+				func(ctx context.Context, req *http.Request) error {
+					utils.SetChecksumHeaders(req.Header, checksums)
+					return nil
+				},
 			)
 
 			if err != nil {

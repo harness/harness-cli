@@ -85,6 +85,13 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 			}
 			progress.Success("Input parameters validated")
 
+			// Compute checksums of the file for X-Checksum-* headers
+			checksums, err := utils.ComputeFileChecksums(packageFilePath)
+			if err != nil {
+				progress.Error("Failed to compute file checksums")
+				return fmt.Errorf("failed to compute checksums for %s: %w", packageFilePath, err)
+			}
+
 			// Extract pubspec.yaml from tarball
 			progress.Step("Extracting pubspec.yaml from tarball")
 			pubspecBytes, err := extractPubspecFromTarball(packageFilePath)
@@ -171,6 +178,10 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 				uploadID,
 				writer.FormDataContentType(),
 				reader,
+				func(ctx context.Context, req *http.Request) error {
+					utils.SetChecksumHeaders(req.Header, checksums)
+					return nil
+				},
 			)
 			if err != nil {
 				progress.Error("Failed to upload Dart package")

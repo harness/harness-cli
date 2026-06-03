@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util/common/auth"
@@ -19,11 +20,12 @@ type GenericUploadJob struct {
 	Version      string
 	// DestPath is the path the file lands at on the registry, exactly as it
 	// will appear in the URL. Forward slashes only.
-	DestPath string
+	DestPath  string
+	Checksums utils.FileChecksums
 }
 
 // NewGenericUploadJob creates a new generic upload job
-func NewGenericUploadJob(id, filePath, destPath, registry, packageName, version string, fileSize int64) *GenericUploadJob {
+func NewGenericUploadJob(id, filePath, destPath, registry, packageName, version string, fileSize int64, checksums utils.FileChecksums) *GenericUploadJob {
 	return &GenericUploadJob{
 		BaseFileUploadJob: BaseFileUploadJob{
 			ID:       id,
@@ -34,6 +36,7 @@ func NewGenericUploadJob(id, filePath, destPath, registry, packageName, version 
 		PackageName:  packageName,
 		Version:      version,
 		DestPath:     destPath,
+		Checksums:    checksums,
 	}
 }
 
@@ -59,6 +62,10 @@ func (j *GenericUploadJob) Upload(ctx context.Context) error {
 		j.DestPath,
 		"application/octet-stream",
 		file,
+		func(ctx context.Context, req *http.Request) error {
+			utils.SetChecksumHeaders(req.Header, j.Checksums)
+			return nil
+		},
 	)
 	if err != nil {
 		return fmt.Errorf("upload request failed: %w", err)

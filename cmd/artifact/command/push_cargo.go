@@ -126,6 +126,13 @@ func NewPushCargoCmd(f *cmdutils.Factory) *cobra.Command {
 				return fmt.Errorf("failed to create package payload: %v", err)
 			}
 
+			// Compute checksums of the file for X-Checksum-* headers
+			checksums, err := utils.ComputeFileChecksums(filePath)
+			if err != nil {
+				progress.Error("Failed to compute file checksums")
+				return fmt.Errorf("failed to compute checksums for %s: %w", filePath, err)
+			}
+
 			progress.Success("Input parameters validated")
 
 			// Initialize the package client
@@ -165,6 +172,10 @@ func NewPushCargoCmd(f *cmdutils.Factory) *cobra.Command {
 				registryName,
 				fileWriter.FormDataContentType(),
 				reader,
+				func(ctx context.Context, req *http.Request) error {
+					utils.SetChecksumHeaders(req.Header, checksums)
+					return nil
+				},
 			)
 
 			if err != nil {

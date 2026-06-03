@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
@@ -101,12 +102,19 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 					return fmt.Errorf("failed to stat file %s: %w", fileNameWithPath, err)
 				}
 
+				// Compute checksums of the file for X-Checksum-* headers
+				checksums, err := utils.ComputeFileChecksums(fileNameWithPath)
+				if err != nil {
+					return fmt.Errorf("failed to compute checksums for %s: %w", fileNameWithPath, err)
+				}
+
 				job := upload.NewPythonUploadJob(
 					fileNameWithPath,
 					registryName,
 					metadata.Name,
 					metadata.Version,
 					fileInfo.Size(),
+					checksums,
 				)
 				jobs = append(jobs, job)
 			}

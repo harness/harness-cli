@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util/common/auth"
@@ -22,10 +23,11 @@ type PythonUploadJob struct {
 	RegistryName string
 	PackageName  string
 	Version      string
+	Checksums    utils.FileChecksums
 }
 
 // NewPythonUploadJob creates a new Python upload job
-func NewPythonUploadJob(filePath, registryName, packageName, version string, fileSize int64) *PythonUploadJob {
+func NewPythonUploadJob(filePath, registryName, packageName, version string, fileSize int64, checksums utils.FileChecksums) *PythonUploadJob {
 	return &PythonUploadJob{
 		BaseFileUploadJob: BaseFileUploadJob{
 			ID:       filepath.Base(filePath),
@@ -36,6 +38,7 @@ func NewPythonUploadJob(filePath, registryName, packageName, version string, fil
 		RegistryName: registryName,
 		PackageName:  packageName,
 		Version:      version,
+		Checksums:    checksums,
 	}
 }
 
@@ -83,6 +86,10 @@ func (j *PythonUploadJob) Upload(ctx context.Context) error {
 		j.RegistryName,
 		fileWriter.FormDataContentType(),
 		&formData,
+		func(ctx context.Context, req *http.Request) error {
+			utils.SetChecksumHeaders(req.Header, j.Checksums)
+			return nil
+		},
 	)
 
 	if err != nil {

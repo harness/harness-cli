@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/util"
@@ -160,7 +161,14 @@ func collectFromPath(p, registry, packageName, version string, includeHidden boo
 	case info.Mode().IsRegular():
 		relName := filepath.Base(abs)
 		destPath := fmt.Sprintf("%s/%s/%s", packageName, version, relName)
-		job := upload.NewGenericUploadJob(relName, abs, destPath, registry, packageName, version, info.Size())
+
+		// Compute checksums of the file for X-Checksum-* headers
+		checksums, err := utils.ComputeFileChecksums(abs)
+		if err != nil {
+			return nil, stats, fmt.Errorf("failed to compute checksums for %s: %w", abs, err)
+		}
+
+		job := upload.NewGenericUploadJob(relName, abs, destPath, registry, packageName, version, info.Size(), checksums)
 		stats.fileCount = 1
 		stats.totalBytes = info.Size()
 		return []upload.FileUploadJob{job}, stats, nil
@@ -226,8 +234,15 @@ func collectFromDir(srcDir, registry, packageName, version string, includeHidden
 			jobRelPath = sourceBase + "/" + relPath
 		}
 		destPath := fmt.Sprintf("%s/%s/%s", packageName, version, jobRelPath)
+
+		// Compute checksums of the file for X-Checksum-* headers
+		checksums, err := utils.ComputeFileChecksums(path)
+		if err != nil {
+			return fmt.Errorf("failed to compute checksums for %s: %w", path, err)
+		}
+
 		jobs = append(jobs, upload.NewGenericUploadJob(
-			jobRelPath, path, destPath, registry, packageName, version, info.Size(),
+			jobRelPath, path, destPath, registry, packageName, version, info.Size(), checksums,
 		))
 		stats.fileCount++
 		stats.totalBytes += info.Size()

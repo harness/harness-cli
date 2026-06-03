@@ -88,6 +88,13 @@ func NewPushPuppetCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 			progress.Success("Input parameters validated")
 
+			// Compute checksums of the file for X-Checksum-* headers
+			checksums, err := utils.ComputeFileChecksums(packageFilePath)
+			if err != nil {
+				progress.Error("Failed to compute file checksums")
+				return fmt.Errorf("failed to compute checksums for %s: %w", packageFilePath, err)
+			}
+
 			progress.Step(fmt.Sprintf("Extracting %s from tarball", puppetMetadataKey))
 			metadata, err := extractPuppetMetadata(packageFilePath)
 			if err != nil {
@@ -141,6 +148,10 @@ func NewPushPuppetCmd(c *cmdutils.Factory) *cobra.Command {
 				registryName,
 				writer.FormDataContentType(),
 				reader,
+				func(ctx context.Context, req *http.Request) error {
+					utils.SetChecksumHeaders(req.Header, checksums)
+					return nil
+				},
 			)
 			if err != nil {
 				progress.Error("Failed to upload Puppet module")
@@ -220,4 +231,3 @@ func extractPuppetMetadata(path string) (*puppetMetadata, error) {
 	}
 	return nil, fmt.Errorf("%s not found at top level of tarball", puppetMetadataKey)
 }
-

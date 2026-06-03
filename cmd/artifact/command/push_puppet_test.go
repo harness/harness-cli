@@ -267,3 +267,37 @@ func TestNewPushPuppetCmd_WrongArgCount(t *testing.T) {
 	}
 }
 
+func TestNewPushPuppetCmd_ChecksumHeadersSet(t *testing.T) {
+	receivedHeaders := make(http.Header)
+	srv := withPuppetServer(t, func(w http.ResponseWriter, r *http.Request) {
+		// Capture all headers
+		for key, values := range r.Header {
+			for _, value := range values {
+				receivedHeaders.Add(key, value)
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	_ = srv
+
+	path := writePuppetTarball(t, map[string]string{
+		"puppetlabs-apache-5.9.0/metadata.json": `{"name":"puppetlabs-apache","version":"5.9.0"}`,
+	})
+	if err := runPuppetCmd(t, "test-registry", path); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify checksum headers are set
+	if receivedHeaders.Get("X-Checksum-Md5") == "" {
+		t.Error("X-Checksum-Md5 header was not set")
+	}
+	if receivedHeaders.Get("X-Checksum-Sha1") == "" {
+		t.Error("X-Checksum-Sha1 header was not set")
+	}
+	if receivedHeaders.Get("X-Checksum-Sha256") == "" {
+		t.Error("X-Checksum-Sha256 header was not set")
+	}
+	if receivedHeaders.Get("X-Checksum-Sha512") == "" {
+		t.Error("X-Checksum-Sha512 header was not set")
+	}
+}

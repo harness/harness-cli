@@ -77,6 +77,13 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 				// Allow .tgz or .tar.gz; simple extension check
 				// More robust checks can be added later if needed
 			}
+			// Compute checksums of the file for X-Checksum-* headers
+			checksums, err := utils.ComputeFileChecksums(packageFilePath)
+			if err != nil {
+				progress.Error("Failed to compute file checksums")
+				return fmt.Errorf("failed to compute checksums for %s: %w", packageFilePath, err)
+			}
+
 			progress.Success("Input parameters validated")
 
 			// Extract package.json from tarball
@@ -192,6 +199,10 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 				pkgName,
 				"application/json",
 				reader,
+				func(ctx context.Context, req *http.Request) error {
+					utils.SetChecksumHeaders(req.Header, checksums)
+					return nil
+				},
 			)
 			if err != nil {
 				progress.Error("Failed to upload NPM package")

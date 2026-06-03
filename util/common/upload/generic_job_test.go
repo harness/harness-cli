@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/config"
 )
 
@@ -57,7 +58,7 @@ func TestGenericUpload_Success(t *testing.T) {
 	})
 
 	path, size := writeTempFile(t, "hello world")
-	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size)
+	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size, utils.FileChecksums{})
 
 	if err := job.Upload(context.Background()); err != nil {
 		t.Fatalf("expected success, got %v", err)
@@ -73,7 +74,7 @@ func TestGenericUpload_Success_201Created(t *testing.T) {
 	})
 
 	path, size := writeTempFile(t, "data")
-	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size)
+	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size, utils.FileChecksums{})
 
 	if err := job.Upload(context.Background()); err != nil {
 		t.Fatalf("expected success on 201, got %v", err)
@@ -86,7 +87,7 @@ func TestGenericUpload_FailsOn4xx(t *testing.T) {
 	})
 
 	path, size := writeTempFile(t, "data")
-	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size)
+	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size, utils.FileChecksums{})
 
 	err := job.Upload(context.Background())
 	if err == nil {
@@ -103,7 +104,7 @@ func TestGenericUpload_FailsOn5xx(t *testing.T) {
 	})
 
 	path, size := writeTempFile(t, "data")
-	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size)
+	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size, utils.FileChecksums{})
 
 	if err := job.Upload(context.Background()); err == nil {
 		t.Fatal("expected error on 500, got nil")
@@ -116,7 +117,7 @@ func TestGenericUpload_FailsOnMissingFile(t *testing.T) {
 	})
 
 	job := NewGenericUploadJob("ghost.bin", "/path/that/does/not/exist.bin",
-		"pkg/v1/ghost.bin", "myreg", "pkg", "v1", 0)
+		"pkg/v1/ghost.bin", "myreg", "pkg", "v1", 0, utils.FileChecksums{})
 
 	err := job.Upload(context.Background())
 	if err == nil {
@@ -138,7 +139,7 @@ func TestGenericUpload_RespectsContextCancel(t *testing.T) {
 	t.Cleanup(func() { close(stop) })
 
 	path, size := writeTempFile(t, "data")
-	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size)
+	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size, utils.FileChecksums{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
