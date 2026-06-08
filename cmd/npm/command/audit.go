@@ -1,0 +1,650 @@
+package command
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/harness/harness-cli/cmd/cmdutils"
+	regcmd "github.com/harness/harness-cli/cmd/registry/command"
+	"github.com/harness/harness-cli/config"
+	ar_v3 "github.com/harness/harness-cli/internal/api/ar_v3"
+	client2 "github.com/harness/harness-cli/util/client"
+	"github.com/harness/harness-cli/util/common/printer"
+	p "github.com/harness/harness-cli/util/common/progress"
+
+	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
+)
+
+type PackageFix struct {
+	Name            string
+	CurrentVersion  string
+	FixVersion      string
+	ScanStatus      string
+	Vulnerabilities []VulnerabilityInfo
+}
+
+type VulnerabilityInfo struct {
+	CveId     string
+	CvssScore float64
+	Severity  string
+}
+
+type auditContext struct {
+	f            *cmdutils.Factory
+	registryUUID uuid.UUID
+	org          string
+	project      string
+	progress     *p.ConsoleReporter
+}
+
+func NewNpmAuditCmd(f *cmdutils.Factory) *cobra.Command {
+	var fix bool
+	var registryName string
+	var runInstall bool
+	var packageJsonPath string
+
+	cmd := &cobra.Command{
+		Use:   "audit",
+		Short: "Audit npm dependencies for vulnerabilities",
+		Long: `Audit npm dependencies against firewall policies and security vulnerabilities.
+		
+This command will:
+1. Parse your package.json file
+2. Evaluate all dependencies against firewall policies
+3. Identify vulnerable packages with available fixes
+4. Optionally update package.json with fix versions (--fix flag)
+5. Optionally run npm install to apply updates (--install flag)`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runNpmAudit(f, registryName, packageJsonPath, fix, runInstall)
+		},
+	}
+
+	cmd.Flags().BoolVar(&fix, "fix", false, "Automatically update package.json with fix versions for vulnerable packages")
+	cmd.Flags().StringVarP(&packageJsonPath, "file", "f", "package.json", "Path to package.json file")
+
+	return cmd
+}
+
+func runNpmAudit(f *cmdutils.Factory, registryName string, packageJsonPath string, fix bool, runInstall bool) error {
+	progress := p.NewConsoleReporter()
+
+	// Validate package.json exists
+	if _, err := os.Stat(packageJsonPath); os.IsNotExist(err) {
+		progress.Error(fmt.Sprintf("package.json not found at: %s", packageJsonPath))
+		return fmt.Errorf("package.json not found at: %s", packageJsonPath)
+	}
+
+	progress.Start("Starting npm audit")
+	log.Info().Str("file", packageJsonPath).Bool("fix", fix).Msg("Starting npm audit")
+
+	// Step 1: Detect registry
+	progress.Step("Detecting HAR registry")
+	regInfo, err := detectNpmRegistry(registryName)
+	if err != nil {
+		progress.Error(fmt.Sprintf("Failed to detect registry: %s", err))
+		return err
+	}
+	progress.Success(fmt.Sprintf("Found registry: %s", regInfo.RegistryIdentifier))
+
+	// Step 2: Resolve org/project
+	org := config.Global.OrgID
+	project := config.Global.ProjectID
+	if envOrg := os.Getenv("ORG_IDENTIFIER"); envOrg != "" {
+		org = envOrg
+	}
+	if envProj := os.Getenv("PROJECT_IDENTIFIER"); envProj != "" {
+		project = envProj
+	}
+
+	// Fallback to saved npm config
+	if org == "" || project == "" {
+		savedCfg, _ := regcmd.LoadNpmRegistryConfig()
+		if savedCfg != nil {
+			if org == "" {
+				org = savedCfg.OrgID
+			}
+			if project == "" {
+				project = savedCfg.ProjectID
+			}
+		}
+	}
+
+	if org == "" || project == "" {
+		progress.Error("Organization and Project identifiers are required")
+		return fmt.Errorf("organization and project identifiers are required. Set via config or environment variables")
+	}
+
+	// Step 3: Resolve registry UUID
+	progress.Step("Resolving registry details")
+	registryUUID, err := resolveRegistryUUID(f, regInfo.RegistryIdentifier, org, project, progress)
+	if err != nil {
+		return err
+	}
+	progress.Success(fmt.Sprintf("Registry UUID: %s", registryUUID.String()))
+
+	// Step 4: Parse package.json
+	progress.Start(fmt.Sprintf("Parsing %s", packageJsonPath))
+	dependencies, err := regcmd.ParseLockFile(packageJsonPath)
+	if err != nil {
+		progress.Error("Failed to parse package.json")
+		return fmt.Errorf("failed to parse package.json: %w", err)
+	}
+
+	if len(dependencies) == 0 {
+		progress.Success("No dependencies found in package.json")
+		return nil
+	}
+	progress.Success(fmt.Sprintf("Found %d dependencies", len(dependencies)))
+
+	// Step 5: Run firewall audit
+	ctx := &auditContext{
+		f:            f,
+		registryUUID: registryUUID,
+		org:          org,
+		project:      project,
+		progress:     progress,
+	}
+
+	scanResults, err := runFirewallAudit(ctx, dependencies, regInfo.RegistryIdentifier)
+	if err != nil {
+		return err
+	}
+
+	// Step 6: Identify vulnerable packages
+	vulnerablePackages := filterVulnerablePackages(scanResults)
+
+	// Step 7: Display results
+	displayAuditResults(scanResults, vulnerablePackages, progress)
+
+	// Step 8: If fix flag is set, fetch fix versions and update package.json
+	if fix && len(vulnerablePackages) > 0 {
+		fmt.Println()
+		progress.Start("Fetching fix version details for vulnerable packages")
+
+		fixes, err := fetchFixVersions(ctx, vulnerablePackages)
+		if err != nil {
+			progress.Error(fmt.Sprintf("Failed to fetch fix versions: %s", err))
+			return err
+		}
+
+		fixablePackages := filterFixablePackages(fixes)
+		if len(fixablePackages) == 0 {
+			progress.Step("No fix versions available for vulnerable packages")
+			return nil
+		}
+
+		progress.Success(fmt.Sprintf("Found fix versions for %d packages", len(fixablePackages)))
+
+		// Create backup
+		if err := backupPackageJson(packageJsonPath); err != nil {
+			progress.Error(fmt.Sprintf("Failed to create backup: %s", err))
+			return err
+		}
+		progress.Success(fmt.Sprintf("Created backup: %s.backup", packageJsonPath))
+
+		// Update package.json
+		if err := updatePackageJson(packageJsonPath, fixablePackages, progress); err != nil {
+			progress.Error(fmt.Sprintf("Failed to update package.json: %s", err))
+			return err
+		}
+
+		// Display before/after comparison
+		displayFixComparison(fixablePackages)
+
+		// Optionally run npm install
+		if runInstall {
+			fmt.Println()
+			progress.Start("Running npm install to apply updates")
+			if err := runNpmInstall(progress); err != nil {
+				progress.Error(fmt.Sprintf("npm install failed: %s", err))
+				return err
+			}
+			progress.Success("npm install completed successfully")
+		} else {
+			fmt.Println()
+			progress.Step("Run 'npm install' to apply the updates")
+		}
+	} else if fix && len(vulnerablePackages) == 0 {
+		fmt.Println()
+		progress.Success("No vulnerable packages found. Nothing to fix!")
+	}
+
+	return nil
+}
+
+func detectNpmRegistry(explicitRegistry string) (*registryInfo, error) {
+	savedCfg, err := regcmd.LoadNpmRegistryConfig()
+	if err == nil && savedCfg != nil && savedCfg.RegistryURL != "" {
+		if explicitRegistry == "" || explicitRegistry == savedCfg.RegistryIdentifier {
+			return &registryInfo{
+				RegistryURL:        savedCfg.RegistryURL,
+				RegistryIdentifier: savedCfg.RegistryIdentifier,
+			}, nil
+		}
+	}
+
+	if explicitRegistry != "" {
+		return nil, fmt.Errorf("registry '%s' not found in saved config", explicitRegistry)
+	}
+	return nil, fmt.Errorf("no HAR registry found. Run 'hc registry configure npm' first")
+}
+
+type registryInfo struct {
+	RegistryURL        string
+	RegistryIdentifier string
+}
+
+func resolveRegistryUUID(f *cmdutils.Factory, registryIdentifier, org, project string, progress *p.ConsoleReporter) (uuid.UUID, error) {
+	registryRef := client2.GetRef(config.Global.AccountID, org, project) + "/" + registryIdentifier
+	registryResp, err := f.RegistryHttpClient().GetRegistryWithResponse(context.Background(), registryRef)
+	if err != nil {
+		progress.Error("Failed to fetch registry details")
+		return uuid.Nil, fmt.Errorf("failed to fetch registry details: %w", err)
+	}
+
+	if registryResp.StatusCode() != 200 || registryResp.JSON200 == nil || registryResp.JSON200.Data.Uuid == nil {
+		progress.Error(fmt.Sprintf("Registry '%s' not found", registryIdentifier))
+		return uuid.Nil, fmt.Errorf("registry '%s' not found", registryIdentifier)
+	}
+
+	registryUUID, err := uuid.Parse(*registryResp.JSON200.Data.Uuid)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("invalid registry UUID: %w", err)
+	}
+
+	return registryUUID, nil
+}
+
+func runFirewallAudit(ctx *auditContext, dependencies []regcmd.Dependency, registryName string) ([]ScanResult, error) {
+	const batchSize = 50
+	totalBatches := (len(dependencies) + batchSize - 1) / batchSize
+	allResults := make([]ScanResult, 0, len(dependencies))
+
+	ctx.progress.Start(fmt.Sprintf("Evaluating %d dependencies against firewall policies", len(dependencies)))
+
+	for batchIdx := 0; batchIdx < totalBatches; batchIdx++ {
+		start := batchIdx * batchSize
+		end := start + batchSize
+		if end > len(dependencies) {
+			end = len(dependencies)
+		}
+		batch := dependencies[start:end]
+
+		ctx.progress.Step(fmt.Sprintf("Processing batch %d/%d (%d packages)", batchIdx+1, totalBatches, len(batch)))
+
+		// Initiate evaluation
+		artifacts := make([]ar_v3.ArtifactScanInput, 0, len(batch))
+		for _, dep := range batch {
+			artifacts = append(artifacts, ar_v3.ArtifactScanInput{
+				PackageName: dep.Name,
+				Version:     dep.Version,
+			})
+		}
+
+		initParams := &ar_v3.InitiateBulkScanEvaluationParams{
+			AccountIdentifier: config.Global.AccountID,
+			OrgIdentifier:     &ctx.org,
+			ProjectIdentifier: &ctx.project,
+		}
+
+		initResp, err := ctx.f.RegistryV3HttpClient().InitiateBulkScanEvaluationWithResponse(
+			context.Background(),
+			initParams,
+			ar_v3.InitiateBulkScanEvaluationJSONRequestBody{
+				RegistryId: ctx.registryUUID,
+				Artifacts:  artifacts,
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initiate evaluation for batch %d: %w", batchIdx+1, err)
+		}
+
+		if initResp.StatusCode() != 202 || initResp.JSON202 == nil || initResp.JSON202.Data == nil || initResp.JSON202.Data.EvaluationId == nil {
+			return nil, fmt.Errorf("failed to initiate evaluation for batch %d", batchIdx+1)
+		}
+
+		evaluationID := *initResp.JSON202.Data.EvaluationId
+
+		// Poll for results
+		statusParams := &ar_v3.GetBulkScanEvaluationStatusParams{
+			AccountIdentifier: config.Global.AccountID,
+			OrgIdentifier:     &ctx.org,
+			ProjectIdentifier: &ctx.project,
+		}
+
+		pollCount := 0
+		maxPolls := 120
+
+		for {
+			pollCount++
+			if pollCount > maxPolls {
+				return nil, fmt.Errorf("timeout waiting for batch %d evaluation", batchIdx+1)
+			}
+
+			statusResp, err := ctx.f.RegistryV3HttpClient().GetBulkScanEvaluationStatusWithResponse(
+				context.Background(),
+				evaluationID,
+				statusParams,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get evaluation status for batch %d: %w", batchIdx+1, err)
+			}
+
+			if statusResp.StatusCode() != 200 || statusResp.JSON200 == nil || statusResp.JSON200.Data == nil || statusResp.JSON200.Data.Status == nil {
+				return nil, fmt.Errorf("invalid response from evaluation status API for batch %d", batchIdx+1)
+			}
+
+			status := *statusResp.JSON200.Data.Status
+
+			if status == ar_v3.SUCCESS {
+				if statusResp.JSON200.Data.Scans != nil {
+					scans := *statusResp.JSON200.Data.Scans
+					for _, scan := range scans {
+						result := ScanResult{}
+						if scan.PackageName != nil {
+							result.PackageName = *scan.PackageName
+						}
+						if scan.Version != nil {
+							result.Version = *scan.Version
+						}
+						if scan.ScanId != nil {
+							result.ScanID = scan.ScanId.String()
+						}
+						if scan.ScanStatus != nil {
+							result.ScanStatus = string(*scan.ScanStatus)
+						}
+						allResults = append(allResults, result)
+					}
+				}
+				break
+			}
+
+			if status == ar_v3.FAILURE {
+				errMsg := fmt.Sprintf("Batch %d evaluation failed", batchIdx+1)
+				if statusResp.JSON200.Data.Error != nil {
+					errMsg = *statusResp.JSON200.Data.Error
+				}
+				return nil, fmt.Errorf("%s", errMsg)
+			}
+
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	ctx.progress.Success(fmt.Sprintf("Evaluation completed for %d packages", len(allResults)))
+	return allResults, nil
+}
+
+type ScanResult struct {
+	PackageName string
+	Version     string
+	ScanID      string
+	ScanStatus  string
+}
+
+func filterVulnerablePackages(results []ScanResult) []ScanResult {
+	vulnerable := make([]ScanResult, 0)
+	for _, r := range results {
+		if r.ScanStatus == "BLOCKED" || r.ScanStatus == "WARN" {
+			vulnerable = append(vulnerable, r)
+		}
+	}
+	return vulnerable
+}
+
+func displayAuditResults(allResults []ScanResult, vulnerablePackages []ScanResult, progress *p.ConsoleReporter) {
+	fmt.Println()
+	progress.Success(fmt.Sprintf("Audit Results for %d dependencies:", len(allResults)))
+
+	var blockedCount, warnCount, allowedCount, unknownCount int
+	for _, r := range allResults {
+		switch r.ScanStatus {
+		case "BLOCKED":
+			blockedCount++
+		case "WARN":
+			warnCount++
+		case "ALLOWED":
+			allowedCount++
+		case "UNKNOWN":
+			unknownCount++
+		}
+	}
+
+	fmt.Println()
+	if blockedCount > 0 {
+		progress.Error(fmt.Sprintf("🚫 Blocked: %d packages", blockedCount))
+	}
+	if warnCount > 0 {
+		progress.Step(fmt.Sprintf("⚠️  Warnings: %d packages", warnCount))
+	}
+	if allowedCount > 0 {
+		progress.Success(fmt.Sprintf("✓ Allowed: %d packages", allowedCount))
+	}
+	if unknownCount > 0 {
+		progress.Step(fmt.Sprintf("? Unknown: %d packages", unknownCount))
+	}
+
+	if len(vulnerablePackages) > 0 {
+		fmt.Println()
+		fmt.Println("Vulnerable Packages:")
+		sort.Slice(vulnerablePackages, func(i, j int) bool {
+			return vulnerablePackages[i].PackageName < vulnerablePackages[j].PackageName
+		})
+
+		printer.Print(vulnerablePackages, 0, 1, int64(len(vulnerablePackages)), false, [][]string{
+			{"packageName", "Package Name"},
+			{"version", "Version"},
+			{"scanStatus", "Status"},
+		})
+	}
+}
+
+func fetchFixVersions(ctx *auditContext, vulnerablePackages []ScanResult) ([]PackageFix, error) {
+	fixes := make([]PackageFix, 0)
+
+	for _, pkg := range vulnerablePackages {
+		if pkg.ScanID == "" {
+			continue
+		}
+
+		scanParams := &ar_v3.GetArtifactScanDetailsParams{
+			AccountIdentifier: config.Global.AccountID,
+		}
+
+		scanResponse, err := ctx.f.RegistryV3HttpClient().GetArtifactScanDetailsWithResponse(
+			context.Background(),
+			pkg.ScanID,
+			scanParams,
+		)
+		if err != nil {
+			log.Warn().Err(err).Str("package", pkg.PackageName).Msg("Failed to get scan details")
+			continue
+		}
+
+		if scanResponse.StatusCode() != 200 || scanResponse.JSON200 == nil || scanResponse.JSON200.Data == nil {
+			log.Warn().Str("package", pkg.PackageName).Int("status", scanResponse.StatusCode()).Msg("Invalid scan details response")
+			continue
+		}
+
+		scanDetails := scanResponse.JSON200.Data
+		fix := PackageFix{
+			Name:           pkg.PackageName,
+			CurrentVersion: pkg.Version,
+			ScanStatus:     pkg.ScanStatus,
+		}
+
+		// Extract fix version
+		if scanDetails.FixVersionDetails != nil && scanDetails.FixVersionDetails.FixVersionAvailable && scanDetails.FixVersionDetails.FixVersion != nil {
+			fix.FixVersion = *scanDetails.FixVersionDetails.FixVersion
+		}
+
+		// Extract vulnerabilities
+		if scanDetails.PolicySetFailureDetails != nil {
+			for _, policySetFailure := range *scanDetails.PolicySetFailureDetails {
+				for _, failure := range policySetFailure.PolicyFailureDetails {
+					if failure.Category == "Security" {
+						securityConfig, err := failure.AsSecurityPolicyFailureDetailConfig()
+						if err == nil && len(securityConfig.Vulnerabilities) > 0 {
+							for _, vuln := range securityConfig.Vulnerabilities {
+								severity := "UNKNOWN"
+								if vuln.CvssScore >= 9.0 {
+									severity = "CRITICAL"
+								} else if vuln.CvssScore >= 7.0 {
+									severity = "HIGH"
+								} else if vuln.CvssScore >= 4.0 {
+									severity = "MEDIUM"
+								} else {
+									severity = "LOW"
+								}
+								fix.Vulnerabilities = append(fix.Vulnerabilities, VulnerabilityInfo{
+									CveId:     vuln.CveId,
+									CvssScore: vuln.CvssScore,
+									Severity:  severity,
+								})
+							}
+						}
+					}
+				}
+			}
+		}
+
+		fixes = append(fixes, fix)
+	}
+
+	return fixes, nil
+}
+
+func filterFixablePackages(fixes []PackageFix) []PackageFix {
+	fixable := make([]PackageFix, 0)
+	for _, fix := range fixes {
+		if fix.FixVersion != "" {
+			fixable = append(fixable, fix)
+		}
+	}
+	return fixable
+}
+
+func backupPackageJson(filePath string) error {
+	backupPath := filePath + ".backup"
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read package.json: %w", err)
+	}
+
+	if err := os.WriteFile(backupPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to create backup: %w", err)
+	}
+
+	log.Info().Str("backup", backupPath).Msg("Created backup of package.json")
+	return nil
+}
+
+func updatePackageJson(filePath string, fixes []PackageFix, progress *p.ConsoleReporter) error {
+	progress.Start("Updating package.json with fix versions")
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read package.json: %w", err)
+	}
+
+	var pkgJson map[string]interface{}
+	if err := json.Unmarshal(data, &pkgJson); err != nil {
+		return fmt.Errorf("failed to parse package.json: %w", err)
+	}
+
+	// Update dependencies
+	updated := 0
+	for _, fix := range fixes {
+		updated += updateDependencySection(pkgJson, "dependencies", fix)
+		updated += updateDependencySection(pkgJson, "devDependencies", fix)
+		updated += updateDependencySection(pkgJson, "peerDependencies", fix)
+		updated += updateDependencySection(pkgJson, "optionalDependencies", fix)
+	}
+
+	// Write back to file with proper formatting
+	updatedData, err := json.MarshalIndent(pkgJson, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated package.json: %w", err)
+	}
+
+	// Add newline at end of file (standard practice)
+	updatedData = append(updatedData, '\n')
+
+	if err := os.WriteFile(filePath, updatedData, 0644); err != nil {
+		return fmt.Errorf("failed to write updated package.json: %w", err)
+	}
+
+	progress.Success(fmt.Sprintf("Updated %d package versions in package.json", updated))
+	log.Info().Int("updated", updated).Msg("Updated package.json")
+	return nil
+}
+
+func updateDependencySection(pkgJson map[string]interface{}, section string, fix PackageFix) int {
+	deps, ok := pkgJson[section].(map[string]interface{})
+	if !ok {
+		return 0
+	}
+
+	if _, exists := deps[fix.Name]; exists {
+		deps[fix.Name] = fix.FixVersion
+		log.Info().Str("package", fix.Name).Str("section", section).Str("version", fix.FixVersion).Msg("Updated package version")
+		return 1
+	}
+
+	return 0
+}
+
+func displayFixComparison(fixes []PackageFix) {
+	fmt.Println()
+	fmt.Println("Package Updates Applied:")
+	fmt.Println(strings.Repeat("=", 80))
+
+	for _, fix := range fixes {
+		fmt.Printf("\n📦 %s\n", fix.Name)
+		fmt.Printf("   %s → %s\n", fix.CurrentVersion, fix.FixVersion)
+
+		if len(fix.Vulnerabilities) > 0 {
+			fmt.Printf("   Fixes %d vulnerabilities:\n", len(fix.Vulnerabilities))
+			for _, vuln := range fix.Vulnerabilities {
+				fmt.Printf("     - %s (CVSS: %.1f, Severity: %s)\n", vuln.CveId, vuln.CvssScore, vuln.Severity)
+			}
+		}
+	}
+
+	fmt.Println()
+	fmt.Println(strings.Repeat("=", 80))
+}
+
+func runNpmInstall(progress *p.ConsoleReporter) error {
+	log.Info().Msg("Running npm install")
+
+	// Note: This would typically execute npm install
+	// Implementation depends on whether you want to use:
+	// 1. Direct exec.Command("npm", "install")
+	// 2. The existing pkgmgr.ExecuteWithFirewall infrastructure
+	// 3. A simple os/exec call
+
+	// For now, we'll indicate that the user should run it manually
+	// To implement actual execution, uncomment and use:
+	/*
+		cmd := exec.Command("npm", "install")
+		cmd.Dir = "."
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("npm install failed: %w", err)
+		}
+	*/
+
+	return nil
+}

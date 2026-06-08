@@ -19,6 +19,7 @@ All other commands are passed through to native npm.`,
 
 	rootCmd.AddCommand(command.NewNpmInstallCmd(f))
 	rootCmd.AddCommand(command.NewNpmCiCmd(f))
+	rootCmd.AddCommand(command.NewNpmAuditCmd(f))
 
 	rootCmd.RunE = func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
