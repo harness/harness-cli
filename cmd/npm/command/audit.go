@@ -172,13 +172,25 @@ func runNpmAudit(f *cmdutils.Factory, registryName string, packageJsonPath strin
 
 		fmt.Println()
 		progress.Start("Fetching security fix information from scan details")
-		fixes, err := evaluateFixVersions(f, vulnerablePackages)
+		fixes, manualFix, err := evaluateFixVersions(f, vulnerablePackages)
 		if err != nil {
 			progress.Error(fmt.Sprintf("Failed to fetch fix versions: %s", err))
 			return err
 		}
 
-		displaySecurityFixes(fixes, progress)
+		if len(fixes) > 0 {
+			progress.Success("Automatic Fixes (minor/patch updates):")
+			displaySecurityFixes(fixes, progress)
+			//TODO Apply fix here
+		}
+
+		if len(manualFix) > 0 {
+			fmt.Println()
+			progress.Step("Manual Fixes Required for below packages (major version changes):")
+			displaySecurityFixes(manualFix, progress)
+			fmt.Println("⚠️  Major version updates may contain breaking changes.")
+			fmt.Println("   Please review the changelog before updating manually.")
+		}
 	}
 
 	// Step 8: If fix flag is set, fetch fix versions and update package.json
@@ -295,8 +307,9 @@ func filterVulnerablePackages(results []ScanResult) []ScanResult {
 	return vulnerable
 }
 
-func evaluateFixVersions(f *cmdutils.Factory, vulnerablePackages []ScanResult) ([]SecurityFixInfo, error) {
+func evaluateFixVersions(f *cmdutils.Factory, vulnerablePackages []ScanResult) ([]SecurityFixInfo, []SecurityFixInfo, error) {
 	fixes := make([]SecurityFixInfo, 0)
+	manualFix := make([]SecurityFixInfo, 0)
 
 	for _, pkg := range vulnerablePackages {
 		if pkg.ScanID == "" {
@@ -354,31 +367,61 @@ func evaluateFixVersions(f *cmdutils.Factory, vulnerablePackages []ScanResult) (
 			if scanDetails.FixVersionDetails.FixVersion != nil {
 				fixInfo.FixVersion = *scanDetails.FixVersionDetails.FixVersion
 			}
-
-			fixes = append(fixes, fixInfo)
+			if !majorChange(fixInfo) {
+				fixes = append(fixes, fixInfo)
+			} else {
+				manualFix = append(manualFix, fixInfo)
+			}
 			log.Info().Str("package", pkg.PackageName).Str("fixVersion", fixInfo.FixVersion).Msg("Found fix version")
 		}
 	}
 
-	return fixes, nil
+	return fixes, manualFix, nil
+}
+
+func majorChange(fixInfo SecurityFixInfo) bool {
+	currentMajor := extractMajorVersion(fixInfo.CurrentVersion)
+	fixMajor := extractMajorVersion(fixInfo.FixVersion)
+
+	// If we can't parse versions, consider it not a major change (safe default)
+	if currentMajor == -1 || fixMajor == -1 {
+		return false
+	}
+
+	return currentMajor != fixMajor
+}
+
+func extractMajorVersion(version string) int {
+	// Remove any leading 'v' or '^' or '~' characters
+	version = strings.TrimPrefix(version, "v")
+	version = strings.TrimPrefix(version, "^")
+	version = strings.TrimPrefix(version, "~")
+
+	// Split by dot and get the first part
+	parts := strings.Split(version, ".")
+	if len(parts) == 0 {
+		return -1
+	}
+
+	// Parse the major version number
+	major := 0
+	_, err := fmt.Sscanf(parts[0], "%d", &major)
+	if err != nil {
+		return -1
+	}
+
+	return major
 }
 
 func displaySecurityFixes(fixes []SecurityFixInfo, progress *p.ConsoleReporter) {
-	if len(fixes) == 0 {
-		fmt.Println()
-		progress.Success("No fixable security issues found")
-		return
-	}
 
 	fmt.Println()
 	fmt.Println("Security Fix Information:")
 	fmt.Println(strings.Repeat("=", 80))
 
 	for _, fix := range fixes {
-		fmt.Println()
 		fmt.Printf("📦 Package: %s\n", fix.PackageName)
 		fmt.Printf("   Current Version:  %s\n", fix.CurrentVersion)
-		fmt.Printf("   Fix Available:    %v\n", fix.FixAvailable)
 		if fix.FixVersion != "" {
 			fmt.Printf("   Fix Version:      %s\n", fix.FixVersion)
 		} else {
@@ -386,7 +429,6 @@ func displaySecurityFixes(fixes []SecurityFixInfo, progress *p.ConsoleReporter) 
 		}
 	}
 
-	fmt.Println()
 	fmt.Println(strings.Repeat("=", 80))
 	progress.Success(fmt.Sprintf("Found %d packages with available fixes", len(fixes)))
 }
