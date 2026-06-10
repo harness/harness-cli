@@ -3,9 +3,6 @@ package command
 import (
 	"testing"
 
-	"github.com/google/uuid"
-	ar_v3 "github.com/harness/harness-cli/internal/api/ar_v3"
-	"github.com/harness/harness-cli/util/common/progress"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -204,145 +201,8 @@ flask[async]>=2.0.0`,
 	}
 }
 
-func TestExtractScanResults(t *testing.T) {
-	tests := []struct {
-		name     string
-		response *ar_v3.GetBulkScanEvaluationStatusResp
-		batchIdx int
-		want     int
-	}{
-		{
-			name: "valid scan results",
-			response: &ar_v3.GetBulkScanEvaluationStatusResp{
-				JSON200: &ar_v3.BulkScanEvaluationStatusResponse{
-					Data: &ar_v3.BulkScanEvaluationStatusData{
-						Scans: &[]ar_v3.BulkScanResultItem{
-							{
-								PackageName: stringPtr("express"),
-								Version:     stringPtr("4.18.2"),
-								ScanId:      uuidPtr(uuid.New()),
-								ScanStatus:  scanStatusPtr(ar_v3.BLOCKED),
-							},
-							{
-								PackageName: stringPtr("lodash"),
-								Version:     stringPtr("4.17.21"),
-								ScanId:      uuidPtr(uuid.New()),
-								ScanStatus:  scanStatusPtr(ar_v3.ALLOWED),
-							},
-						},
-					},
-				},
-			},
-			batchIdx: 0,
-			want:     2,
-		},
-		{
-			name: "nil scans",
-			response: &ar_v3.GetBulkScanEvaluationStatusResp{
-				JSON200: &ar_v3.BulkScanEvaluationStatusResponse{
-					Data: &ar_v3.BulkScanEvaluationStatusData{
-						Scans: nil,
-					},
-				},
-			},
-			batchIdx: 0,
-			want:     0,
-		},
-		{
-			name: "empty scans",
-			response: &ar_v3.GetBulkScanEvaluationStatusResp{
-				JSON200: &ar_v3.BulkScanEvaluationStatusResponse{
-					Data: &ar_v3.BulkScanEvaluationStatusData{
-						Scans: &[]ar_v3.BulkScanResultItem{},
-					},
-				},
-			},
-			batchIdx: 0,
-			want:     0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			results := extractScanResults(tt.response, tt.batchIdx)
-			assert.Equal(t, tt.want, len(results))
-		})
-	}
-}
-
-func TestDisplayResults(t *testing.T) {
-	tests := []struct {
-		name    string
-		results []ScanResult
-		wantErr bool
-	}{
-		{
-			name: "valid results",
-			results: []ScanResult{
-				{
-					PackageName: "express",
-					Version:     "4.18.2",
-					ScanID:      uuid.New().String(),
-					ScanStatus:  "BLOCKED",
-				},
-				{
-					PackageName: "lodash",
-					Version:     "4.17.21",
-					ScanID:      uuid.New().String(),
-					ScanStatus:  "ALLOWED",
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name:    "empty results",
-			results: []ScanResult{},
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			p := progress.NewConsoleReporter()
-			err := displayResults(tt.results, p)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestBatchInfo(t *testing.T) {
-	info := batchInfo{
-		batchIdx:     0,
-		totalBatches: 3,
-		registryName: "test-registry",
-	}
-
-	assert.Equal(t, 0, info.batchIdx)
-	assert.Equal(t, 3, info.totalBatches)
-	assert.Equal(t, "test-registry", info.registryName)
-}
-
-func TestAuditContext(t *testing.T) {
-	testUUID := uuid.New()
-	p := progress.NewConsoleReporter()
-
-	ctx := &auditContext{
-		f:            nil,
-		registryUUID: testUUID,
-		org:          "test-org",
-		project:      "test-project",
-		p:            p,
-	}
-
-	assert.Equal(t, testUUID, ctx.registryUUID)
-	assert.Equal(t, "test-org", ctx.org)
-	assert.Equal(t, "test-project", ctx.project)
-	assert.NotNil(t, ctx.p)
-}
+// Tests for extractScanResults, DisplayResults, BatchInfo, and AuditContext
+// have been moved to fw_util_test.go since these functions are now in fw_util.go
 
 func TestParsePomXml(t *testing.T) {
 	tests := []struct {
@@ -434,14 +294,4 @@ func TestParseYarnLock(t *testing.T) {
 	}
 }
 
-func stringPtr(s string) *string {
-	return &s
-}
-
-func uuidPtr(u uuid.UUID) *uuid.UUID {
-	return &u
-}
-
-func scanStatusPtr(s ar_v3.BulkScanResultItemScanStatus) *ar_v3.BulkScanResultItemScanStatus {
-	return &s
-}
+// Helper functions have been moved to fw_util_test.go
