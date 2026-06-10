@@ -45,7 +45,6 @@ type auditContext = regcmd.AuditContext
 
 func NewNpmAuditCmd(f *cmdutils.Factory) *cobra.Command {
 	var fix bool
-	var registryName string
 	var packageJsonPath string
 
 	cmd := &cobra.Command{
@@ -57,70 +56,74 @@ This command will:
 1. Parse your package.json file
 2. Evaluate all dependencies against firewall policies
 3. Identify vulnerable packages with available fixes
-4. Optionally update package.json with fix versions (--fix flag)
-5. Optionally run npm install to apply updates (--install flag)`,
+4. Optionally update package.json with fix versions (--fix flag)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runNpmAudit(f, registryName, packageJsonPath, fix)
+			// Validate packageJsonPath for package.json file
+			if err := validatePackageJsonPath(packageJsonPath); err != nil {
+				return err
+			}
+			return runNpmAudit(f, packageJsonPath, fix)
 		},
 	}
 
 	cmd.Flags().BoolVar(&fix, "fix", false, "Automatically update package.json with fix versions for vulnerable packages")
 	cmd.Flags().StringVarP(&packageJsonPath, "file", "f", "package.json", "Path to package.json file")
-	cmd.Flags().StringVar(&registryName, "registry", "", "Registry name (optional, will auto-detect from config)")
 
 	return cmd
 }
 
-func runNpmAudit(f *cmdutils.Factory, registryName string, packageJsonPath string, fix bool) error {
-	progress := p.NewConsoleReporter()
-
-	// Validate package.json exists
-	if _, err := os.Stat(packageJsonPath); os.IsNotExist(err) {
-		progress.Error(fmt.Sprintf("package.json not found at: %s", packageJsonPath))
-		return fmt.Errorf("package.json not found at: %s", packageJsonPath)
+func validatePackageJsonPath(filePath string) error {
+	// Check if path exists
+	fileInfo, err := os.Stat(filePath)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("file not found: %s", filePath)
 	}
+	if err != nil {
+		return fmt.Errorf("failed to access file: %w", err)
+	}
+
+	// Check if it's a directory
+	if fileInfo.IsDir() {
+		return fmt.Errorf("path is a directory, not a file: %s", filePath)
+	}
+
+	// Check if filename is package.json
+	fileName := filePath
+	if idx := strings.LastIndex(filePath, "/"); idx != -1 {
+		fileName = filePath[idx+1:]
+	}
+	if fileName != "package.json" {
+		return fmt.Errorf("file must be named 'package.json', got: %s", fileName)
+	}
+
+	return nil
+}
+
+func runNpmAudit(f *cmdutils.Factory, packageJsonPath string, fix bool) error {
+	progress := p.NewConsoleReporter()
 
 	progress.Start("Starting npm audit")
 	log.Info().Str("file", packageJsonPath).Bool("fix", fix).Msg("Starting npm audit")
 
-	// Step 1: Detect registry
+	// Detect registry
 	progress.Step("Detecting HAR registry")
-	regInfo, err := detectNpmRegistry(registryName)
+	regInfo, err := detectNpmRegistry()
 	if err != nil {
 		progress.Error(fmt.Sprintf("Failed to detect registry: %s", err))
 		return err
 	}
 	progress.Success(fmt.Sprintf("Found registry: %s", regInfo.RegistryIdentifier))
 
-	// Step 2: Resolve org/project
-	org := config.Global.OrgID
-	project := config.Global.ProjectID
-	if envOrg := os.Getenv("ORG_IDENTIFIER"); envOrg != "" {
-		org = envOrg
-	}
-	if envProj := os.Getenv("PROJECT_IDENTIFIER"); envProj != "" {
-		project = envProj
-	}
-
-	// Fallback to saved npm config
-	if org == "" || project == "" {
-		savedCfg, _ := regcmd.LoadNpmRegistryConfig()
-		if savedCfg != nil {
-			if org == "" {
-				org = savedCfg.OrgID
-			}
-			if project == "" {
-				project = savedCfg.ProjectID
-			}
-		}
-	}
+	//Setting values assigned during configuration
+	org := regInfo.OrgID
+	project := regInfo.ProjectID
 
 	if org == "" || project == "" {
 		progress.Error("Organization and Project identifiers are required")
 		return fmt.Errorf("organization and project identifiers are required. Set via config or environment variables")
 	}
 
-	// Step 3: Resolve registry UUID
+	// resolve registry UUID
 	progress.Step("Resolving registry details")
 	registryUUID, err := resolveRegistryUUID(f, regInfo.RegistryIdentifier, org, project, progress)
 	if err != nil {
@@ -128,7 +131,7 @@ func runNpmAudit(f *cmdutils.Factory, registryName string, packageJsonPath strin
 	}
 	progress.Success(fmt.Sprintf("Registry UUID: %s", registryUUID.String()))
 
-	// Step 4: Parse package.json
+	// Parse package.json
 	progress.Start(fmt.Sprintf("Parsing %s", packageJsonPath))
 	dependencies, err := regcmd.ParseLockFile(packageJsonPath)
 	if err != nil {
@@ -218,19 +221,16 @@ func runNpmAudit(f *cmdutils.Factory, registryName string, packageJsonPath strin
 	return nil
 }
 
-func detectNpmRegistry(explicitRegistry string) (*registryInfo, error) {
+func detectNpmRegistry() (*registryInfo, error) {
 	savedCfg, err := regcmd.LoadNpmRegistryConfig()
 	if err == nil && savedCfg != nil && savedCfg.RegistryURL != "" {
-		if explicitRegistry == "" || explicitRegistry == savedCfg.RegistryIdentifier {
-			return &registryInfo{
-				RegistryURL:        savedCfg.RegistryURL,
-				RegistryIdentifier: savedCfg.RegistryIdentifier,
-			}, nil
-		}
-	}
+		return &registryInfo{
+			RegistryURL:        savedCfg.RegistryURL,
+			RegistryIdentifier: savedCfg.RegistryIdentifier,
+			OrgID:              savedCfg.OrgID,
+			ProjectID:          savedCfg.ProjectID,
+		}, nil
 
-	if explicitRegistry != "" {
-		return nil, fmt.Errorf("registry '%s' not found in saved config", explicitRegistry)
 	}
 	return nil, fmt.Errorf("no HAR registry found. Run 'hc registry configure npm' first")
 }
@@ -238,6 +238,8 @@ func detectNpmRegistry(explicitRegistry string) (*registryInfo, error) {
 type registryInfo struct {
 	RegistryURL        string
 	RegistryIdentifier string
+	OrgID              string
+	ProjectID          string
 }
 
 func resolveRegistryUUID(f *cmdutils.Factory, registryIdentifier, org, project string, progress *p.ConsoleReporter) (uuid.UUID, error) {
