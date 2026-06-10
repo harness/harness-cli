@@ -211,7 +211,7 @@ func pollBatchEvaluation(ctx *AuditContext, evaluationID string, info BatchInfo)
 }
 
 func extractScanResults(statusResp *ar_v3.GetBulkScanEvaluationStatusResp, batchIdx int) []ScanResult {
-	if statusResp.JSON200.Data.Scans == nil {
+	if statusResp == nil || statusResp.JSON200 == nil || statusResp.JSON200.Data == nil || statusResp.JSON200.Data.Scans == nil {
 		return nil
 	}
 

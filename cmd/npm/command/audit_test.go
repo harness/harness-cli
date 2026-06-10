@@ -475,3 +475,439 @@ func TestRegistryInfoStruct(t *testing.T) {
 	assert.Equal(t, "test-project", info.ProjectID)
 }
 
+func TestNewNpmAuditCmd(t *testing.T) {
+	// Create a mock factory (nil is acceptable for command creation)
+	cmd := NewNpmAuditCmd(nil)
+
+	assert.NotNil(t, cmd)
+	assert.Equal(t, "audit", cmd.Use)
+	assert.Equal(t, "Audit npm dependencies for vulnerabilities", cmd.Short)
+	assert.NotNil(t, cmd.RunE)
+
+	// Check flags
+	fixFlag := cmd.Flags().Lookup("fix")
+	assert.NotNil(t, fixFlag)
+	assert.Equal(t, "false", fixFlag.DefValue)
+
+	fileFlag := cmd.Flags().Lookup("file")
+	assert.NotNil(t, fileFlag)
+	assert.Equal(t, "package.json", fileFlag.DefValue)
+}
+
+func TestDetectNpmRegistry(t *testing.T) {
+	// This test verifies the detectNpmRegistry function behavior
+	// Note: This function depends on regcmd.LoadNpmRegistryConfig() which reads from
+	// the user's home directory, making it difficult to test in isolation without mocking.
+	// We test that it returns the expected error when no config exists.
+	
+	t.Run("returns error when no config", func(t *testing.T) {
+		// Save current HOME
+		originalHome := os.Getenv("HOME")
+		defer os.Setenv("HOME", originalHome)
+		
+		// Set HOME to a non-existent directory
+		tmpDir := t.TempDir()
+		nonExistentDir := filepath.Join(tmpDir, "nonexistent")
+		os.Setenv("HOME", nonExistentDir)
+		
+		_, err := detectNpmRegistry()
+		// Should return an error when config doesn't exist
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no HAR registry found")
+	})
+	
+	t.Run("registryInfo struct", func(t *testing.T) {
+		// Test the registryInfo struct creation
+		info := &registryInfo{
+			RegistryURL:        "https://test-registry.com",
+			RegistryIdentifier: "test-registry",
+			OrgID:              "test-org",
+			ProjectID:          "test-project",
+		}
+		
+		assert.Equal(t, "https://test-registry.com", info.RegistryURL)
+		assert.Equal(t, "test-registry", info.RegistryIdentifier)
+		assert.Equal(t, "test-org", info.OrgID)
+		assert.Equal(t, "test-project", info.ProjectID)
+	})
+}
+
+func TestDisplaySecurityFixes(t *testing.T) {
+	tests := []struct {
+		name  string
+		fixes []SecurityFixInfo
+	}{
+		{
+			name: "display multiple fixes",
+			fixes: []SecurityFixInfo{
+				{
+					PackageName:    "lodash",
+					CurrentVersion: "4.17.15",
+					FixVersion:     "4.17.21",
+					FixAvailable:   true,
+				},
+				{
+					PackageName:    "axios",
+					CurrentVersion: "0.21.0",
+					FixVersion:     "0.21.4",
+					FixAvailable:   true,
+				},
+			},
+		},
+		{
+			name: "display fix without version",
+			fixes: []SecurityFixInfo{
+				{
+					PackageName:    "express",
+					CurrentVersion: "4.17.0",
+					FixVersion:     "",
+					FixAvailable:   false,
+				},
+			},
+		},
+		{
+			name:  "empty fixes",
+			fixes: []SecurityFixInfo{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prog := progress.NewConsoleReporter()
+			// This function prints to stdout, so we just verify it doesn't panic
+			assert.NotPanics(t, func() {
+				displaySecurityFixes(tt.fixes, prog)
+			})
+		})
+	}
+}
+
+func TestDisplayFixComparisonFromSecurityFixes(t *testing.T) {
+	tests := []struct {
+		name  string
+		fixes []SecurityFixInfo
+	}{
+		{
+			name: "display comparison for multiple packages",
+			fixes: []SecurityFixInfo{
+				{
+					PackageName:    "lodash",
+					CurrentVersion: "4.17.15",
+					FixVersion:     "4.17.21",
+				},
+				{
+					PackageName:    "axios",
+					CurrentVersion: "0.21.0",
+					FixVersion:     "1.2.0",
+				},
+			},
+		},
+		{
+			name: "single package comparison",
+			fixes: []SecurityFixInfo{
+				{
+					PackageName:    "react",
+					CurrentVersion: "17.0.0",
+					FixVersion:     "18.0.0",
+				},
+			},
+		},
+		{
+			name:  "empty fixes",
+			fixes: []SecurityFixInfo{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This function prints to stdout, so we just verify it doesn't panic
+			assert.NotPanics(t, func() {
+				displayFixComparisonFromSecurityFixes(tt.fixes)
+			})
+		})
+	}
+}
+
+func TestEvaluateFixVersions_ErrorHandling(t *testing.T) {
+	// Test with empty vulnerable packages
+	fixes, manualFix, err := evaluateFixVersions(nil, []regcmd.ScanResult{})
+	assert.NoError(t, err)
+	assert.Empty(t, fixes)
+	assert.Empty(t, manualFix)
+
+	// Test with packages without scan IDs
+	packages := []regcmd.ScanResult{
+		{
+			PackageName: "test-pkg",
+			Version:     "1.0.0",
+			ScanID:      "",
+			ScanStatus:  "BLOCKED",
+		},
+	}
+	fixes, manualFix, err = evaluateFixVersions(nil, packages)
+	assert.NoError(t, err)
+	assert.Empty(t, fixes)
+	assert.Empty(t, manualFix)
+}
+
+func TestRunNpmAudit_ValidationError(t *testing.T) {
+	// Note: runNpmAudit requires a valid factory and registry configuration.
+	// Testing the full flow requires mocking the HTTP client and registry config.
+	// Instead, we test the validation that happens before runNpmAudit is called.
+	
+	tmpDir := t.TempDir()
+
+	t.Run("validation catches invalid path", func(t *testing.T) {
+		// This tests that validatePackageJsonPath (called before runNpmAudit) works
+		invalidPath := filepath.Join(tmpDir, "nonexistent", "package.json")
+		err := validatePackageJsonPath(invalidPath)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "file not found")
+	})
+	
+	t.Run("validation catches directory instead of file", func(t *testing.T) {
+		dirPath := tmpDir
+		err := validatePackageJsonPath(dirPath)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "path is a directory")
+	})
+}
+
+func TestMajorChangeEdgeCases(t *testing.T) {
+	tests := []struct {
+		name    string
+		fixInfo SecurityFixInfo
+		want    bool
+	}{
+		{
+			name: "both versions invalid",
+			fixInfo: SecurityFixInfo{
+				CurrentVersion: "invalid",
+				FixVersion:     "also-invalid",
+			},
+			want: false,
+		},
+		{
+			name: "current version invalid",
+			fixInfo: SecurityFixInfo{
+				CurrentVersion: "invalid",
+				FixVersion:     "2.0.0",
+			},
+			want: false,
+		},
+		{
+			name: "fix version invalid",
+			fixInfo: SecurityFixInfo{
+				CurrentVersion: "1.0.0",
+				FixVersion:     "invalid",
+			},
+			want: false,
+		},
+		{
+			name: "empty versions",
+			fixInfo: SecurityFixInfo{
+				CurrentVersion: "",
+				FixVersion:     "",
+			},
+			want: false,
+		},
+		{
+			name: "version with multiple prefixes",
+			fixInfo: SecurityFixInfo{
+				CurrentVersion: "^~v1.0.0",
+				FixVersion:     "2.0.0",
+			},
+			want: false, // Will fail to parse after stripping known prefixes
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := majorChange(tt.fixInfo)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestExtractMajorVersionEdgeCases(t *testing.T) {
+	tests := []struct {
+		name    string
+		version string
+		want    int
+	}{
+		{
+			name:    "version with spaces",
+			version: " 4.17.21 ",
+			want:    4, // Spaces are trimmed by strings.Split
+		},
+		{
+			name:    "version with letters",
+			version: "v1.2.3-alpha",
+			want:    1,
+		},
+		{
+			name:    "only dots",
+			version: "...",
+			want:    -1,
+		},
+		{
+			name:    "negative version",
+			version: "-1.0.0",
+			want:    -1,
+		},
+		{
+			name:    "very large major version",
+			version: "999.0.0",
+			want:    999,
+		},
+		{
+			name:    "version with text prefix",
+			version: "version4.0.0",
+			want:    -1, // Will fail to parse "version4" as int
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractMajorVersion(tt.version)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestBackupPackageJsonEdgeCases(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	t.Run("backup already exists", func(t *testing.T) {
+		// Create original file
+		filePath := filepath.Join(tmpDir, "existing-backup", "package.json")
+		os.MkdirAll(filepath.Dir(filePath), 0755)
+		originalData := []byte(`{"name": "test", "version": "1.0.0"}`)
+		os.WriteFile(filePath, originalData, 0644)
+
+		// Create existing backup
+		backupPath := filePath + ".backup"
+		oldBackupData := []byte(`{"name": "old", "version": "0.9.0"}`)
+		os.WriteFile(backupPath, oldBackupData, 0644)
+
+		// Create new backup (should overwrite)
+		err := backupPackageJson(filePath)
+		assert.NoError(t, err)
+
+		// Verify backup was overwritten with current content
+		newBackupData, _ := os.ReadFile(backupPath)
+		assert.Equal(t, originalData, newBackupData)
+	})
+
+	t.Run("read-only directory", func(t *testing.T) {
+		if os.Getuid() == 0 {
+			t.Skip("Skipping test when running as root")
+		}
+
+		readOnlyDir := filepath.Join(tmpDir, "readonly")
+		os.MkdirAll(readOnlyDir, 0755)
+		filePath := filepath.Join(readOnlyDir, "package.json")
+		os.WriteFile(filePath, []byte(`{"name": "test"}`), 0644)
+
+		// Make directory read-only
+		os.Chmod(readOnlyDir, 0555)
+		defer os.Chmod(readOnlyDir, 0755) // Restore for cleanup
+
+		err := backupPackageJson(filePath)
+		assert.Error(t, err)
+	})
+}
+
+func TestUpdatePackageJsonWithFixesEdgeCases(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	t.Run("malformed json", func(t *testing.T) {
+		filePath := filepath.Join(tmpDir, "malformed", "package.json")
+		os.MkdirAll(filepath.Dir(filePath), 0755)
+		os.WriteFile(filePath, []byte(`{invalid json}`), 0644)
+
+		fixes := []SecurityFixInfo{
+			{PackageName: "lodash", FixVersion: "4.17.21"},
+		}
+
+		prog := progress.NewConsoleReporter()
+		err := updatePackageJsonWithFixes(filePath, fixes, prog)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse package.json")
+	})
+
+	t.Run("no matching dependencies", func(t *testing.T) {
+		filePath := filepath.Join(tmpDir, "no-match", "package.json")
+		os.MkdirAll(filepath.Dir(filePath), 0755)
+
+		pkgData := map[string]interface{}{
+			"name":    "test",
+			"version": "1.0.0",
+			"dependencies": map[string]interface{}{
+				"express": "4.18.2",
+			},
+		}
+		data, _ := json.MarshalIndent(pkgData, "", "  ")
+		os.WriteFile(filePath, data, 0644)
+
+		fixes := []SecurityFixInfo{
+			{PackageName: "lodash", FixVersion: "4.17.21"}, // Not in dependencies
+		}
+
+		prog := progress.NewConsoleReporter()
+		err := updatePackageJsonWithFixes(filePath, fixes, prog)
+		assert.NoError(t, err) // Should succeed but update 0 packages
+	})
+
+	t.Run("update all dependency types", func(t *testing.T) {
+		filePath := filepath.Join(tmpDir, "all-types", "package.json")
+		os.MkdirAll(filepath.Dir(filePath), 0755)
+
+		pkgData := map[string]interface{}{
+			"name":    "test",
+			"version": "1.0.0",
+			"dependencies": map[string]interface{}{
+				"lodash": "4.17.15",
+			},
+			"devDependencies": map[string]interface{}{
+				"jest": "29.0.0",
+			},
+			"peerDependencies": map[string]interface{}{
+				"react": "17.0.0",
+			},
+			"optionalDependencies": map[string]interface{}{
+				"fsevents": "2.3.0",
+			},
+		}
+		data, _ := json.MarshalIndent(pkgData, "", "  ")
+		os.WriteFile(filePath, data, 0644)
+
+		fixes := []SecurityFixInfo{
+			{PackageName: "lodash", FixVersion: "4.17.21"},
+			{PackageName: "jest", FixVersion: "29.5.0"},
+			{PackageName: "react", FixVersion: "18.0.0"},
+			{PackageName: "fsevents", FixVersion: "2.3.2"},
+		}
+
+		prog := progress.NewConsoleReporter()
+		err := updatePackageJsonWithFixes(filePath, fixes, prog)
+		assert.NoError(t, err)
+
+		// Verify all sections were updated
+		updatedData, _ := os.ReadFile(filePath)
+		var updatedPkg map[string]interface{}
+		json.Unmarshal(updatedData, &updatedPkg)
+
+		deps := updatedPkg["dependencies"].(map[string]interface{})
+		assert.Equal(t, "4.17.21", deps["lodash"])
+
+		devDeps := updatedPkg["devDependencies"].(map[string]interface{})
+		assert.Equal(t, "29.5.0", devDeps["jest"])
+
+		peerDeps := updatedPkg["peerDependencies"].(map[string]interface{})
+		assert.Equal(t, "18.0.0", peerDeps["react"])
+
+		optDeps := updatedPkg["optionalDependencies"].(map[string]interface{})
+		assert.Equal(t, "2.3.2", optDeps["fsevents"])
+	})
+}
