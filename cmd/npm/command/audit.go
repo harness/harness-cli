@@ -181,7 +181,26 @@ func runNpmAudit(f *cmdutils.Factory, registryName string, packageJsonPath strin
 		if len(fixes) > 0 {
 			progress.Success("Automatic Fixes (minor/patch updates):")
 			displaySecurityFixes(fixes, progress)
-			//TODO Apply fix here
+
+			// Apply automatic fixes
+			fmt.Println()
+			progress.Start("Applying automatic fixes to package.json")
+
+			// Backup package.json
+			if err := backupPackageJson(packageJsonPath); err != nil {
+				progress.Error(fmt.Sprintf("Failed to backup package.json: %s", err))
+				return err
+			}
+			progress.Success(fmt.Sprintf("Backup created: %s.backup", packageJsonPath))
+
+			// Update package.json
+			if err := updatePackageJsonWithFixes(packageJsonPath, fixes, progress); err != nil {
+				progress.Error(fmt.Sprintf("Failed to update package.json: %s", err))
+				return err
+			}
+
+			// Display comparison
+			displayFixComparisonFromSecurityFixes(fixes)
 		}
 
 		if len(manualFix) > 0 {
@@ -192,63 +211,10 @@ func runNpmAudit(f *cmdutils.Factory, registryName string, packageJsonPath strin
 			fmt.Println("   Please review the changelog before updating manually.")
 		}
 	}
-
-	// Step 8: If fix flag is set, fetch fix versions and update package.json
-	/*TODO
-	if fix && len(vulnerablePackages) > 0 {
-		fmt.Println()
-		progress.Start("Fetching fix version details for vulnerable packages")
-
-		fixes, err := fetchFixVersions(ctx, vulnerablePackages)
-		if err != nil {
-			progress.Error(fmt.Sprintf("Failed to fetch fix versions: %s", err))
-			return err
-		}
-
-		fixablePackages := filterFixablePackages(fixes)
-		if len(fixablePackages) == 0 {
-			progress.Step("No fix versions available for vulnerable packages")
-			return nil
-		}
-
-		progress.Success(fmt.Sprintf("Found fix versions for %d packages", len(fixablePackages)))
-
-		// Create backup
-		if err := backupPackageJson(packageJsonPath); err != nil {
-			progress.Error(fmt.Sprintf("Failed to create backup: %s", err))
-			return err
-		}
-		progress.Success(fmt.Sprintf("Created backup: %s.backup", packageJsonPath))
-
-		// Update package.json
-		if err := updatePackageJson(packageJsonPath, fixablePackages, progress); err != nil {
-			progress.Error(fmt.Sprintf("Failed to update package.json: %s", err))
-			return err
-		}
-
-		// Display before/after comparison
-		displayFixComparison(fixablePackages)
-
-		// Optionally run npm install
-		if runInstall {
-			fmt.Println()
-			progress.Start("Running npm install to apply updates")
-			if err := runNpmInstall(progress); err != nil {
-				progress.Error(fmt.Sprintf("npm install failed: %s", err))
-				return err
-			}
-			progress.Success("npm install completed successfully")
-		} else {
-			fmt.Println()
-			progress.Step("Run 'npm install' to apply the updates")
-		}
-	} else if fix && len(vulnerablePackages) == 0 {
+	if fix && len(vulnerablePackages) == 0 {
 		fmt.Println()
 		progress.Success("No vulnerable packages found. Nothing to fix!")
 	}
-
-	*/
-
 	return nil
 }
 
@@ -433,16 +399,6 @@ func displaySecurityFixes(fixes []SecurityFixInfo, progress *p.ConsoleReporter) 
 	progress.Success(fmt.Sprintf("Found %d packages with available fixes", len(fixes)))
 }
 
-func filterFixablePackages(fixes []PackageFix) []PackageFix {
-	fixable := make([]PackageFix, 0)
-	for _, fix := range fixes {
-		if fix.FixVersion != "" {
-			fixable = append(fixable, fix)
-		}
-	}
-	return fixable
-}
-
 func backupPackageJson(filePath string) error {
 	backupPath := filePath + ".backup"
 
@@ -459,7 +415,7 @@ func backupPackageJson(filePath string) error {
 	return nil
 }
 
-func updatePackageJson(filePath string, fixes []PackageFix, progress *p.ConsoleReporter) error {
+func updatePackageJsonWithFixes(filePath string, fixes []SecurityFixInfo, progress *p.ConsoleReporter) error {
 	progress.Start("Updating package.json with fix versions")
 
 	data, err := os.ReadFile(filePath)
@@ -472,13 +428,12 @@ func updatePackageJson(filePath string, fixes []PackageFix, progress *p.ConsoleR
 		return fmt.Errorf("failed to parse package.json: %w", err)
 	}
 
-	// Update dependencies
 	updated := 0
 	for _, fix := range fixes {
-		updated += updateDependencySection(pkgJson, "dependencies", fix)
-		updated += updateDependencySection(pkgJson, "devDependencies", fix)
-		updated += updateDependencySection(pkgJson, "peerDependencies", fix)
-		updated += updateDependencySection(pkgJson, "optionalDependencies", fix)
+		updated += updateDependencySectionWithFix(pkgJson, "dependencies", fix)
+		updated += updateDependencySectionWithFix(pkgJson, "devDependencies", fix)
+		updated += updateDependencySectionWithFix(pkgJson, "peerDependencies", fix)
+		updated += updateDependencySectionWithFix(pkgJson, "optionalDependencies", fix)
 	}
 
 	// Write back to file with proper formatting
@@ -499,64 +454,29 @@ func updatePackageJson(filePath string, fixes []PackageFix, progress *p.ConsoleR
 	return nil
 }
 
-func updateDependencySection(pkgJson map[string]interface{}, section string, fix PackageFix) int {
+func updateDependencySectionWithFix(pkgJson map[string]interface{}, section string, fix SecurityFixInfo) int {
 	deps, ok := pkgJson[section].(map[string]interface{})
 	if !ok {
 		return 0
 	}
 
-	if _, exists := deps[fix.Name]; exists {
-		deps[fix.Name] = fix.FixVersion
-		log.Info().Str("package", fix.Name).Str("section", section).Str("version", fix.FixVersion).Msg("Updated package version")
+	if _, exists := deps[fix.PackageName]; exists {
+		deps[fix.PackageName] = fix.FixVersion
+		log.Info().Str("package", fix.PackageName).Str("section", section).Str("version", fix.FixVersion).Msg("Updated package version")
 		return 1
 	}
 
 	return 0
 }
 
-func displayFixComparison(fixes []PackageFix) {
+func displayFixComparisonFromSecurityFixes(fixes []SecurityFixInfo) {
 	fmt.Println()
 	fmt.Println("Package Updates Applied:")
 	fmt.Println(strings.Repeat("=", 80))
 
 	for _, fix := range fixes {
-		fmt.Printf("\n📦 %s\n", fix.Name)
-		fmt.Printf("   %s → %s\n", fix.CurrentVersion, fix.FixVersion)
-
-		if len(fix.Vulnerabilities) > 0 {
-			fmt.Printf("   Fixes %d vulnerabilities:\n", len(fix.Vulnerabilities))
-			for _, vuln := range fix.Vulnerabilities {
-				fmt.Printf("     - %s (CVSS: %.1f, Severity: %s)\n", vuln.CveId, vuln.CvssScore, vuln.Severity)
-			}
-		}
+		fmt.Printf("\n📦 %s  ::   %s → %s\n", fix.PackageName, fix.CurrentVersion, fix.FixVersion)
 	}
 
-	fmt.Println()
 	fmt.Println(strings.Repeat("=", 80))
-}
-
-func runNpmInstall(progress *p.ConsoleReporter) error {
-	log.Info().Msg("Running npm install")
-
-	// Note: This would typically execute npm install
-	// Implementation depends on whether you want to use:
-	// 1. Direct exec.Command("npm", "install")
-	// 2. The existing pkgmgr.ExecuteWithFirewall infrastructure
-	// 3. A simple os/exec call
-
-	// For now, we'll indicate that the user should run it manually
-	// To implement actual execution, uncomment and use:
-	/*
-		cmd := exec.Command("npm", "install")
-		cmd.Dir = "."
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("npm install failed: %w", err)
-		}
-	*/
-
-	return nil
 }
