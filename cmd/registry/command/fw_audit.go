@@ -10,13 +10,10 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	ar_v3 "github.com/harness/harness-cli/internal/api/ar_v3"
 	client2 "github.com/harness/harness-cli/util/client"
-	"github.com/harness/harness-cli/util/common/printer"
 	"github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/google/uuid"
@@ -25,33 +22,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type Dependency struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Source  string `json:"source"`
-	Parent  string `json:"parent,omitempty"`
-}
-
-type ScanResult struct {
-	PackageName string `json:"packageName"`
-	Version     string `json:"version"`
-	ScanID      string `json:"scanId"`
-	ScanStatus  string `json:"scanStatus"`
-}
-
-type auditContext struct {
-	f            *cmdutils.Factory
-	registryUUID uuid.UUID
-	org          string
-	project      string
-	p            *progress.ConsoleReporter
-}
-
-type batchInfo struct {
-	batchIdx     int
-	totalBatches int
-	registryName string
-}
+type auditContext = AuditContext
+type batchInfo = BatchInfo
 
 func fetchRegistryDetails(f *cmdutils.Factory, registryName, org, project string, p *progress.ConsoleReporter) (uuid.UUID, string, error) {
 	p.Step(fmt.Sprintf("Fetching registry details for: %s", registryName))
@@ -95,249 +67,12 @@ func fetchRegistryDetails(f *cmdutils.Factory, registryName, org, project string
 	return registryUUID, packageType, nil
 }
 
-func initiateBatchEvaluation(ctx *auditContext, batch []Dependency, info batchInfo) (string, error) {
-	ctx.p.Step(fmt.Sprintf("Processing batch %d/%d (%d packages) for registry: %s", info.batchIdx+1, info.totalBatches, len(batch), info.registryName))
-	log.Info().Str("registry", info.registryName).Int("batch", info.batchIdx+1).Int("totalBatches", info.totalBatches).Int("batchSize", len(batch)).Msg("Initiating bulk evaluation")
-
-	artifacts := make([]ar_v3.ArtifactScanInput, 0, len(batch))
-	for _, dep := range batch {
-		artifacts = append(artifacts, ar_v3.ArtifactScanInput{
-			PackageName: dep.Name,
-			Version:     dep.Version,
-		})
-	}
-
-	initParams := &ar_v3.InitiateBulkScanEvaluationParams{
-		AccountIdentifier: config.Global.AccountID,
-		OrgIdentifier:     &ctx.org,
-		ProjectIdentifier: &ctx.project,
-	}
-
-	initResp, err := ctx.f.RegistryV3HttpClient().InitiateBulkScanEvaluationWithResponse(
-		context.Background(),
-		initParams,
-		ar_v3.InitiateBulkScanEvaluationJSONRequestBody{
-			RegistryId: ctx.registryUUID,
-			Artifacts:  artifacts,
-		},
-	)
-	if err != nil {
-		ctx.p.Error(fmt.Sprintf("Failed to initiate bulk evaluation for batch %d/%d", info.batchIdx+1, info.totalBatches))
-		log.Error().Err(err).Int("batch", info.batchIdx+1).Msg("Failed to initiate bulk evaluation")
-		return "", fmt.Errorf("failed to initiate bulk evaluation for batch %d: %w", info.batchIdx+1, err)
-	}
-
-	if initResp.StatusCode() != 202 {
-		errMsg := fmt.Sprintf("Failed to initiate bulk evaluation for batch %d/%d", info.batchIdx+1, info.totalBatches)
-		if initResp.JSONDefault != nil && initResp.JSONDefault.Error.Message != nil {
-			errMsg = *initResp.JSONDefault.Error.Message
-		}
-		ctx.p.Error(errMsg)
-		log.Error().Int("statusCode", initResp.StatusCode()).Int("batch", info.batchIdx+1).Msg(errMsg)
-		return "", fmt.Errorf("%s", errMsg)
-	}
-
-	if initResp.JSON202 == nil || initResp.JSON202.Data == nil || initResp.JSON202.Data.EvaluationId == nil {
-		ctx.p.Error(fmt.Sprintf("Invalid response from bulk evaluation API for batch %d/%d", info.batchIdx+1, info.totalBatches))
-		log.Error().Int("batch", info.batchIdx+1).Msg("Invalid response from bulk evaluation API")
-		return "", fmt.Errorf("invalid response from bulk evaluation API for batch %d", info.batchIdx+1)
-	}
-
-	evaluationID := *initResp.JSON202.Data.EvaluationId
-	ctx.p.Success(fmt.Sprintf("Batch %d/%d evaluation initiated with ID: %s", info.batchIdx+1, info.totalBatches, evaluationID))
-	log.Info().Str("evaluationId", evaluationID).Int("batch", info.batchIdx+1).Msg("Bulk evaluation initiated")
-
-	return evaluationID, nil
-}
-
-func pollBatchEvaluation(ctx *auditContext, evaluationID string, info batchInfo) (*ar_v3.GetBulkScanEvaluationStatusResp, error) {
-	ctx.p.Step(fmt.Sprintf("Waiting for batch %d/%d evaluation to complete", info.batchIdx+1, info.totalBatches))
-	log.Info().Int("batch", info.batchIdx+1).Msg("Polling bulk evaluation status")
-
-	statusParams := &ar_v3.GetBulkScanEvaluationStatusParams{
-		AccountIdentifier: config.Global.AccountID,
-		OrgIdentifier:     &ctx.org,
-		ProjectIdentifier: &ctx.project,
-	}
-
-	pollCount := 0
-	maxPolls := 120
-
-	for {
-		pollCount++
-		if pollCount > maxPolls {
-			ctx.p.Error(fmt.Sprintf("Timeout waiting for batch %d/%d evaluation to complete", info.batchIdx+1, info.totalBatches))
-			log.Error().Int("maxPolls", maxPolls).Int("batch", info.batchIdx+1).Msg("Timeout waiting for bulk evaluation")
-			return nil, fmt.Errorf("timeout waiting for batch %d evaluation to complete", info.batchIdx+1)
-		}
-
-		statusResp, err := ctx.f.RegistryV3HttpClient().GetBulkScanEvaluationStatusWithResponse(
-			context.Background(),
-			evaluationID,
-			statusParams,
-		)
-		if err != nil {
-			ctx.p.Error(fmt.Sprintf("Failed to get bulk evaluation status for batch %d/%d", info.batchIdx+1, info.totalBatches))
-			log.Error().Err(err).Int("batch", info.batchIdx+1).Msg("Failed to get bulk evaluation status")
-			return nil, fmt.Errorf("failed to get bulk evaluation status for batch %d: %w", info.batchIdx+1, err)
-		}
-
-		if statusResp.StatusCode() != 200 {
-			errMsg := fmt.Sprintf("Failed to get bulk evaluation status for batch %d/%d", info.batchIdx+1, info.totalBatches)
-			if statusResp.JSONDefault != nil && statusResp.JSONDefault.Error.Message != nil {
-				errMsg = *statusResp.JSONDefault.Error.Message
-			}
-			ctx.p.Error(errMsg)
-			log.Error().Int("statusCode", statusResp.StatusCode()).Int("batch", info.batchIdx+1).Msg(errMsg)
-			return nil, fmt.Errorf("%s", errMsg)
-		}
-
-		if statusResp.JSON200 == nil || statusResp.JSON200.Data == nil || statusResp.JSON200.Data.Status == nil {
-			ctx.p.Error(fmt.Sprintf("Invalid response from bulk evaluation status API for batch %d/%d", info.batchIdx+1, info.totalBatches))
-			log.Error().Int("batch", info.batchIdx+1).Msg("Invalid response from bulk evaluation status API")
-			return nil, fmt.Errorf("invalid response from bulk evaluation status API for batch %d", info.batchIdx+1)
-		}
-
-		status := *statusResp.JSON200.Data.Status
-		log.Debug().Str("status", string(status)).Int("poll", pollCount).Int("batch", info.batchIdx+1).Msg("Bulk evaluation status")
-
-		if status == ar_v3.SUCCESS {
-			ctx.p.Success(fmt.Sprintf("Batch %d/%d evaluation completed successfully", info.batchIdx+1, info.totalBatches))
-			log.Info().Int("batch", info.batchIdx+1).Msg("Bulk evaluation completed successfully")
-			return statusResp, nil
-		}
-
-		if status == ar_v3.FAILURE {
-			errMsg := fmt.Sprintf("Batch %d/%d evaluation failed", info.batchIdx+1, info.totalBatches)
-			if statusResp.JSON200.Data.Error != nil {
-				errMsg = *statusResp.JSON200.Data.Error
-			}
-			ctx.p.Error(errMsg)
-			log.Error().Str("error", errMsg).Int("batch", info.batchIdx+1).Msg("Bulk evaluation failed")
-			return nil, fmt.Errorf("%s", errMsg)
-		}
-
-		time.Sleep(2 * time.Second)
-	}
-}
-
-func extractScanResults(statusResp *ar_v3.GetBulkScanEvaluationStatusResp, batchIdx int) []ScanResult {
-	if statusResp.JSON200.Data.Scans == nil {
-		return nil
-	}
-
-	scans := *statusResp.JSON200.Data.Scans
-	log.Info().Int("count", len(scans)).Int("batch", batchIdx+1).Msg("Scan results received")
-
-	results := make([]ScanResult, 0, len(scans))
-	for _, scan := range scans {
-		result := ScanResult{}
-		if scan.PackageName != nil {
-			result.PackageName = *scan.PackageName
-		}
-		if scan.Version != nil {
-			result.Version = *scan.Version
-		}
-		if scan.ScanId != nil {
-			result.ScanID = scan.ScanId.String()
-		}
-		if scan.ScanStatus != nil {
-			result.ScanStatus = string(*scan.ScanStatus)
-		}
-		results = append(results, result)
-	}
-	return results
-}
-
 func processBatches(ctx *auditContext, dependencies []Dependency, registryName string) ([]ScanResult, error) {
-	const batchSize = 50
-	totalBatches := (len(dependencies) + batchSize - 1) / batchSize
-	allResults := make([]ScanResult, 0, len(dependencies))
-
-	for batchIdx := 0; batchIdx < totalBatches; batchIdx++ {
-		start := batchIdx * batchSize
-		end := start + batchSize
-		if end > len(dependencies) {
-			end = len(dependencies)
-		}
-		batch := dependencies[start:end]
-
-		info := batchInfo{
-			batchIdx:     batchIdx,
-			totalBatches: totalBatches,
-			registryName: registryName,
-		}
-
-		evaluationID, err := initiateBatchEvaluation(ctx, batch, info)
-		if err != nil {
-			return nil, err
-		}
-
-		statusResp, err := pollBatchEvaluation(ctx, evaluationID, info)
-		if err != nil {
-			return nil, err
-		}
-
-		batchResults := extractScanResults(statusResp, batchIdx)
-		allResults = append(allResults, batchResults...)
-	}
-
-	return allResults, nil
+	return ProcessBatches(ctx, dependencies, registryName)
 }
 
 func displayResults(results []ScanResult, p *progress.ConsoleReporter) error {
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].PackageName < results[j].PackageName
-	})
-
-	if config.Global.Format == "json" {
-		jsonBytes, err := json.MarshalIndent(results, "", "  ")
-		if err != nil {
-			p.Error("Failed to marshal JSON output")
-			log.Error().Err(err).Msg("Failed to marshal JSON output")
-			return err
-		}
-		fmt.Println(string(jsonBytes))
-		return nil
-	}
-
-	fmt.Println()
-	p.Success(fmt.Sprintf("Scan Results for %d dependencies:", len(results)))
-
-	var blockedCount, warnCount, allowedCount, unknownCount int
-	for _, r := range results {
-		switch r.ScanStatus {
-		case "BLOCKED":
-			blockedCount++
-		case "WARN":
-			warnCount++
-		case "ALLOWED":
-			allowedCount++
-		case "UNKNOWN":
-			unknownCount++
-		}
-	}
-
-	if blockedCount > 0 {
-		p.Error(fmt.Sprintf("Blocked: %d", blockedCount))
-	}
-	if warnCount > 0 {
-		p.Step(fmt.Sprintf("Warnings: %d", warnCount))
-	}
-	if allowedCount > 0 {
-		p.Success(fmt.Sprintf("Allowed: %d", allowedCount))
-	}
-	if unknownCount > 0 {
-		p.Step(fmt.Sprintf("Unknown: %d", unknownCount))
-	}
-
-	fmt.Println()
-
-	return printer.Print(results, 0, 1, int64(len(results)), false, [][]string{
-		{"packageName", "Package Name"},
-		{"version", "Version"},
-		{"scanStatus", "Status"},
-	})
+	return DisplayResults(results, p)
 }
 
 func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
@@ -407,11 +142,11 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 			p.Success(fmt.Sprintf("Found %d dependencies in %s", len(dependencies), fileName))
 
 			ctx := &auditContext{
-				f:            f,
-				registryUUID: registryUUID,
-				org:          org,
-				project:      project,
-				p:            p,
+				F:            f,
+				RegistryUUID: registryUUID,
+				Org:          org,
+				Project:      project,
+				P:            p,
 			}
 
 			results, err := processBatches(ctx, dependencies, registryName)

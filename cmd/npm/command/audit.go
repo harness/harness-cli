@@ -5,16 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"sort"
 	"strings"
-	"time"
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	regcmd "github.com/harness/harness-cli/cmd/registry/command"
 	"github.com/harness/harness-cli/config"
-	ar_v3 "github.com/harness/harness-cli/internal/api/ar_v3"
 	client2 "github.com/harness/harness-cli/util/client"
-	"github.com/harness/harness-cli/util/common/printer"
 	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/google/uuid"
@@ -36,13 +32,7 @@ type VulnerabilityInfo struct {
 	Severity  string
 }
 
-type auditContext struct {
-	f            *cmdutils.Factory
-	registryUUID uuid.UUID
-	org          string
-	project      string
-	progress     *p.ConsoleReporter
-}
+type auditContext = regcmd.AuditContext
 
 func NewNpmAuditCmd(f *cmdutils.Factory) *cobra.Command {
 	var fix bool
@@ -68,6 +58,7 @@ This command will:
 
 	cmd.Flags().BoolVar(&fix, "fix", false, "Automatically update package.json with fix versions for vulnerable packages")
 	cmd.Flags().StringVarP(&packageJsonPath, "file", "f", "package.json", "Path to package.json file")
+	cmd.Flags().StringVar(&registryName, "registry", "", "Registry name (optional, will auto-detect from config)")
 
 	return cmd
 }
@@ -145,25 +136,28 @@ func runNpmAudit(f *cmdutils.Factory, registryName string, packageJsonPath strin
 
 	// Step 5: Run firewall audit
 	ctx := &auditContext{
-		f:            f,
-		registryUUID: registryUUID,
-		org:          org,
-		project:      project,
-		progress:     progress,
+		F:            f,
+		RegistryUUID: registryUUID,
+		Org:          org,
+		Project:      project,
+		P:            progress,
 	}
 
-	scanResults, err := runFirewallAudit(ctx, dependencies, regInfo.RegistryIdentifier)
+	scanResults, err := regcmd.ProcessBatches(ctx, dependencies, regInfo.RegistryIdentifier)
 	if err != nil {
 		return err
 	}
 
 	// Step 6: Identify vulnerable packages
-	vulnerablePackages := filterVulnerablePackages(scanResults)
+	//vulnerablePackages := filterVulnerablePackages(scanResults)
 
 	// Step 7: Display results
-	displayAuditResults(scanResults, vulnerablePackages, progress)
+	if err := regcmd.DisplayResults(scanResults, progress); err != nil {
+		return err
+	}
 
 	// Step 8: If fix flag is set, fetch fix versions and update package.json
+	/*TODO
 	if fix && len(vulnerablePackages) > 0 {
 		fmt.Println()
 		progress.Start("Fetching fix version details for vulnerable packages")
@@ -216,6 +210,8 @@ func runNpmAudit(f *cmdutils.Factory, registryName string, packageJsonPath strin
 		progress.Success("No vulnerable packages found. Nothing to fix!")
 	}
 
+	*/
+
 	return nil
 }
 
@@ -262,132 +258,7 @@ func resolveRegistryUUID(f *cmdutils.Factory, registryIdentifier, org, project s
 	return registryUUID, nil
 }
 
-func runFirewallAudit(ctx *auditContext, dependencies []regcmd.Dependency, registryName string) ([]ScanResult, error) {
-	const batchSize = 50
-	totalBatches := (len(dependencies) + batchSize - 1) / batchSize
-	allResults := make([]ScanResult, 0, len(dependencies))
-
-	ctx.progress.Start(fmt.Sprintf("Evaluating %d dependencies against firewall policies", len(dependencies)))
-
-	for batchIdx := 0; batchIdx < totalBatches; batchIdx++ {
-		start := batchIdx * batchSize
-		end := start + batchSize
-		if end > len(dependencies) {
-			end = len(dependencies)
-		}
-		batch := dependencies[start:end]
-
-		ctx.progress.Step(fmt.Sprintf("Processing batch %d/%d (%d packages)", batchIdx+1, totalBatches, len(batch)))
-
-		// Initiate evaluation
-		artifacts := make([]ar_v3.ArtifactScanInput, 0, len(batch))
-		for _, dep := range batch {
-			artifacts = append(artifacts, ar_v3.ArtifactScanInput{
-				PackageName: dep.Name,
-				Version:     dep.Version,
-			})
-		}
-
-		initParams := &ar_v3.InitiateBulkScanEvaluationParams{
-			AccountIdentifier: config.Global.AccountID,
-			OrgIdentifier:     &ctx.org,
-			ProjectIdentifier: &ctx.project,
-		}
-
-		initResp, err := ctx.f.RegistryV3HttpClient().InitiateBulkScanEvaluationWithResponse(
-			context.Background(),
-			initParams,
-			ar_v3.InitiateBulkScanEvaluationJSONRequestBody{
-				RegistryId: ctx.registryUUID,
-				Artifacts:  artifacts,
-			},
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to initiate evaluation for batch %d: %w", batchIdx+1, err)
-		}
-
-		if initResp.StatusCode() != 202 || initResp.JSON202 == nil || initResp.JSON202.Data == nil || initResp.JSON202.Data.EvaluationId == nil {
-			return nil, fmt.Errorf("failed to initiate evaluation for batch %d", batchIdx+1)
-		}
-
-		evaluationID := *initResp.JSON202.Data.EvaluationId
-
-		// Poll for results
-		statusParams := &ar_v3.GetBulkScanEvaluationStatusParams{
-			AccountIdentifier: config.Global.AccountID,
-			OrgIdentifier:     &ctx.org,
-			ProjectIdentifier: &ctx.project,
-		}
-
-		pollCount := 0
-		maxPolls := 120
-
-		for {
-			pollCount++
-			if pollCount > maxPolls {
-				return nil, fmt.Errorf("timeout waiting for batch %d evaluation", batchIdx+1)
-			}
-
-			statusResp, err := ctx.f.RegistryV3HttpClient().GetBulkScanEvaluationStatusWithResponse(
-				context.Background(),
-				evaluationID,
-				statusParams,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get evaluation status for batch %d: %w", batchIdx+1, err)
-			}
-
-			if statusResp.StatusCode() != 200 || statusResp.JSON200 == nil || statusResp.JSON200.Data == nil || statusResp.JSON200.Data.Status == nil {
-				return nil, fmt.Errorf("invalid response from evaluation status API for batch %d", batchIdx+1)
-			}
-
-			status := *statusResp.JSON200.Data.Status
-
-			if status == ar_v3.SUCCESS {
-				if statusResp.JSON200.Data.Scans != nil {
-					scans := *statusResp.JSON200.Data.Scans
-					for _, scan := range scans {
-						result := ScanResult{}
-						if scan.PackageName != nil {
-							result.PackageName = *scan.PackageName
-						}
-						if scan.Version != nil {
-							result.Version = *scan.Version
-						}
-						if scan.ScanId != nil {
-							result.ScanID = scan.ScanId.String()
-						}
-						if scan.ScanStatus != nil {
-							result.ScanStatus = string(*scan.ScanStatus)
-						}
-						allResults = append(allResults, result)
-					}
-				}
-				break
-			}
-
-			if status == ar_v3.FAILURE {
-				errMsg := fmt.Sprintf("Batch %d evaluation failed", batchIdx+1)
-				if statusResp.JSON200.Data.Error != nil {
-					errMsg = *statusResp.JSON200.Data.Error
-				}
-				return nil, fmt.Errorf("%s", errMsg)
-			}
-
-			time.Sleep(2 * time.Second)
-		}
-	}
-
-	ctx.progress.Success(fmt.Sprintf("Evaluation completed for %d packages", len(allResults)))
-	return allResults, nil
-}
-
-type ScanResult struct {
-	PackageName string
-	Version     string
-	ScanID      string
-	ScanStatus  string
-}
+type ScanResult = regcmd.ScanResult
 
 func filterVulnerablePackages(results []ScanResult) []ScanResult {
 	vulnerable := make([]ScanResult, 0)
@@ -399,53 +270,7 @@ func filterVulnerablePackages(results []ScanResult) []ScanResult {
 	return vulnerable
 }
 
-func displayAuditResults(allResults []ScanResult, vulnerablePackages []ScanResult, progress *p.ConsoleReporter) {
-	fmt.Println()
-	progress.Success(fmt.Sprintf("Audit Results for %d dependencies:", len(allResults)))
-
-	var blockedCount, warnCount, allowedCount, unknownCount int
-	for _, r := range allResults {
-		switch r.ScanStatus {
-		case "BLOCKED":
-			blockedCount++
-		case "WARN":
-			warnCount++
-		case "ALLOWED":
-			allowedCount++
-		case "UNKNOWN":
-			unknownCount++
-		}
-	}
-
-	fmt.Println()
-	if blockedCount > 0 {
-		progress.Error(fmt.Sprintf("🚫 Blocked: %d packages", blockedCount))
-	}
-	if warnCount > 0 {
-		progress.Step(fmt.Sprintf("⚠️  Warnings: %d packages", warnCount))
-	}
-	if allowedCount > 0 {
-		progress.Success(fmt.Sprintf("✓ Allowed: %d packages", allowedCount))
-	}
-	if unknownCount > 0 {
-		progress.Step(fmt.Sprintf("? Unknown: %d packages", unknownCount))
-	}
-
-	if len(vulnerablePackages) > 0 {
-		fmt.Println()
-		fmt.Println("Vulnerable Packages:")
-		sort.Slice(vulnerablePackages, func(i, j int) bool {
-			return vulnerablePackages[i].PackageName < vulnerablePackages[j].PackageName
-		})
-
-		printer.Print(vulnerablePackages, 0, 1, int64(len(vulnerablePackages)), false, [][]string{
-			{"packageName", "Package Name"},
-			{"version", "Version"},
-			{"scanStatus", "Status"},
-		})
-	}
-}
-
+/* TODO
 func fetchFixVersions(ctx *auditContext, vulnerablePackages []ScanResult) ([]PackageFix, error) {
 	fixes := make([]PackageFix, 0)
 
@@ -520,6 +345,8 @@ func fetchFixVersions(ctx *auditContext, vulnerablePackages []ScanResult) ([]Pac
 
 	return fixes, nil
 }
+
+*/
 
 func filterFixablePackages(fixes []PackageFix) []PackageFix {
 	fixable := make([]PackageFix, 0)
