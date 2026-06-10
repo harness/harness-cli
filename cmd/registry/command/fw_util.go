@@ -34,11 +34,19 @@ type ScanResult struct {
 }
 
 type AuditContext struct {
-	F            *cmdutils.Factory
-	RegistryUUID uuid.UUID
-	Org          string
-	Project      string
-	P            *progress.ConsoleReporter
+	F                *cmdutils.Factory
+	RegistryV3Client ar_v3.ClientWithResponsesInterface
+	RegistryUUID     uuid.UUID
+	Org              string
+	Project          string
+	P                *progress.ConsoleReporter
+}
+
+func (ctx *AuditContext) registryV3Client() ar_v3.ClientWithResponsesInterface {
+	if ctx.RegistryV3Client != nil {
+		return ctx.RegistryV3Client
+	}
+	return ctx.F.RegistryV3HttpClient()
 }
 
 type BatchInfo struct {
@@ -102,7 +110,7 @@ func initiateBatchEvaluation(ctx *AuditContext, batch []Dependency, info BatchIn
 		ProjectIdentifier: &ctx.Project,
 	}
 
-	initResp, err := ctx.F.RegistryV3HttpClient().InitiateBulkScanEvaluationWithResponse(
+	initResp, err := ctx.registryV3Client().InitiateBulkScanEvaluationWithResponse(
 		context.Background(),
 		initParams,
 		ar_v3.InitiateBulkScanEvaluationJSONRequestBody{
@@ -160,7 +168,7 @@ func pollBatchEvaluation(ctx *AuditContext, evaluationID string, info BatchInfo)
 			return nil, fmt.Errorf("timeout waiting for batch %d evaluation to complete", info.BatchIdx+1)
 		}
 
-		statusResp, err := ctx.F.RegistryV3HttpClient().GetBulkScanEvaluationStatusWithResponse(
+		statusResp, err := ctx.registryV3Client().GetBulkScanEvaluationStatusWithResponse(
 			context.Background(),
 			evaluationID,
 			statusParams,

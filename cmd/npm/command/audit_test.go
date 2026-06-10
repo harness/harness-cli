@@ -2,11 +2,17 @@ package command
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/harness/harness-cli/cmd/cmdutils"
 	regcmd "github.com/harness/harness-cli/cmd/registry/command"
+	ar "github.com/harness/harness-cli/internal/api/ar"
+	ar_v3 "github.com/harness/harness-cli/internal/api/ar_v3"
 	"github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/stretchr/testify/assert"
@@ -499,23 +505,23 @@ func TestDetectNpmRegistry(t *testing.T) {
 	// Note: This function depends on regcmd.LoadNpmRegistryConfig() which reads from
 	// the user's home directory, making it difficult to test in isolation without mocking.
 	// We test that it returns the expected error when no config exists.
-	
+
 	t.Run("returns error when no config", func(t *testing.T) {
 		// Save current HOME
 		originalHome := os.Getenv("HOME")
 		defer os.Setenv("HOME", originalHome)
-		
+
 		// Set HOME to a non-existent directory
 		tmpDir := t.TempDir()
 		nonExistentDir := filepath.Join(tmpDir, "nonexistent")
 		os.Setenv("HOME", nonExistentDir)
-		
+
 		_, err := detectNpmRegistry()
 		// Should return an error when config doesn't exist
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "no HAR registry found")
 	})
-	
+
 	t.Run("registryInfo struct", func(t *testing.T) {
 		// Test the registryInfo struct creation
 		info := &registryInfo{
@@ -524,7 +530,7 @@ func TestDetectNpmRegistry(t *testing.T) {
 			OrgID:              "test-org",
 			ProjectID:          "test-project",
 		}
-		
+
 		assert.Equal(t, "https://test-registry.com", info.RegistryURL)
 		assert.Equal(t, "test-registry", info.RegistryIdentifier)
 		assert.Equal(t, "test-org", info.OrgID)
@@ -654,7 +660,7 @@ func TestRunNpmAudit_ValidationError(t *testing.T) {
 	// Note: runNpmAudit requires a valid factory and registry configuration.
 	// Testing the full flow requires mocking the HTTP client and registry config.
 	// Instead, we test the validation that happens before runNpmAudit is called.
-	
+
 	tmpDir := t.TempDir()
 
 	t.Run("validation catches invalid path", func(t *testing.T) {
@@ -664,7 +670,7 @@ func TestRunNpmAudit_ValidationError(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "file not found")
 	})
-	
+
 	t.Run("validation catches directory instead of file", func(t *testing.T) {
 		dirPath := tmpDir
 		err := validatePackageJsonPath(dirPath)
@@ -816,6 +822,320 @@ func TestBackupPackageJsonEdgeCases(t *testing.T) {
 		err := backupPackageJson(filePath)
 		assert.Error(t, err)
 	})
+}
+
+// ----- Struct tests -----
+
+func TestPackageFixStruct(t *testing.T) {
+	fix := PackageFix{
+		Name:           "lodash",
+		CurrentVersion: "4.17.15",
+		FixVersion:     "4.17.21",
+		ScanStatus:     "BLOCKED",
+		Vulnerabilities: []VulnerabilityInfo{
+			{CveId: "CVE-2021-1234", CvssScore: 9.8, Severity: "CRITICAL"},
+		},
+	}
+	assert.Equal(t, "lodash", fix.Name)
+	assert.Equal(t, "4.17.15", fix.CurrentVersion)
+	assert.Equal(t, "4.17.21", fix.FixVersion)
+	assert.Equal(t, "BLOCKED", fix.ScanStatus)
+	assert.Len(t, fix.Vulnerabilities, 1)
+	assert.Equal(t, "CVE-2021-1234", fix.Vulnerabilities[0].CveId)
+	assert.Equal(t, 9.8, fix.Vulnerabilities[0].CvssScore)
+	assert.Equal(t, "CRITICAL", fix.Vulnerabilities[0].Severity)
+}
+
+func TestVulnerabilityInfoStruct(t *testing.T) {
+	v := VulnerabilityInfo{
+		CveId:     "CVE-2022-5678",
+		CvssScore: 7.5,
+		Severity:  "HIGH",
+	}
+	assert.Equal(t, "CVE-2022-5678", v.CveId)
+	assert.Equal(t, 7.5, v.CvssScore)
+	assert.Equal(t, "HIGH", v.Severity)
+}
+
+// ----- validatePackageJsonPath edge case -----
+
+func TestValidatePackageJsonPath_DirectFilename(t *testing.T) {
+	// "package.json" without any "/" - fileName branch uses filePath directly
+	tmpDir := t.TempDir()
+	// Change to tmp dir and back so we can use a relative path
+	orig, _ := os.Getwd()
+	defer os.Chdir(orig)
+	os.Chdir(tmpDir)
+
+	// Create package.json in tmpDir
+	os.WriteFile("package.json", []byte(`{"name":"test"}`), 0644)
+	err := validatePackageJsonPath("package.json")
+	assert.NoError(t, err)
+}
+
+// ----- detectNpmRegistry success path -----
+
+func TestDetectNpmRegistry_Success(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+
+	// Write the config file directly (saveNpmRegistryConfig is unexported)
+	configDir := filepath.Join(tmpDir, ".harness")
+	os.MkdirAll(configDir, 0755)
+	cfgJSON := `{"registryIdentifier":"my-registry","registryUrl":"https://registry.example.com","orgId":"my-org","projectId":"my-project","npmrcPath":""}`
+	os.WriteFile(filepath.Join(configDir, "npm-config.json"), []byte(cfgJSON), 0600)
+
+	info, err := detectNpmRegistry()
+	require.NoError(t, err)
+	assert.Equal(t, "https://registry.example.com", info.RegistryURL)
+	assert.Equal(t, "my-registry", info.RegistryIdentifier)
+	assert.Equal(t, "my-org", info.OrgID)
+	assert.Equal(t, "my-project", info.ProjectID)
+}
+
+// ----- resolveRegistryUUID tests via httptest.Server -----
+
+func newMockRegistryServer(statusCode int, uuidStr string) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		if statusCode == 200 && uuidStr != "" {
+			fmt.Fprintf(w, `{"data":{"identifier":"test-registry","packageType":"NPM","url":"https://example.com","uuid":%q}}`, uuidStr)
+		} else if statusCode == 200 {
+			fmt.Fprintf(w, `{"data":{"identifier":"test-registry","packageType":"NPM","url":"https://example.com"}}`)
+		} else {
+			fmt.Fprintf(w, `{"message":"not found"}`)
+		}
+	}))
+}
+
+func TestResolveRegistryUUID_Success(t *testing.T) {
+	expectedUUID := "550e8400-e29b-41d4-a716-446655440000"
+	srv := newMockRegistryServer(200, expectedUUID)
+	defer srv.Close()
+
+	client, err := ar.NewClientWithResponses(srv.URL)
+	require.NoError(t, err)
+
+	f := &cmdutils.Factory{
+		RegistryHttpClient: func() *ar.ClientWithResponses { return client },
+	}
+
+	prog := progress.NewConsoleReporter()
+	uid, err := resolveRegistryUUID(f, "my-registry", "org", "project", prog)
+	require.NoError(t, err)
+	assert.Equal(t, expectedUUID, uid.String())
+}
+
+func TestResolveRegistryUUID_Non200Response(t *testing.T) {
+	srv := newMockRegistryServer(404, "")
+	defer srv.Close()
+
+	client, err := ar.NewClientWithResponses(srv.URL)
+	require.NoError(t, err)
+
+	f := &cmdutils.Factory{
+		RegistryHttpClient: func() *ar.ClientWithResponses { return client },
+	}
+
+	prog := progress.NewConsoleReporter()
+	_, err = resolveRegistryUUID(f, "missing-registry", "org", "project", prog)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing-registry")
+}
+
+func TestResolveRegistryUUID_NilUUID(t *testing.T) {
+	srv := newMockRegistryServer(200, "")
+	defer srv.Close()
+
+	client, err := ar.NewClientWithResponses(srv.URL)
+	require.NoError(t, err)
+
+	f := &cmdutils.Factory{
+		RegistryHttpClient: func() *ar.ClientWithResponses { return client },
+	}
+
+	prog := progress.NewConsoleReporter()
+	_, err = resolveRegistryUUID(f, "no-uuid-registry", "org", "project", prog)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+}
+
+func TestResolveRegistryUUID_InvalidUUID(t *testing.T) {
+	srv := newMockRegistryServer(200, "not-a-valid-uuid")
+	defer srv.Close()
+
+	client, err := ar.NewClientWithResponses(srv.URL)
+	require.NoError(t, err)
+
+	f := &cmdutils.Factory{
+		RegistryHttpClient: func() *ar.ClientWithResponses { return client },
+	}
+
+	prog := progress.NewConsoleReporter()
+	_, err = resolveRegistryUUID(f, "bad-uuid-registry", "org", "project", prog)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid registry UUID")
+}
+
+// ----- evaluateFixVersions via httptest.Server -----
+
+func newMockScanDetailsServer(statusCode int, body string) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		fmt.Fprint(w, body)
+	}))
+}
+
+func TestEvaluateFixVersions_NoSecurityViolation(t *testing.T) {
+	body := `{"data":{"id":"00000000-0000-0000-0000-000000000001","packageName":"lodash","packageType":"NPM","registryName":"test","scanStatus":"BLOCKED","version":"4.17.15","policySetFailureDetails":[{"policyFailureDetails":[{"category":"License","policyName":"license-policy","policyRef":"lp"}],"policySetName":"ps","policySetRef":"psr"}]}}`
+	srv := newMockScanDetailsServer(200, body)
+	defer srv.Close()
+
+	client, err := ar_v3.NewClientWithResponses(srv.URL)
+	require.NoError(t, err)
+
+	f := &cmdutils.Factory{
+		RegistryV3HttpClient: func() *ar_v3.ClientWithResponses { return client },
+	}
+
+	packages := []regcmd.ScanResult{{PackageName: "lodash", Version: "4.17.15", ScanID: "scan-123", ScanStatus: "BLOCKED"}}
+	fixes, manualFix, err := evaluateFixVersions(f, packages)
+	assert.NoError(t, err)
+	assert.Empty(t, fixes)
+	assert.Empty(t, manualFix)
+}
+
+func TestEvaluateFixVersions_SecurityViolation_MinorFix(t *testing.T) {
+	fixVer := "4.17.21"
+	body := fmt.Sprintf(`{"data":{"id":"00000000-0000-0000-0000-000000000001","packageName":"lodash","packageType":"NPM","registryName":"test","scanStatus":"BLOCKED","version":"4.17.15","policySetFailureDetails":[{"policyFailureDetails":[{"category":"Security","policyName":"sec-policy","policyRef":"sp"}],"policySetName":"ps","policySetRef":"psr"}],"fixVersionDetails":{"currentVersion":"4.17.15","fixVersion":%q,"fixVersionAvailable":true}}}`, fixVer)
+	srv := newMockScanDetailsServer(200, body)
+	defer srv.Close()
+
+	client, err := ar_v3.NewClientWithResponses(srv.URL)
+	require.NoError(t, err)
+
+	f := &cmdutils.Factory{
+		RegistryV3HttpClient: func() *ar_v3.ClientWithResponses { return client },
+	}
+
+	packages := []regcmd.ScanResult{{PackageName: "lodash", Version: "4.17.15", ScanID: "scan-123", ScanStatus: "BLOCKED"}}
+	fixes, manualFix, err := evaluateFixVersions(f, packages)
+	assert.NoError(t, err)
+	require.Len(t, fixes, 1)
+	assert.Empty(t, manualFix)
+	assert.Equal(t, "lodash", fixes[0].PackageName)
+	assert.Equal(t, "4.17.21", fixes[0].FixVersion)
+	assert.True(t, fixes[0].FixAvailable)
+}
+
+func TestEvaluateFixVersions_SecurityViolation_MajorFix(t *testing.T) {
+	fixVer := "5.0.0"
+	body := fmt.Sprintf(`{"data":{"id":"00000000-0000-0000-0000-000000000001","packageName":"express","packageType":"NPM","registryName":"test","scanStatus":"BLOCKED","version":"4.18.2","policySetFailureDetails":[{"policyFailureDetails":[{"category":"Security","policyName":"sec-policy","policyRef":"sp"}],"policySetName":"ps","policySetRef":"psr"}],"fixVersionDetails":{"currentVersion":"4.18.2","fixVersion":%q,"fixVersionAvailable":true}}}`, fixVer)
+	srv := newMockScanDetailsServer(200, body)
+	defer srv.Close()
+
+	client, err := ar_v3.NewClientWithResponses(srv.URL)
+	require.NoError(t, err)
+
+	f := &cmdutils.Factory{
+		RegistryV3HttpClient: func() *ar_v3.ClientWithResponses { return client },
+	}
+
+	packages := []regcmd.ScanResult{{PackageName: "express", Version: "4.18.2", ScanID: "scan-456", ScanStatus: "BLOCKED"}}
+	fixes, manualFix, err := evaluateFixVersions(f, packages)
+	assert.NoError(t, err)
+	assert.Empty(t, fixes)
+	require.Len(t, manualFix, 1)
+	assert.Equal(t, "express", manualFix[0].PackageName)
+	assert.Equal(t, "5.0.0", manualFix[0].FixVersion)
+}
+
+func TestEvaluateFixVersions_SecurityViolation_NilFixVersion(t *testing.T) {
+	body := `{"data":{"id":"00000000-0000-0000-0000-000000000001","packageName":"lodash","packageType":"NPM","registryName":"test","scanStatus":"BLOCKED","version":"4.17.15","policySetFailureDetails":[{"policyFailureDetails":[{"category":"Security","policyName":"sec","policyRef":"sp"}],"policySetName":"ps","policySetRef":"psr"}],"fixVersionDetails":{"currentVersion":"4.17.15","fixVersionAvailable":false}}}`
+	srv := newMockScanDetailsServer(200, body)
+	defer srv.Close()
+
+	client, err := ar_v3.NewClientWithResponses(srv.URL)
+	require.NoError(t, err)
+
+	f := &cmdutils.Factory{
+		RegistryV3HttpClient: func() *ar_v3.ClientWithResponses { return client },
+	}
+
+	packages := []regcmd.ScanResult{{PackageName: "lodash", Version: "4.17.15", ScanID: "scan-789", ScanStatus: "BLOCKED"}}
+	fixes, manualFix, err := evaluateFixVersions(f, packages)
+	assert.NoError(t, err)
+	// No fixVersion → FixVersion is "", major check: extractMajorVersion("") = -1, so not a major change → goes to fixes
+	require.Len(t, fixes, 1)
+	assert.Empty(t, manualFix)
+	assert.Equal(t, "", fixes[0].FixVersion)
+}
+
+func TestEvaluateFixVersions_Non200Response(t *testing.T) {
+	srv := newMockScanDetailsServer(404, `{"message":"not found"}`)
+	defer srv.Close()
+
+	client, err := ar_v3.NewClientWithResponses(srv.URL)
+	require.NoError(t, err)
+
+	f := &cmdutils.Factory{
+		RegistryV3HttpClient: func() *ar_v3.ClientWithResponses { return client },
+	}
+
+	packages := []regcmd.ScanResult{{PackageName: "lodash", Version: "4.17.15", ScanID: "scan-123", ScanStatus: "BLOCKED"}}
+	fixes, manualFix, err := evaluateFixVersions(f, packages)
+	// Non-200 skips the package, returns empty with no error
+	assert.NoError(t, err)
+	assert.Empty(t, fixes)
+	assert.Empty(t, manualFix)
+}
+
+func TestEvaluateFixVersions_MultiplePackages(t *testing.T) {
+	// Two packages: one with security+minor fix, one without violation
+	callCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		callCount++
+		if callCount == 1 {
+			// First package: security violation with minor fix
+			fmt.Fprint(w, `{"data":{"id":"00000000-0000-0000-0000-000000000001","packageName":"lodash","packageType":"NPM","registryName":"test","scanStatus":"BLOCKED","version":"4.17.15","policySetFailureDetails":[{"policyFailureDetails":[{"category":"Security","policyName":"s","policyRef":"s"}],"policySetName":"ps","policySetRef":"psr"}],"fixVersionDetails":{"currentVersion":"4.17.15","fixVersion":"4.17.21","fixVersionAvailable":true}}}`)
+		} else {
+			// Second package: no violation
+			fmt.Fprint(w, `{"data":{"id":"00000000-0000-0000-0000-000000000002","packageName":"axios","packageType":"NPM","registryName":"test","scanStatus":"WARN","version":"0.21.0"}}`)
+		}
+	}))
+	defer srv.Close()
+
+	client, err := ar_v3.NewClientWithResponses(srv.URL)
+	require.NoError(t, err)
+
+	f := &cmdutils.Factory{
+		RegistryV3HttpClient: func() *ar_v3.ClientWithResponses { return client },
+	}
+
+	packages := []regcmd.ScanResult{
+		{PackageName: "lodash", Version: "4.17.15", ScanID: "scan-1", ScanStatus: "BLOCKED"},
+		{PackageName: "axios", Version: "0.21.0", ScanID: "scan-2", ScanStatus: "WARN"},
+	}
+	fixes, manualFix, err := evaluateFixVersions(f, packages)
+	assert.NoError(t, err)
+	assert.Len(t, fixes, 1)
+	assert.Empty(t, manualFix)
+	assert.Equal(t, "lodash", fixes[0].PackageName)
+}
+
+// ----- updatePackageJsonWithFixes edge case -----
+
+func TestUpdatePackageJsonWithFixes_NonexistentFile(t *testing.T) {
+	prog := progress.NewConsoleReporter()
+	err := updatePackageJsonWithFixes("/nonexistent/path/package.json", []SecurityFixInfo{
+		{PackageName: "lodash", FixVersion: "4.17.21"},
+	}, prog)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read package.json")
 }
 
 func TestUpdatePackageJsonWithFixesEdgeCases(t *testing.T) {
