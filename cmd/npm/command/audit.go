@@ -10,6 +10,7 @@ import (
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	regcmd "github.com/harness/harness-cli/cmd/registry/command"
 	"github.com/harness/harness-cli/config"
+	ar_v3 "github.com/harness/harness-cli/internal/api/ar_v3"
 	client2 "github.com/harness/harness-cli/util/client"
 	p "github.com/harness/harness-cli/util/common/progress"
 
@@ -32,12 +33,19 @@ type VulnerabilityInfo struct {
 	Severity  string
 }
 
+type SecurityFixInfo struct {
+	PackageName      string
+	CurrentVersion   string
+	FixVersion       string
+	FixAvailable     bool
+	HasSecurityIssue bool
+}
+
 type auditContext = regcmd.AuditContext
 
 func NewNpmAuditCmd(f *cmdutils.Factory) *cobra.Command {
 	var fix bool
 	var registryName string
-	var runInstall bool
 	var packageJsonPath string
 
 	cmd := &cobra.Command{
@@ -52,7 +60,7 @@ This command will:
 4. Optionally update package.json with fix versions (--fix flag)
 5. Optionally run npm install to apply updates (--install flag)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runNpmAudit(f, registryName, packageJsonPath, fix, runInstall)
+			return runNpmAudit(f, registryName, packageJsonPath, fix)
 		},
 	}
 
@@ -63,7 +71,7 @@ This command will:
 	return cmd
 }
 
-func runNpmAudit(f *cmdutils.Factory, registryName string, packageJsonPath string, fix bool, runInstall bool) error {
+func runNpmAudit(f *cmdutils.Factory, registryName string, packageJsonPath string, fix bool) error {
 	progress := p.NewConsoleReporter()
 
 	// Validate package.json exists
@@ -148,12 +156,29 @@ func runNpmAudit(f *cmdutils.Factory, registryName string, packageJsonPath strin
 		return err
 	}
 
-	// Step 6: Identify vulnerable packages
-	//vulnerablePackages := filterVulnerablePackages(scanResults)
-
-	// Step 7: Display results
 	if err := regcmd.DisplayResults(scanResults, progress); err != nil {
 		return err
+	}
+
+	// Step : Identify vulnerable packages
+	vulnerablePackages := filterVulnerablePackages(scanResults)
+
+	if fix && len(vulnerablePackages) > 0 {
+		fmt.Println()
+		progress.Step("Analyzing vulnerable packages for fix versions")
+		if err := regcmd.DisplayResults(vulnerablePackages, progress); err != nil {
+			return err
+		}
+
+		fmt.Println()
+		progress.Start("Fetching security fix information from scan details")
+		fixes, err := evaluateFixVersions(f, vulnerablePackages)
+		if err != nil {
+			progress.Error(fmt.Sprintf("Failed to fetch fix versions: %s", err))
+			return err
+		}
+
+		displaySecurityFixes(fixes, progress)
 	}
 
 	// Step 8: If fix flag is set, fetch fix versions and update package.json
@@ -270,20 +295,21 @@ func filterVulnerablePackages(results []ScanResult) []ScanResult {
 	return vulnerable
 }
 
-/* TODO
-func fetchFixVersions(ctx *auditContext, vulnerablePackages []ScanResult) ([]PackageFix, error) {
-	fixes := make([]PackageFix, 0)
+func evaluateFixVersions(f *cmdutils.Factory, vulnerablePackages []ScanResult) ([]SecurityFixInfo, error) {
+	fixes := make([]SecurityFixInfo, 0)
 
 	for _, pkg := range vulnerablePackages {
 		if pkg.ScanID == "" {
+			log.Warn().Str("package", pkg.PackageName).Msg("No scan ID available, skipping")
 			continue
 		}
 
+		// Fetch scan details
 		scanParams := &ar_v3.GetArtifactScanDetailsParams{
 			AccountIdentifier: config.Global.AccountID,
 		}
 
-		scanResponse, err := ctx.f.RegistryV3HttpClient().GetArtifactScanDetailsWithResponse(
+		scanResponse, err := f.RegistryV3HttpClient().GetArtifactScanDetailsWithResponse(
 			context.Background(),
 			pkg.ScanID,
 			scanParams,
@@ -299,54 +325,71 @@ func fetchFixVersions(ctx *auditContext, vulnerablePackages []ScanResult) ([]Pac
 		}
 
 		scanDetails := scanResponse.JSON200.Data
-		fix := PackageFix{
-			Name:           pkg.PackageName,
-			CurrentVersion: pkg.Version,
-			ScanStatus:     pkg.ScanStatus,
-		}
 
-		// Extract fix version
-		if scanDetails.FixVersionDetails != nil && scanDetails.FixVersionDetails.FixVersionAvailable && scanDetails.FixVersionDetails.FixVersion != nil {
-			fix.FixVersion = *scanDetails.FixVersionDetails.FixVersion
-		}
-
-		// Extract vulnerabilities
+		// Check if there's a security violation
+		hasSecurityViolation := false
 		if scanDetails.PolicySetFailureDetails != nil {
 			for _, policySetFailure := range *scanDetails.PolicySetFailureDetails {
 				for _, failure := range policySetFailure.PolicyFailureDetails {
 					if failure.Category == "Security" {
-						securityConfig, err := failure.AsSecurityPolicyFailureDetailConfig()
-						if err == nil && len(securityConfig.Vulnerabilities) > 0 {
-							for _, vuln := range securityConfig.Vulnerabilities {
-								severity := "UNKNOWN"
-								if vuln.CvssScore >= 9.0 {
-									severity = "CRITICAL"
-								} else if vuln.CvssScore >= 7.0 {
-									severity = "HIGH"
-								} else if vuln.CvssScore >= 4.0 {
-									severity = "MEDIUM"
-								} else {
-									severity = "LOW"
-								}
-								fix.Vulnerabilities = append(fix.Vulnerabilities, VulnerabilityInfo{
-									CveId:     vuln.CveId,
-									CvssScore: vuln.CvssScore,
-									Severity:  severity,
-								})
-							}
-						}
+						hasSecurityViolation = true
+						break
 					}
+				}
+				if hasSecurityViolation {
+					break
 				}
 			}
 		}
 
-		fixes = append(fixes, fix)
+		// Extract fix version information if security violation exists
+		if hasSecurityViolation && scanDetails.FixVersionDetails != nil {
+			fixInfo := SecurityFixInfo{
+				PackageName:      pkg.PackageName,
+				CurrentVersion:   scanDetails.FixVersionDetails.CurrentVersion,
+				FixAvailable:     scanDetails.FixVersionDetails.FixVersionAvailable,
+				HasSecurityIssue: true,
+			}
+
+			if scanDetails.FixVersionDetails.FixVersion != nil {
+				fixInfo.FixVersion = *scanDetails.FixVersionDetails.FixVersion
+			}
+
+			fixes = append(fixes, fixInfo)
+			log.Info().Str("package", pkg.PackageName).Str("fixVersion", fixInfo.FixVersion).Msg("Found fix version")
+		}
 	}
 
 	return fixes, nil
 }
 
-*/
+func displaySecurityFixes(fixes []SecurityFixInfo, progress *p.ConsoleReporter) {
+	if len(fixes) == 0 {
+		fmt.Println()
+		progress.Success("No fixable security issues found")
+		return
+	}
+
+	fmt.Println()
+	fmt.Println("Security Fix Information:")
+	fmt.Println(strings.Repeat("=", 80))
+
+	for _, fix := range fixes {
+		fmt.Println()
+		fmt.Printf("📦 Package: %s\n", fix.PackageName)
+		fmt.Printf("   Current Version:  %s\n", fix.CurrentVersion)
+		fmt.Printf("   Fix Available:    %v\n", fix.FixAvailable)
+		if fix.FixVersion != "" {
+			fmt.Printf("   Fix Version:      %s\n", fix.FixVersion)
+		} else {
+			fmt.Printf("   Fix Version:      (not available)\n")
+		}
+	}
+
+	fmt.Println()
+	fmt.Println(strings.Repeat("=", 80))
+	progress.Success(fmt.Sprintf("Found %d packages with available fixes", len(fixes)))
+}
 
 func filterFixablePackages(fixes []PackageFix) []PackageFix {
 	fixable := make([]PackageFix, 0)
