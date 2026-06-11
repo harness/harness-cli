@@ -41,6 +41,7 @@ type Package struct {
 	Size     int
 	URL      string
 	Version  string
+	Metadata map[string]string // Package-type specific metadata (e.g., Debian: distribution, component, etc.)
 }
 
 type Version struct {

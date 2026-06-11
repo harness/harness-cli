@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/pterm/pterm"
 	"github.com/rs/zerolog/log"
@@ -11,6 +12,32 @@ import (
 
 // ColumnMapping defines a mapping between original field names and display names
 type ColumnMapping [][]string
+
+// formatArtifactKey formats the artifactKey map as comma-separated key=value pairs
+func formatArtifactKey(val interface{}) string {
+	// Check if it's a map
+	if m, ok := val.(map[string]interface{}); ok {
+		if len(m) == 0 {
+			return "-"
+		}
+		// Sort keys for consistent output
+		keys := make([]string, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		// Build key=value pairs
+		pairs := make([]string, 0, len(keys))
+		for _, k := range keys {
+			pairs = append(pairs, fmt.Sprintf("%s=%v", k, m[k]))
+		}
+		return strings.Join(pairs, ",")
+	}
+
+	// If not a map, return as-is
+	return fmt.Sprint(val)
+}
 
 // jsonToTableWithMapping converts JSON string to a table with custom column mapping
 func jsonToTableWithMapping(jsonStr string, mapping ColumnMapping) error {
@@ -58,7 +85,12 @@ func jsonToTableWithMapping(jsonStr string, mapping ColumnMapping) error {
 						row[i] = "-" // missing key
 						continue
 					}
-					row[i] = fmt.Sprint(val) // stringify numbers, bools, etc.
+					// Special formatting for artifactKey field
+					if originalField == "artifactKey" {
+						row[i] = formatArtifactKey(val)
+					} else {
+						row[i] = fmt.Sprint(val) // stringify numbers, bools, etc.
+					}
 				}
 			}
 		} else {
@@ -69,7 +101,12 @@ func jsonToTableWithMapping(jsonStr string, mapping ColumnMapping) error {
 					row[i] = "-" // missing key
 					continue
 				}
-				row[i] = fmt.Sprint(val) // stringify numbers, bools, etc.
+				// Special formatting for artifactKey field
+				if col == "artifactKey" {
+					row[i] = formatArtifactKey(val)
+				} else {
+					row[i] = fmt.Sprint(val) // stringify numbers, bools, etc.
+				}
 			}
 		}
 

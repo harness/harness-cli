@@ -240,7 +240,7 @@ func parseDotnetListOutput(output string) ([]regcmd.Dependency, error) {
 	var jsonOutput struct {
 		Projects []struct {
 			Frameworks []struct {
-				TopLevelPackages  []struct{ ID, Version string } `json:"topLevelPackages"`
+				TopLevelPackages   []struct{ ID, Version string } `json:"topLevelPackages"`
 				TransitivePackages []struct{ ID, Version string } `json:"transitivePackages"`
 			} `json:"frameworks"`
 		} `json:"projects"`

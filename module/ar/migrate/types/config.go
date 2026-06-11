@@ -28,6 +28,7 @@ var (
 	NPM         ArtifactType = "NPM"
 	NUGET       ArtifactType = "NUGET"
 	RPM         ArtifactType = "RPM"
+	DEBIAN      ArtifactType = "DEBIAN"
 	GO          ArtifactType = "GO"
 	CONDA       ArtifactType = "CONDA"
 	COMPOSER    ArtifactType = "COMPOSER"

@@ -347,4 +347,3 @@ func parseSettingsXMLForHAR(settingsPath, explicitRegistry string) (*pkgmgr.Regi
 
 	return nil, fmt.Errorf("no HAR registry URL found in %s", settingsPath)
 }
-

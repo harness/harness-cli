@@ -17,12 +17,12 @@ import (
 )
 
 type NugetRegistryConfig struct {
-	RegistryIdentifier   string `json:"registryIdentifier"`
-	RegistryURL          string `json:"registryUrl"`
-	OrgID                string `json:"orgId,omitempty"`
-	ProjectID            string `json:"projectId,omitempty"`
+	RegistryIdentifier    string `json:"registryIdentifier"`
+	RegistryURL           string `json:"registryUrl"`
+	OrgID                 string `json:"orgId,omitempty"`
+	ProjectID             string `json:"projectId,omitempty"`
 	NugetConfigBackupPath string `json:"nugetConfigBackupPath,omitempty"`
-	NugetConfigPath      string `json:"nugetConfigPath"`
+	NugetConfigPath       string `json:"nugetConfigPath"`
 }
 
 func SaveNugetRegistryConfig(cfg NugetRegistryConfig) error {
@@ -162,12 +162,12 @@ func NewConfigureNugetCmd(f *cmdutils.Factory) *cobra.Command {
 
 			// Save registry config with backup path for future restore
 			if err := SaveNugetRegistryConfig(NugetRegistryConfig{
-				RegistryIdentifier:   registryIdentifier,
-				RegistryURL:          registryURL,
-				OrgID:                org,
-				ProjectID:            project,
+				RegistryIdentifier:    registryIdentifier,
+				RegistryURL:           registryURL,
+				OrgID:                 org,
+				ProjectID:             project,
 				NugetConfigBackupPath: backupPath,
-				NugetConfigPath:      configPath,
+				NugetConfigPath:       configPath,
 			}); err != nil {
 				log.Warn().Err(err).Msg("Failed to save nuget registry config")
 			}
@@ -211,8 +211,8 @@ func writeNugetConfig(configPath, registryID, registryURL, authToken string) err
 		Sources []SourceCredential `xml:",any"`
 	}
 	type Configuration struct {
-		XMLName                  xml.Name                 `xml:"configuration"`
-		PackageSources           PackageSources           `xml:"packageSources"`
+		XMLName                  xml.Name                  `xml:"configuration"`
+		PackageSources           PackageSources            `xml:"packageSources"`
 		PackageSourceCredentials *PackageSourceCredentials `xml:"packageSourceCredentials,omitempty"`
 	}
 

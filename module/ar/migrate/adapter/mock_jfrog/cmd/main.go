@@ -103,6 +103,60 @@ func main() {
 		{"content/raw-local/assets/images/logo.png",
 			[]byte("fake-png-content-for-testing")},
 
+		// Debian repository metadata
+		{"content/debian-local/dists/bookworm/InRelease", []byte(`-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Suite: bookworm
+Codename: bookworm
+Components: main
+Architectures: amd64 arm64
+Date: Sat, 01 Jan 2023 00:00:00 UTC
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCgAdFiEEtest...
+-----END PGP SIGNATURE-----`)},
+
+		{"content/debian-local/dists/bookworm/Release", []byte(`Suite: bookworm
+Codename: bookworm
+Components: main
+Architectures: amd64 arm64
+Date: Sat, 01 Jan 2023 00:00:00 UTC`)},
+
+		{"content/debian-local/dists/bookworm/main/binary-amd64/Packages.gz", gzipContent([]byte(`Package: nginx
+Version: 1.18.0-1
+Architecture: amd64
+Maintainer: Test Maintainer <test@example.com>
+Installed-Size: 1024
+Depends: libc6 (>= 2.14)
+Section: httpd
+Priority: optional
+Homepage: https://nginx.org
+Description: high performance web server
+Filename: pool/main/n/nginx/nginx_1.18.0-1_amd64.deb
+Size: 1048576
+MD5sum: 5d41402abc4b2a76b9719d911017c592
+SHA1: da39a3ee5e6b4b0d3255bfef95601890afd80743
+SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+`))},
+
+		{"content/debian-local/dists/bookworm/main/source/Sources.gz", gzipContent([]byte(`Package: apache2
+Binary: apache2, apache2-bin, apache2-data
+Version: 2.4.52-1
+Maintainer: Debian Apache Maintainers <debian-apache@lists.debian.org>
+Architecture: any all
+Standards-Version: 4.6.0
+Build-Depends: debhelper (>= 13)
+Homepage: https://httpd.apache.org/
+Directory: pool/main/a/apache2
+Files:
+ 5d41402abc4b2a76b9719d911017c592 8388608 apache2_2.4.52.orig.tar.gz
+ aaf4c61ddcc5e8a2dabede0f3b482cd9 524288 apache2_2.4.52-1.debian.tar.gz
+ e99a18c428cb38d5f260853678922e03 2048 apache2_2.4.52-1.dsc
+
+`))},
+
 		// ── Binary packages ──
 
 		// NPM tarballs
@@ -122,6 +176,12 @@ func main() {
 		{"nuget-local/foo/company.grpc.pkg/1.0.0/company.grpc.pkg.1.0.0.nupkg", nupkg("company.grpc.pkg", "1.0.0")},
 		{"nuget-local/foo/company.grpc.pkg/2.0.0/company.grpc.pkg.2.0.0.nupkg", nupkg("company.grpc.pkg", "2.0.0")},
 		{"nuget-local/foo/company.grpc.pkg/2.0.0/company.grpc.pkg.2.0.0.snupkg", nupkg("company.grpc.pkg", "2.0.0")},
+
+		// Debian packages
+		{"debian-local/pool/main/n/nginx/nginx_1.18.0-1_amd64.deb", debPackage("nginx", "1.18.0-1", "amd64")},
+		{"debian-local/pool/main/a/apache2/apache2_2.4.52-1.dsc", debSourceDsc("apache2", "2.4.52-1")},
+		{"debian-local/pool/main/a/apache2/apache2_2.4.52.orig.tar.gz", debSourceTarGz("apache2", "2.4.52")},
+		{"debian-local/pool/main/a/apache2/apache2_2.4.52-1.debian.tar.gz", debSourceTarGz("apache2", "2.4.52-1")},
 	}
 
 	for _, e := range entries {
@@ -188,4 +248,93 @@ func nupkg(id, version string) []byte {
 func writetar(tw *tar.Writer, name, content string) {
 	tw.WriteHeader(&tar.Header{Name: name, Mode: 0644, Size: int64(len(content))})
 	tw.Write([]byte(content))
+}
+
+func gzipContent(content []byte) []byte {
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	gw.Write(content)
+	gw.Close()
+	return buf.Bytes()
+}
+
+func debPackage(name, version, arch string) []byte {
+	// Simplified .deb ar archive structure
+	var buf bytes.Buffer
+	buf.WriteString("!<arch>\n")
+
+	// debian-binary
+	debianBinary := "2.0\n"
+	writeArFile(&buf, "debian-binary", []byte(debianBinary))
+
+	// control.tar.gz
+	controlContent := fmt.Sprintf(`Package: %s
+Version: %s
+Architecture: %s
+Maintainer: Test Maintainer <test@example.com>
+Description: Mock Debian package
+`, name, version, arch)
+	controlTar := createTarGz("control", controlContent)
+	writeArFile(&buf, "control.tar.gz", controlTar)
+
+	// data.tar.gz (empty)
+	dataTar := createTarGz("", "")
+	writeArFile(&buf, "data.tar.gz", dataTar)
+
+	return buf.Bytes()
+}
+
+func writeArFile(buf *bytes.Buffer, filename string, data []byte) {
+	header := fmt.Sprintf("%-16s%-12d%-6d%-6d%-8s%-10d`\n",
+		filename, 1234567890, 0, 0, "100644", len(data))
+	buf.WriteString(header)
+	buf.Write(data)
+	if len(data)%2 != 0 {
+		buf.WriteByte('\n')
+	}
+}
+
+func createTarGz(filename, content string) []byte {
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gw)
+
+	if filename != "" && content != "" {
+		tw.WriteHeader(&tar.Header{Name: filename, Mode: 0644, Size: int64(len(content))})
+		tw.Write([]byte(content))
+	}
+
+	tw.Close()
+	gw.Close()
+	return buf.Bytes()
+}
+
+func debSourceDsc(name, version string) []byte {
+	dscContent := fmt.Sprintf(`Format: 3.0 (quilt)
+Source: %s
+Binary: %s
+Architecture: any
+Version: %s
+Maintainer: Test Maintainer <test@example.com>
+Homepage: https://example.com
+Standards-Version: 4.6.0
+Build-Depends: debhelper (>= 13)
+Files:
+ 5d41402abc4b2a76b9719d911017c592 8388608 %s_%s.orig.tar.gz
+ aaf4c61ddcc5e8a2dabede0f3b482cd9 524288 %s_%s.debian.tar.gz
+`, name, name, version, name, "2.4.52", name, version)
+	return []byte(dscContent)
+}
+
+func debSourceTarGz(name, version string) []byte {
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gw)
+
+	content := fmt.Sprintf("Mock source for %s version %s\n", name, version)
+	writetar(tw, fmt.Sprintf("%s-%s/README", name, version), content)
+
+	tw.Close()
+	gw.Close()
+	return buf.Bytes()
 }

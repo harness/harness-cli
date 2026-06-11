@@ -803,6 +803,7 @@ components:
         - CONDA
         - DART
         - SWIFT
+        - DEBIAN
     PackageKind:
       type: string
       description: refers to package kind which is being used in huggingface packages for model, dataset

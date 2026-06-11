@@ -342,6 +342,128 @@ func (c *client) uploadRPMFile(
 	return nil
 }
 
+func (c *client) uploadDebianFile(
+	registry string,
+	filename string,
+	file io.ReadCloser,
+	metadata map[string]interface{},
+) error {
+	fileUri := strings.TrimPrefix(filename, "/")
+
+	// Extract distribution, component, file type, package, and version from metadata
+	distribution := ""
+	component := ""
+	fileType := "deb" // default to binary package
+	packageName := ""
+	version := ""
+
+	if metadata != nil {
+		if dist, ok := metadata["distribution"].(string); ok {
+			distribution = dist
+		}
+		if comp, ok := metadata["component"].(string); ok {
+			component = comp
+		}
+		if ft, ok := metadata["fileType"].(string); ok {
+			fileType = ft
+		}
+		if pkg, ok := metadata["package"].(string); ok {
+			packageName = pkg
+		}
+		if ver, ok := metadata["version"].(string); ok {
+			version = ver
+		}
+	}
+
+	// Validate required parameters
+	if distribution == "" {
+		return fmt.Errorf("distribution is required in metadata")
+	}
+	if component == "" {
+		return fmt.Errorf("component is required in metadata")
+	}
+
+	// For source files, package and version are required
+	if fileType == "src" {
+		if packageName == "" {
+			return fmt.Errorf("package is required in metadata for source files")
+		}
+		if version == "" {
+			return fmt.Errorf("version is required in metadata for source files")
+		}
+	}
+
+	// Determine endpoint based on file type
+	// /deb for .deb files, /dsc for .dsc files, /src for other source files
+	var endpoint string
+	switch fileType {
+	case "dsc":
+		endpoint = "dsc"
+	case "src":
+		endpoint = "src"
+	default:
+		endpoint = "deb"
+	}
+
+	// Build URL: /pkg/{account}/{registry}/debian/{endpoint} with query parameters
+	baseURL := fmt.Sprintf("%s/pkg/%s/%s/debian/%s", c.url, config.Global.AccountID, registry, endpoint)
+
+	// Build query parameters
+	params := []string{
+		fmt.Sprintf("distribution=%s", distribution),
+		fmt.Sprintf("component=%s", component),
+	}
+
+	// Add package and version for source files
+	if fileType == "src" {
+		params = append(params, fmt.Sprintf("package=%s", packageName))
+		params = append(params, fmt.Sprintf("version=%s", version))
+	}
+
+	url := fmt.Sprintf("%s?%s", baseURL, strings.Join(params, "&"))
+
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+
+	// Process multipart form asynchronously
+	go func() {
+		defer pw.Close()
+		defer writer.Close()
+
+		part, err := writer.CreateFormFile("file", filename)
+		if err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+
+		if _, err := io.Copy(part, file); err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+	}()
+
+	req, err := http2.NewRequest(http2.MethodPut, url, pr)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to upload file '%s': %w", fileUri, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to upload file '%s', status code: %d, response: %s",
+			fileUri, resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
 func (c *client) uploadCondaFile(
 	registry string,
 	filename string,

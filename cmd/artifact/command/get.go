@@ -55,6 +55,7 @@ func NewGetArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 				*response.JSON200.Data.PageCount, *response.JSON200.Data.ItemCount, true, [][]string{
 					{"name", "Artifact"},
 					{"version", "Version"},
+					{"artifactKey", "Artifact Key"},
 					{"packageType", "Package Type"},
 					{"registryIdentifier", "Registry"},
 					{"downloadsCount", "Download Count"},

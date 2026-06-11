@@ -18,6 +18,7 @@ import (
 	"github.com/harness/harness-cli/module/ar/migrate/tree"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/module/ar/migrate/util"
+	"github.com/harness/harness-cli/util/artifact"
 	"github.com/harness/harness-cli/util/common"
 
 	"github.com/google/go-containerregistry/pkg/crane"
@@ -287,6 +288,8 @@ func (r *Package) Migrate(ctx context.Context) error {
 		r.migrateLegacyHelm(ctx)
 	} else if r.artifactType == types.RPM {
 		r.migrateRPM(ctx)
+	} else if r.artifactType == types.DEBIAN {
+		r.migrateDebian(ctx)
 	} else if r.artifactType == types.CONDA {
 		r.migrateConda(ctx)
 	} else if r.artifactType == types.COMPOSER {
@@ -454,6 +457,145 @@ func (r *Package) migrateRPM(ctx context.Context) error {
 		pterm.Success.Println(title)
 	}
 	r.stats.FileStats = append(r.stats.FileStats, stat)
+	return nil
+}
+
+func (r *Package) migrateDebian(ctx context.Context) error {
+	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.URL)
+	if err != nil {
+		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download Debian package %s", r.pkg.URL)
+		pterm.Error.Println(fmt.Sprintf("Failed to download Debian package %s", r.pkg.URL))
+		return err
+	}
+	defer file.Close()
+
+	title := fmt.Sprintf("%s (%s)", r.pkg.Name, common.GetSize(int64(r.pkg.Size)))
+	pterm.Info.Println(fmt.Sprintf("Copying file %s from %s to %s", r.pkg.Name, r.srcRegistry, r.destRegistry))
+
+	// Prepare metadata with distribution and component for Debian packages
+	metadata := map[string]interface{}{
+		"distribution": r.pkg.Metadata["distribution"],
+		"component":    r.pkg.Metadata["component"],
+	}
+
+	// Determine file type
+	// Debian packages can be either .deb (binary) or .dsc (source descriptor)
+	// Source tar files are not processed as separate packages - they are uploaded
+	// automatically when their parent .dsc file is processed (see below)
+	isDscFile := strings.HasSuffix(r.pkg.Name, ".dsc")
+	if isDscFile {
+		metadata["fileType"] = "dsc"
+		// Add source files list to metadata if available
+		if sourceFiles, ok := r.pkg.Metadata["sourceFiles"]; ok && sourceFiles != "" {
+			metadata["sourceFiles"] = sourceFiles
+		}
+	} else {
+		// Assume .deb binary package
+		metadata["fileType"] = "deb"
+	}
+
+	err = r.destAdapter.UploadFile(r.destRegistry, file, &types.File{Uri: r.pkg.URL}, header, r.pkg.Name, r.pkg.Name,
+		r.artifactType, metadata)
+	stat := types.FileStat{
+		Name:     r.pkg.Name,
+		Registry: r.srcRegistry,
+		Uri:      r.pkg.URL,
+		Size:     int64(r.pkg.Size),
+		Status:   types.StatusSuccess,
+	}
+	if err != nil {
+		r.logger.Error().Err(err).Msg("Failed to upload file")
+		stat.Status = types.StatusFail
+		stat.Error = err.Error()
+		pterm.Error.Println(title)
+	} else {
+		pterm.Success.Println(title)
+	}
+	r.stats.FileStats = append(r.stats.FileStats, stat)
+
+	// If this is a .dsc file and upload was successful, upload associated source files
+	if isDscFile && err == nil {
+		if sourceFilesStr, ok := r.pkg.Metadata["sourceFiles"]; ok && sourceFilesStr != "" {
+			sourceFileNames := strings.Split(sourceFilesStr, ",")
+			directory := r.pkg.Metadata["directory"]
+
+			for _, srcFileName := range sourceFileNames {
+				srcFileName = strings.TrimSpace(srcFileName)
+				if srcFileName == "" {
+					continue
+				}
+
+				// Construct the full path for the source file
+				var srcFilePath string
+				if directory != "" {
+					srcFilePath = directory + "/" + srcFileName
+				} else {
+					srcFilePath = srcFileName
+				}
+
+				// Download the source file
+				srcFile, srcHeader, err := r.srcAdapter.DownloadFile(r.srcRegistry, srcFilePath)
+				if err != nil {
+					log.Error().Ctx(ctx).Err(err).Msgf("Failed to download source file %s", srcFilePath)
+					pterm.Error.Println(fmt.Sprintf("Failed to download source file %s", srcFilePath))
+					r.stats.FileStats = append(r.stats.FileStats, types.FileStat{
+						Name:     srcFileName,
+						Registry: r.srcRegistry,
+						Uri:      srcFilePath,
+						Size:     0,
+						Status:   types.StatusFail,
+						Error:    err.Error(),
+					})
+					continue
+				}
+
+				srcTitle := fmt.Sprintf("%s (source file)", srcFileName)
+				pterm.Info.Println(fmt.Sprintf("Copying source file %s from %s to %s", srcFileName, r.srcRegistry, r.destRegistry))
+
+				// Prepare metadata for source file
+				srcMetadata := map[string]interface{}{
+					"distribution": r.pkg.Metadata["distribution"],
+					"component":    r.pkg.Metadata["component"],
+					"fileType":     "src",
+					"package":      r.pkg.Metadata["packageName"],
+				}
+
+				// Determine version based on file type
+				fullVersion := r.pkg.Metadata["fullVersion"]
+				if strings.Contains(srcFileName, ".orig.tar.") {
+					// Extract upstream version from full version (e.g., "2.4.52-1" -> "2.4.52")
+					srcMetadata["version"] = artifact.ExtractUpstreamVersion(fullVersion)
+				} else {
+					// For .debian.tar.*, use full version
+					srcMetadata["version"] = fullVersion
+				}
+
+				// Upload the source file
+				// Use just the filename (not the full path) for the upload
+				err = r.destAdapter.UploadFile(r.destRegistry, srcFile, &types.File{Name: srcFileName, Uri: srcFilePath}, srcHeader,
+					srcFileName, srcFileName, r.artifactType, srcMetadata)
+				srcFile.Close()
+
+				srcStat := types.FileStat{
+					Name:     srcFileName,
+					Registry: r.srcRegistry,
+					Uri:      srcFilePath,
+					Size:     0, // Size not available here
+					Status:   types.StatusSuccess,
+				}
+				if err != nil {
+					r.logger.Error().Err(err).Msgf("Failed to upload source file %s", srcFileName)
+					srcStat.Status = types.StatusFail
+					srcStat.Error = err.Error()
+					pterm.Error.Println(srcTitle)
+				} else {
+					pterm.Success.Println(srcTitle)
+				}
+				r.stats.FileStats = append(r.stats.FileStats, srcStat)
+			}
+		}
+	}
+
 	return nil
 }
 

@@ -177,6 +177,7 @@ func (c *mockClient) loadContent() {
 		[]byte(`<html><body><a href="requests/">requests</a><br/></body></html>`)
 	c.fileContent["python-local/.pypi/requests/requests.html"] =
 		[]byte(`<html><body><a href="../requests-2.28.0.tar.gz#sha256=abc123">requests-2.28.0.tar.gz</a><br/><a href="../requests-2.29.0.tar.gz#sha256=def456">requests-2.29.0.tar.gz</a><br/></body></html>`)
+	fmt.Printf("DEBUG: Loaded %d file content entries\n", len(c.fileContent))
 }
 
 func (c *mockClient) loadBinaryContent() {
@@ -196,12 +197,7 @@ func (c *mockClient) loadBinaryContent() {
 		loaded++
 		return nil
 	})
-	if loaded > 0 {
-		return
-	}
 
-	// Fallback: generate binaries programmatically when testdata/binary/
-	// doesn't exist (e.g. fresh clone without running `make mock-init`).
 	npmPkgs := []struct{ name, version string }{
 		{"@har/sample-package", "1.0.0"},
 		{"@har/sample-package", "1.1.0"},
@@ -270,6 +266,21 @@ func (c *mockClient) GetFile(registry string, path string) (io.ReadCloser, http2
 		header := make(http2.Header)
 		header.Set("Content-Type", "application/gzip")
 		return io.NopCloser(bytes.NewReader(content)), header, nil
+	}
+
+	// Debug: print available keys for this registry
+	fmt.Printf("DEBUG: File not found: %s\n", fileKey)
+	fmt.Printf("DEBUG: Available file content keys for %s:\n", registry)
+	for k := range c.fileContent {
+		if strings.HasPrefix(k, registry+"/") {
+			fmt.Printf("  - %s\n", k)
+		}
+	}
+	fmt.Printf("DEBUG: Available binary content keys for %s:\n", registry)
+	for k := range c.binaryContent {
+		if strings.HasPrefix(k, registry+"/") {
+			fmt.Printf("  - %s\n", k)
+		}
 	}
 
 	return nil, nil, fmt.Errorf("file not found: %s", fileKey)

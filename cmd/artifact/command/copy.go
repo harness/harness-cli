@@ -9,6 +9,7 @@ import (
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
 	v2client "github.com/harness/harness-cli/internal/api/ar_v2"
+	"github.com/harness/harness-cli/util/artifact"
 	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/spf13/cobra"
@@ -16,6 +17,7 @@ import (
 
 func NewCopyArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 	var artifactType string
+	var artifactKeyStr string
 	const expectedArgumentCount = 2
 	cmd := &cobra.Command{
 		Use:   "copy <SRC_REGISTRY>/<PACKAGE_NAME>/<VERSION> <DEST_REGISTRY>",
@@ -36,6 +38,17 @@ func NewCopyArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 
 			// Create progress reporter
 			progress := p.NewConsoleReporter()
+
+			// Parse artifact key if provided
+			var artifactKey artifact.ArtifactKey
+			var err error
+			if artifactKeyStr != "" {
+				artifactKey, err = artifact.ParseArtifactKeyString(artifactKeyStr)
+				if err != nil {
+					progress.Error("Failed to parse artifact key")
+					return fmt.Errorf("invalid artifact key format: %w", err)
+				}
+			}
 
 			progress.Start("Validating input parameters")
 
@@ -59,6 +72,12 @@ func NewCopyArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 			if len(artifactType) > 0 {
 				//setting additional param required for Hugging Face
 				copyReqParam.ArtifactType = &artifactType
+			}
+
+			// Add artifact key filters if provided
+			if !artifactKey.IsEmpty() {
+				filters := buildFiltersFromArtifactKey(artifactKey)
+				copyReqParam.Filters = &filters
 			}
 
 			//validating all required parameter
@@ -91,6 +110,10 @@ func NewCopyArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&artifactType, "artifact-type", "", "artifact type used e.g. model or dataset")
+	cmd.Flags().StringVar(&artifactKeyStr, "artifact-key", "",
+		"Artifact key filters as comma-separated key=value pairs\n"+
+			"Example: architecture=amd64,distribution=focal,component=main\n"+
+			"Accepts any key names - no validation is performed")
 	return cmd
 }
 

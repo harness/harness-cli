@@ -24,6 +24,7 @@ paths:
         - $ref: "#/components/parameters/RegistryIdentifier"
         - $ref: "#/components/parameters/PackageParam"
         - $ref: "#/components/parameters/VersionParam"
+        - $ref: "#/components/parameters/FiltersParam"
       responses:
         200:
           $ref: "#/components/responses/MetadataResponse"
@@ -102,6 +103,7 @@ paths:
         - $ref: "#/components/parameters/SrcArtifact"
         - $ref: "#/components/parameters/SrcVersion"
         - $ref: "#/components/parameters/ArtifactType"
+        - $ref: "#/components/parameters/FiltersParam"
 
       responses:
         200:
@@ -187,6 +189,22 @@ components:
       schema:
         type: string
 
+    FiltersParam:
+      name: filters
+      in: query
+      required: false
+      description: |
+        Key-value filters for artifact retrieval. Repeat the parameter once per filter.
+        Format per entry: key:value
+        Example: ?filters=architecture:amd64&filters=distribution:jammy
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+          example: "architecture:amd64"
+
   requestBodies:
     MetadataRequest:
       description: Request body containing metadata key-value pairs to add or update
@@ -269,6 +287,18 @@ components:
           type: string
           description: Optional version identifier.
           example: "1.0.0"
+        artifactKeyFilters:
+          type: object
+          description: |
+            Optional artifact key filters for Debian packages.
+            Key-value pairs for artifact identification.
+            Example: {"architecture": "amd64", "distribution": "focal", "component": "main"}
+          additionalProperties:
+            type: string
+          example:
+            architecture: "amd64"
+            distribution: "focal"
+            component: "main"
         metadata:
           type: array
           description: Array of metadata key-value pairs

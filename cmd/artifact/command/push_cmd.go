@@ -29,6 +29,7 @@ func NewPushArtifactCmd(f *cmdutils.Factory) *cobra.Command {
 	cmd.AddCommand(NewPushNugetCmd(f))
 	cmd.AddCommand(NewPushSwiftCmd(f))
 	cmd.AddCommand(NewPushPuppetCmd(f))
+	cmd.AddCommand(NewPushDebianCmd(f))
 
 	return cmd
 }

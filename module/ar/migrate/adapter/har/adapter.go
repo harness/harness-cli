@@ -126,6 +126,8 @@ func (a *adapter) UploadFile(
 		err = a.client.uploadNPMFile(registry, artifactName, version, f, file)
 	} else if artifactType == types.RPM {
 		err = a.client.uploadRPMFile(registry, f.Name, file)
+	} else if artifactType == types.DEBIAN {
+		err = a.client.uploadDebianFile(registry, f.Name, file, metadata)
 	} else if artifactType == types.CONDA {
 		err = a.client.uploadCondaFile(registry, f.Name, file, metadata)
 	} else if artifactType == types.COMPOSER {

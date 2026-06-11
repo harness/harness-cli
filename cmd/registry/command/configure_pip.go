@@ -223,4 +223,3 @@ func writePipConf(pipConfPath, registryURL, authToken string) error {
 
 	return nil
 }
-

@@ -1,0 +1,65 @@
+[
+  {
+    "Registry": "debian-local",
+    "Name": "InRelease",
+    "Uri": "/dists/bookworm/InRelease",
+    "Folder": false,
+    "Size": 1024,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80740"
+  },
+  {
+    "Registry": "debian-local",
+    "Name": "Packages.gz",
+    "Uri": "/dists/bookworm/main/binary-amd64/Packages.gz",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80741"
+  },
+  {
+    "Registry": "debian-local",
+    "Name": "Sources.gz",
+    "Uri": "/dists/bookworm/main/source/Sources.gz",
+    "Folder": false,
+    "Size": 1536,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80742"
+  },
+  {
+    "Registry": "debian-local",
+    "Name": "nginx_1.18.0-1_amd64.deb",
+    "Uri": "/pool/main/n/nginx/nginx_1.18.0-1_amd64.deb",
+    "Folder": false,
+    "Size": 1048576,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80743"
+  },
+  {
+    "Registry": "debian-local",
+    "Name": "apache2_2.4.52-1.dsc",
+    "Uri": "/pool/main/a/apache2/apache2_2.4.52-1.dsc",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80744"
+  },
+  {
+    "Registry": "debian-local",
+    "Name": "apache2_2.4.52.orig.tar.gz",
+    "Uri": "/pool/main/a/apache2/apache2_2.4.52.orig.tar.gz",
+    "Folder": false,
+    "Size": 8388608,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80745"
+  },
+  {
+    "Registry": "debian-local",
+    "Name": "apache2_2.4.52-1.debian.tar.gz",
+    "Uri": "/pool/main/a/apache2/apache2_2.4.52-1.debian.tar.gz",
+    "Folder": false,
+    "Size": 524288,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80746"
+  }
+]

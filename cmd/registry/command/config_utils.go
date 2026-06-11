@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	HarnessConfigDir    = ".harness"
-	MavenConfigFile     = "maven-config.json"
-	PipConfigFile       = "pip-config.json"
-	NugetConfigFile     = "nuget-config.json"
+	HarnessConfigDir = ".harness"
+	MavenConfigFile  = "maven-config.json"
+	PipConfigFile    = "pip-config.json"
+	NugetConfigFile  = "nuget-config.json"
 )
 
 func harnessConfigPath(filename string) (string, error) {

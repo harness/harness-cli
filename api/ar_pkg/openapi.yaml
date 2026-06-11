@@ -889,6 +889,156 @@ paths:
           description: Missing or invalid `x-api-key`
         '5XX':
           description: Server-side error
+  /pkg/{accountId}/{registry}/debian/deb:
+    put:
+      summary: Upload a Debian .deb package file
+      operationId: uploadDebianDebFile
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: distribution
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Debian distribution name (e.g., focal, bullseye)
+        - name: component
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Debian component name (e.g., main, contrib, non-free)
+      security:
+        - ApiKeyAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+              description: Debian .deb package file to upload
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/debian/dsc:
+    put:
+      summary: Upload a Debian .dsc source control file
+      operationId: uploadDebianDscFile
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: distribution
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Debian distribution name (e.g., focal, bullseye)
+        - name: component
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Debian component name (e.g., main, contrib, non-free)
+      security:
+        - ApiKeyAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+              description: Debian .dsc source control file to upload
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/debian/src:
+    put:
+      summary: Upload a Debian source file
+      operationId: uploadDebianSrcFile
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: distribution
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Debian distribution name (e.g., focal, bullseye)
+        - name: component
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Debian component name (e.g., main, contrib, non-free)
+        - name: package
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Debian package name (must be at least 2 characters and contain only lowercase letters, digits, +, -, .)
+        - name: version
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Debian version format ([epoch:]upstream_version[-debian_revision])
+      security:
+        - ApiKeyAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+              description: Debian source file to upload (e.g., .tar.gz, .tar.xz, .orig.tar.gz)
+      responses:
+        '200':
+          description: Package uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
 components:
   securitySchemes:
     ApiKeyAuth:

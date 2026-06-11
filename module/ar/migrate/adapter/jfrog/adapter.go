@@ -257,6 +257,109 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			return nil, fmt.Errorf("extract RPM package URLs: %w", err)
 		}
 		return packages, nil
+	} else if artifactType == types.DEBIAN {
+		// Get the dists node
+		distsNode, err := tree.GetNodeForPath(root, "/dists")
+		if err != nil {
+			return nil, fmt.Errorf("get dists folder: %w", err)
+		}
+
+		// Iterate through distributions (subdirectories of dists)
+		for _, distNode := range distsNode.Children {
+			if !distNode.IsLeaf {
+				// Check for InRelease or Release file to validate distribution
+				// Try InRelease first (GPG-signed inline version)
+				releaseNode, err := tree.GetNodeForPath(&distNode, "InRelease")
+				if err != nil {
+					// Fall back to Release file
+					releaseNode, err = tree.GetNodeForPath(&distNode, "Release")
+					if err != nil {
+						log.Warn().Msgf("Skipping %s: no Release or InRelease file found", distNode.Name)
+						continue
+					}
+				}
+
+				// Download and parse Release file to get components
+				releaseFile, _, err := a.DownloadFile(registry, releaseNode.File.Uri)
+				if err != nil {
+					log.Warn().Msgf("Failed to download Release file for %s: %v", distNode.Name, err)
+					continue
+				}
+
+				components, architectures, err := parseDebianRelease(releaseFile)
+				releaseFile.Close()
+				if err != nil {
+					log.Warn().Msgf("Failed to parse Release file for %s: %v", distNode.Name, err)
+					continue
+				}
+
+				// Iterate through components and architectures
+				for _, component := range components {
+					// Process binary packages for each architecture
+					for _, arch := range architectures {
+						// Path to Packages file
+						packagesPath := fmt.Sprintf("/dists/%s/%s/binary-%s/Packages", distNode.Name, component, arch)
+						packagesNode, err := tree.GetNodeForPath(root, packagesPath)
+						if err != nil {
+							// Try .gz version
+							packagesPath = fmt.Sprintf("/dists/%s/%s/binary-%s/Packages.gz", distNode.Name, component, arch)
+							packagesNode, err = tree.GetNodeForPath(root, packagesPath)
+							if err != nil {
+								log.Warn().Msgf("Packages file not found: %s", packagesPath)
+								continue
+							}
+						}
+
+						// Download and parse Packages file
+						packagesFile, _, err := a.DownloadFile(registry, packagesNode.File.Uri)
+						if err != nil {
+							log.Warn().Msgf("Failed to download Packages file %s: %v", packagesPath, err)
+							continue
+						}
+
+						debPackages, err := extractDebianPackages(packagesFile, registry, distNode.Name, component, strings.HasSuffix(packagesPath, ".gz"))
+						packagesFile.Close()
+						if err != nil {
+							log.Warn().Msgf("Failed to extract Debian packages from %s: %v", packagesPath, err)
+							continue
+						}
+
+						packages = append(packages, debPackages...)
+					}
+
+					// Process source packages for this component
+					sourcesPath := fmt.Sprintf("/dists/%s/%s/source/Sources", distNode.Name, component)
+					sourcesNode, err := tree.GetNodeForPath(root, sourcesPath)
+					if err != nil {
+						// Try .gz version
+						sourcesPath = fmt.Sprintf("/dists/%s/%s/source/Sources.gz", distNode.Name, component)
+						sourcesNode, err = tree.GetNodeForPath(root, sourcesPath)
+						if err != nil {
+							log.Debug().Msgf("Sources file not found: %s (this is normal if no source packages)", sourcesPath)
+							continue
+						}
+					}
+
+					// Download and parse Sources file
+					sourcesFile, _, err := a.DownloadFile(registry, sourcesNode.File.Uri)
+					if err != nil {
+						log.Warn().Msgf("Failed to download Sources file %s: %v", sourcesPath, err)
+						continue
+					}
+
+					sourcePackages, err := extractDebianSourcePackages(sourcesFile, registry, distNode.Name, component, strings.HasSuffix(sourcesPath, ".gz"))
+					sourcesFile.Close()
+					if err != nil {
+						log.Warn().Msgf("Failed to extract Debian source packages from %s: %v", sourcesPath, err)
+						continue
+					}
+
+					packages = append(packages, sourcePackages...)
+				}
+			}
+		}
+
+		return packages, nil
 	} else if artifactType == types.GO {
 		leaves, _ := tree.GetAllFiles(root)
 		packageMap := make(map[string]bool)
@@ -494,6 +597,230 @@ func extractRPMPackages(file io.Reader, registry string) ([]types.Package, error
 				Size:     pkg.Size.Package,
 			})
 		}
+	}
+
+	return packages, nil
+}
+
+func parseDebianRelease(file io.Reader) ([]string, []string, error) {
+	var components []string
+	var architectures []string
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, nil, fmt.Errorf("read Release file: %w", err)
+	}
+
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Components:") {
+			componentStr := strings.TrimPrefix(line, "Components:")
+			components = strings.Fields(strings.TrimSpace(componentStr))
+		} else if strings.HasPrefix(line, "Architectures:") {
+			archStr := strings.TrimPrefix(line, "Architectures:")
+			architectures = strings.Fields(strings.TrimSpace(archStr))
+		}
+	}
+
+	if len(components) == 0 {
+		return nil, nil, fmt.Errorf("no components found in Release file")
+	}
+	if len(architectures) == 0 {
+		return nil, nil, fmt.Errorf("no architectures found in Release file")
+	}
+
+	return components, architectures, nil
+}
+
+func extractDebianPackages(file io.Reader, registry string, distribution string, component string, isGzipped bool) ([]types.Package, error) {
+	var reader io.Reader = file
+
+	if isGzipped {
+		gz, err := gzip.NewReader(file)
+		if err != nil {
+			return nil, fmt.Errorf("create gzip reader: %w", err)
+		}
+		defer gz.Close()
+		reader = gz
+	}
+
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("read Packages file: %w", err)
+	}
+
+	var packages []types.Package
+	paragraphs := strings.Split(string(data), "\n\n")
+
+	for _, paragraph := range paragraphs {
+		if strings.TrimSpace(paragraph) == "" {
+			continue
+		}
+
+		var filename string
+		var size int
+
+		lines := strings.Split(paragraph, "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "Filename:") {
+				filename = strings.TrimSpace(strings.TrimPrefix(line, "Filename:"))
+			} else if strings.HasPrefix(line, "Size:") {
+				sizeStr := strings.TrimSpace(strings.TrimPrefix(line, "Size:"))
+				fmt.Sscanf(sizeStr, "%d", &size)
+			}
+		}
+
+		if filename != "" {
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     "/",
+				Name:     path.Base(filename),
+				URL:      filename,
+				Size:     size,
+				Metadata: map[string]string{
+					"distribution": distribution,
+					"component":    component,
+				},
+			})
+		}
+	}
+
+	return packages, nil
+}
+
+func extractDebianSourcePackages(file io.Reader, registry string, distribution string, component string, isGzipped bool) ([]types.Package, error) {
+	var reader = file
+
+	if isGzipped {
+		gz, err := gzip.NewReader(file)
+		if err != nil {
+			return nil, fmt.Errorf("create gzip reader: %w", err)
+		}
+		defer gz.Close()
+		reader = gz
+	}
+
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("read Sources file: %w", err)
+	}
+
+	var packages []types.Package
+	paragraphs := strings.Split(string(data), "\n\n")
+
+	for _, paragraph := range paragraphs {
+		if strings.TrimSpace(paragraph) == "" {
+			continue
+		}
+
+		var packageName string
+		var version string
+		var directory string
+		var dscFiles []types.Package
+		var allFiles []string // Track all filenames for metadata
+
+		lines := strings.Split(paragraph, "\n")
+		inFilesSection := false
+
+		for _, line := range lines {
+			// Extract Package name
+			if strings.HasPrefix(line, "Package:") {
+				packageName = strings.TrimSpace(strings.TrimPrefix(line, "Package:"))
+				inFilesSection = false
+				continue
+			}
+
+			// Extract Version
+			if strings.HasPrefix(line, "Version:") {
+				version = strings.TrimSpace(strings.TrimPrefix(line, "Version:"))
+				inFilesSection = false
+				continue
+			}
+
+			// Check if we're in the Files section
+			if strings.HasPrefix(line, "Files:") {
+				inFilesSection = true
+				continue
+			}
+
+			// Check if we're in the Directory field
+			if strings.HasPrefix(line, "Directory:") {
+				directory = strings.TrimSpace(strings.TrimPrefix(line, "Directory:"))
+				inFilesSection = false
+				continue
+			}
+
+			// If line doesn't start with space, we're out of Files section
+			if inFilesSection && !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
+				inFilesSection = false
+			}
+
+			// Parse file entries in Files section
+			if inFilesSection && (strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t")) {
+				// Files format: <md5sum> <size> <filename>
+				fields := strings.Fields(line)
+				if len(fields) >= 3 {
+					filename := fields[2]
+
+					// Track all filenames for metadata
+					allFiles = append(allFiles, filename)
+
+					// Only create package entries for .dsc files
+					// Source files will be uploaded when the .dsc is processed
+					if strings.HasSuffix(filename, ".dsc") {
+						size := 0
+						fmt.Sscanf(fields[1], "%d", &size)
+
+						var filePath string
+						if directory != "" {
+							filePath = directory + "/" + filename
+						} else {
+							filePath = filename
+						}
+
+						pkg := types.Package{
+							Registry: registry,
+							Path:     "/",
+							Name:     filename,
+							URL:      filePath,
+							Size:     size,
+							Metadata: map[string]string{
+								"distribution": distribution,
+								"component":    component,
+								"packageName":  packageName,
+								"fullVersion":  version,
+							},
+						}
+
+						dscFiles = append(dscFiles, pkg)
+					}
+				}
+			}
+		}
+
+		// Add source file information to .dsc file metadata
+		for i := range dscFiles {
+			var sourceFiles []string
+			for _, filename := range allFiles {
+				if strings.Contains(filename, ".orig.tar.") || strings.Contains(filename, ".tar.") {
+					sourceFiles = append(sourceFiles, filename)
+				}
+			}
+			if len(sourceFiles) > 0 {
+				dscFiles[i].Metadata["sourceFiles"] = strings.Join(sourceFiles, ",")
+			}
+			// Store directory path for locating source files
+			if directory != "" {
+				dscFiles[i].Metadata["directory"] = directory
+			}
+		}
+
+		// Only add .dsc files as packages
+		// Source files (otherFiles) will be automatically uploaded when the .dsc file is processed
+		// by the migrateDebian function in migratable/package.go
+		packages = append(packages, dscFiles...)
 	}
 
 	return packages, nil

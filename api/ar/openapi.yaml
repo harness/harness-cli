@@ -881,6 +881,10 @@ components:
           type: string
         version:
           type: string
+        artifactKey:
+          type: object
+          additionalProperties:
+            type: string
       required:
         - name
         - registryIdentifier
@@ -954,6 +958,10 @@ components:
           type: string
         size:
           type: string
+        artifactKey:
+          type: object
+          additionalProperties:
+            type: string
       required:
         - name
         - registryIdentifier

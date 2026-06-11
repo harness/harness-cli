@@ -75,5 +75,12 @@
     "url": "http://localhost:8081/artifactory/swift-local",
     "description": "Mock Swift Local Repository",
     "packageType": "swift"
+  },
+  "debian-local": {
+    "key": "debian-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/debian-local",
+    "description": "Mock Debian Local Repository",
+    "packageType": "debian"
   }
 }
