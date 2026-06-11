@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
@@ -430,29 +431,24 @@ func updatePackageJsonWithFixes(filePath string, fixes []SecurityFixInfo, progre
 		return fmt.Errorf("failed to read package.json: %w", err)
 	}
 
-	var pkgJson map[string]interface{}
-	if err := json.Unmarshal(data, &pkgJson); err != nil {
+	// Validate JSON before touching anything
+	var jsonCheck interface{}
+	if err := json.Unmarshal(data, &jsonCheck); err != nil {
 		return fmt.Errorf("failed to parse package.json: %w", err)
 	}
 
+	content := string(data)
 	updated := 0
 	for _, fix := range fixes {
-		updated += updateDependencySectionWithFix(pkgJson, "dependencies", fix)
-		updated += updateDependencySectionWithFix(pkgJson, "devDependencies", fix)
-		updated += updateDependencySectionWithFix(pkgJson, "peerDependencies", fix)
-		updated += updateDependencySectionWithFix(pkgJson, "optionalDependencies", fix)
+		newContent, changed := replaceDependencyVersion(content, fix.PackageName, fix.FixVersion)
+		if changed {
+			content = newContent
+			updated++
+			log.Info().Str("package", fix.PackageName).Str("version", fix.FixVersion).Msg("Updated package version")
+		}
 	}
 
-	// Write back to file with proper formatting
-	updatedData, err := json.MarshalIndent(pkgJson, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal updated package.json: %w", err)
-	}
-
-	// Add newline at end of file (standard practice)
-	updatedData = append(updatedData, '\n')
-
-	if err := os.WriteFile(filePath, updatedData, 0644); err != nil {
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
 		return fmt.Errorf("failed to write updated package.json: %w", err)
 	}
 
@@ -461,19 +457,17 @@ func updatePackageJsonWithFixes(filePath string, fixes []SecurityFixInfo, progre
 	return nil
 }
 
-func updateDependencySectionWithFix(pkgJson map[string]interface{}, section string, fix SecurityFixInfo) int {
-	deps, ok := pkgJson[section].(map[string]interface{})
-	if !ok {
-		return 0
+// replaceDependencyVersion performs in-place replacement of a single
+// package version string inside raw JSON text. It preserves key order, indentation,
+// and all other formatting because the rest of the file is never touched.
+func replaceDependencyVersion(content, pkg, newVersion string) (string, bool) {
+	pattern := fmt.Sprintf(`"%s"\s*:\s*"[^"]*"`, regexp.QuoteMeta(pkg))
+	re := regexp.MustCompile(pattern)
+	if !re.MatchString(content) {
+		return content, false
 	}
-
-	if _, exists := deps[fix.PackageName]; exists {
-		deps[fix.PackageName] = fix.FixVersion
-		log.Info().Str("package", fix.PackageName).Str("section", section).Str("version", fix.FixVersion).Msg("Updated package version")
-		return 1
-	}
-
-	return 0
+	replacement := fmt.Sprintf(`"%s": "%s"`, pkg, newVersion)
+	return re.ReplaceAllString(content, replacement), true
 }
 
 func displayFixComparisonFromSecurityFixes(fixes []SecurityFixInfo) {

@@ -322,78 +322,78 @@ func TestBackupPackageJson(t *testing.T) {
 	}
 }
 
-func TestUpdateDependencySectionWithFix(t *testing.T) {
+func TestReplaceDependencyVersion(t *testing.T) {
 	tests := []struct {
-		name    string
-		pkgJson map[string]interface{}
-		section string
-		fix     SecurityFixInfo
-		want    int
+		name        string
+		content     string
+		pkg         string
+		newVersion  string
+		wantChange  bool
+		wantContain string
 	}{
 		{
-			name: "update existing dependency",
-			pkgJson: map[string]interface{}{
-				"dependencies": map[string]interface{}{
-					"lodash": "4.17.15",
-					"axios":  "0.21.0",
-				},
-			},
-			section: "dependencies",
-			fix: SecurityFixInfo{
-				PackageName: "lodash",
-				FixVersion:  "4.17.21",
-			},
-			want: 1,
+			name:        "update existing dependency",
+			content:     `{"dependencies":{"lodash":"4.17.15","axios":"0.21.0"}}`,
+			pkg:         "lodash",
+			newVersion:  "4.17.21",
+			wantChange:  true,
+			wantContain: `"lodash": "4.17.21"`,
 		},
 		{
-			name: "package not in section",
-			pkgJson: map[string]interface{}{
-				"dependencies": map[string]interface{}{
-					"express": "4.18.2",
-				},
-			},
-			section: "dependencies",
-			fix: SecurityFixInfo{
-				PackageName: "lodash",
-				FixVersion:  "4.17.21",
-			},
-			want: 0,
+			name:       "package not present",
+			content:    `{"dependencies":{"express":"4.18.2"}}`,
+			pkg:        "lodash",
+			newVersion: "4.17.21",
+			wantChange: false,
 		},
 		{
-			name:    "section does not exist",
-			pkgJson: map[string]interface{}{},
-			section: "dependencies",
-			fix: SecurityFixInfo{
-				PackageName: "lodash",
-				FixVersion:  "4.17.21",
-			},
-			want: 0,
+			name:        "other keys are preserved unchanged",
+			content:     `{"name":"app","version":"1.0.0","dependencies":{"lodash":"4.17.15"}}`,
+			pkg:         "lodash",
+			newVersion:  "4.17.21",
+			wantChange:  true,
+			wantContain: `"name":"app"`,
 		},
 		{
-			name: "update devDependencies",
-			pkgJson: map[string]interface{}{
-				"devDependencies": map[string]interface{}{
-					"jest": "29.0.0",
-				},
-			},
-			section: "devDependencies",
-			fix: SecurityFixInfo{
-				PackageName: "jest",
-				FixVersion:  "29.5.0",
-			},
-			want: 1,
+			name:        "update in devDependencies",
+			content:     `{"devDependencies":{"jest":"29.0.0"}}`,
+			pkg:         "jest",
+			newVersion:  "29.5.0",
+			wantChange:  true,
+			wantContain: `"jest": "29.5.0"`,
+		},
+		{
+			name:        "caret prefix in existing version is replaced cleanly",
+			content:     `{"dependencies":{"lodash":"^4.17.15"}}`,
+			pkg:         "lodash",
+			newVersion:  "4.17.21",
+			wantChange:  true,
+			wantContain: `"lodash": "4.17.21"`,
+		},
+		{
+			name:        "scoped package name with special regex chars",
+			content:     `{"dependencies":{"@scope/pkg":"1.0.0"}}`,
+			pkg:         "@scope/pkg",
+			newVersion:  "2.0.0",
+			wantChange:  true,
+			wantContain: `"@scope/pkg": "2.0.0"`,
+		},
+		{
+			name:        "extra whitespace around colon is normalised",
+			content:     `{"dependencies":{"lodash" :  "4.17.15"}}`,
+			pkg:         "lodash",
+			newVersion:  "4.17.21",
+			wantChange:  true,
+			wantContain: `"lodash": "4.17.21"`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := updateDependencySectionWithFix(tt.pkgJson, tt.section, tt.fix)
-			assert.Equal(t, tt.want, result)
-
-			// If update was successful, verify the version was actually changed
-			if result > 0 {
-				deps := tt.pkgJson[tt.section].(map[string]interface{})
-				assert.Equal(t, tt.fix.FixVersion, deps[tt.fix.PackageName])
+			result, changed := replaceDependencyVersion(tt.content, tt.pkg, tt.newVersion)
+			assert.Equal(t, tt.wantChange, changed)
+			if tt.wantContain != "" {
+				assert.Contains(t, result, tt.wantContain)
 			}
 		})
 	}
