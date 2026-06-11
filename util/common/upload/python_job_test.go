@@ -12,6 +12,8 @@ import (
 
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/config"
+	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
+	"github.com/harness/harness-cli/util/common/auth"
 )
 
 // withPythonPkgServer spins up a stub package server, points config.Global at
@@ -47,6 +49,16 @@ func writePythonFile(t *testing.T, contents string) (string, int64) {
 	return p, int64(len(contents))
 }
 
+func createTestPythonPkgClient(t *testing.T) *pkgclient.ClientWithResponses {
+	t.Helper()
+	client, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
+		auth.GetAuthOptionARPKG())
+	if err != nil {
+		t.Fatalf("failed to create test client: %v", err)
+	}
+	return client
+}
+
 func TestPythonUpload_Success(t *testing.T) {
 	_, hits := withPythonPkgServer(t, func(hit int, w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -75,7 +87,8 @@ func TestPythonUpload_Success(t *testing.T) {
 		SHA256: "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
 		SHA512: "309ecc489c12d6eb4cc40f50c902f2b4d0ed77ee511a7c7a9bcd3ca86d4cd86f989dd35bc5ff499670da34255b45b0cfd830e81f605dcf7dc5542e93ae9cd76f",
 	}
-	job := NewPythonUploadJob(path, "myreg", "test-pkg", "1.0.0", size, checksums)
+	pkgClient := createTestPythonPkgClient(t)
+	job := NewPythonUploadJob(path, "myreg", "test-pkg", "1.0.0", size, checksums, pkgClient)
 
 	if err := job.Upload(context.Background()); err != nil {
 		t.Fatalf("expected success, got %v", err)
@@ -97,7 +110,8 @@ func TestPythonUpload_Success_201Created(t *testing.T) {
 		SHA256: "3a7bd3e2360a3d29eea436fcfb7e44c735d117c4d1eef568a0e0b0c8b1301a70",
 		SHA512: "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
 	}
-	job := NewPythonUploadJob(path, "myreg", "test-pkg", "1.0.0", size, checksums)
+	pkgClient := createTestPythonPkgClient(t)
+	job := NewPythonUploadJob(path, "myreg", "test-pkg", "1.0.0", size, checksums, pkgClient)
 
 	if err := job.Upload(context.Background()); err != nil {
 		t.Fatalf("expected success on 201, got %v", err)
@@ -116,7 +130,8 @@ func TestPythonUpload_FailsOn4xx(t *testing.T) {
 		SHA256: "3a7bd3e2360a3d29eea436fcfb7e44c735d117c4d1eef568a0e0b0c8b1301a70",
 		SHA512: "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
 	}
-	job := NewPythonUploadJob(path, "myreg", "test-pkg", "1.0.0", size, checksums)
+	pkgClient := createTestPythonPkgClient(t)
+	job := NewPythonUploadJob(path, "myreg", "test-pkg", "1.0.0", size, checksums, pkgClient)
 
 	err := job.Upload(context.Background())
 	if err == nil {
@@ -139,7 +154,8 @@ func TestPythonUpload_FailsOn5xx(t *testing.T) {
 		SHA256: "3a7bd3e2360a3d29eea436fcfb7e44c735d117c4d1eef568a0e0b0c8b1301a70",
 		SHA512: "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
 	}
-	job := NewPythonUploadJob(path, "myreg", "test-pkg", "1.0.0", size, checksums)
+	pkgClient := createTestPythonPkgClient(t)
+	job := NewPythonUploadJob(path, "myreg", "test-pkg", "1.0.0", size, checksums, pkgClient)
 
 	if err := job.Upload(context.Background()); err == nil {
 		t.Fatal("expected error on 500, got nil")
@@ -152,7 +168,8 @@ func TestPythonUpload_FailsOnMissingFile(t *testing.T) {
 	})
 
 	checksums := utils.FileChecksums{}
-	job := NewPythonUploadJob("/path/that/does/not/exist.whl", "myreg", "test-pkg", "1.0.0", 0, checksums)
+	pkgClient := createTestPythonPkgClient(t)
+	job := NewPythonUploadJob("/path/that/does/not/exist.whl", "myreg", "test-pkg", "1.0.0", 0, checksums, pkgClient)
 
 	err := job.Upload(context.Background())
 	if err == nil {
@@ -182,7 +199,8 @@ func TestPythonUpload_ChecksumHeadersSet(t *testing.T) {
 		SHA256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
 		SHA512: "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
 	}
-	job := NewPythonUploadJob(path, "myreg", "test-pkg", "1.0.0", size, checksums)
+	pkgClient := createTestPythonPkgClient(t)
+	job := NewPythonUploadJob(path, "myreg", "test-pkg", "1.0.0", size, checksums, pkgClient)
 
 	if err := job.Upload(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)

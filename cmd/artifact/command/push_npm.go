@@ -13,9 +13,7 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util"
-	"github.com/harness/harness-cli/util/common/auth"
 	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/spf13/cobra"
@@ -129,12 +127,7 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 
 			// Initialize the package client
 			progress.Step("Initializing package client")
-			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-				auth.GetAuthOptionARPKG())
-			if err != nil {
-				progress.Error("Failed to create package client")
-				return fmt.Errorf("failed to create package client: %w", err)
-			}
+			pkgClient := f.PkgHttpClient()
 
 			progress.Step("checking if already exist")
 			//calling to get all the existing version to prevent duplicate upload ,same as npm publish
@@ -151,7 +144,13 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 			// Check response
 			if metadataResp.StatusCode() != http.StatusOK && metadataResp.StatusCode() != http.StatusNotFound {
 				progress.Error("download of metadata  failed")
-				return fmt.Errorf("failed to downlad NPM metadata: %s \n response: %s", metadataResp.Status(), metadataResp.Body)
+				status := ""
+				var body []byte
+				if metadataResp != nil {
+					status = metadataResp.Status()
+					body = metadataResp.Body
+				}
+				return fmt.Errorf("failed to download NPM metadata: %s \n response: %s", status, body)
 			}
 			//Check for pre exist only if success response came
 			if metadataResp.StatusCode() == http.StatusOK {
@@ -189,8 +188,9 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 
 			// Initialize progress reader for upload tracking
 			bufferSize := fileInfo.Size()
-			reader, closer := p.Reader(bufferSize, pr, fileInfo.Name())
-			defer closer()
+
+			//Re-initializing pkgClient with progress reader for upload tracking
+			pkgClient = f.PkgHttpClientWithProgress(progress, bufferSize, fileInfo.Name())
 
 			resp, err := pkgClient.UploadNPMPackageWithBodyWithResponse(
 				context.Background(),
@@ -198,7 +198,7 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 				registryName,
 				pkgName,
 				"application/json",
-				reader,
+				pr,
 				func(ctx context.Context, req *http.Request) error {
 					utils.SetChecksumHeaders(req.Header, checksums)
 					return nil

@@ -17,8 +17,6 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
-	"github.com/harness/harness-cli/util/common/auth"
 	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/spf13/cobra"
@@ -107,14 +105,6 @@ func NewPushPuppetCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 			progress.Success(fmt.Sprintf("Module metadata extracted: %s@%s", metadata.Name, metadata.Version))
 
-			pkgClient, err := pkgclient.NewClientWithResponses(
-				config.Global.Registry.PkgURL,
-				auth.GetAuthOptionARPKG(),
-			)
-			if err != nil {
-				return fmt.Errorf("failed to create package client: %w", err)
-			}
-
 			file, err := os.Open(packageFilePath)
 			if err != nil {
 				progress.Error("Failed to open package file")
@@ -139,15 +129,14 @@ func NewPushPuppetCmd(c *cmdutils.Factory) *cobra.Command {
 			}()
 
 			progress.Step("Uploading module to registry")
-			reader, closer := p.Reader(fileInfo.Size(), pr, fileInfo.Name())
-			defer closer()
 
+			pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), fileInfo.Name())
 			resp, err := pkgClient.UploadPuppetPackageWithBodyWithResponse(
 				context.Background(),
 				config.Global.AccountID,
 				registryName,
 				writer.FormDataContentType(),
-				reader,
+				pr,
 				func(ctx context.Context, req *http.Request) error {
 					utils.SetChecksumHeaders(req.Header, checksums)
 					return nil

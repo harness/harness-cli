@@ -11,6 +11,7 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
+	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util"
 	"github.com/harness/harness-cli/util/common/progress"
 	"github.com/harness/harness-cli/util/common/upload"
@@ -60,8 +61,10 @@ func NewPushGenericCmd(c *cmdutils.Factory) *cobra.Command {
 				ctx = context.Background()
 			}
 
+			pkgClient := c.PkgHttpClient()
+
 			fmt.Printf("Scanning %d input(s) ...\n", len(paths))
-			jobs, stats, err := collectGenericUploadJobs(paths, registryName, packageName, version, includeHidden)
+			jobs, stats, err := collectGenericUploadJobs(paths, registryName, packageName, version, includeHidden, pkgClient)
 			if err != nil {
 				return err
 			}
@@ -125,12 +128,12 @@ type walkStats struct {
 //   - File   "./pkg.tgz"            -> <pkg>/<v>/pkg.tgz
 //   - Dir    "./build" (rel)        -> <pkg>/<v>/build/<relPath>
 //   - Dir    "/" or "."  (edge)     -> <pkg>/<v>/<relPath>
-func collectGenericUploadJobs(paths []string, registry, packageName, version string, includeHidden bool) ([]upload.FileUploadJob, walkStats, error) {
+func collectGenericUploadJobs(paths []string, registry, packageName, version string, includeHidden bool, pkgClient *pkgclient.ClientWithResponses) ([]upload.FileUploadJob, walkStats, error) {
 	var allJobs []upload.FileUploadJob
 	var allStats walkStats
 
 	for _, p := range paths {
-		jobs, stats, err := collectFromPath(p, registry, packageName, version, includeHidden)
+		jobs, stats, err := collectFromPath(p, registry, packageName, version, includeHidden, pkgClient)
 		if err != nil {
 			return nil, allStats, err
 		}
@@ -143,7 +146,7 @@ func collectGenericUploadJobs(paths []string, registry, packageName, version str
 
 // collectFromPath returns jobs for one input path, dispatching on whether
 // it's a file or a directory.
-func collectFromPath(p, registry, packageName, version string, includeHidden bool) ([]upload.FileUploadJob, walkStats, error) {
+func collectFromPath(p, registry, packageName, version string, includeHidden bool, pkgClient *pkgclient.ClientWithResponses) ([]upload.FileUploadJob, walkStats, error) {
 	var stats walkStats
 
 	abs, err := filepath.Abs(p)
@@ -157,7 +160,7 @@ func collectFromPath(p, registry, packageName, version string, includeHidden boo
 
 	switch {
 	case info.IsDir():
-		return collectFromDir(abs, registry, packageName, version, includeHidden)
+		return collectFromDir(abs, registry, packageName, version, includeHidden, pkgClient)
 	case info.Mode().IsRegular():
 		relName := filepath.Base(abs)
 		destPath := fmt.Sprintf("%s/%s/%s", packageName, version, relName)
@@ -168,7 +171,7 @@ func collectFromPath(p, registry, packageName, version string, includeHidden boo
 			return nil, stats, fmt.Errorf("failed to compute checksums for %s: %w", abs, err)
 		}
 
-		job := upload.NewGenericUploadJob(relName, abs, destPath, registry, packageName, version, info.Size(), checksums)
+		job := upload.NewGenericUploadJob(relName, abs, destPath, registry, packageName, version, info.Size(), checksums, pkgClient)
 		stats.fileCount = 1
 		stats.totalBytes = info.Size()
 		return []upload.FileUploadJob{job}, stats, nil
@@ -181,7 +184,7 @@ func collectFromPath(p, registry, packageName, version string, includeHidden boo
 // The directory's basename is preserved as a prefix on the registry so
 // "./build" -> "<pkg>/<v>/build/<rel>". Filesystem-root inputs (where no
 // basename can be derived) gracefully fall back to no-prefix layout.
-func collectFromDir(srcDir, registry, packageName, version string, includeHidden bool) ([]upload.FileUploadJob, walkStats, error) {
+func collectFromDir(srcDir, registry, packageName, version string, includeHidden bool, pkgClient *pkgclient.ClientWithResponses) ([]upload.FileUploadJob, walkStats, error) {
 	var jobs []upload.FileUploadJob
 	var stats walkStats
 
@@ -242,7 +245,7 @@ func collectFromDir(srcDir, registry, packageName, version string, includeHidden
 		}
 
 		jobs = append(jobs, upload.NewGenericUploadJob(
-			jobRelPath, path, destPath, registry, packageName, version, info.Size(), checksums,
+			jobRelPath, path, destPath, registry, packageName, version, info.Size(), checksums, pkgClient,
 		))
 		stats.fileCount++
 		stats.totalBytes += info.Size()

@@ -12,10 +12,8 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/module/ar/packages/gopkg"
 	"github.com/harness/harness-cli/util"
-	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	p "github.com/harness/harness-cli/util/common/progress"
 
@@ -115,26 +113,19 @@ func NewPushGoCmd(c *cmdutils.Factory) *cobra.Command {
 				progress.Error("Failed to finalize form data")
 				return closeErr
 			}
-
-			// Initialize the package client
-			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-				auth.GetAuthOptionARPKG())
-			if err != nil {
-				return fmt.Errorf("failed to create package client: %w", err)
-			}
-
 			// Upload package
 			progress.Step("Uploading package to registry")
 			bufferSize := int64(formData.Len())
-			reader, closer := p.Reader(bufferSize, &formData, "go")
-			defer closer()
+
+			// Initialize the package client
+			pkgClient := c.PkgHttpClientWithProgress(progress, bufferSize, "go")
 
 			resp, err := pkgClient.UploadGoPackageWithBodyWithResponse(
 				context.Background(),
 				config.Global.AccountID,
 				registryName,
 				formWriter.FormDataContentType(),
-				reader,
+				&formData,
 			)
 			if err != nil {
 				progress.Error("Failed to upload package")

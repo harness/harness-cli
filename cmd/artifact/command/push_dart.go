@@ -15,10 +15,8 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/module/ar/migrate/types/dart"
 	"github.com/harness/harness-cli/util"
-	"github.com/harness/harness-cli/util/common/auth"
 	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/google/uuid"
@@ -119,15 +117,6 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 			}
 			progress.Success(fmt.Sprintf("Package metadata extracted: %s@%s", pubspec.Name, pubspec.Version))
 
-			// Initialize the package client
-			progress.Step("Initializing package client")
-			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-				auth.GetAuthOptionARPKG())
-			if err != nil {
-				progress.Error("Failed to create package client")
-				return fmt.Errorf("failed to create package client: %w", err)
-			}
-
 			// Open the tar.gz file for upload
 			progress.Step("Preparing package file for upload")
 			file, err := os.Open(packageFilePath)
@@ -168,8 +157,10 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 
 			// Initialize progress reader for upload tracking
 			bufferSize := fileInfo.Size()
-			reader, closer := p.Reader(bufferSize, pr, fileInfo.Name())
-			defer closer()
+
+			// Initialize the package client
+			progress.Step("Initializing package client")
+			pkgClient := f.PkgHttpClientWithProgress(progress, bufferSize, fileInfo.Name())
 
 			resp, err := pkgClient.UploadDartPackageWithBodyWithResponse(
 				context.Background(),
@@ -177,7 +168,7 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 				registryName,
 				uploadID,
 				writer.FormDataContentType(),
-				reader,
+				pr,
 				func(ctx context.Context, req *http.Request) error {
 					utils.SetChecksumHeaders(req.Header, checksums)
 					return nil

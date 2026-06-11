@@ -11,6 +11,8 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
+	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
+	"github.com/harness/harness-cli/util/common/auth"
 )
 
 // withComposerServer spins up a stub server and points the global config at it
@@ -46,7 +48,17 @@ func writeComposerFile(t *testing.T, content string) string {
 // and returns the resulting error.
 func runComposerCmd(t *testing.T, args ...string) error {
 	t.Helper()
-	cmd := NewPushComposerCmd(&cmdutils.Factory{})
+	factory := &cmdutils.Factory{
+		PkgHttpClient: func() *pkgclient.ClientWithResponses {
+			client, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
+				auth.GetAuthOptionARPKG())
+			if err != nil {
+				t.Fatalf("failed to create pkg client: %v", err)
+			}
+			return client
+		},
+	}
+	cmd := NewPushComposerCmd(factory)
 	cmd.SetArgs(args)
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))

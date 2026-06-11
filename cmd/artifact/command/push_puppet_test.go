@@ -13,6 +13,8 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
+	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
+	"github.com/harness/harness-cli/util/common/auth"
 )
 
 // withPuppetServer spins up a stub server and points the global config at it
@@ -147,7 +149,17 @@ func TestExtractPuppetMetadata_OpenError(t *testing.T) {
 // and returns the resulting error.
 func runPuppetCmd(t *testing.T, args ...string) error {
 	t.Helper()
-	cmd := NewPushPuppetCmd(&cmdutils.Factory{})
+	factory := &cmdutils.Factory{
+		PkgHttpClient: func() *pkgclient.ClientWithResponses {
+			client, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
+				auth.GetAuthOptionARPKG())
+			if err != nil {
+				t.Fatalf("failed to create pkg client: %v", err)
+			}
+			return client
+		},
+	}
+	cmd := NewPushPuppetCmd(factory)
 	cmd.SetArgs(args)
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))

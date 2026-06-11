@@ -13,11 +13,10 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util"
-	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	"github.com/harness/harness-cli/util/common/fileutil"
+	"github.com/harness/harness-cli/util/common/httpclient"
 	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/spf13/cobra"
@@ -95,15 +94,6 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 				return fmt.Errorf("failed to compute checksums for %s: %w", filePath, err)
 			}
 
-			// Initialize the package client
-			pkgClient, err := pkgclient.NewClientWithResponses(
-				config.Global.Registry.PkgURL,
-				auth.GetAuthOptionARPKG())
-
-			if err != nil {
-				return fmt.Errorf("failed to create package client: %w", err)
-			}
-
 			file, err := os.Open(filePath)
 			if err != nil {
 				progress.Error("Failed to open package file")
@@ -131,8 +121,6 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 			// Initialize progress reader
 			progress.Step("Uploading package to registry")
 			bufferSize := int64(formData.Len())
-			reader, closer := p.Reader(bufferSize, &formData, "nupkg")
-			defer closer()
 
 			if len(path) > 0 {
 				//This section will get executed only when a nested path is provided via flag
@@ -141,8 +129,10 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 					context.Background(),
 					apiUrlForNestedDirectory,
 					fileWriter.FormDataContentType(),
-					reader,
+					&formData,
 					config.Global.AuthToken,
+					progress,
+					bufferSize,
 					checksums,
 				)
 				if err != nil {
@@ -150,12 +140,13 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 				}
 
 			} else {
+				pkgClient := c.PkgHttpClientWithProgress(progress, bufferSize, "nupkg")
 				resp, err := pkgClient.UploadNugetPackageWithBodyWithResponse(
 					context.Background(),
 					config.Global.AccountID,
 					registryName,
 					fileWriter.FormDataContentType(),
-					reader,
+					&formData,
 					func(ctx context.Context, req *http.Request) error {
 						utils.SetChecksumHeaders(req.Header, checksums)
 						return nil
@@ -184,7 +175,7 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 	return cmd
 }
 
-func uploadNugetPackageDirect(ctx context.Context, url string, contentType string, body io.Reader, apiKey string, checksums utils.FileChecksums) error {
+func uploadNugetPackageDirect(ctx context.Context, url string, contentType string, body io.Reader, apiKey string, progress p.Reporter, bufferSize int64, checksums utils.FileChecksums) error {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, body)
 	if err != nil {
@@ -197,7 +188,8 @@ func uploadNugetPackageDirect(ctx context.Context, url string, contentType strin
 
 	utils.SetChecksumHeaders(req.Header, checksums)
 
-	client := &http.Client{}
+	//creating retry client
+	client := httpclient.NewRetryClientWithProgress(progress, bufferSize, "nupkg")
 
 	resp, err := client.Do(req)
 	if err != nil {

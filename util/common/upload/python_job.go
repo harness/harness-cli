@@ -13,7 +13,6 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
-	"github.com/harness/harness-cli/util/common/auth"
 )
 
 // Python package upload job
@@ -24,10 +23,11 @@ type PythonUploadJob struct {
 	PackageName  string
 	Version      string
 	Checksums    utils.FileChecksums
+	PkgClient    *pkgclient.ClientWithResponses
 }
 
 // NewPythonUploadJob creates a new Python upload job
-func NewPythonUploadJob(filePath, registryName, packageName, version string, fileSize int64, checksums utils.FileChecksums) *PythonUploadJob {
+func NewPythonUploadJob(filePath, registryName, packageName, version string, fileSize int64, checksums utils.FileChecksums, client *pkgclient.ClientWithResponses) *PythonUploadJob {
 	return &PythonUploadJob{
 		BaseFileUploadJob: BaseFileUploadJob{
 			ID:       filepath.Base(filePath),
@@ -39,15 +39,15 @@ func NewPythonUploadJob(filePath, registryName, packageName, version string, fil
 		PackageName:  packageName,
 		Version:      version,
 		Checksums:    checksums,
+		PkgClient:    client,
 	}
 }
 
 // Python package upload
 func (j *PythonUploadJob) Upload(ctx context.Context) error {
-	pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-		auth.GetAuthOptionARPKG())
-	if err != nil {
-		return fmt.Errorf("failed to create package client: %w", err)
+	pkgClient := j.PkgClient
+	if pkgClient == nil {
+		return fmt.Errorf("package client not initialized")
 	}
 
 	file, err := os.Open(j.FilePath)

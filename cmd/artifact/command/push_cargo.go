@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"os"
 	"path"
@@ -18,9 +17,7 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util"
-	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	"github.com/harness/harness-cli/util/common/fileutil"
 	p "github.com/harness/harness-cli/util/common/progress"
@@ -113,7 +110,7 @@ func NewPushCargoCmd(f *cmdutils.Factory) *cobra.Command {
 				progress.Error("Failed to open package file")
 				return err
 			}
-
+			defer file.Close()
 			fileData, err := os.ReadFile(filePath)
 
 			if err != nil {
@@ -135,43 +132,18 @@ func NewPushCargoCmd(f *cmdutils.Factory) *cobra.Command {
 
 			progress.Success("Input parameters validated")
 
-			// Initialize the package client
-			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-				auth.GetAuthOptionARPKG())
-			if err != nil {
-				return fmt.Errorf("failed to create package client: %w", err)
-			}
-
-			defer file.Close()
-
-			var formData bytes.Buffer
-			fileWriter := multipart.NewWriter(&formData)
-
-			part, err := fileWriter.CreateFormFile("file", filepath.Base(filePath))
-			if err != nil {
-				return err
-			}
-
-			_, err = io.Copy(part, bytes.NewReader(payload))
-			if err != nil {
-				return err
-			}
-
-			fileWriter.Close()
+			bufferSize := int64(len(payload))
+			pkgClient := f.PkgHttpClientWithProgress(progress, bufferSize, "cargo")
 
 			// Initialize progress reader
 			progress.Step("Uploading package to registry")
-			bufferSize := int64(len(payload))
-
-			reader, closer := p.Reader(bufferSize, bytes.NewReader(payload), "cargo")
-			defer closer()
 
 			resp, err := pkgClient.UploadCargoPackageWithBodyWithResponse(
 				context.Background(),
 				config.Global.AccountID,
 				registryName,
-				fileWriter.FormDataContentType(),
-				reader,
+				"application/octet-stream",
+				bytes.NewReader(payload),
 				func(ctx context.Context, req *http.Request) error {
 					utils.SetChecksumHeaders(req.Header, checksums)
 					return nil

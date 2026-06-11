@@ -49,6 +49,7 @@ func newClient(reg *types.RegistryConfig) *client {
 		auth.GetXApiKeyOptionAR())
 
 	pkgClient, _ := pkgclient.NewClientWithResponses(reg.Endpoint,
+		pkgclient.WithHTTPClient(retryingHTTPClient()),
 		auth.GetAuthOptionARPKG())
 
 	return &client{

@@ -39,7 +39,7 @@ func writeCargoFile(t *testing.T) string {
 	var buf bytes.Buffer
 	gzw := gzip.NewWriter(&buf)
 	tw := tar.NewWriter(gzw)
-	
+
 	// Create Cargo.toml with package metadata
 	cargoToml := `[package]
 name = "test-package"
@@ -53,14 +53,14 @@ authors = ["Test Author"]
 	if _, err := tw.Write([]byte(cargoToml)); err != nil {
 		t.Fatalf("write body: %v", err)
 	}
-	
+
 	if err := tw.Close(); err != nil {
 		t.Fatalf("close tar: %v", err)
 	}
 	if err := gzw.Close(); err != nil {
 		t.Fatalf("close gzip: %v", err)
 	}
-	
+
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.crate")
 	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {

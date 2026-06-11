@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -9,8 +10,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
+	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
+	"github.com/harness/harness-cli/util/common/auth"
 )
 
 // withNugetServer spins up a stub server and points the global config at it
@@ -46,7 +50,17 @@ func writeNugetFile(t *testing.T, content string) string {
 // and returns the resulting error.
 func runNugetCmd(t *testing.T, args ...string) error {
 	t.Helper()
-	cmd := NewPushNugetCmd(&cmdutils.Factory{})
+	factory := &cmdutils.Factory{
+		PkgHttpClient: func() *pkgclient.ClientWithResponses {
+			client, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
+				auth.GetAuthOptionARPKG())
+			if err != nil {
+				t.Fatalf("failed to create pkg client: %v", err)
+			}
+			return client
+		},
+	}
+	cmd := NewPushNugetCmd(factory)
 	cmd.SetArgs(args)
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
@@ -172,3 +186,189 @@ func TestNewPushNugetCmd_ChecksumHeadersSet(t *testing.T) {
 		t.Error("X-Checksum-Sha512 header was not set")
 	}
 }
+
+func TestNewPushNugetCmd_NestedPath(t *testing.T) {
+	receivedPath := ""
+	srv := withNugetServer(t, func(w http.ResponseWriter, r *http.Request) {
+		receivedPath = r.URL.Path
+		w.WriteHeader(http.StatusOK)
+	})
+	_ = srv
+
+	path := writeNugetFile(t, "test nuget content")
+	if err := runNugetCmd(t, "test-registry", path, "--path", "nested/folder"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify the path includes the nested directory
+	if !strings.Contains(receivedPath, "nested/folder") {
+		t.Errorf("expected path to contain 'nested/folder', got: %s", receivedPath)
+	}
+}
+
+func TestNewPushNugetCmd_CustomPkgUrl(t *testing.T) {
+	srv := withNugetServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	path := writeNugetFile(t, "test nuget content")
+	if err := runNugetCmd(t, "test-registry", path, "--pkg-url", srv.URL); err != nil {
+		t.Fatalf("unexpected error with custom pkg-url: %v", err)
+	}
+}
+
+func TestNewPushNugetCmd_Success_201Created(t *testing.T) {
+	srv := withNugetServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+	})
+	_ = srv
+
+	path := writeNugetFile(t, "test nuget content")
+	if err := runNugetCmd(t, "test-registry", path); err != nil {
+		t.Fatalf("expected success on 201, got error: %v", err)
+	}
+}
+
+func TestNewPushNugetCmd_PkgHttpClientWithProgress(t *testing.T) {
+	// This test specifically covers line 143: pkgClient := c.PkgHttpClientWithProgress(...)
+	clientCreated := false
+	srv := withNugetServer(t, func(w http.ResponseWriter, r *http.Request) {
+		clientCreated = true
+		w.WriteHeader(http.StatusOK)
+	})
+	_ = srv
+
+	path := writeNugetFile(t, "test nuget content")
+
+	// Use the default factory which will call PkgHttpClientWithProgress
+	factory := cmdutils.NewFactory()
+
+	cmd := NewPushNugetCmd(factory)
+	cmd.SetArgs([]string{"test-registry", path})
+	cmd.SetOut(new(bytes.Buffer))
+	cmd.SetErr(new(bytes.Buffer))
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !clientCreated {
+		t.Error("PkgHttpClientWithProgress was not called - line 143 not covered")
+	}
+}
+
+func TestNewPushNugetCmd_MultipartFormData(t *testing.T) {
+	receivedContentType := ""
+	srv := withNugetServer(t, func(w http.ResponseWriter, r *http.Request) {
+		receivedContentType = r.Header.Get("Content-Type")
+		w.WriteHeader(http.StatusOK)
+	})
+	_ = srv
+
+	path := writeNugetFile(t, "test nuget content")
+	if err := runNugetCmd(t, "test-registry", path); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify multipart form data is used
+	if !strings.HasPrefix(receivedContentType, "multipart/form-data") {
+		t.Errorf("expected multipart/form-data content type, got: %s", receivedContentType)
+	}
+}
+
+func TestNewPushNugetCmd_EmptyFile(t *testing.T) {
+	srv := withNugetServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	_ = srv
+
+	// Create empty nupkg file
+	path := writeNugetFile(t, "")
+	if err := runNugetCmd(t, "test-registry", path); err != nil {
+		t.Fatalf("unexpected error for empty file: %v", err)
+	}
+}
+
+func TestNewPushNugetCmd_LargeFile(t *testing.T) {
+	srv := withNugetServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	_ = srv
+
+	// Create a larger file (1MB)
+	largeContent := strings.Repeat("A", 1024*1024)
+	path := writeNugetFile(t, largeContent)
+	if err := runNugetCmd(t, "test-registry", path); err != nil {
+		t.Fatalf("unexpected error for large file: %v", err)
+	}
+}
+
+func TestNewPushNugetCmd_NestedPathServerError(t *testing.T) {
+	srv := withNugetServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"server error"}`))
+	})
+	_ = srv
+
+	path := writeNugetFile(t, "test nuget content")
+	err := runNugetCmd(t, "test-registry", path, "--path", "nested/folder")
+	if err == nil {
+		t.Fatal("expected error for server error with nested path")
+	}
+	// Error message can be either "upload failed" or "request failed" due to retries
+	if !strings.Contains(err.Error(), "failed") {
+		t.Errorf("error should mention failure, got: %v", err)
+	}
+}
+
+func TestUploadNugetPackageDirect(t *testing.T) {
+	// Test the uploadNugetPackageDirect function directly
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			t.Errorf("expected PUT method, got %s", r.Method)
+		}
+		if r.Header.Get("x-api-key") == "" {
+			t.Error("x-api-key header is missing")
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	origAuthToken := config.Global.AuthToken
+	config.Global.AuthToken = "test-api-key"
+	defer func() { config.Global.AuthToken = origAuthToken }()
+
+	body := bytes.NewBufferString("test content")
+	checksums := utils.FileChecksums{
+		MD5:    "test-md5",
+		SHA1:   "test-sha1",
+		SHA256: "test-sha256",
+		SHA512: "test-sha512",
+	}
+
+	progress := &mockProgressReporter{}
+	err := uploadNugetPackageDirect(
+		context.Background(),
+		srv.URL,
+		"multipart/form-data",
+		body,
+		config.Global.AuthToken,
+		progress,
+		int64(body.Len()),
+		checksums,
+	)
+
+	if err != nil {
+		t.Fatalf("uploadNugetPackageDirect failed: %v", err)
+	}
+}
+
+// mockProgressReporter implements progress.Reporter for testing
+type mockProgressReporter struct{}
+
+func (m *mockProgressReporter) Start(message string) {}
+func (m *mockProgressReporter) End()                 {}
+func (m *mockProgressReporter) Step(msg string)      {}
+func (m *mockProgressReporter) Success(msg string)   {}
+func (m *mockProgressReporter) Error(msg string)     {}
+func (m *mockProgressReporter) Warn(msg string)      {}

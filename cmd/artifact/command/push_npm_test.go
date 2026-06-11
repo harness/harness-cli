@@ -13,6 +13,8 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
+	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
+	"github.com/harness/harness-cli/util/common/auth"
 )
 
 // withNpmServer spins up a stub server and points the global config at it
@@ -67,7 +69,17 @@ func writeNpmTarball(t *testing.T, entries map[string]string) string {
 // and returns the resulting error.
 func runNpmCmd(t *testing.T, args ...string) error {
 	t.Helper()
-	cmd := NewPushNpmCmd(&cmdutils.Factory{})
+	factory := &cmdutils.Factory{
+		PkgHttpClient: func() *pkgclient.ClientWithResponses {
+			client, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
+				auth.GetAuthOptionARPKG())
+			if err != nil {
+				t.Fatalf("failed to create pkg client: %v", err)
+			}
+			return client
+		},
+	}
+	cmd := NewPushNpmCmd(factory)
 	cmd.SetArgs(args)
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
@@ -254,5 +266,178 @@ func TestNewPushNpmCmd_ChecksumHeadersSet(t *testing.T) {
 	}
 	if receivedHeaders.Get("X-Checksum-Sha512") == "" {
 		t.Error("X-Checksum-Sha512 header was not set")
+	}
+}
+
+func TestNewPushNpmCmd_MetadataDownloadError(t *testing.T) {
+	// Test lines 147-153: error handling when metadata download fails with non-200/404 status
+	srv := withNpmServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			// Return 500 error for metadata download
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"error":"internal server error"}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	_ = srv
+
+	path := writeNpmTarball(t, map[string]string{
+		"package/package.json": `{
+  "name": "test-package",
+  "version": "1.0.0"
+}`,
+	})
+	err := runNpmCmd(t, "test-registry", path)
+	if err == nil {
+		t.Fatal("expected error for metadata download failure")
+	}
+	// Verify error message includes status and response body (lines 147-153)
+	if !strings.Contains(err.Error(), "failed to download NPM metadata") {
+		t.Errorf("error should mention metadata download failure, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "500") {
+		t.Errorf("error should include status code, got: %v", err)
+	}
+}
+
+func TestNewPushNpmCmd_MetadataDownloadBadGateway(t *testing.T) {
+	// Test lines 147-153: error handling with 502 Bad Gateway
+	srv := withNpmServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte(`{"error":"bad gateway"}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	_ = srv
+
+	path := writeNpmTarball(t, map[string]string{
+		"package/package.json": `{
+  "name": "test-package",
+  "version": "1.0.0"
+}`,
+	})
+	err := runNpmCmd(t, "test-registry", path)
+	if err == nil {
+		t.Fatal("expected error for bad gateway response")
+	}
+	if !strings.Contains(err.Error(), "failed to download NPM metadata") {
+		t.Errorf("error should mention metadata download failure, got: %v", err)
+	}
+}
+
+func TestNewPushNpmCmd_PkgHttpClientWithProgress(t *testing.T) {
+	// Test line 193: pkgClient = f.PkgHttpClientWithProgress(progress, bufferSize, fileInfo.Name())
+	clientCreated := false
+	srv := withNpmServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		clientCreated = true
+		w.WriteHeader(http.StatusOK)
+	})
+	_ = srv
+
+	path := writeNpmTarball(t, map[string]string{
+		"package/package.json": `{
+  "name": "test-package",
+  "version": "1.0.0"
+}`,
+	})
+
+	// Use the default factory which will call PkgHttpClientWithProgress
+	factory := cmdutils.NewFactory()
+
+	cmd := NewPushNpmCmd(factory)
+	cmd.SetArgs([]string{"test-registry", path})
+	cmd.SetOut(new(bytes.Buffer))
+	cmd.SetErr(new(bytes.Buffer))
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !clientCreated {
+		t.Error("PkgHttpClientWithProgress was not called - line 193 not covered")
+	}
+}
+
+func TestNewPushNpmCmd_PackageAlreadyExists(t *testing.T) {
+	// Test when package already exists (GET returns 200)
+	srv := withNpmServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			// Return existing package metadata
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{
+  "name": "test-package",
+  "versions": {
+    "1.0.0": {
+      "name": "test-package",
+      "version": "1.0.0"
+    }
+  }
+}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	_ = srv
+
+	path := writeNpmTarball(t, map[string]string{
+		"package/package.json": `{
+  "name": "test-package",
+  "version": "1.0.0"
+}`,
+	})
+	err := runNpmCmd(t, "test-registry", path)
+	if err == nil {
+		t.Fatal("expected error when package version already exists")
+	}
+	if !strings.Contains(err.Error(), "already exist") {
+		t.Errorf("error should mention package already exists, got: %v", err)
+	}
+}
+
+func TestNewPushNpmCmd_Success_201Created(t *testing.T) {
+	srv := withNpmServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+	})
+	_ = srv
+
+	path := writeNpmTarball(t, map[string]string{
+		"package/package.json": `{
+  "name": "test-package",
+  "version": "1.0.0"
+}`,
+	})
+	if err := runNpmCmd(t, "test-registry", path); err != nil {
+		t.Fatalf("expected success on 201, got error: %v", err)
+	}
+}
+
+func TestNewPushNpmCmd_CustomPkgUrl(t *testing.T) {
+	srv := withNpmServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	path := writeNpmTarball(t, map[string]string{
+		"package/package.json": `{
+  "name": "test-package",
+  "version": "1.0.0"
+}`,
+	})
+	if err := runNpmCmd(t, "test-registry", path, "--pkg-url", srv.URL); err != nil {
+		t.Fatalf("unexpected error with custom pkg-url: %v", err)
 	}
 }

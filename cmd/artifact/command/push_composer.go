@@ -11,9 +11,7 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util"
-	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	p "github.com/harness/harness-cli/util/common/progress"
 
@@ -80,13 +78,6 @@ func NewPushComposerCmd(c *cmdutils.Factory) *cobra.Command {
 				return fmt.Errorf("failed to compute checksums for %s: %w", filePath, err)
 			}
 
-			// Initialize the package client
-			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-				auth.GetAuthOptionARPKG())
-			if err != nil {
-				return fmt.Errorf("failed to create package client: %w", err)
-			}
-
 			// Upload package
 			progress.Step("Uploading package to registry")
 
@@ -97,17 +88,14 @@ func NewPushComposerCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 			defer file.Close()
 
-			// Initialize progress reader
-			bufferSize := int64(fileInfo.Size())
-			reader, closer := p.Reader(bufferSize, file, "composer")
-			defer closer()
+			pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), "composer")
 
 			resp, err := pkgClient.UploadComposerPackageWithBodyWithResponse(
 				context.Background(),
 				config.Global.AccountID,
 				registryName,
 				"application/octet-stream",
-				reader,
+				file,
 				func(ctx context.Context, req *http.Request) error {
 					utils.SetChecksumHeaders(req.Header, checksums)
 					return nil

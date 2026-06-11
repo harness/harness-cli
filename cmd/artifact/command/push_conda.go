@@ -14,9 +14,7 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util"
-	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	p "github.com/harness/harness-cli/util/common/progress"
 
@@ -87,16 +85,8 @@ func NewPushCondaCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Success("Input parameters validated")
 
-			// Initialize the package client
-			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-				auth.GetAuthOptionARPKG())
-			if err != nil {
-				return fmt.Errorf("failed to create package client: %w", err)
-			}
-
 			// Upload package
 			progress.Step("Uploading package to registry")
-			// upload file from filepath to registry using pkgClient.UploadCondaPackageWithBodyWithResponse
 
 			file, err := os.Open(filePath)
 			if err != nil {
@@ -104,11 +94,6 @@ func NewPushCondaCmd(c *cmdutils.Factory) *cobra.Command {
 				return err
 			}
 			defer file.Close()
-
-			// Initialize progress reader
-			bufferSize := int64(fileInfo.Size())
-			reader, closer := p.Reader(bufferSize, file, "conda")
-			defer closer()
 
 			// Initialize customHeaders if nil
 			if customHeaders == nil {
@@ -130,12 +115,15 @@ func NewPushCondaCmd(c *cmdutils.Factory) *cobra.Command {
 				return nil
 			}
 
+			// Initialize the package client with retry and progress support
+			pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), "conda")
+
 			resp, err := pkgClient.UploadCondaPackageWithBodyWithResponse(
 				context.Background(),
 				config.Global.AccountID,
 				registryName,
 				"application/octet-stream",
-				reader,
+				file,
 				customHeaderEditor,
 			)
 

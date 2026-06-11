@@ -9,7 +9,6 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
-	"github.com/harness/harness-cli/util/common/auth"
 )
 
 // Generic Package Upload Job
@@ -22,10 +21,11 @@ type GenericUploadJob struct {
 	// will appear in the URL. Forward slashes only.
 	DestPath  string
 	Checksums utils.FileChecksums
+	PkgClient *pkgclient.ClientWithResponses
 }
 
 // NewGenericUploadJob creates a new generic upload job
-func NewGenericUploadJob(id, filePath, destPath, registry, packageName, version string, fileSize int64, checksums utils.FileChecksums) *GenericUploadJob {
+func NewGenericUploadJob(id, filePath, destPath, registry, packageName, version string, fileSize int64, checksums utils.FileChecksums, pkgClient *pkgclient.ClientWithResponses) *GenericUploadJob {
 	return &GenericUploadJob{
 		BaseFileUploadJob: BaseFileUploadJob{
 			ID:       id,
@@ -37,25 +37,20 @@ func NewGenericUploadJob(id, filePath, destPath, registry, packageName, version 
 		Version:      version,
 		DestPath:     destPath,
 		Checksums:    checksums,
+		PkgClient:    pkgClient,
 	}
 }
 
 // Upload performs the PUT once. Any transient-failure handling is the
 // HTTP client layer's responsibility (see comment on GenericUploadJob).
 func (j *GenericUploadJob) Upload(ctx context.Context) error {
-	pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-		auth.GetAuthOptionARPKG())
-	if err != nil {
-		return fmt.Errorf("failed to create package client: %w", err)
-	}
-
 	file, err := os.Open(j.FilePath)
 	if err != nil {
 		return fmt.Errorf("failed to open file %s: %w", j.FilePath, err)
 	}
 	defer file.Close()
 
-	resp, err := pkgClient.UploadGenericFileToPathWithBodyWithResponse(
+	resp, err := j.PkgClient.UploadGenericFileToPathWithBodyWithResponse(
 		ctx,
 		config.Global.AccountID,
 		j.RegistryName,

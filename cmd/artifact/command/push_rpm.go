@@ -13,9 +13,7 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util"
-	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/errors"
 	"github.com/harness/harness-cli/util/common/fileutil"
 	p "github.com/harness/harness-cli/util/common/progress"
@@ -93,12 +91,7 @@ func NewPushRpmCmd(c *cmdutils.Factory) *cobra.Command {
 				return fmt.Errorf("failed to compute checksums for %s: %w", filePath, err)
 			}
 
-			// Initialize the package client
-			pkgClient, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-				auth.GetAuthOptionARPKG())
-			if err != nil {
-				return fmt.Errorf("failed to create package client: %w", err)
-			}
+			// Initialize the package client with retry support
 
 			file, err := os.Open(filePath)
 			if err != nil {
@@ -123,19 +116,18 @@ func NewPushRpmCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 
 			fileWriter.Close()
-
-			// Initialize progress reader
-			progress.Step("Uploading package to registry")
 			bufferSize := int64(formData.Len())
-			reader, closer := p.Reader(bufferSize, &formData, "rpm")
-			defer closer()
+			pkgClient := c.PkgHttpClientWithProgress(progress, bufferSize, "rpm")
+
+			// Upload package
+			progress.Step("Uploading package to registry")
 
 			resp, err := pkgClient.UploadRpmPackageWithBodyWithResponse(
 				context.Background(),
 				config.Global.AccountID,
 				registryName,
 				fileWriter.FormDataContentType(),
-				reader,
+				&formData,
 				func(ctx context.Context, req *http.Request) error {
 					utils.SetChecksumHeaders(req.Header, checksums)
 					return nil

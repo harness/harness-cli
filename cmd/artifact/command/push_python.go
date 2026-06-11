@@ -88,6 +88,8 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Success("Input parameters validated")
 
+			pkgClient := c.PkgHttpClient()
+
 			progress.Step("Preparing python upload jobs")
 			jobs := make([]upload.FileUploadJob, 0, len(pythonPkgFiles))
 			for _, fileNameWithPath := range pythonPkgFiles {
@@ -115,6 +117,7 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 					metadata.Version,
 					fileInfo.Size(),
 					checksums,
+					pkgClient,
 				)
 				jobs = append(jobs, job)
 			}
