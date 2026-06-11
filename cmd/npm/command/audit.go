@@ -232,6 +232,11 @@ func detectNpmRegistry() (*registryInfo, error) {
 		}, nil
 
 	}
+
+	if err != nil {
+		return nil, fmt.Errorf("no HAR registry found. Run 'hc registry configure npm' first,: %w", err)
+	}
+
 	return nil, fmt.Errorf("no HAR registry found. Run 'hc registry configure npm' first")
 }
 

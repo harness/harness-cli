@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
@@ -1136,6 +1137,297 @@ func TestUpdatePackageJsonWithFixes_NonexistentFile(t *testing.T) {
 	}, prog)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to read package.json")
+}
+
+// ===== runNpmAudit integration tests: lines 102-222 =====
+
+const (
+	runAuditTestRegistryUUID = "550e8400-e29b-41d4-a716-446655440000"
+	runAuditPkgJSON          = `{"name":"test-app","version":"1.0.0","dependencies":{"lodash":"^4.17.15"}}`
+	runAuditEmptyPkgJSON     = `{"name":"test-app","version":"1.0.0"}`
+	runAuditMinorFixDetails  = `{"data":{"id":"00000000-0000-0000-0000-000000000001","packageName":"lodash","packageType":"NPM","registryName":"test","scanStatus":"BLOCKED","version":"4.17.15","policySetFailureDetails":[{"policyFailureDetails":[{"category":"Security","policyName":"s","policyRef":"s"}],"policySetName":"ps","policySetRef":"psr"}],"fixVersionDetails":{"currentVersion":"4.17.15","fixVersion":"4.17.21","fixVersionAvailable":true}}}`
+	runAuditMajorFixDetails  = `{"data":{"id":"00000000-0000-0000-0000-000000000001","packageName":"lodash","packageType":"NPM","registryName":"test","scanStatus":"BLOCKED","version":"4.17.15","policySetFailureDetails":[{"policyFailureDetails":[{"category":"Security","policyName":"s","policyRef":"s"}],"policySetName":"ps","policySetRef":"psr"}],"fixVersionDetails":{"currentVersion":"4.17.15","fixVersion":"5.0.0","fixVersionAvailable":true}}}`
+)
+
+// writeRunAuditNpmConfig writes npm-config.json to homeDir/.harness/
+func writeRunAuditNpmConfig(t *testing.T, homeDir, registryID, orgID, projectID string) {
+	t.Helper()
+	configDir := filepath.Join(homeDir, ".harness")
+	os.MkdirAll(configDir, 0755)
+	cfg := fmt.Sprintf(`{"registryIdentifier":%q,"registryUrl":"https://example.com","orgId":%q,"projectId":%q,"npmrcPath":""}`,
+		registryID, orgID, projectID)
+	os.WriteFile(filepath.Join(configDir, "npm-config.json"), []byte(cfg), 0600)
+}
+
+// newARV3AuditServer creates an httptest.Server that routes:
+//
+//	POST /scans/bulk-evaluate       → 202 (InitiateBulkScanEvaluation)
+//	GET  /scans/bulk-evaluate/{id}  → 200 SUCCESS with scanStatus (GetBulkScanEvaluationStatus)
+//	GET  /scans/{id}/details        → 200 with detailsBody (GetArtifactScanDetails)
+func newARV3AuditServer(scanStatus, detailsBody string) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		path := r.URL.Path
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(path, "/bulk-evaluate"):
+			w.WriteHeader(202)
+			fmt.Fprint(w, `{"data":{"evaluationId":"eval-audit-test"}}`)
+		case r.Method == http.MethodGet && strings.Contains(path, "/bulk-evaluate/"):
+			w.WriteHeader(200)
+			fmt.Fprintf(w,
+				`{"data":{"status":"SUCCESS","scans":[{"packageName":"lodash","version":"4.17.15","scanId":"00000000-0000-0000-0000-000000000001","scanStatus":%q}]}}`,
+				scanStatus)
+		case r.Method == http.MethodGet && strings.HasSuffix(path, "/details"):
+			if detailsBody != "" {
+				w.WriteHeader(200)
+				fmt.Fprint(w, detailsBody)
+			} else {
+				w.WriteHeader(404)
+				fmt.Fprint(w, `{"message":"not found"}`)
+			}
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+}
+
+// buildRunAuditFactory creates a *cmdutils.Factory wired to the given test servers.
+func buildRunAuditFactory(t *testing.T, arSrvURL, arV3SrvURL string) *cmdutils.Factory {
+	t.Helper()
+	arClient, err := ar.NewClientWithResponses(arSrvURL)
+	require.NoError(t, err)
+	arV3Client, err := ar_v3.NewClientWithResponses(arV3SrvURL)
+	require.NoError(t, err)
+	return &cmdutils.Factory{
+		RegistryHttpClient:   func() *ar.ClientWithResponses { return arClient },
+		RegistryV3HttpClient: func() *ar_v3.ClientWithResponses { return arV3Client },
+	}
+}
+
+// createRunAuditPkgFile writes content to <dir>/package.json and returns the path.
+func createRunAuditPkgFile(t *testing.T, dir, content string) string {
+	t.Helper()
+	os.MkdirAll(dir, 0755)
+	path := filepath.Join(dir, "package.json")
+	require.NoError(t, os.WriteFile(path, []byte(content), 0644))
+	return path
+}
+
+// TestRunNpmAudit_NoRegistryConfig — lines 110-114: detectNpmRegistry fails (no config file)
+func TestRunNpmAudit_NoRegistryConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir) // no npm-config.json written
+
+	err := runNpmAudit(&cmdutils.Factory{}, "/any/path/package.json", false)
+	assert.Error(t, err)
+}
+
+// TestRunNpmAudit_EmptyOrgProject — lines 121-124: config present but org+project are empty
+func TestRunNpmAudit_EmptyOrgProject(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	writeRunAuditNpmConfig(t, tmpDir, "test-registry", "", "")
+
+	err := runNpmAudit(&cmdutils.Factory{}, "/any/path/package.json", false)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "organization and project identifiers are required")
+}
+
+// TestRunNpmAudit_OrgPresentProjectEmpty — lines 121-124: org set but project empty
+func TestRunNpmAudit_OrgPresentProjectEmpty(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	writeRunAuditNpmConfig(t, tmpDir, "test-registry", "my-org", "")
+
+	err := runNpmAudit(&cmdutils.Factory{}, "/any/path/package.json", false)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "organization and project identifiers are required")
+}
+
+// TestRunNpmAudit_RegistryUUIDFail — lines 128-131: resolveRegistryUUID returns error (404)
+func TestRunNpmAudit_RegistryUUIDFail(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	writeRunAuditNpmConfig(t, tmpDir, "test-registry", "my-org", "my-project")
+
+	arSrv := newMockRegistryServer(404, "")
+	defer arSrv.Close()
+	arClient, err := ar.NewClientWithResponses(arSrv.URL)
+	require.NoError(t, err)
+	f := &cmdutils.Factory{
+		RegistryHttpClient: func() *ar.ClientWithResponses { return arClient },
+	}
+
+	err = runNpmAudit(f, "/any/path/package.json", false)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "test-registry")
+}
+
+// TestRunNpmAudit_ParseLockFileFail — lines 136-140: package.json path does not exist
+func TestRunNpmAudit_ParseLockFileFail(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	writeRunAuditNpmConfig(t, tmpDir, "test-registry", "my-org", "my-project")
+
+	arSrv := newMockRegistryServer(200, runAuditTestRegistryUUID)
+	defer arSrv.Close()
+	arClient, err := ar.NewClientWithResponses(arSrv.URL)
+	require.NoError(t, err)
+	f := &cmdutils.Factory{
+		RegistryHttpClient: func() *ar.ClientWithResponses { return arClient },
+	}
+
+	err = runNpmAudit(f, filepath.Join(tmpDir, "missing", "package.json"), false)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to parse package.json")
+}
+
+// TestRunNpmAudit_NoDependencies — lines 142-145: package.json has no dependencies → returns nil early
+func TestRunNpmAudit_NoDependencies(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	writeRunAuditNpmConfig(t, tmpDir, "test-registry", "my-org", "my-project")
+
+	pkgPath := createRunAuditPkgFile(t, filepath.Join(tmpDir, "app"), runAuditEmptyPkgJSON)
+
+	arSrv := newMockRegistryServer(200, runAuditTestRegistryUUID)
+	defer arSrv.Close()
+	arClient, err := ar.NewClientWithResponses(arSrv.URL)
+	require.NoError(t, err)
+	f := &cmdutils.Factory{
+		RegistryHttpClient: func() *ar.ClientWithResponses { return arClient },
+	}
+
+	err = runNpmAudit(f, pkgPath, false)
+	assert.NoError(t, err)
+}
+
+// TestRunNpmAudit_AllAllowed_FixFalse — lines 157-167: batch succeeds, all ALLOWED, fix=false
+func TestRunNpmAudit_AllAllowed_FixFalse(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	writeRunAuditNpmConfig(t, tmpDir, "test-registry", "my-org", "my-project")
+
+	pkgPath := createRunAuditPkgFile(t, filepath.Join(tmpDir, "app"), runAuditPkgJSON)
+
+	arSrv := newMockRegistryServer(200, runAuditTestRegistryUUID)
+	defer arSrv.Close()
+	arV3Srv := newARV3AuditServer("ALLOWED", "")
+	defer arV3Srv.Close()
+	f := buildRunAuditFactory(t, arSrv.URL, arV3Srv.URL)
+
+	err := runNpmAudit(f, pkgPath, false)
+	assert.NoError(t, err)
+}
+
+// TestRunNpmAudit_BlockedPackages_FixFalse — lines 157-167: BLOCKED pkgs but fix=false → no action
+func TestRunNpmAudit_BlockedPackages_FixFalse(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	writeRunAuditNpmConfig(t, tmpDir, "test-registry", "my-org", "my-project")
+
+	pkgPath := createRunAuditPkgFile(t, filepath.Join(tmpDir, "app"), runAuditPkgJSON)
+
+	arSrv := newMockRegistryServer(200, runAuditTestRegistryUUID)
+	defer arSrv.Close()
+	arV3Srv := newARV3AuditServer("BLOCKED", "")
+	defer arV3Srv.Close()
+	f := buildRunAuditFactory(t, arSrv.URL, arV3Srv.URL)
+
+	err := runNpmAudit(f, pkgPath, false)
+	assert.NoError(t, err)
+}
+
+// TestRunNpmAudit_FixTrue_NoVulnerable — lines 217-220: fix=true but all ALLOWED → "Nothing to fix!"
+func TestRunNpmAudit_FixTrue_NoVulnerable(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	writeRunAuditNpmConfig(t, tmpDir, "test-registry", "my-org", "my-project")
+
+	pkgPath := createRunAuditPkgFile(t, filepath.Join(tmpDir, "app"), runAuditPkgJSON)
+
+	arSrv := newMockRegistryServer(200, runAuditTestRegistryUUID)
+	defer arSrv.Close()
+	arV3Srv := newARV3AuditServer("ALLOWED", "")
+	defer arV3Srv.Close()
+	f := buildRunAuditFactory(t, arSrv.URL, arV3Srv.URL)
+
+	err := runNpmAudit(f, pkgPath, true)
+	assert.NoError(t, err)
+}
+
+// TestRunNpmAudit_FixTrue_WithAutoFix — lines 169-207: fix=true, BLOCKED with minor fix → backup+update
+func TestRunNpmAudit_FixTrue_WithAutoFix(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	writeRunAuditNpmConfig(t, tmpDir, "test-registry", "my-org", "my-project")
+
+	pkgPath := createRunAuditPkgFile(t, filepath.Join(tmpDir, "app"), runAuditPkgJSON)
+
+	arSrv := newMockRegistryServer(200, runAuditTestRegistryUUID)
+	defer arSrv.Close()
+	arV3Srv := newARV3AuditServer("BLOCKED", runAuditMinorFixDetails)
+	defer arV3Srv.Close()
+	f := buildRunAuditFactory(t, arSrv.URL, arV3Srv.URL)
+
+	err := runNpmAudit(f, pkgPath, true)
+	assert.NoError(t, err)
+
+	// Backup file must exist
+	_, statErr := os.Stat(pkgPath + ".backup")
+	assert.NoError(t, statErr, "backup file should have been created")
+
+	// package.json must contain the fix version
+	updated, _ := os.ReadFile(pkgPath)
+	assert.Contains(t, string(updated), "4.17.21")
+}
+
+// TestRunNpmAudit_FixTrue_WithManualFix — lines 209-215: fix=true, BLOCKED with major fix → manual message, no backup
+func TestRunNpmAudit_FixTrue_WithManualFix(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	writeRunAuditNpmConfig(t, tmpDir, "test-registry", "my-org", "my-project")
+
+	pkgPath := createRunAuditPkgFile(t, filepath.Join(tmpDir, "app"), runAuditPkgJSON)
+
+	arSrv := newMockRegistryServer(200, runAuditTestRegistryUUID)
+	defer arSrv.Close()
+	arV3Srv := newARV3AuditServer("BLOCKED", runAuditMajorFixDetails)
+	defer arV3Srv.Close()
+	f := buildRunAuditFactory(t, arSrv.URL, arV3Srv.URL)
+
+	err := runNpmAudit(f, pkgPath, true)
+	assert.NoError(t, err)
+
+	// No backup created for major-version-only changes
+	_, statErr := os.Stat(pkgPath + ".backup")
+	assert.True(t, os.IsNotExist(statErr), "no backup should be created for major fixes")
+}
+
+// TestRunNpmAudit_FixTrue_BackupFail — lines 193-196: backup write fails (read-only directory)
+func TestRunNpmAudit_FixTrue_BackupFail(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("Skipping read-only dir test when running as root")
+	}
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	writeRunAuditNpmConfig(t, tmpDir, "test-registry", "my-org", "my-project")
+
+	pkgDir := filepath.Join(tmpDir, "app")
+	pkgPath := createRunAuditPkgFile(t, pkgDir, runAuditPkgJSON)
+
+	arSrv := newMockRegistryServer(200, runAuditTestRegistryUUID)
+	defer arSrv.Close()
+	arV3Srv := newARV3AuditServer("BLOCKED", runAuditMinorFixDetails)
+	defer arV3Srv.Close()
+	f := buildRunAuditFactory(t, arSrv.URL, arV3Srv.URL)
+
+	// Make directory read-only so the backup write is rejected by the OS
+	require.NoError(t, os.Chmod(pkgDir, 0555))
+	defer os.Chmod(pkgDir, 0755)
+
+	err := runNpmAudit(f, pkgPath, true)
+	assert.Error(t, err)
 }
 
 func TestUpdatePackageJsonWithFixesEdgeCases(t *testing.T) {
