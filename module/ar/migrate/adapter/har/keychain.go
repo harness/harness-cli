@@ -27,12 +27,16 @@ func (g harKeychain) Resolve(r authn.Resource) (authn.Authenticator, error) {
 		return authn.Anonymous, nil
 	}
 
-	if g.username == "" || g.password == "" {
+	if g.password == "" {
 		return authn.Anonymous, nil
 	}
 
 	if strings.EqualFold(serverURL.Hostname(), g.hostname) {
-		return harAuthenticator{g.username, g.password}, nil
+		username := g.username
+		if username == "" {
+			username = "x-token"
+		}
+		return harAuthenticator{username, g.password}, nil
 	}
 	return authn.Anonymous, nil
 }
