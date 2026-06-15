@@ -243,6 +243,8 @@ func extractScanResults(statusResp *ar_v3.GetBulkScanEvaluationStatusResp, batch
 		}
 		if scan.ScanStatus != nil {
 			result.ScanStatus = string(*scan.ScanStatus)
+		} else {
+			result.ScanStatus = "ALLOWED"
 		}
 		results = append(results, result)
 	}
@@ -305,16 +307,20 @@ func displayResults(results []ScanResult, p *progress.ConsoleReporter) error {
 	p.Success(fmt.Sprintf("Scan Results for %d dependencies:", len(results)))
 
 	var blockedCount, warnCount, allowedCount, unknownCount int
-	for _, r := range results {
-		switch r.ScanStatus {
+	for i := range results {
+		switch results[i].ScanStatus {
 		case "BLOCKED":
 			blockedCount++
 		case "WARN":
 			warnCount++
-		case "ALLOWED":
+		case "ALLOWED", "":
 			allowedCount++
+			results[i].ScanStatus = "ALLOWED"
 		case "UNKNOWN":
 			unknownCount++
+		default:
+			allowedCount++
+			results[i].ScanStatus = "ALLOWED"
 		}
 	}
 
