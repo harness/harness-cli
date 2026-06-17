@@ -82,5 +82,12 @@
     "url": "http://localhost:8081/artifactory/debian-local",
     "description": "Mock Debian Local Repository",
     "packageType": "debian"
+  },
+  "puppet-local": {
+    "key": "puppet-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/puppet-local",
+    "description": "Mock Puppet Local Repository",
+    "packageType": "puppet"
   }
 }

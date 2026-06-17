@@ -487,6 +487,37 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			Size:     -1,
 		})
 		return packages, nil
+	} else if artifactType == types.PUPPET {
+		// Puppet modules in JFrog follow the Forge layout
+		// <repo>/<author>/<module>/<author>-<module>-<version>.tar.gz, but
+		// we don't depend on the directory structure: any .tar.gz whose
+		// filename matches "<author>-<module>-<version>" is a candidate.
+		files, err := tree.GetAllFiles(root)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+
+		pkgMap := make(map[string]bool)
+		for _, file := range files {
+			if file.Folder {
+				continue
+			}
+			pkgName, _, ok := util.ParsePuppetFileNameWithPath(file.Uri)
+			if !ok {
+				continue
+			}
+			pkgMap[pkgName] = true
+		}
+
+		for pkgName := range pkgMap {
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     "/",
+				Name:     pkgName,
+				Size:     -1,
+			})
+		}
+		log.Info().Msgf("Found %d PUPPET packages", len(packages))
 	} else {
 		return []types.Package{}, errors.New("unknown artifact type")
 	}
@@ -1034,6 +1065,37 @@ func (a *adapter) GetVersions(
 			Name:     p.Version,
 			Size:     p.Size,
 		})
+		return versions, nil
+	}
+	if artifactType == types.PUPPET {
+		files, err := tree.GetAllFiles(node)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+
+		versionMap := make(map[string]bool)
+		for _, file := range files {
+			if file.Folder {
+				continue
+			}
+			pkgName, version, ok := util.ParsePuppetFileNameWithPath(file.Uri)
+			if !ok || pkgName != pkg {
+				continue
+			}
+			versionMap[version] = true
+		}
+
+		var versions []types.Version
+		for version := range versionMap {
+			versions = append(versions, types.Version{
+				Registry: registry,
+				Pkg:      pkg,
+				Path:     "/",
+				Name:     version,
+				Size:     -1,
+			})
+		}
+		log.Info().Msgf("Found %d versions for PUPPET package %s", len(versions), pkg)
 		return versions, nil
 	}
 	return []types.Version{}, errors.New("unknown artifact type")

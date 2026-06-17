@@ -690,6 +690,55 @@ func (c *client) uploadDartFile(
 	return nil
 }
 
+// uploadPuppetFile streams a Puppet module .tar.gz tarball to HAR via the
+// puppet upload endpoint. The server re-parses the tarball's metadata.json,
+// so the client only needs to forward the bytes as a multipart "file" field.
+func (c *client) uploadPuppetFile(
+	registry string,
+	f *types.File,
+	file io.ReadCloser,
+) error {
+	base := strings.TrimRight(c.url, "/")
+	url := fmt.Sprintf("%s/pkg/%s/%s/puppet/upload", base, config.Global.AccountID, registry)
+
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
+
+	go func() {
+		defer pw.Close()
+		defer writer.Close()
+
+		part, err := writer.CreateFormFile("file", f.Name)
+		if err != nil {
+			pw.CloseWithError(fmt.Errorf("failed to create form file: %w", err))
+			return
+		}
+		if _, err := io.Copy(part, file); err != nil {
+			pw.CloseWithError(fmt.Errorf("failed to write file to form: %w", err))
+			return
+		}
+	}()
+
+	req, err := http2.NewRequest(http2.MethodPut, url, pr)
+	if err != nil {
+		return fmt.Errorf("failed to create Puppet upload request: %w", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to upload Puppet module '%s': %w", f.Name, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to upload Puppet module '%s', status code: %d, response: %s",
+			f.Name, resp.StatusCode, string(body))
+	}
+	return nil
+}
+
 func (c *client) uploadPythonFile(
 	registry string,
 	name string,

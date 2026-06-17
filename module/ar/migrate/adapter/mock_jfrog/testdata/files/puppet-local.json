@@ -1,0 +1,29 @@
+[
+  {
+    "Registry": "puppet-local",
+    "Name": "puppetlabs-stdlib-9.4.1.tar.gz",
+    "Uri": "/puppetlabs/stdlib/puppetlabs-stdlib-9.4.1.tar.gz",
+    "Folder": false,
+    "Size": 1024,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80730"
+  },
+  {
+    "Registry": "puppet-local",
+    "Name": "puppetlabs-stdlib-9.5.0.tar.gz",
+    "Uri": "/puppetlabs/stdlib/puppetlabs-stdlib-9.5.0.tar.gz",
+    "Folder": false,
+    "Size": 1100,
+    "LastModified": "2023-02-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80731"
+  },
+  {
+    "Registry": "puppet-local",
+    "Name": "puppetlabs-apache-12.3.0.tar.gz",
+    "Uri": "/puppetlabs/apache/puppetlabs-apache-12.3.0.tar.gz",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-03-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80732"
+  }
+]

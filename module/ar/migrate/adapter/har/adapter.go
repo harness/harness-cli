@@ -136,6 +136,8 @@ func (a *adapter) UploadFile(
 		err = a.client.uploadSwiftFile(registry, f.Name, file, artifactName, version)
 	} else if artifactType == types.DART {
 		err = a.client.uploadDartFile(registry, artifactName, version, f, file)
+	} else if artifactType == types.PUPPET {
+		err = a.client.uploadPuppetFile(registry, f, file)
 	} else if artifactType == types.RAW {
 		err = a.client.uploadRawFile(registry, f, file)
 	}

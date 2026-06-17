@@ -231,6 +231,16 @@ func (c *mockClient) loadBinaryContent() {
 	}
 	c.binaryContent["nuget-local/foo/company.grpc.pkg/2.0.0/company.grpc.pkg.2.0.0.snupkg"] =
 		createNugetPackageNupkg("company.grpc.pkg", "2.0.0")
+
+	puppetPkgs := []struct{ author, module, version string }{
+		{"puppetlabs", "stdlib", "9.4.1"},
+		{"puppetlabs", "stdlib", "9.5.0"},
+		{"puppetlabs", "apache", "12.3.0"},
+	}
+	for _, p := range puppetPkgs {
+		key := fmt.Sprintf("puppet-local/%s/%s/%s-%s-%s.tar.gz", p.author, p.module, p.author, p.module, p.version)
+		c.binaryContent[key] = createPuppetPackageTarGz(p.author, p.module, p.version)
+	}
 }
 
 func (c *mockClient) GetRegistries() ([]jfrog.JFrogRepository, error) {
@@ -370,6 +380,48 @@ func createNugetPackageNupkg(id, version string) []byte {
 	f.Write([]byte(nuspec))
 
 	w.Close()
+	return buf.Bytes()
+}
+
+// createPuppetPackageTarGz creates a minimal valid Puppet module .tar.gz
+// containing a metadata.json at the expected "<author>-<module>/metadata.json"
+// path. AR's puppet upload handler reads metadata.json from this depth.
+func createPuppetPackageTarGz(author, module, version string) []byte {
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	tarWriter := tar.NewWriter(gzWriter)
+
+	moduleDir := fmt.Sprintf("%s-%s", author, module)
+	metadata := fmt.Sprintf(`{
+  "name": "%s-%s",
+  "version": "%s",
+  "author": "%s",
+  "summary": "Mock Puppet module for migration testing",
+  "license": "Apache-2.0",
+  "source": "https://example.com/%s/%s",
+  "dependencies": []
+}`, author, module, version, author, author, module)
+
+	files := []struct {
+		name    string
+		content string
+	}{
+		{moduleDir + "/metadata.json", metadata},
+	}
+
+	for _, file := range files {
+		hdr := &tar.Header{
+			Name: file.name,
+			Mode: 0644,
+			Size: int64(len(file.content)),
+		}
+		tarWriter.WriteHeader(hdr)
+		tarWriter.Write([]byte(file.content))
+	}
+
+	tarWriter.Close()
+	gzWriter.Close()
+
 	return buf.Bytes()
 }
 

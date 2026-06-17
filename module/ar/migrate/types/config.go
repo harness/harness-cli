@@ -35,6 +35,7 @@ var (
 	DART        ArtifactType = "DART"
 	RAW         ArtifactType = "RAW"
 	SWIFT       ArtifactType = "SWIFT"
+	PUPPET      ArtifactType = "PUPPET"
 )
 
 // Config represents the top-level configuration structure

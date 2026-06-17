@@ -182,6 +182,11 @@ Files:
 		{"debian-local/pool/main/a/apache2/apache2_2.4.52-1.dsc", debSourceDsc("apache2", "2.4.52-1")},
 		{"debian-local/pool/main/a/apache2/apache2_2.4.52.orig.tar.gz", debSourceTarGz("apache2", "2.4.52")},
 		{"debian-local/pool/main/a/apache2/apache2_2.4.52-1.debian.tar.gz", debSourceTarGz("apache2", "2.4.52-1")},
+
+		// Puppet modules
+		{"puppet-local/puppetlabs/stdlib/puppetlabs-stdlib-9.4.1.tar.gz", puppetTarGz("puppetlabs", "stdlib", "9.4.1")},
+		{"puppet-local/puppetlabs/stdlib/puppetlabs-stdlib-9.5.0.tar.gz", puppetTarGz("puppetlabs", "stdlib", "9.5.0")},
+		{"puppet-local/puppetlabs/apache/puppetlabs-apache-12.3.0.tar.gz", puppetTarGz("puppetlabs", "apache", "12.3.0")},
 	}
 
 	for _, e := range entries {
@@ -219,6 +224,32 @@ func dartTarGz(name, version string) []byte {
 
 	pubspec := fmt.Sprintf("name: %s\nversion: %s\n", name, version)
 	writetar(tw, "pubspec.yaml", pubspec)
+
+	tw.Close()
+	gw.Close()
+	return buf.Bytes()
+}
+
+// puppetTarGz creates a minimal valid Puppet module .tar.gz containing a
+// metadata.json at "<author>-<module>/metadata.json", which is what AR's
+// upload handler reads (depth 1).
+func puppetTarGz(author, module, version string) []byte {
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gw)
+
+	moduleDir := fmt.Sprintf("%s-%s", author, module)
+	metadata := fmt.Sprintf(`{
+  "name": "%s-%s",
+  "version": "%s",
+  "author": "%s",
+  "summary": "Mock Puppet module for migration testing",
+  "license": "Apache-2.0",
+  "source": "https://example.com/%s/%s",
+  "dependencies": []
+}`, author, module, version, author, author, module)
+
+	writetar(tw, moduleDir+"/metadata.json", metadata)
 
 	tw.Close()
 	gw.Close()
