@@ -239,24 +239,21 @@ func (c *client) uploadNugetFile(
 	return nil
 }
 
-// nugetSubDir extracts the subdirectory prefix from a NuGet file URI.
-// JFrog stores NuGet packages as: /{subdir}/{packageId}/{version}/{filename}
-// The last 3 segments are always packageId/version/filename.
-// Returns the subdirectory with a trailing slash, or empty string if none.
+// nugetSubDir extracts the directory prefix from a NuGet file URI.
+// Returns everything except the filename (last segment), with a trailing slash,
+// or empty string if the file is at the root.
 //
 // Examples:
 //
-//	"foo/company.grpc.pkg/1.0.0/company.grpc.pkg.1.0.0.nupkg" → "foo/"
-//	"a/b/pkg/1.0.0/pkg.1.0.0.nupkg"                           → "a/b/"
-//	"company.grpc.pkg/1.0.0/company.grpc.pkg.1.0.0.nupkg"     → ""
+//	"a/b/c/d/proto-bindings.0.8.662.nupkg" → "a/b/c/d/"
+//	"foo/company.grpc.pkg.1.0.0.nupkg"     → "foo/"
+//	"company.grpc.pkg.1.0.0.nupkg"         → ""
 func nugetSubDir(fileUri string) string {
 	parts := strings.Split(strings.TrimPrefix(fileUri, "/"), "/")
-	// Need at least 4 segments for there to be a subdirectory
-	// (subdir + packageId + version + filename)
-	if len(parts) <= 3 {
+	if len(parts) <= 1 {
 		return ""
 	}
-	return strings.Join(parts[:len(parts)-3], "/") + "/"
+	return strings.Join(parts[:len(parts)-1], "/") + "/"
 }
 
 func (c *client) uploadNPMFile(
