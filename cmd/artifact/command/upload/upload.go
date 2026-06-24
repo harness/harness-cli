@@ -1,4 +1,4 @@
-package command
+package upload
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
+	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/inhies/go-bytesize"
 	"github.com/spf13/cobra"
@@ -49,36 +50,54 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			srcPattern := args[0]
 			target := args[1]
-
+			progress := p.NewConsoleReporter()
 			ctx := cmd.Context()
 			if ctx == nil {
 				ctx = context.Background()
 			}
 
+			/*
+				We can create uploader here using some factory logic ,
+				For any other pkg type whose artifact type is clearly identified by extension
+				then they can be pushed to there resepectivr registry based on there interface implementtion logic
+				currently it is default for generic registry
+			*/
 			var uploader Pusher = &GenericUploader{
 				SrcPattern: srcPattern,
 				Version:    packageVersion,
 				PkgClient:  c.PkgHttpClient(),
 			}
 
+			progress.Start("Validating input parameters")
 			registryName, err := uploader.GetRegistryAndPath(target)
 			if err != nil {
+				progress.Error("Failed to validate input parameter")
 				return err
 			}
 
 			fmt.Printf("Scanning pattern %q ...\n", srcPattern)
+			progress.Step("Collecting files to be uploaded")
 			jobs, stats, err := uploader.GetFiles()
 			if err != nil {
 				return err
 			}
 			if len(jobs) == 0 {
+				progress.Error("no files matched the given pattern")
 				return errors.New("no files matched the given pattern")
 			}
 
-			fmt.Printf("Found %d file(s) (%s) to upload to registry %q\n",
-				stats.FileCount, bytesize.New(float64(stats.TotalBytes)), registryName)
+			progress.Step(fmt.Sprintf("Found %d file(s) (%s) to upload to registry %q\n",
+				stats.FileCount, bytesize.New(float64(stats.TotalBytes)), registryName))
 
-			return uploader.PushFiles(ctx, jobs)
+			progress.Step("Executing upload step")
+			err = uploader.PushFiles(ctx, jobs)
+			if err != nil {
+				progress.Error("failed during PushFiles operation")
+				return err
+			}
+
+			progress.Success("Execution complete")
+			return nil
 		},
 	}
 

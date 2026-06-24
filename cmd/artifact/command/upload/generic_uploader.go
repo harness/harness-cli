@@ -1,4 +1,4 @@
-package command
+package upload
 
 import (
 	"context"
@@ -20,17 +20,7 @@ import (
 //     (*)        – like * but captures the matched segment as a numbered group {1}, {2}, …
 //     (**)       – like ** but captures the matched remainder as a numbered group
 //     ?          – matches exactly one character
-//
-// The DestTemplate may contain back-references {1}, {2}, … to captured groups.
-// The final destination path is always: <DestTemplate>/<Version>/<basename>,
-// satisfying Harness generic registry's required package/version/file structure.
-//
-// Example:
-//
-//	SrcPattern   = "dist/(*)/*.zip"
-//	DestTemplate = "releases/{1}"
-//	Version      = "2.0.0"
-//	→  dist/linux/app.zip  →  releases/linux/2.0.0/app.zip
+
 type GenericUploader struct {
 	SrcPattern   string
 	DestTemplate string // package path within the registry; may contain {N} placeholders
@@ -80,11 +70,10 @@ func (u *GenericUploader) GetFiles() ([]upload.FileUploadJob, UploadStats, error
 	}
 
 	//Compile the relative pattern into a regexp with capture groups
-	re, groupCount, err := compileWildcardPattern(relPattern)
+	re, _, err := compileWildcardPattern(relPattern)
 	if err != nil {
 		return nil, stats, fmt.Errorf("invalid pattern %q: %w", u.SrcPattern, err)
 	}
-	_ = groupCount // informational; actual count is re.NumSubexp()
 
 	// Walk the root and collect matching files
 	var jobs []upload.FileUploadJob
@@ -277,14 +266,10 @@ func compileWildcardPattern(pattern string) (*regexp.Regexp, int, error) {
 // resolveDestPath computes the final destination path for one matched file.
 //
 // The Harness generic registry requires paths of the form package/version/file.
-// resolveDestPath mirrors what push_generic.go does with:
-//
-//		fmt.Sprintf("%s/%s/%s", packageName, version, relName)
-//
-//	  - template  – the package-path template (may contain {1}, {2}, …)
-//	  - version   – inserted between the resolved template and the basename
-//	  - captures  – ordered capture group values substituted into template
-//	  - basename  – the file's base name, always appended after version
+//   - template  – the package-path template (may contain {1}, {2}, …)
+//   - version   – inserted between the resolved template and the basename
+//   - captures  – ordered capture group values substituted into template
+//   - basename  – the file's base name, always appended after version
 func resolveDestPath(template, version string, captures []string, basename string) string {
 	dest := template
 	for i, cap := range captures {

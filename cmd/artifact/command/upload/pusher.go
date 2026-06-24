@@ -1,4 +1,4 @@
-package command
+package upload
 
 import (
 	"context"
