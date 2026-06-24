@@ -15,15 +15,11 @@ import (
 )
 
 // GenericUploader implements Pusher for generic artifact uploads using
-// JFrog-style wildcard source patterns.
-//
-// Supported pattern syntax (same semantics as `jf rt u`):
-//
 //   - – matches any characters within a single path segment (no slash)
 //     **         – matches any characters across zero or more path segments
 //     (*)        – like * but captures the matched segment as a numbered group {1}, {2}, …
 //     (**)       – like ** but captures the matched remainder as a numbered group
-//     ?          – matches exactly one character (not a slash)
+//     ?          – matches exactly one character
 //
 // The DestTemplate may contain back-references {1}, {2}, … to captured groups.
 // The final destination path is always: <DestTemplate>/<Version>/<basename>,
@@ -39,11 +35,8 @@ type GenericUploader struct {
 	SrcPattern   string
 	DestTemplate string // package path within the registry; may contain {N} placeholders
 	RegistryName string
-	// Version is inserted between DestTemplate and the filename to satisfy the
-	// Harness generic registry's required package/version/file path structure.
-	// Defaults to "1.0.0" when empty.
-	Version   string
-	PkgClient *pkgclient.ClientWithResponses
+	Version      string
+	PkgClient    *pkgclient.ClientWithResponses
 }
 
 // GetFiles expands SrcPattern and returns one GenericUploadJob per matched file.
@@ -55,7 +48,7 @@ func (u *GenericUploader) GetFiles() ([]upload.FileUploadJob, UploadStats, error
 		version = "1.0.0"
 	}
 
-	// ── 1. Determine the walk root (the longest non-wildcard directory prefix). ──
+	// Determine the walk root (the longest non-wildcard directory prefix).
 	root, relPattern := splitPatternRoot(u.SrcPattern)
 
 	absRoot, err := filepath.Abs(root)
@@ -63,7 +56,7 @@ func (u *GenericUploader) GetFiles() ([]upload.FileUploadJob, UploadStats, error
 		return nil, stats, fmt.Errorf("cannot resolve source root %q: %w", root, err)
 	}
 
-	// ── 2. Handle the literal-path fast path (no wildcards). ──
+	//  Handle the literal-path fast path (no wildcards)
 	if relPattern == "" {
 		info, err := os.Stat(absRoot)
 		if err != nil {
@@ -86,14 +79,14 @@ func (u *GenericUploader) GetFiles() ([]upload.FileUploadJob, UploadStats, error
 		return []upload.FileUploadJob{job}, stats, nil
 	}
 
-	// ── 3. Compile the relative pattern into a regexp with capture groups. ──
+	//Compile the relative pattern into a regexp with capture groups
 	re, groupCount, err := compileWildcardPattern(relPattern)
 	if err != nil {
 		return nil, stats, fmt.Errorf("invalid pattern %q: %w", u.SrcPattern, err)
 	}
 	_ = groupCount // informational; actual count is re.NumSubexp()
 
-	// ── 4. Walk the root and collect matching files. ──
+	// Walk the root and collect matching files
 	var jobs []upload.FileUploadJob
 
 	walkErr := filepath.WalkDir(absRoot, func(path string, d os.DirEntry, werr error) error {
@@ -104,7 +97,6 @@ func (u *GenericUploader) GetFiles() ([]upload.FileUploadJob, UploadStats, error
 			return nil
 		}
 
-		// Skip irregular files (devices, sockets, symlinks, …).
 		if d.IsDir() {
 			return nil
 		}
@@ -172,13 +164,19 @@ func (u *GenericUploader) PushFiles(ctx context.Context, jobs []upload.FileUploa
 	return nil
 }
 
-// ── Pattern helpers ──────────────────────────────────────────────────────────
+// GetRegistryAndPath parses a generic target of the form "<registry>/<dest-path>"
 
-// splitPatternRoot splits a JFrog-style src pattern into:
-//
-//   - root       – the longest directory prefix that contains no wildcard characters
-//   - relPattern – the remaining portion of the pattern, relative to root
-//
+func (u *GenericUploader) GetRegistryAndPath(target string) (string, error) {
+	idx := strings.IndexByte(target, '/')
+	if idx < 0 {
+		return "", fmt.Errorf("target must be in the form <registry>/<path>, got %q", target)
+	}
+	u.RegistryName = target[:idx]
+	u.DestTemplate = target[idx+1:]
+	return u.RegistryName, nil
+}
+
+// ── Pattern helpers
 // Examples:
 //
 //	"dist/(*)/*.zip"   →  "dist",  "(*)/*.zip"
@@ -213,7 +211,7 @@ func containsWildcard(s string) bool {
 	return strings.ContainsAny(s, "*?([")
 }
 
-// compileWildcardPattern converts a JFrog-style relative pattern to a Go regexp.
+// compileWildcardPattern converts a  relative pattern to a Go regexp.
 //
 // Token precedence (checked left to right):
 //

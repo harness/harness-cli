@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 
@@ -13,19 +12,13 @@ import (
 )
 
 // NewUploadArtifactCmd uploads files to a Harness Artifact Registry using
-// JFrog-compatible wildcard source patterns.
-//
-// Usage:
-//
-//	hc artifact upload <SRC_PATTERN> <REGISTRY/DEST_PATH>
-//
 // SRC_PATTERN supports:
 //
 //   - match any characters within one path segment
 //     **         match any characters across path segments (recursive)
 //     (*)        capture one path segment → referenced as {1}, {2}, … in DEST_PATH
 //     (**)       capture the entire remaining path → referenced as {1}, {2}, …
-//     ?          match exactly one character (not a slash)
+//     ?          match exactly one character
 //
 // Examples:
 //
@@ -42,7 +35,7 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 		Use:   "upload <SRC_PATH_PATTERN> <REGISTRY/DEST_PATH>",
 		Short: "Upload artifact files to a registry using wildcard patterns",
 		Long: "Upload one or more artifact files to a Harness Artifact Registry.\n" +
-			"SRC_PATH_PATTERN supports JFrog-style wildcards (* ** ? (*) (**)).\n" +
+			"SRC_PATH_PATTERN supports wildcards (* ** ? (*) (**)).\n" +
 			"Capture groups (*)/(** ) in the source can be referenced as {1}, {2}, … in DEST_PATH.",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != expectedArgumentCount {
@@ -57,25 +50,20 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 			srcPattern := args[0]
 			target := args[1]
 
-			// Split target into <registry> and <dest-path-template>.
-			idx := strings.IndexByte(target, '/')
-			if idx < 0 {
-				return fmt.Errorf("target must be in the form <registry>/<path>, got %q", target)
-			}
-			registryName := target[:idx]
-			destTemplate := target[idx+1:]
-
 			ctx := cmd.Context()
 			if ctx == nil {
 				ctx = context.Background()
 			}
 
 			var uploader Pusher = &GenericUploader{
-				SrcPattern:   srcPattern,
-				DestTemplate: destTemplate,
-				RegistryName: registryName,
-				Version:      packageVersion,
-				PkgClient:    c.PkgHttpClient(),
+				SrcPattern: srcPattern,
+				Version:    packageVersion,
+				PkgClient:  c.PkgHttpClient(),
+			}
+
+			registryName, err := uploader.GetRegistryAndPath(target)
+			if err != nil {
+				return err
 			}
 
 			fmt.Printf("Scanning pattern %q ...\n", srcPattern)
