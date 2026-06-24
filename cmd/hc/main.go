@@ -149,10 +149,10 @@ func main() {
 	if envVal := os.Getenv("HARNESS_API_KEY"); envVal != "" {
 		config.Global.AuthToken = envVal
 	}
-	if envVal := os.Getenv("HARNESS_ORG_ID"); envVal != "" {
+	if envVal := os.Getenv("ORG_IDENTIFIER"); envVal != "" {
 		config.Global.OrgID = envVal
 	}
-	if envVal := os.Getenv("HARNESS_PROJECT_ID"); envVal != "" {
+	if envVal := os.Getenv("PROJECT_IDENTIFIER"); envVal != "" {
 		config.Global.ProjectID = envVal
 	}
 	if envVal := os.Getenv("HARNESS_TIMEOUT_SECONDS"); envVal != "" {

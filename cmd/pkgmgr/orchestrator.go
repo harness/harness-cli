@@ -122,30 +122,12 @@ func ExecuteWithFirewall(
 	return fmt.Errorf("%s %s failed", clientName, command)
 }
 
-// resolveOrgProject resolves org and project from env vars, global config, or client-specific saved config.
+// resolveOrgProject returns the org and project that were saved by `hc registry configure <client>`.
+// The configure command is the single source of truth — install does not read from env vars
+// or global flags, so pipeline env vars (ORG_IDENTIFIER, PROJECT_IDENTIFIER) can't override
+// the user's intent (e.g. an account-level registry getting looked up at project level).
 func resolveOrgProject(client Client) (string, string) {
-	org := config.Global.OrgID
-	project := config.Global.ProjectID
-
-	if envOrg := os.Getenv("ORG_IDENTIFIER"); envOrg != "" {
-		org = envOrg
-	}
-	if envProj := os.Getenv("PROJECT_IDENTIFIER"); envProj != "" {
-		project = envProj
-	}
-
-	// Fallback: ask the client for saved org/project
-	if org == "" || project == "" {
-		fallbackOrg, fallbackProject := client.FallbackOrgProject()
-		if org == "" {
-			org = fallbackOrg
-		}
-		if project == "" {
-			project = fallbackProject
-		}
-	}
-
-	return org, project
+	return client.FallbackOrgProject()
 }
 
 // ResolveRegistryUUID looks up the registry UUID from the registry identifier.

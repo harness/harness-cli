@@ -15,60 +15,32 @@ import (
 )
 
 func TestResolveOrgProject(t *testing.T) {
-	t.Run("from global config", func(t *testing.T) {
-		config.Global = config.GlobalFlags{
-			OrgID:     "config-org",
-			ProjectID: "config-proj",
-		}
-		t.Setenv("ORG_IDENTIFIER", "")
-		t.Setenv("PROJECT_IDENTIFIER", "")
-
-		client := &mockClient{orgProject: [2]string{"", ""}}
+	t.Run("returns values saved by configure", func(t *testing.T) {
+		client := &mockClient{orgProject: [2]string{"saved-org", "saved-proj"}}
 		org, project := resolveOrgProject(client)
-		assert.Equal(t, "config-org", org)
-		assert.Equal(t, "config-proj", project)
+		assert.Equal(t, "saved-org", org)
+		assert.Equal(t, "saved-proj", project)
 	})
 
-	t.Run("env vars override global config", func(t *testing.T) {
+	t.Run("returns empty for account-level registry", func(t *testing.T) {
+		client := &mockClient{orgProject: [2]string{"", ""}}
+		org, project := resolveOrgProject(client)
+		assert.Equal(t, "", org)
+		assert.Equal(t, "", project)
+	})
+
+	t.Run("ignores global config and env vars", func(t *testing.T) {
 		config.Global = config.GlobalFlags{
-			OrgID:     "config-org",
-			ProjectID: "config-proj",
+			OrgID:     "global-org",
+			ProjectID: "global-proj",
 		}
 		t.Setenv("ORG_IDENTIFIER", "env-org")
 		t.Setenv("PROJECT_IDENTIFIER", "env-proj")
 
-		client := &mockClient{orgProject: [2]string{"", ""}}
+		client := &mockClient{orgProject: [2]string{"saved-org", "saved-proj"}}
 		org, project := resolveOrgProject(client)
-		assert.Equal(t, "env-org", org)
-		assert.Equal(t, "env-proj", project)
-	})
-
-	t.Run("fallback to client when empty", func(t *testing.T) {
-		config.Global = config.GlobalFlags{
-			OrgID:     "",
-			ProjectID: "",
-		}
-		t.Setenv("ORG_IDENTIFIER", "")
-		t.Setenv("PROJECT_IDENTIFIER", "")
-
-		client := &mockClient{orgProject: [2]string{"fallback-org", "fallback-proj"}}
-		org, project := resolveOrgProject(client)
-		assert.Equal(t, "fallback-org", org)
-		assert.Equal(t, "fallback-proj", project)
-	})
-
-	t.Run("partial fallback", func(t *testing.T) {
-		config.Global = config.GlobalFlags{
-			OrgID:     "config-org",
-			ProjectID: "",
-		}
-		t.Setenv("ORG_IDENTIFIER", "")
-		t.Setenv("PROJECT_IDENTIFIER", "")
-
-		client := &mockClient{orgProject: [2]string{"fb-org", "fb-proj"}}
-		org, project := resolveOrgProject(client)
-		assert.Equal(t, "config-org", org)
-		assert.Equal(t, "fb-proj", project)
+		assert.Equal(t, "saved-org", org)
+		assert.Equal(t, "saved-proj", project)
 	})
 }
 
