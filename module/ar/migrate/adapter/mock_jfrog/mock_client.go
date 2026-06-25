@@ -139,6 +139,12 @@ func (c *mockClient) loadContent() {
 		[]byte("apiVersion: v1\nentries:\n  nginx:\n    - name: nginx\n      version: 1.0.0\n      urls:\n        - charts/nginx-1.0.0.tgz\n")
 	c.fileContent["helm-legacy-local/index.yaml"] =
 		[]byte("apiVersion: v1\nentries:\n  nginx:\n    - name: nginx\n      version: 8.2.0\n      urls:\n        - nginx-8.2.0.tgz\n")
+	// HELM_HTTP index lists only the flat nginx chart (with a relative URL, the
+	// JFrog default since Artifactory 7.59.5). The nested abc chart and the
+	// orphan chart are intentionally absent so the hybrid tree sweep recovers
+	// them — exercising index+tree dedup.
+	c.fileContent["helm-http-local/index.yaml"] =
+		[]byte("apiVersion: v1\nentries:\n  nginx:\n    - name: nginx\n      version: 1.0.0\n      urls:\n        - nginx-1.0.0.tgz\n")
 	c.fileContent["dart-local/sample_dart_pkg"] = []byte(`{
   "name": "sample_dart_pkg",
   "latest": {
@@ -241,6 +247,34 @@ func (c *mockClient) loadBinaryContent() {
 		key := fmt.Sprintf("puppet-local/%s/%s/%s-%s-%s.tar.gz", p.author, p.module, p.author, p.module, p.version)
 		c.binaryContent[key] = createPuppetPackageTarGz(p.author, p.module, p.version)
 	}
+
+	// HELM_HTTP fixtures. The download key for a chart is "registry/<chart-uri>"
+	// where <chart-uri> is what enumeration resolves: for index entries it is the
+	// (relative) index URL, for tree-sweep entries it is the file Uri (which may
+	// carry a nested directory prefix). The leaf chart name (last path segment,
+	// minus -<version>.tgz) must match the embedded Chart.yaml so HAR's
+	// putHelmChartFile metadata check passes.
+	//
+	//   nginx-1.0.0.tgz                 → in index.yaml (flat, relative URL)
+	//   nginx-1.0.0.tgz.prov            → sibling provenance of the indexed chart
+	//   ChartA/ChartB/abc-1.0.1.tgz     → on disk only (hybrid tree sweep), nested
+	//   orphan-2.0.0.tgz                → on disk only (hybrid tree sweep), flat
+	//   team-a/abc-1.0.1.tgz, team-b/abc-1.0.1.tgz → distinct nested charts that
+	//                                  share a leaf name+version (collision case)
+	helmHTTPCharts := []struct{ key, leaf, version string }{
+		{"helm-http-local/nginx-1.0.0.tgz", "nginx", "1.0.0"},
+		{"helm-http-local/ChartA/ChartB/abc-1.0.1.tgz", "abc", "1.0.1"},
+		{"helm-http-local/orphan-2.0.0.tgz", "orphan", "2.0.0"},
+		{"helm-http-local/team-a/abc-1.0.1.tgz", "abc", "1.0.1"},
+		{"helm-http-local/team-b/abc-1.0.1.tgz", "abc", "1.0.1"},
+	}
+	for _, ch := range helmHTTPCharts {
+		c.binaryContent[ch.key] = createHelmChartTgz(ch.leaf, ch.version)
+	}
+	// Provenance sidecar — opaque bytes; the server treats it as a blob attached
+	// to the already-uploaded chart.
+	c.binaryContent["helm-http-local/nginx-1.0.0.tgz.prov"] =
+		[]byte("-----BEGIN PGP SIGNED MESSAGE-----\nmock provenance for nginx-1.0.0\n-----END PGP SIGNATURE-----\n")
 }
 
 func (c *mockClient) GetRegistries() ([]jfrog.JFrogRepository, error) {
@@ -407,6 +441,42 @@ func createPuppetPackageTarGz(author, module, version string) []byte {
 		content string
 	}{
 		{moduleDir + "/metadata.json", metadata},
+	}
+
+	for _, file := range files {
+		hdr := &tar.Header{
+			Name: file.name,
+			Mode: 0644,
+			Size: int64(len(file.content)),
+		}
+		tarWriter.WriteHeader(hdr)
+		tarWriter.Write([]byte(file.content))
+	}
+
+	tarWriter.Close()
+	gzWriter.Close()
+
+	return buf.Bytes()
+}
+
+// createHelmChartTgz creates a valid Helm chart .tgz containing a Chart.yaml at
+// "<name>/Chart.yaml" whose name/version match the arguments. HAR's
+// putHelmChartFile opens the archive, reads Chart.yaml, and rejects the upload
+// if name/version disagree with the parsed file name, so the embedded metadata
+// must equal the leaf chart name/version.
+func createHelmChartTgz(name, version string) []byte {
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	tarWriter := tar.NewWriter(gzWriter)
+
+	chartYaml := fmt.Sprintf("apiVersion: v2\nname: %s\nversion: %s\ndescription: Mock Helm chart for migration testing\ntype: application\n",
+		name, version)
+
+	files := []struct {
+		name    string
+		content string
+	}{
+		{name + "/Chart.yaml", chartYaml},
 	}
 
 	for _, file := range files {

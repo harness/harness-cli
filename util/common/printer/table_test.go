@@ -172,9 +172,9 @@ func TestJsonToTableWithMapping(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:    "No mapping - alphabetical order",
-			jsonStr: `[{"name": "test", "version": "1.0.0", "size": 100}]`,
-			mapping: nil,
+			name:        "No mapping - alphabetical order",
+			jsonStr:     `[{"name": "test", "version": "1.0.0", "size": 100}]`,
+			mapping:     nil,
 			expectError: false,
 		},
 		{
@@ -290,9 +290,9 @@ func TestColumnMapping_EdgeCases(t *testing.T) {
 			expectError: false, // Should show "-" for missing fields
 		},
 		{
-			name:    "Empty mapping array",
-			jsonStr: `[{"name": "test"}]`,
-			mapping: ColumnMapping{},
+			name:        "Empty mapping array",
+			jsonStr:     `[{"name": "test"}]`,
+			mapping:     ColumnMapping{},
 			expectError: false, // Should fall back to alphabetical
 		},
 		{

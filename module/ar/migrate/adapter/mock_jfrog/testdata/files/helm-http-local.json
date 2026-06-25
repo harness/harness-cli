@@ -1,0 +1,65 @@
+[
+  {
+    "Registry": "helm-http-local",
+    "Name": "index.yaml",
+    "Uri": "/index.yaml",
+    "Folder": false,
+    "Size": 256,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80707"
+  },
+  {
+    "Registry": "helm-http-local",
+    "Name": "nginx-1.0.0.tgz",
+    "Uri": "/nginx-1.0.0.tgz",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80707"
+  },
+  {
+    "Registry": "helm-http-local",
+    "Name": "nginx-1.0.0.tgz.prov",
+    "Uri": "/nginx-1.0.0.tgz.prov",
+    "Folder": false,
+    "Size": 128,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80707"
+  },
+  {
+    "Registry": "helm-http-local",
+    "Name": "abc-1.0.1.tgz",
+    "Uri": "/ChartA/ChartB/abc-1.0.1.tgz",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80707"
+  },
+  {
+    "Registry": "helm-http-local",
+    "Name": "orphan-2.0.0.tgz",
+    "Uri": "/orphan-2.0.0.tgz",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80707"
+  },
+  {
+    "Registry": "helm-http-local",
+    "Name": "abc-1.0.1.tgz",
+    "Uri": "/team-a/abc-1.0.1.tgz",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80707"
+  },
+  {
+    "Registry": "helm-http-local",
+    "Name": "abc-1.0.1.tgz",
+    "Uri": "/team-b/abc-1.0.1.tgz",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80707"
+  }
+]

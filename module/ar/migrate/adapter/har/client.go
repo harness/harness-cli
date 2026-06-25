@@ -126,7 +126,7 @@ func (c *client) uploadRawFile(registry string, f *types.File, file io.ReadClose
 	fileUri := strings.TrimPrefix(f.Uri, "/")
 	defer file.Close()
 
-	_, err := c.pkgClient.UploadGenericFileToPathWithBodyWithResponse(
+	resp, err := c.pkgClient.UploadGenericFileToPathWithBodyWithResponse(
 		context.Background(),
 		config.Global.AccountID,
 		registry,
@@ -138,7 +138,16 @@ func (c *client) uploadRawFile(registry string, f *types.File, file io.ReadClose
 		return fmt.Errorf("failed to upload raw file '%s': %w", fileUri, err)
 	}
 
-	return nil
+	sc := resp.StatusCode()
+	switch {
+	case sc == http2.StatusConflict:
+		return types.ErrArtifactAlreadyExists
+	case sc >= 200 && sc <= 299:
+		return nil
+	default:
+		return fmt.Errorf("failed to upload raw file '%s', status code: %d, response: %s",
+			fileUri, sc, string(resp.Body))
+	}
 }
 
 func (c *client) uploadMavenFile(
@@ -914,8 +923,12 @@ func (c *client) getRegistry(
 				SearchTerm: &registry,
 				Scope:      &descendants,
 			})
-		if err != nil || response.StatusCode() != http2.StatusOK {
-			return types.RegistryInfo{}, fmt.Errorf("failed to get registry: %w", err)
+		if err != nil {
+			return types.RegistryInfo{}, fmt.Errorf("failed to get registry %q: %w", registry, err)
+		}
+		if response.StatusCode() != http2.StatusOK {
+			return types.RegistryInfo{}, fmt.Errorf("failed to get registry %q: status code %d: %s",
+				registry, response.StatusCode(), strings.TrimSpace(string(response.Body)))
 		}
 		data := response.JSON200
 		if data == nil {
@@ -960,6 +973,9 @@ func (c *client) artifactVersionExists(
 			})
 		if err != nil {
 			return false, fmt.Errorf("failed to get artifact versions: %w", err)
+		}
+		if response.StatusCode() == http2.StatusNotFound {
+			return false, nil
 		}
 		if response.StatusCode() != http2.StatusOK {
 			return false, fmt.Errorf("failed to get artifact versions: %s", response.Status())

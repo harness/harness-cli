@@ -167,42 +167,86 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			})
 		}
 	} else if artifactType == types.HELM_LEGACY {
-		node, err := tree.GetNodeForPath(root, "/index.yaml")
+		indexPkgs, err := a.enumerateHelmIndex(registry, root)
 		if err != nil {
-			return nil, fmt.Errorf("get node for path: %w", err)
+			return nil, err
 		}
-		file, _, err := a.DownloadFile(registry, node.File.Uri)
-		tmp, err := os.CreateTemp("", "index-*.yaml")
-		defer os.Remove(tmp.Name())
-		_, err = io.Copy(tmp, file)
-		index, err := repo.LoadIndexFile(tmp.Name())
+		packages = append(packages, indexPkgs...)
+	} else if artifactType == types.HELM_HTTP {
+		// Hybrid enumeration, tree-primary.
+		//
+		// The tree sweep is the source of truth for physical layout: every .tgz
+		// on disk yields its FULL nested package name (directory prefix + leaf)
+		// plus version. This keeps genuinely-distinct nested charts distinct —
+		// "team-a/abc-1.0.1.tgz" and "team-b/abc-1.0.1.tgz" are the separate
+		// identities "team-a/abc" and "team-b/abc" (same version), and both must
+		// survive (each is its own package_name in HAR storage).
+		//
+		// The index.yaml is the secondary source: it only contributes charts
+		// that are listed but NOT present on disk (a stale index). Dedup between
+		// the two is keyed on the chart's repository-relative path, so a chart
+		// appearing in both sources is enumerated once — under the tree's nested
+		// name, which is more reliable than the index's: JFrog defaults to
+		// relative index URLs (since 7.59.5), for which getNestedName degrades to
+		// the bare leaf name. Keying dedup on the path (not name+version) avoids
+		// both collisions (distinct nested charts surviving) and the relative-URL
+		// name divergence (same file matched across sources).
+		seenPath := make(map[string]bool) // repo-relative .tgz path
+
+		// 1. Tree sweep (ground truth for physical charts + full nested names).
+		files, err := tree.GetAllFiles(root)
 		if err != nil {
-			return nil, fmt.Errorf("load index file: %w", err)
+			return nil, fmt.Errorf("get all files: %w", err)
 		}
-
-		for name, entries := range index.Entries {
-			for _, ver := range entries {
-				nestedName, err2 := getNestedName(name, ver.URLs)
-				if err2 != nil {
-					log.Error().Err(err2).Msgf("Failed to get package name for registry: %s, name: %s, version: %s",
-						registry, name, ver.Version)
-					continue
-				}
-				chartUrl := ver.URLs[0]
-				if strings.HasPrefix(chartUrl, "local://") {
-					chartUrl = strings.TrimPrefix(chartUrl, "local://")
-				}
-
-				pkg := types.Package{
-					Registry: registry,
-					Path:     "/",
-					Name:     nestedName,
-					Size:     -1,
-					URL:      chartUrl,
-					Version:  ver.Version,
-				}
-				packages = append(packages, pkg)
+		for _, f := range files {
+			if f.Folder {
+				continue
 			}
+			if !util.IsHelmChartArchive(f.Uri) {
+				continue
+			}
+			leafName, ver, ok := util.ParseChartFileName(f.Name)
+			if !ok {
+				log.Warn().Msgf(
+					"HELM_HTTP: skipping chart file with non-conforming name (cannot parse <name>-<version>): %s", f.Uri)
+				continue
+			}
+			relPath := strings.TrimPrefix(f.Uri, "/")
+			seenPath[relPath] = true
+
+			// Preserve the nested directory prefix so the upload mirrors the
+			// source layout (e.g. "team-a/abc"); flat charts keep the bare leaf.
+			nestedName := leafName
+			if dir := strings.Trim(path.Dir(relPath), "/"); dir != "" && dir != "." {
+				nestedName = dir + "/" + leafName
+			}
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     "/",
+				Name:     nestedName,
+				Version:  ver,
+				Size:     f.Size,
+				URL:      f.Uri,
+			})
+		}
+
+		// 2. Index pass (recovers charts in index.yaml but missing on disk). A
+		//    missing/unreadable index is not fatal — the tree sweep already
+		//    covers physical charts — so we warn and continue.
+		indexPkgs, err := a.enumerateHelmIndex(registry, root)
+		if err != nil {
+			log.Warn().Err(err).Msgf(
+				"HELM_HTTP: failed to enumerate index.yaml for registry %s; relying on tree sweep only", registry)
+		}
+		for _, pkg := range indexPkgs {
+			relPath := chartRepoRelPath(pkg.URL)
+			if seenPath[relPath] {
+				// Same physical chart already enumerated from the tree (with its
+				// full nested name) — skip the index's representation.
+				continue
+			}
+			seenPath[relPath] = true
+			packages = append(packages, pkg)
 		}
 	} else if artifactType == types.PYTHON {
 
@@ -523,6 +567,93 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 	}
 
 	return packages, nil
+}
+
+// enumerateHelmIndex parses the repository's /index.yaml and returns one
+// package per chart entry (name+version). Chart names are derived via
+// getNestedName so the nested directory prefix is preserved (when the index URL
+// is absolute). Shared by the HELM_LEGACY and HELM_HTTP enumeration paths.
+func (a *adapter) enumerateHelmIndex(registry string, root *types.TreeNode) ([]types.Package, error) {
+	node, err := tree.GetNodeForPath(root, "/index.yaml")
+	if err != nil {
+		return nil, fmt.Errorf("get node for path: %w", err)
+	}
+	file, _, err := a.DownloadFile(registry, node.File.Uri)
+	if err != nil {
+		return nil, fmt.Errorf("download index.yaml: %w", err)
+	}
+	defer file.Close()
+
+	tmp, err := os.CreateTemp("", "index-*.yaml")
+	if err != nil {
+		return nil, fmt.Errorf("create temp index file: %w", err)
+	}
+	defer os.Remove(tmp.Name())
+	defer tmp.Close()
+
+	if _, err := io.Copy(tmp, file); err != nil {
+		return nil, fmt.Errorf("copy index.yaml to temp: %w", err)
+	}
+	index, err := repo.LoadIndexFile(tmp.Name())
+	if err != nil {
+		return nil, fmt.Errorf("load index file: %w", err)
+	}
+
+	var packages []types.Package
+	for name, entries := range index.Entries {
+		for _, ver := range entries {
+			if len(ver.URLs) == 0 {
+				log.Warn().Msgf(
+					"Skipping helm chart with no URLs for registry: %s, name: %s, version: %s",
+					registry, name, ver.Version)
+				continue
+			}
+			nestedName, err2 := getNestedName(name, ver.URLs)
+			if err2 != nil {
+				log.Error().Err(err2).Msgf("Failed to get package name for registry: %s, name: %s, version: %s",
+					registry, name, ver.Version)
+				continue
+			}
+			chartUrl := ver.URLs[0]
+			if strings.HasPrefix(chartUrl, "local://") {
+				chartUrl = strings.TrimPrefix(chartUrl, "local://")
+			}
+
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     "/",
+				Name:     nestedName,
+				Size:     -1,
+				URL:      chartUrl,
+				Version:  ver.Version,
+			})
+		}
+	}
+	return packages, nil
+}
+
+// chartRepoRelPath normalizes a Helm index chart URL to the repository-relative
+// path (e.g. "team-a/abc-1.0.1.tgz"), matching the form the tree sweep derives
+// from a file's repo-relative Uri. This lets HELM_HTTP enumeration dedup the
+// same physical chart across the index and the tree regardless of whether the
+// index URL is absolute (/artifactory/<repo>/<dirs>/<file>, the pre-7.59.5
+// default) or relative (<dirs>/<file>, the current default). The absolute case
+// drops the leading "", "artifactory", and "<repo>" segments — the same
+// splits[3:] convention getNestedName uses.
+func chartRepoRelPath(chartURL string) string {
+	parsed, err := url.Parse(chartURL)
+	if err != nil {
+		return strings.TrimPrefix(chartURL, "/")
+	}
+	p := parsed.Path
+	if strings.HasPrefix(p, "/") {
+		splits := strings.Split(p, "/")
+		if len(splits) >= 4 {
+			return strings.Join(splits[3:], "/")
+		}
+		return strings.TrimPrefix(p, "/")
+	}
+	return p
 }
 
 func getNestedName(packageName string, urls []string) (string, error) {
@@ -921,7 +1052,7 @@ func (a *adapter) GetVersions(
 		return versions, nil
 	}
 
-	if artifactType == types.HELM_LEGACY {
+	if artifactType == types.HELM_LEGACY || artifactType == types.HELM_HTTP {
 		return []types.Version{
 			{
 				Registry: registry,

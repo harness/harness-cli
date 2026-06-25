@@ -1,6 +1,7 @@
 package migratable
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -122,7 +123,7 @@ func (r *Package) Pre(ctx context.Context) error {
 		return nil
 	}
 
-	if !r.config.Overwrite && (r.artifactType == types.HELM_LEGACY && r.pkg.Name != "" && r.pkg.Version != "") {
+	if !r.config.Overwrite && ((r.artifactType == types.HELM_LEGACY || r.artifactType == types.HELM_HTTP) && r.pkg.Name != "" && r.pkg.Version != "") {
 		exists, err := r.destAdapter.VersionExists(ctx, r.pkg,
 			r.registry.Path, r.pkg.Name, r.pkg.Version,
 			r.artifactType)
@@ -139,7 +140,7 @@ func (r *Package) Pre(ctx context.Context) error {
 			stat := types.FileStat{
 				Name:     r.pkg.Name,
 				Registry: r.srcRegistry,
-				Uri:      r.pkg.Version,
+				Uri:      r.pkg.URL,
 				Size:     int64(r.pkg.Size),
 				Status:   types.StatusSkip,
 			}
@@ -286,6 +287,8 @@ func (r *Package) Migrate(ctx context.Context) error {
 	} else if r.artifactType == types.HELM_LEGACY {
 		// TODO: Replace by providing function to this migration job instead of complete implementation here.
 		r.migrateLegacyHelm(ctx)
+	} else if r.artifactType == types.HELM_HTTP {
+		r.migrateHelmHTTP(ctx)
 	} else if r.artifactType == types.RPM {
 		r.migrateRPM(ctx)
 	} else if r.artifactType == types.DEBIAN {
@@ -382,6 +385,144 @@ func (r *Package) migrateLegacyHelm(ctx context.Context) error {
 	pterm.Success.Println(fmt.Sprintf("Successfully pushed helm chart %s to %s", r.pkg.Name, refStr))
 	r.stats.FileStats = append(r.stats.FileStats, stat)
 	return nil
+}
+
+// migrateHelmHTTP migrates a single Helm chart (and its optional .prov sidecar)
+// from a source provider (JFrog/MOCK_JFROG/Nexus) into a HAR HELM_HTTP
+// registry.
+//
+// The flow is provider-agnostic: it only relies on srcAdapter.DownloadFile
+// against pkg.URL (the chart) and pkg.URL+".prov" (the sidecar). The chart is
+// streamed without a temp file (memory-safe for large charts); UploadFile owns
+// closing the reader.
+func (r *Package) migrateHelmHTTP(ctx context.Context) error {
+	if r.config.DryRun {
+		return nil
+	}
+
+	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.URL)
+	if err != nil {
+		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download helm chart %s", r.pkg.URL)
+		pterm.Error.Println(fmt.Sprintf("Failed to download helm chart %s", r.pkg.URL))
+		r.stats.FileStats = append(r.stats.FileStats, types.FileStat{
+			Name:     r.pkg.Name,
+			Registry: r.srcRegistry,
+			Uri:      r.pkg.URL,
+			Size:     int64(r.pkg.Size),
+			Status:   types.StatusFail,
+			Error:    err.Error(),
+		})
+		return err
+	}
+
+	// Canonical upload name: "<name>-<version>.tgz". pkg.Name may carry a nested
+	// directory prefix (e.g. "ChartA/ChartB/abc") from the JFrog adapter's
+	// getNestedName, which is preserved verbatim so the upload mirrors the
+	// source layout; the server strips the prefix and validates the leaf
+	// against Chart.yaml.
+	chartFile := util.GetChartFileName(r.pkg.Name, r.pkg.Version)
+
+	title := fmt.Sprintf("%s (%s)", r.pkg.Name, common.GetSize(int64(r.pkg.Size)))
+	pterm.Info.Println(fmt.Sprintf("Copying helm chart %s from %s to %s", chartFile, r.srcRegistry, r.destRegistry))
+	err = r.destAdapter.UploadFile(
+		r.destRegistry,
+		file,
+		&types.File{Name: chartFile, Uri: chartFile},
+		header,
+		r.pkg.Name,
+		r.pkg.Version,
+		types.RAW,
+		nil,
+	)
+	stat := types.FileStat{
+		Name:     r.pkg.Name,
+		Registry: r.srcRegistry,
+		Uri:      r.pkg.URL,
+		Size:     int64(r.pkg.Size),
+		Status:   types.StatusSuccess,
+	}
+	if err != nil {
+		if errors.Is(err, types.ErrArtifactAlreadyExists) {
+			stat.Status = types.StatusSkip
+			pterm.Info.Println(fmt.Sprintf("%s already exists, skipping", title))
+			r.stats.FileStats = append(r.stats.FileStats, stat)
+			return nil
+		}
+		r.logger.Error().Err(err).Msg("Failed to upload helm chart")
+		stat.Status = types.StatusFail
+		stat.Error = err.Error()
+		pterm.Error.Println(title)
+		r.stats.FileStats = append(r.stats.FileStats, stat)
+		// Do not attempt the provenance upload if the chart failed — the server
+		// would reject a .prov with no chart (ErrChartNotFoundForProvenance).
+		return err
+	}
+	pterm.Success.Println(title)
+	r.stats.FileStats = append(r.stats.FileStats, stat)
+
+	// Provenance is best-effort and only attempted after a successful chart
+	// upload. A missing .prov is the normal case and must not be recorded as a
+	// failure.
+	r.migrateHelmHTTPProv(ctx)
+	return nil
+}
+
+// migrateHelmHTTPProv migrates a chart's provenance sidecar if one exists. It is
+// always called after the chart upload has succeeded. The sidecar is discovered
+// as "<chartURL>.prov" in the source; if the source has no such file, the
+// download fails and we simply skip (debug log only) — missing provenance is
+// normal and is not a migration failure. When present, it is uploaded as
+// "<name>-<version>.tgz.prov" so the server attaches it to the already-uploaded
+// chart of the same identity.
+func (r *Package) migrateHelmHTTPProv(ctx context.Context) {
+	provURL := r.pkg.URL + ".prov"
+	provFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, provURL)
+	if err != nil {
+		r.logger.Debug().Err(err).Msgf("No provenance file for chart %s (skipping)", r.pkg.URL)
+		return
+	}
+
+	provBytes, err := io.ReadAll(provFile)
+	_ = provFile.Close()
+	if err != nil {
+		r.logger.Debug().Err(err).Msgf("Could not read provenance file for chart %s (skipping)", r.pkg.URL)
+		return
+	}
+	provSize := int64(len(provBytes))
+
+	provName := util.GetChartProvFileName(r.pkg.Name, r.pkg.Version)
+	pterm.Info.Println(fmt.Sprintf("Copying provenance %s from %s to %s", provName, r.srcRegistry, r.destRegistry))
+	err = r.destAdapter.UploadFile(
+		r.destRegistry,
+		io.NopCloser(bytes.NewReader(provBytes)),
+		&types.File{Name: provName, Uri: provName},
+		header,
+		r.pkg.Name,
+		r.pkg.Version,
+		types.RAW,
+		nil,
+	)
+	stat := types.FileStat{
+		Name:     r.pkg.Name,
+		Registry: r.srcRegistry,
+		Uri:      provURL,
+		Size:     provSize,
+		Status:   types.StatusSuccess,
+	}
+	if err != nil {
+		if errors.Is(err, types.ErrArtifactAlreadyExists) {
+			stat.Status = types.StatusSkip
+			pterm.Info.Println(fmt.Sprintf("Provenance %s already exists, skipping", provName))
+		} else {
+			r.logger.Error().Err(err).Msgf("Failed to upload provenance %s", provName)
+			stat.Status = types.StatusFail
+			stat.Error = err.Error()
+			pterm.Error.Println(fmt.Sprintf("Failed to upload provenance %s", provName))
+		}
+	} else {
+		pterm.Success.Println(fmt.Sprintf("Successfully uploaded provenance %s", provName))
+	}
+	r.stats.FileStats = append(r.stats.FileStats, stat)
 }
 
 func (r *Package) migrateConda(ctx context.Context) error {

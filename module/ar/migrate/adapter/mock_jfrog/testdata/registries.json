@@ -89,5 +89,12 @@
     "url": "http://localhost:8081/artifactory/puppet-local",
     "description": "Mock Puppet Local Repository",
     "packageType": "puppet"
+  },
+  "helm-http-local": {
+    "key": "helm-http-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/helm-http-local",
+    "description": "Mock Helm HTTP Local Repository",
+    "packageType": "HELM"
   }
 }

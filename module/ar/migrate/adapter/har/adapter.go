@@ -2,12 +2,15 @@ package har
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
 	//"github.com/harness/harness-cli/module/ar/migrate"
 	//client2 "github.com/harness/harness-cli/util/client"
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 
 	"github.com/harness/harness-cli/config"
@@ -114,35 +117,41 @@ func (a *adapter) UploadFile(
 ) error {
 	a.logger.Debug().Msgf("Uploaded file %s to registry: %s", f.Uri, registry)
 	var err error
-	if artifactType == types.GENERIC {
+	switch artifactType {
+	case types.GENERIC:
 		err = a.client.uploadGenericFile(registry, artifactName, version, f, file)
-	} else if artifactType == types.MAVEN {
+	case types.MAVEN:
 		err = a.client.uploadMavenFile(registry, artifactName, version, f, file)
-	} else if artifactType == types.PYTHON {
+	case types.PYTHON:
 		err = a.client.uploadPythonFile(registry, artifactName, version, f, file, metadata)
-	} else if artifactType == types.NUGET {
+	case types.NUGET:
 		err = a.client.uploadNugetFile(registry, artifactName, version, f, file)
-	} else if artifactType == types.NPM {
+	case types.NPM:
 		err = a.client.uploadNPMFile(registry, artifactName, version, f, file)
-	} else if artifactType == types.RPM {
+	case types.RPM:
 		err = a.client.uploadRPMFile(registry, f.Name, file)
-	} else if artifactType == types.DEBIAN {
+	case types.DEBIAN:
 		err = a.client.uploadDebianFile(registry, f.Name, file, metadata)
-	} else if artifactType == types.CONDA {
+	case types.CONDA:
 		err = a.client.uploadCondaFile(registry, f.Name, file, metadata)
-	} else if artifactType == types.COMPOSER {
+	case types.COMPOSER:
 		err = a.client.uploadComposerFile(registry, f.Name, file)
-	} else if artifactType == types.SWIFT {
+	case types.SWIFT:
 		err = a.client.uploadSwiftFile(registry, f.Name, file, artifactName, version)
-	} else if artifactType == types.DART {
+	case types.DART:
 		err = a.client.uploadDartFile(registry, artifactName, version, f, file)
-	} else if artifactType == types.PUPPET {
+	case types.PUPPET:
 		err = a.client.uploadPuppetFile(registry, f, file)
-	} else if artifactType == types.RAW {
+	case types.RAW:
 		err = a.client.uploadRawFile(registry, f, file)
+	default:
+		return fmt.Errorf("unsupported artifact type: %s", artifactType)
 	}
 
 	if err != nil {
+		if errors.Is(err, types.ErrArtifactAlreadyExists) {
+			return err
+		}
 		a.logger.Error().Err(err).Msgf("Failed to upload file %s to registry: %s", f.Uri, registry)
 		return fmt.Errorf("failed to upload file %s to registry: %s, %v", f.Uri, registry, err)
 	}
@@ -166,6 +175,13 @@ func (a *adapter) VersionExists(
 ) (bool, error) {
 	if artifactType == types.HELM_LEGACY {
 		artifactType = types.HELM
+	}
+	if artifactType == types.HELM_HTTP {
+		// A HELM_HTTP destination names the chart by its leaf (Chart.yaml) name,
+		// while pkg may carry the nested source layout (e.g. "ChartA/ChartB/abc").
+		// Query the leaf so the lookup matches the stored artifact and the path
+		// param contains no '/' that would break the route.
+		pkg = path.Base(pkg)
 	}
 	return a.client.artifactVersionExists(ctx, registryRef, pkg, version, artifactType)
 }

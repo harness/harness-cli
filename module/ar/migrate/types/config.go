@@ -22,6 +22,7 @@ var (
 	DOCKER      ArtifactType = "DOCKER"
 	HELM        ArtifactType = "HELM"
 	HELM_LEGACY ArtifactType = "HELM_LEGACY"
+	HELM_HTTP   ArtifactType = "HELM_HTTP"
 	GENERIC     ArtifactType = "GENERIC"
 	PYTHON      ArtifactType = "PYTHON"
 	MAVEN       ArtifactType = "MAVEN"

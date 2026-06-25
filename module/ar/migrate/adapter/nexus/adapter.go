@@ -109,15 +109,25 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 		}
 
 		for _, component := range searchResponse.Items {
-			if artifactType == types.HELM_LEGACY {
+			if artifactType == types.HELM_LEGACY || artifactType == types.HELM_HTTP {
 				for _, asset := range component.Assets {
-					if asset.Format == "helm" {
-						if _, ok := pkgNames[component.Name]; !ok {
-							pkgNames[component.Name] = []string{}
-						}
-						pkgNames[component.Name] = append(pkgNames[component.Name], asset.Path)
-						assetToVersion[asset.Path] = component.Version
+					if asset.Format != "helm" {
+						continue
 					}
+					// For HELM_HTTP, enumerate only chart archives. Whether Nexus
+					// tags the provenance sidecar (.tgz.prov) as format "helm" is
+					// version/environment-dependent, so we filter it out here
+					// rather than relying on the tag — the .prov is migrated as a
+					// sibling of the chart by migrateHelmHTTPProv, never as its own
+					// package. HELM_LEGACY keeps its original (unfiltered) behavior.
+					if artifactType == types.HELM_HTTP && !util.IsHelmChartArchive(asset.Path) {
+						continue
+					}
+					if _, ok := pkgNames[component.Name]; !ok {
+						pkgNames[component.Name] = []string{}
+					}
+					pkgNames[component.Name] = append(pkgNames[component.Name], asset.Path)
+					assetToVersion[asset.Path] = component.Version
 				}
 			} else {
 				var pkgName string

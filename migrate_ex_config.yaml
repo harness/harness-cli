@@ -18,6 +18,9 @@ mappings:
   - artifactType: HELM_LEGACY
     sourceRegistry: src
     destinationRegistry: dst
+  - artifactType: HELM_HTTP
+    sourceRegistry: src
+    destinationRegistry: dst
   - artifactType: MAVEN
     sourceRegistry: src
     destinationRegistry: dst

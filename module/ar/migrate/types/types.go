@@ -13,6 +13,7 @@ var (
 	ErrArtifactNotFound        = errors.New("artifact not found")
 	ErrRegistryNotFound        = errors.New("ar not found")
 	ErrInvalidCredentials      = errors.New("invalid credentials")
+	ErrArtifactAlreadyExists   = errors.New("artifact already exists")
 )
 
 type File struct {
