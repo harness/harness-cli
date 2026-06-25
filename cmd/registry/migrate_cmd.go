@@ -42,7 +42,7 @@ Example configuration file (config.yaml):
 
   source:
     endpoint: https://source-registry.example.com
-    type: JFROG                    # Supported: JFROG, NEXUS
+    type: JFROG                    # Supported: JFROG, NEXUS, HARBOR
     credentials:
       username: source_user
       password: source_password
@@ -73,7 +73,9 @@ Example configuration file (config.yaml):
       destinationRegistry: harness-helm
 
 Supported artifact types:
-  DOCKER, HELM, HELM_LEGACY, MAVEN, NPM, NUGET, PYTHON, GO, GENERIC, CONDA, COMPOSER ,SWIFT
+  DOCKER, HELM, HELM_LEGACY, MAVEN, NPM, NUGET, PYTHON, GO, GENERIC, CONDA, COMPOSER, SWIFT
+
+Note: HARBOR source supports OCI artifact types only (DOCKER, HELM).
 
 Environment variables can be used in the config file using ${VAR_NAME} syntax.
 

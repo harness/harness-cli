@@ -19,6 +19,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	_ "github.com/harness/harness-cli/module/ar/migrate/adapter/har"
+	_ "github.com/harness/harness-cli/module/ar/migrate/adapter/harbor"
 	_ "github.com/harness/harness-cli/module/ar/migrate/adapter/jfrog"
 	_ "github.com/harness/harness-cli/module/ar/migrate/adapter/mock_jfrog"
 	_ "github.com/harness/harness-cli/module/ar/migrate/adapter/nexus"
