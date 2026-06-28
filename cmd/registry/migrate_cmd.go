@@ -42,7 +42,7 @@ Example configuration file (config.yaml):
 
   source:
     endpoint: https://source-registry.example.com
-    type: JFROG                    # Supported: JFROG, NEXUS
+    type: JFROG                    # Supported: JFROG, NEXUS, GITLAB
     credentials:
       username: source_user
       password: source_password

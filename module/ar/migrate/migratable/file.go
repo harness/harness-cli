@@ -175,11 +175,11 @@ func (r *File) Migrate(ctx context.Context) error {
 
 	if r.artifactType == types.GENERIC || r.artifactType == types.RAW || r.artifactType == types.MAVEN || r.artifactType == types.NUGET || r.artifactType == types.PUPPET {
 		downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.file.Uri)
-		defer downloadFile.Close()
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to download file")
 			return fmt.Errorf("download file failed: %w", err)
 		}
+		defer downloadFile.Close()
 
 		//readCloser := progress.ReadCloser(int64(r.file.Size), downloadFile, r.file.Name)
 		title := fmt.Sprintf("%s (%s)", r.file.Name, common.GetSize(int64(r.file.Size)))

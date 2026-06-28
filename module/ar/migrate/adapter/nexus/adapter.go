@@ -83,7 +83,7 @@ func (a *adapter) GetRegistry(ctx context.Context, registry string) (types.Regis
 	}, nil
 }
 
-func (a *adapter) CreateRegistryIfDoesntExist(registry string) (bool, error) {
+func (a *adapter) CreateRegistryIfDoesntExist(registry string, artifactType types.ArtifactType) (bool, error) {
 	// Nexus repositories are typically created through the UI or API by administrators
 	// This adapter assumes repositories already exist
 	_, err := a.client.getRepository(registry)
