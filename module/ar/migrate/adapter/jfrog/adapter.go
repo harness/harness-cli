@@ -100,7 +100,9 @@ func (a *adapter) GetRegistry(ctx context.Context, registry string) (types.Regis
 		URL:  reg.Url,
 	}, nil
 }
-func (a *adapter) CreateRegistryIfDoesntExist(registry string) (bool, error) { return false, nil }
+func (a *adapter) CreateRegistryIfDoesntExist(registry string, artifactType types.ArtifactType) (bool, error) {
+	return false, nil
+}
 
 func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, root *types.TreeNode) (
 	[]types.Package,
