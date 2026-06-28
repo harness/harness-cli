@@ -144,7 +144,8 @@ func (r *Version) Migrate(ctx context.Context) error {
 	var jobs []engine.Job
 
 	if r.artifactType == types.GENERIC || r.artifactType == types.RAW || r.artifactType == types.MAVEN || r.artifactType == types.PYTHON ||
-		r.artifactType == types.NUGET || r.artifactType == types.NPM || r.artifactType == types.DART || r.artifactType == types.PUPPET {
+		r.artifactType == types.NUGET || r.artifactType == types.NPM || r.artifactType == types.DART || r.artifactType == types.PUPPET ||
+		r.artifactType == types.CONAN || r.artifactType == types.RUBYGEMS || r.artifactType == types.SWIFT {
 		files, err := tree.GetAllFiles(r.node)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to get files from tree")

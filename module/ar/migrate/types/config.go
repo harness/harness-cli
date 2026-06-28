@@ -14,6 +14,7 @@ var (
 	JFROG      RegistryType = "JFROG"
 	MOCK_JFROG RegistryType = "MOCK_JFROG"
 	NEXUS      RegistryType = "NEXUS"
+	GITLAB     RegistryType = "GITLAB"
 )
 
 type ArtifactType string
@@ -33,8 +34,10 @@ var (
 	GO          ArtifactType = "GO"
 	CONDA       ArtifactType = "CONDA"
 	COMPOSER    ArtifactType = "COMPOSER"
+	CONAN       ArtifactType = "CONAN"
 	DART        ArtifactType = "DART"
 	RAW         ArtifactType = "RAW"
+	RUBYGEMS    ArtifactType = "RUBYGEMS"
 	SWIFT       ArtifactType = "SWIFT"
 	PUPPET      ArtifactType = "PUPPET"
 )
@@ -159,7 +162,7 @@ func validateCredentials(registry RegistryConfig) error {
 
 	// Check supported registry types
 	switch registry.Type {
-	case HAR, JFROG, NEXUS, MOCK_JFROG:
+	case HAR, JFROG, NEXUS, MOCK_JFROG, GITLAB:
 		// These are supported
 	default:
 		return fmt.Errorf("unsupported registry type: %s", registry.Type)
