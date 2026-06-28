@@ -34,10 +34,8 @@ var (
 	GO          ArtifactType = "GO"
 	CONDA       ArtifactType = "CONDA"
 	COMPOSER    ArtifactType = "COMPOSER"
-	CONAN       ArtifactType = "CONAN"
 	DART        ArtifactType = "DART"
 	RAW         ArtifactType = "RAW"
-	RUBYGEMS    ArtifactType = "RUBYGEMS"
 	SWIFT       ArtifactType = "SWIFT"
 	PUPPET      ArtifactType = "PUPPET"
 )

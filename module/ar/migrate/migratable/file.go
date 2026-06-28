@@ -173,8 +173,7 @@ func (r *File) Migrate(ctx context.Context) error {
 		return fmt.Errorf("OCI migrate file is not supported")
 	}
 
-	if r.artifactType == types.GENERIC || r.artifactType == types.RAW || r.artifactType == types.MAVEN || r.artifactType == types.NUGET ||
-		r.artifactType == types.PUPPET || r.artifactType == types.CONAN || r.artifactType == types.RUBYGEMS || r.artifactType == types.SWIFT {
+	if r.artifactType == types.GENERIC || r.artifactType == types.RAW || r.artifactType == types.MAVEN || r.artifactType == types.NUGET || r.artifactType == types.PUPPET {
 		downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.file.Uri)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to download file")

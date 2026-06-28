@@ -78,7 +78,7 @@ func (a *adapter) GetRegistry(ctx context.Context, registry string) (types.Regis
 }
 
 // CreateRegistryIfDoesntExist is not applicable for GitLab (projects are managed separately)
-func (a *adapter) CreateRegistryIfDoesntExist(registry string, artifactType types.ArtifactType) (bool, error) {
+func (a *adapter) CreateRegistryIfDoesntExist(registry string) (bool, error) {
 	return false, nil
 }
 
@@ -579,16 +579,12 @@ func mapArtifactTypeToGitLab(artifactType types.ArtifactType) string {
 		return "nuget"
 	case types.COMPOSER:
 		return "composer"
-	case types.CONAN:
-		return "conan"
 	case types.HELM, types.HELM_LEGACY, types.HELM_HTTP:
 		return "helm"
 	case types.DEBIAN:
 		return "debian"
 	case types.GO:
 		return "golang"
-	case types.RUBYGEMS:
-		return "rubygems"
 	case types.GENERIC, types.RAW:
 		return "generic"
 	case types.RPM, types.CONDA, types.DART, types.SWIFT, types.PUPPET:

@@ -17,7 +17,7 @@ type Adapter interface {
 	GetConfig() types.RegistryConfig
 	ValidateCredentials() (bool, error)
 	GetRegistry(ctx context.Context, registry string) (types.RegistryInfo, error)
-	CreateRegistryIfDoesntExist(registry string, artifactType types.ArtifactType) (bool, error)
+	CreateRegistryIfDoesntExist(registry string) (bool, error)
 	GetPackages(registry string, artifactType types.ArtifactType, root *types.TreeNode) (
 		packages []types.Package,
 		err error,
