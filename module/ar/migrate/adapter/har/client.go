@@ -24,7 +24,7 @@ import (
 	retryablehttp "github.com/hashicorp/go-retryablehttp"
 )
 
-func retryingHTTPClient() *http2.Client {
+func retryingPkgHTTPClient() *http2.Client {
 	rc := retryablehttp.NewClient()
 	rc.RetryMax = 5
 	rc.RetryWaitMin = 200 * time.Millisecond
@@ -33,7 +33,20 @@ func retryingHTTPClient() *http2.Client {
 	rc.Logger = nil
 
 	std := rc.StandardClient() // returns *http.Client using a retrying RoundTripper
-	std.Timeout = 20 * time.Second
+	std.Timeout = 30 * time.Minute
+	return std
+}
+
+func retryingArHTTPClient() *http2.Client {
+	rc := retryablehttp.NewClient()
+	rc.RetryMax = 5
+	rc.RetryWaitMin = 200 * time.Millisecond
+	rc.RetryWaitMax = 1 * time.Minute
+	rc.Backoff = retryablehttp.RateLimitLinearJitterBackoff
+	rc.Logger = nil
+
+	std := rc.StandardClient() // returns *http.Client using a retrying RoundTripper
+	std.Timeout = 2 * time.Minute
 	return std
 }
 
@@ -45,11 +58,11 @@ func newClient(reg *types.RegistryConfig) *client {
 	token = reg.Credentials.Password
 
 	arClient, _ := ar.NewClientWithResponses(config.Global.APIBaseURL+"/gateway/har/api/v1",
-		ar.WithHTTPClient(retryingHTTPClient()),
+		ar.WithHTTPClient(retryingArHTTPClient()),
 		auth.GetXApiKeyOptionAR())
 
 	pkgClient, _ := pkgclient.NewClientWithResponses(reg.Endpoint,
-		pkgclient.WithHTTPClient(retryingHTTPClient()),
+		pkgclient.WithHTTPClient(retryingPkgHTTPClient()),
 		auth.GetAuthOptionARPKG())
 
 	return &client{
