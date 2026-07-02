@@ -116,7 +116,7 @@ func ExecuteWithFirewall(
 
 	// Upload build info only if firewall returned results
 	if scanCount > 0 {
-		uploadBuildInfo(f, client, registryUUID, depResult.Dependencies, org, project, progress)
+		uploadBuildInfo(f, client, registryUUID, depResult.Dependencies, progress)
 	}
 
 	return fmt.Errorf("%s %s failed", clientName, command)

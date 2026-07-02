@@ -25,9 +25,14 @@ func uploadBuildInfo(
 	client Client,
 	registryUUID uuid.UUID,
 	deps []regcmd.Dependency,
-	org, project string,
 	progress p.Reporter,
 ) {
+	pipelineCtx := buildPipelineContext()
+	if pipelineCtx == nil {
+		progress.Step("Skipping build info upload: required HARNESS_* pipeline env vars are missing")
+		return
+	}
+
 	progress.Step("Uploading build info")
 
 	rootPkg := detectRootPackage(client)
@@ -57,13 +62,9 @@ func uploadBuildInfo(
 			Name:    rootPkg.Name,
 			Version: rootPkg.Version,
 		},
-		Status:   status,
-		Metadata: nodes,
-	}
-
-	pipelineCtx := buildPipelineContext(org, project)
-	if pipelineCtx != nil {
-		body.PipelineContext = pipelineCtx
+		Status:          status,
+		Metadata:        nodes,
+		PipelineContext: pipelineCtx,
 	}
 
 	params := &ar_v3.AddBuildInfoParams{
@@ -292,12 +293,28 @@ func packageTypeToAPI(pkgType string) ar_v3.PackageType {
 	}
 }
 
-func buildPipelineContext(org, project string) *ar_v3.PipelineContext {
+func buildPipelineContext() *ar_v3.PipelineContext {
 	pipelineID := os.Getenv("HARNESS_PIPELINE_ID")
 	executionID := os.Getenv("HARNESS_EXECUTION_ID")
+	orgID := os.Getenv("HARNESS_ORG_ID")
+	projectID := os.Getenv("HARNESS_PROJECT_ID")
 	stageID := os.Getenv("HARNESS_STAGE_ID")
 
-	if pipelineID == "" || executionID == "" {
+	var missing []string
+	if pipelineID == "" {
+		missing = append(missing, "HARNESS_PIPELINE_ID")
+	}
+	if executionID == "" {
+		missing = append(missing, "HARNESS_EXECUTION_ID")
+	}
+	if orgID == "" {
+		missing = append(missing, "HARNESS_ORG_ID")
+	}
+	if projectID == "" {
+		missing = append(missing, "HARNESS_PROJECT_ID")
+	}
+	if len(missing) > 0 {
+		log.Info().Strs("missing", missing).Msg("Skipping build info upload: pipeline env vars missing")
 		return nil
 	}
 
@@ -308,8 +325,8 @@ func buildPipelineContext(org, project string) *ar_v3.PipelineContext {
 	ctx := &ar_v3.PipelineContext{
 		PipelineId:  pipelineID,
 		ExecutionId: executionID,
-		OrgId:       org,
-		ProjectId:   project,
+		OrgId:       orgID,
+		ProjectId:   projectID,
 		StageId:     stageID,
 	}
 

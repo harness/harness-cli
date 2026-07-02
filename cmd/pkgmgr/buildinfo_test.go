@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/harness/harness-cli/util/common/progress"
+
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -339,29 +342,75 @@ func TestDetectNugetRootPackage(t *testing.T) {
 }
 
 func TestBuildPipelineContext(t *testing.T) {
-	t.Run("returns nil when pipeline env vars missing", func(t *testing.T) {
+	t.Run("returns nil when all pipeline env vars missing", func(t *testing.T) {
 		t.Setenv("HARNESS_PIPELINE_ID", "")
 		t.Setenv("HARNESS_EXECUTION_ID", "")
+		t.Setenv("HARNESS_ORG_ID", "")
+		t.Setenv("HARNESS_PROJECT_ID", "")
 
-		ctx := buildPipelineContext("org", "project")
+		ctx := buildPipelineContext()
 		assert.Nil(t, ctx)
 	})
 
 	t.Run("returns nil when only pipeline ID set", func(t *testing.T) {
 		t.Setenv("HARNESS_PIPELINE_ID", "pipe-1")
 		t.Setenv("HARNESS_EXECUTION_ID", "")
+		t.Setenv("HARNESS_ORG_ID", "")
+		t.Setenv("HARNESS_PROJECT_ID", "")
 
-		ctx := buildPipelineContext("org", "project")
+		ctx := buildPipelineContext()
+		assert.Nil(t, ctx)
+	})
+
+	t.Run("returns nil when execution ID missing", func(t *testing.T) {
+		t.Setenv("HARNESS_PIPELINE_ID", "pipe-1")
+		t.Setenv("HARNESS_EXECUTION_ID", "")
+		t.Setenv("HARNESS_ORG_ID", "org1")
+		t.Setenv("HARNESS_PROJECT_ID", "proj1")
+
+		ctx := buildPipelineContext()
+		assert.Nil(t, ctx)
+	})
+
+	t.Run("returns nil when pipeline ID missing but others set", func(t *testing.T) {
+		t.Setenv("HARNESS_PIPELINE_ID", "")
+		t.Setenv("HARNESS_EXECUTION_ID", "build-123")
+		t.Setenv("HARNESS_ORG_ID", "org1")
+		t.Setenv("HARNESS_PROJECT_ID", "proj1")
+
+		ctx := buildPipelineContext()
+		assert.Nil(t, ctx)
+	})
+
+	t.Run("returns nil when org missing", func(t *testing.T) {
+		t.Setenv("HARNESS_PIPELINE_ID", "pipe-1")
+		t.Setenv("HARNESS_EXECUTION_ID", "build-123")
+		t.Setenv("HARNESS_ORG_ID", "")
+		t.Setenv("HARNESS_PROJECT_ID", "proj1")
+
+		ctx := buildPipelineContext()
+		assert.Nil(t, ctx)
+	})
+
+	t.Run("returns nil when project missing", func(t *testing.T) {
+		t.Setenv("HARNESS_PIPELINE_ID", "pipe-1")
+		t.Setenv("HARNESS_EXECUTION_ID", "build-123")
+		t.Setenv("HARNESS_ORG_ID", "org1")
+		t.Setenv("HARNESS_PROJECT_ID", "")
+
+		ctx := buildPipelineContext()
 		assert.Nil(t, ctx)
 	})
 
 	t.Run("returns context with defaults", func(t *testing.T) {
 		t.Setenv("HARNESS_PIPELINE_ID", "pipe-1")
 		t.Setenv("HARNESS_EXECUTION_ID", "build-123")
+		t.Setenv("HARNESS_ORG_ID", "org1")
+		t.Setenv("HARNESS_PROJECT_ID", "proj1")
 		t.Setenv("HARNESS_STAGE_ID", "")
 		t.Setenv("HARNESS_STEP_ID", "")
 
-		ctx := buildPipelineContext("org1", "proj1")
+		ctx := buildPipelineContext()
 		require.NotNil(t, ctx)
 		assert.Equal(t, "pipe-1", ctx.PipelineId)
 		assert.Equal(t, "build-123", ctx.ExecutionId)
@@ -374,13 +423,63 @@ func TestBuildPipelineContext(t *testing.T) {
 	t.Run("includes stage and step when set", func(t *testing.T) {
 		t.Setenv("HARNESS_PIPELINE_ID", "pipe-1")
 		t.Setenv("HARNESS_EXECUTION_ID", "build-123")
+		t.Setenv("HARNESS_ORG_ID", "org1")
+		t.Setenv("HARNESS_PROJECT_ID", "proj1")
 		t.Setenv("HARNESS_STAGE_ID", "stage-1")
 		t.Setenv("HARNESS_STEP_ID", "step-1")
 
-		ctx := buildPipelineContext("org1", "proj1")
+		ctx := buildPipelineContext()
 		require.NotNil(t, ctx)
 		assert.Equal(t, "stage-1", ctx.StageId)
 		require.NotNil(t, ctx.StepId)
 		assert.Equal(t, "step-1", *ctx.StepId)
+	})
+
+	t.Run("uses HARNESS_ORG_ID and HARNESS_PROJECT_ID env vars, not args", func(t *testing.T) {
+		t.Setenv("HARNESS_PIPELINE_ID", "pipe-1")
+		t.Setenv("HARNESS_EXECUTION_ID", "build-123")
+		t.Setenv("HARNESS_ORG_ID", "env-org")
+		t.Setenv("HARNESS_PROJECT_ID", "env-proj")
+		t.Setenv("HARNESS_STAGE_ID", "")
+		t.Setenv("HARNESS_STEP_ID", "")
+
+		ctx := buildPipelineContext()
+		require.NotNil(t, ctx)
+		assert.Equal(t, "env-org", ctx.OrgId)
+		assert.Equal(t, "env-proj", ctx.ProjectId)
+	})
+}
+
+// TestUploadBuildInfoSkipsWhenEnvMissing verifies that uploadBuildInfo returns
+// early — before touching Factory/HTTP — when required pipeline env vars are
+// missing. Passing nil Factory would panic otherwise; this asserts the guard
+// short-circuits before the factory is used.
+func TestUploadBuildInfoSkipsWhenEnvMissing(t *testing.T) {
+	t.Run("no panic when factory nil and env vars missing", func(t *testing.T) {
+		t.Setenv("HARNESS_PIPELINE_ID", "")
+		t.Setenv("HARNESS_EXECUTION_ID", "")
+		t.Setenv("HARNESS_ORG_ID", "")
+		t.Setenv("HARNESS_PROJECT_ID", "")
+
+		reporter := progress.NewNopReporter()
+		client := &mockClient{name: "npm", pkgType: PackageTypeNpm}
+
+		assert.NotPanics(t, func() {
+			uploadBuildInfo(nil, client, uuid.Nil, nil, reporter)
+		})
+	})
+
+	t.Run("no panic when only some env vars set", func(t *testing.T) {
+		t.Setenv("HARNESS_PIPELINE_ID", "pipe-1")
+		t.Setenv("HARNESS_EXECUTION_ID", "build-1")
+		t.Setenv("HARNESS_ORG_ID", "")
+		t.Setenv("HARNESS_PROJECT_ID", "")
+
+		reporter := progress.NewNopReporter()
+		client := &mockClient{name: "npm", pkgType: PackageTypeNpm}
+
+		assert.NotPanics(t, func() {
+			uploadBuildInfo(nil, client, uuid.Nil, nil, reporter)
+		})
 	})
 }
