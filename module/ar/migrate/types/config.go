@@ -37,6 +37,7 @@ var (
 	RAW         ArtifactType = "RAW"
 	SWIFT       ArtifactType = "SWIFT"
 	PUPPET      ArtifactType = "PUPPET"
+	CONAN       ArtifactType = "CONAN"
 )
 
 // Config represents the top-level configuration structure

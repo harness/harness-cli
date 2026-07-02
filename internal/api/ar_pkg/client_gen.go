@@ -229,6 +229,12 @@ type ClientInterface interface {
 	// UploadComposerPackageWithBody request with any body
 	UploadComposerPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// UploadConanRecipeFileWithBody request with any body
+	UploadConanRecipeFileWithBody(ctx context.Context, accountId string, registry string, name string, version string, user string, channel string, rrev string, filename string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadConanPackageFileWithBody request with any body
+	UploadConanPackageFileWithBody(ctx context.Context, accountId string, registry string, name string, version string, user string, channel string, rrev string, pkgid string, prev string, filename string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// UploadCondaPackageWithBody request with any body
 	UploadCondaPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -310,6 +316,30 @@ func (c *Client) UploadCargoPackageWithBody(ctx context.Context, accountId strin
 
 func (c *Client) UploadComposerPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadComposerPackageRequestWithBody(c.Server, accountId, registry, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadConanRecipeFileWithBody(ctx context.Context, accountId string, registry string, name string, version string, user string, channel string, rrev string, filename string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadConanRecipeFileRequestWithBody(c.Server, accountId, registry, name, version, user, channel, rrev, filename, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadConanPackageFileWithBody(ctx context.Context, accountId string, registry string, name string, version string, user string, channel string, rrev string, pkgid string, prev string, filename string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadConanPackageFileRequestWithBody(c.Server, accountId, registry, name, version, user, channel, rrev, pkgid, prev, filename, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -661,6 +691,190 @@ func NewUploadComposerPackageRequestWithBody(server string, accountId string, re
 	}
 
 	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUploadConanRecipeFileRequestWithBody generates requests for UploadConanRecipeFile with any type of body
+func NewUploadConanRecipeFileRequestWithBody(server string, accountId string, registry string, name string, version string, user string, channel string, rrev string, filename string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "registry", runtime.ParamLocationPath, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "name", runtime.ParamLocationPath, name)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "version", runtime.ParamLocationPath, version)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam4 string
+
+	pathParam4, err = runtime.StyleParamWithLocation("simple", false, "user", runtime.ParamLocationPath, user)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam5 string
+
+	pathParam5, err = runtime.StyleParamWithLocation("simple", false, "channel", runtime.ParamLocationPath, channel)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam6 string
+
+	pathParam6, err = runtime.StyleParamWithLocation("simple", false, "rrev", runtime.ParamLocationPath, rrev)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam7 string
+
+	pathParam7, err = runtime.StyleParamWithLocation("simple", false, "filename", runtime.ParamLocationPath, filename)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pkg/%s/%s/conan/v2/conans/%s/%s/%s/%s/revisions/%s/files/%s", pathParam0, pathParam1, pathParam2, pathParam3, pathParam4, pathParam5, pathParam6, pathParam7)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUploadConanPackageFileRequestWithBody generates requests for UploadConanPackageFile with any type of body
+func NewUploadConanPackageFileRequestWithBody(server string, accountId string, registry string, name string, version string, user string, channel string, rrev string, pkgid string, prev string, filename string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "registry", runtime.ParamLocationPath, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "name", runtime.ParamLocationPath, name)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "version", runtime.ParamLocationPath, version)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam4 string
+
+	pathParam4, err = runtime.StyleParamWithLocation("simple", false, "user", runtime.ParamLocationPath, user)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam5 string
+
+	pathParam5, err = runtime.StyleParamWithLocation("simple", false, "channel", runtime.ParamLocationPath, channel)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam6 string
+
+	pathParam6, err = runtime.StyleParamWithLocation("simple", false, "rrev", runtime.ParamLocationPath, rrev)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam7 string
+
+	pathParam7, err = runtime.StyleParamWithLocation("simple", false, "pkgid", runtime.ParamLocationPath, pkgid)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam8 string
+
+	pathParam8, err = runtime.StyleParamWithLocation("simple", false, "prev", runtime.ParamLocationPath, prev)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam9 string
+
+	pathParam9, err = runtime.StyleParamWithLocation("simple", false, "filename", runtime.ParamLocationPath, filename)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pkg/%s/%s/conan/v2/conans/%s/%s/%s/%s/revisions/%s/packages/%s/revisions/%s/files/%s", pathParam0, pathParam1, pathParam2, pathParam3, pathParam4, pathParam5, pathParam6, pathParam7, pathParam8, pathParam9)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -1953,6 +2167,12 @@ type ClientWithResponsesInterface interface {
 	// UploadComposerPackageWithBodyWithResponse request with any body
 	UploadComposerPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadComposerPackageResp, error)
 
+	// UploadConanRecipeFileWithBodyWithResponse request with any body
+	UploadConanRecipeFileWithBodyWithResponse(ctx context.Context, accountId string, registry string, name string, version string, user string, channel string, rrev string, filename string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadConanRecipeFileResp, error)
+
+	// UploadConanPackageFileWithBodyWithResponse request with any body
+	UploadConanPackageFileWithBodyWithResponse(ctx context.Context, accountId string, registry string, name string, version string, user string, channel string, rrev string, pkgid string, prev string, filename string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadConanPackageFileResp, error)
+
 	// UploadCondaPackageWithBodyWithResponse request with any body
 	UploadCondaPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadCondaPackageResp, error)
 
@@ -2056,6 +2276,48 @@ func (r UploadComposerPackageResp) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r UploadComposerPackageResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UploadConanRecipeFileResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadConanRecipeFileResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadConanRecipeFileResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UploadConanPackageFileResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadConanPackageFileResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadConanPackageFileResp) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -2542,6 +2804,24 @@ func (c *ClientWithResponses) UploadComposerPackageWithBodyWithResponse(ctx cont
 	return ParseUploadComposerPackageResp(rsp)
 }
 
+// UploadConanRecipeFileWithBodyWithResponse request with arbitrary body returning *UploadConanRecipeFileResp
+func (c *ClientWithResponses) UploadConanRecipeFileWithBodyWithResponse(ctx context.Context, accountId string, registry string, name string, version string, user string, channel string, rrev string, filename string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadConanRecipeFileResp, error) {
+	rsp, err := c.UploadConanRecipeFileWithBody(ctx, accountId, registry, name, version, user, channel, rrev, filename, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadConanRecipeFileResp(rsp)
+}
+
+// UploadConanPackageFileWithBodyWithResponse request with arbitrary body returning *UploadConanPackageFileResp
+func (c *ClientWithResponses) UploadConanPackageFileWithBodyWithResponse(ctx context.Context, accountId string, registry string, name string, version string, user string, channel string, rrev string, pkgid string, prev string, filename string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadConanPackageFileResp, error) {
+	rsp, err := c.UploadConanPackageFileWithBody(ctx, accountId, registry, name, version, user, channel, rrev, pkgid, prev, filename, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadConanPackageFileResp(rsp)
+}
+
 // UploadCondaPackageWithBodyWithResponse request with arbitrary body returning *UploadCondaPackageResp
 func (c *ClientWithResponses) UploadCondaPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadCondaPackageResp, error) {
 	rsp, err := c.UploadCondaPackageWithBody(ctx, accountId, registry, contentType, body, reqEditors...)
@@ -2765,6 +3045,38 @@ func ParseUploadComposerPackageResp(rsp *http.Response) (*UploadComposerPackageR
 	}
 
 	response := &UploadComposerPackageResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseUploadConanRecipeFileResp parses an HTTP response from a UploadConanRecipeFileWithResponse call
+func ParseUploadConanRecipeFileResp(rsp *http.Response) (*UploadConanRecipeFileResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadConanRecipeFileResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseUploadConanPackageFileResp parses an HTTP response from a UploadConanPackageFileWithResponse call
+func ParseUploadConanPackageFileResp(rsp *http.Response) (*UploadConanPackageFileResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadConanPackageFileResp{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

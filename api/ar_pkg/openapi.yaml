@@ -1039,6 +1039,158 @@ paths:
           description: Missing or invalid `x-api-key`
         '5XX':
           description: Server-side error
+  /pkg/{accountId}/{registry}/conan/v2/conans/{name}/{version}/{user}/{channel}/revisions/{rrev}/files/{filename}:
+    put:
+      summary: Upload a Conan recipe-layer file
+      operationId: uploadConanRecipeFile
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Conan package name
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Conan package version
+        - name: user
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Conan user ("_" when absent)
+        - name: channel
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Conan channel ("_" when absent)
+        - name: rrev
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Recipe revision
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Recipe-layer file name (e.g. conanfile.py, conanmanifest.txt, conan_export.tgz)
+      security:
+        - ApiKeyAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+              description: Recipe-layer file to upload
+      responses:
+        '200':
+          description: File uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/conan/v2/conans/{name}/{version}/{user}/{channel}/revisions/{rrev}/packages/{pkgid}/revisions/{prev}/files/{filename}:
+    put:
+      summary: Upload a Conan package-layer file
+      operationId: uploadConanPackageFile
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Conan package name
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Conan package version
+        - name: user
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Conan user ("_" when absent)
+        - name: channel
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Conan channel ("_" when absent)
+        - name: rrev
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Recipe revision
+        - name: pkgid
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Conan package_id
+        - name: prev
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Package revision
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Package-layer file name (e.g. conaninfo.txt, conanmanifest.txt, conan_package.tgz)
+      security:
+        - ApiKeyAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+              description: Package-layer file to upload
+      responses:
+        '200':
+          description: File uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '5XX':
+          description: Server-side error
 components:
   securitySchemes:
     ApiKeyAuth:
