@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	//"github.com/harness/harness-cli/module/ar/migrate"
 	//client2 "github.com/harness/harness-cli/util/client"
 	"io"
@@ -41,6 +40,10 @@ type adapter struct {
 	reg       types.RegistryConfig
 	logger    zerolog.Logger
 	pkgClient *pkgclient.ClientWithResponses
+}
+
+func (a *adapter) SearchFiles(registry string) ([]types.SearchedFile, error) {
+	return nil, fmt.Errorf("search Not implemented for this Client")
 }
 
 // Create an adapter section

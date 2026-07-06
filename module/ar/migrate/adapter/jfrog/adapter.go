@@ -1242,6 +1242,16 @@ func (a *adapter) GetFiles(registry string) ([]types.File, error) {
 	return files, nil
 }
 
+func (a *adapter) SearchFiles(registry string) ([]types.SearchedFile, error) {
+	files, err := a.client.SearchFiles(registry)
+	if err != nil {
+		log.Error().Msgf("Failed to search files from registry: %v", err)
+		return nil, fmt.Errorf("failed to search files from registry: %w", err)
+	}
+	log.Info().Msgf("Search files from registry %s ::  %v", registry, files)
+	return files, nil
+}
+
 func (a *adapter) DownloadFile(registry string, uri string) (io.ReadCloser, http.Header, error) {
 	return a.client.GetFile(registry, uri)
 }

@@ -29,6 +29,7 @@ type Adapter interface {
 		artifactType types.ArtifactType,
 	) (versions []types.Version, err error)
 	GetFiles(registry string) ([]types.File, error)
+	SearchFiles(registry string) ([]types.SearchedFile, error)
 	DownloadFile(registry string, uri string) (io.ReadCloser, http.Header, error)
 	UploadFile(
 		registry string,

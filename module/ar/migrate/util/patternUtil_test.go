@@ -2,6 +2,9 @@ package util
 
 import (
 	"testing"
+	"time"
+
+	"github.com/harness/harness-cli/module/ar/migrate/types"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -54,6 +57,43 @@ func TestMatchesWildCardPattern(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := MatchesWildCardPattern(tt.pkg, tt.pattern)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestIsTimeBasedFilterPresent(t *testing.T) {
+	someTime := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name    string
+		mapping *types.RegistryMapping
+		want    bool
+	}{
+		{
+			name:    "both nil — no filter",
+			mapping: &types.RegistryMapping{},
+			want:    false,
+		},
+		{
+			name:    "IncludeCreatedAfter set",
+			mapping: &types.RegistryMapping{IncludeCreatedAfter: &someTime},
+			want:    true,
+		},
+		{
+			name:    "IncludeAccessedAfter set",
+			mapping: &types.RegistryMapping{IncludeAccessedAfter: &someTime},
+			want:    true,
+		},
+		{
+			name:    "both set",
+			mapping: &types.RegistryMapping{IncludeCreatedAfter: &someTime, IncludeAccessedAfter: &someTime},
+			want:    true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IsTimeBasedFilterPresent(tc.mapping))
 		})
 	}
 }

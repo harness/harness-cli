@@ -124,7 +124,7 @@ func (r *Registry) Migrate(ctx context.Context) error {
 	logger.Info().Msg("Starting registry migration step")
 
 	if len(r.mapping.IncludePatterns) > 0 && len(r.mapping.ExcludePatterns) > 0 {
-		logger.Error().Msgf("Either include or Exclude Pattern is suppoted at a time for %s", r.artifactType)
+		logger.Error().Msgf("Either include or Exclude Pattern is supported at a time for %s", r.artifactType)
 		return fmt.Errorf("failed in validating config file for %s ", r.artifactType)
 	}
 
@@ -158,6 +158,28 @@ func (r *Registry) Migrate(ctx context.Context) error {
 				Packages: make(map[string]*types.DryRunPackageEntry),
 			}
 		}
+	}
+
+	if util.IsTimeBasedFilterPresent(r.mapping) {
+
+		//both cannot be present in config
+		if r.mapping.IncludeCreatedAfter != nil && r.mapping.IncludeAccessedAfter != nil {
+			logger.Error().Msgf("Either IncludeCreatedAfter or IncludeAccessedAfter is supported at a time for %s", r.artifactType)
+			return fmt.Errorf("failed in validating config file for %s ", r.artifactType)
+		}
+
+		searchedFiles, err2 := r.srcAdapter.SearchFiles(r.srcRegistry)
+		if err2 != nil {
+			logger.Error().Msgf("Failed to search files from registry %s", r.srcRegistry)
+			return fmt.Errorf("search files from registry %s failed: %w", r.srcRegistry, err2)
+		}
+		logger.Info().Msgf("Applying  time based filter")
+		filteredURIs := util.FilterFilesByTime(searchedFiles, r.mapping)
+		//logger.Info().Msgf("Time-based filter matched %d file(s): %v", len(filteredURIs), filteredURIs)
+		logger.Info().Msgf("Time-based filter matched %d file(s): out of  %d", len(filteredURIs), len(searchedFiles))
+		originalCount := len(files)
+		files = util.FilterFilesByDate(files, filteredURIs)
+		logger.Info().Msgf("Filtered files by date: %d -> %d", originalCount, len(files))
 	}
 
 	// Filter files based on include/exclude patterns

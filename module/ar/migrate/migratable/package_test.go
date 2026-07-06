@@ -20,6 +20,10 @@ import (
 // (DownloadFile, UploadFile). It keeps the test focused on the package-job flow.
 type noopAdapter struct{}
 
+func (noopAdapter) SearchFiles(registry string) ([]types.SearchedFile, error) {
+	return nil, fmt.Errorf("search Not implemented for this Client")
+}
+
 func (noopAdapter) GetKeyChain(string) (authn.Keychain, error) { return nil, nil }
 func (noopAdapter) GetConfig() types.RegistryConfig            { return types.RegistryConfig{} }
 func (noopAdapter) ValidateCredentials() (bool, error)         { return true, nil }
@@ -63,6 +67,10 @@ type fakeSrc struct {
 	content map[string][]byte // uri -> bytes
 }
 
+func (s *fakeSrc) SearchFiles(registry string) ([]types.SearchedFile, error) {
+	return nil, fmt.Errorf("search Not implemented for this Client")
+}
+
 func (s *fakeSrc) DownloadFile(_ string, uri string) (io.ReadCloser, http.Header, error) {
 	b, ok := s.content[uri]
 	if !ok {
@@ -81,6 +89,10 @@ type fakeDest struct {
 	uploaded    []string // f.Name values, in order
 	failSuffix  string   // if non-empty, UploadFile errors when f.Name ends with it
 	drainReader bool
+}
+
+func (d *fakeDest) SearchFiles(registry string) ([]types.SearchedFile, error) {
+	return nil, fmt.Errorf("search Not implemented for this Client")
 }
 
 func (d *fakeDest) UploadFile(

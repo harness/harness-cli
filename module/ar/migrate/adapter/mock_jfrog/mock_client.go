@@ -23,6 +23,7 @@ var testdataFS embed.FS
 type mockClient struct {
 	registries    map[string]jfrog.JFrogRepository
 	files         map[string][]types.File
+	searchedFiles map[string][]types.SearchedFile
 	catalogs      map[string][]string
 	fileContent   map[string][]byte // keyed by "registry/path"
 	binaryContent map[string][]byte
@@ -34,12 +35,14 @@ func NewMockClient() jfrog.Client {
 	c := &mockClient{
 		registries:    make(map[string]jfrog.JFrogRepository),
 		files:         make(map[string][]types.File),
+		searchedFiles: make(map[string][]types.SearchedFile),
 		catalogs:      make(map[string][]string),
 		fileContent:   make(map[string][]byte),
 		binaryContent: make(map[string][]byte),
 	}
 	c.loadRegistries()
 	c.loadFiles()
+	c.loadSearchedFiles()
 	c.loadCatalogs()
 	c.loadContent()
 	c.loadBinaryContent()
@@ -77,6 +80,35 @@ func (c *mockClient) loadFiles() {
 			continue
 		}
 		c.files[registry] = files
+	}
+}
+
+func (c *mockClient) loadSearchedFiles() {
+	entries, err := testdataFS.ReadDir("testdata/search")
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".json") {
+			continue
+		}
+		registry := strings.TrimSuffix(name, ".json")
+		data, err := testdataFS.ReadFile("testdata/search/" + name)
+		if err != nil {
+			continue
+		}
+		type aqlResponse struct {
+			Results []types.SearchedFile `json:"results"`
+		}
+		var resp aqlResponse
+		if err := json.Unmarshal(data, &resp); err != nil {
+			continue
+		}
+		c.searchedFiles[registry] = resp.Results
 	}
 }
 
@@ -355,6 +387,12 @@ func (c *mockClient) GetFiles(registry string) ([]types.File, error) {
 			SHA1:         "da39a3ee5e6b4b0d3255bfef95601890afd80709",
 		},
 	}, nil
+}
+func (c *mockClient) SearchFiles(registry string) ([]types.SearchedFile, error) {
+	if files, exists := c.searchedFiles[registry]; exists {
+		return files, nil
+	}
+	return nil, fmt.Errorf("no search data found for registry '%s'", registry)
 }
 
 func (c *mockClient) GetCatalog(registry string) ([]string, error) {

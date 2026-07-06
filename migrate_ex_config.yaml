@@ -41,6 +41,8 @@ mappings:
     destinationRegistry: dst
   - artifactType: NUGET
     sourceRegistry: src
+    includeCreatedAfter : 2023-01-01T00:00:00.000Z
+    includeAccessedAfter : 2026-06-01T00:00:00.000Z
     destinationRegistry: dst
   - artifactType: NPM
     sourceRegistry: src

@@ -142,6 +142,21 @@ type DryRunVersionEntry struct {
 	Files []DryRunVersionFileEntry `json:"files"`
 }
 
+// DownloadStat represents a single download stat entry for a searched file
+type DownloadStat struct {
+	Downloaded string `json:"downloaded"`
+}
+
+// SearchedFile represents a file entry returned by SearchFiles
+type SearchedFile struct {
+	Repo     string         `json:"repo"`
+	Path     string         `json:"path"`
+	Name     string         `json:"name"`
+	Created  string         `json:"created"`
+	Modified string         `json:"modified"`
+	Stats    []DownloadStat `json:"stats"`
+}
+
 // DryRunStats holds the dry-run statistics
 type DryRunStats struct {
 	Files       []DryRunFileEntry                // All files from GetFiles

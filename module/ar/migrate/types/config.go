@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -72,7 +73,9 @@ type RegistryMapping struct {
 	IncludePatterns []string `yaml:"includePatterns"`
 	ExcludePatterns []string `yaml:"excludePatterns"`
 	//Optional
-	SourcePackageHostname string `yaml:"sourcePackageHostname"`
+	SourcePackageHostname string     `yaml:"sourcePackageHostname"`
+	IncludeCreatedAfter   *time.Time `yaml:"includeCreatedAfter"`
+	IncludeAccessedAfter  *time.Time `yaml:"includeAccessedAfter"`
 }
 
 // CredentialsConfig defines the credential configuration

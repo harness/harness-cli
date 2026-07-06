@@ -43,6 +43,10 @@ type adapter struct {
 	reg    types.RegistryConfig
 }
 
+func (a *adapter) SearchFiles(registry string) ([]types.SearchedFile, error) {
+	return nil, fmt.Errorf("search Not implemented for this Client")
+}
+
 func newAdapter(config types.RegistryConfig) (adp.Adapter, error) {
 	return &adapter{
 		client: newClient(&config),

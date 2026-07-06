@@ -162,6 +162,10 @@ func IsPackageLevelFilterableArtifact(artifactType types.ArtifactType) bool {
 	}
 }
 
+func IsTimeBasedFilterPresent(mapping *types.RegistryMapping) bool {
+	return mapping.IncludeCreatedAfter != nil || mapping.IncludeAccessedAfter != nil
+}
+
 // support * and ?
 func MatchesWildCardPattern(packageName string, pattern string) bool {
 	g, err := glob.Compile(pattern)
