@@ -1,0 +1,83 @@
+[
+  {
+    "Registry": "conan-local",
+    "Name": "conanfile.py",
+    "Uri": "/zlib/1.2.13/_/_/9a0b1c2d3e4f5061728394a5b6c7d8e9/export/conanfile.py",
+    "Folder": false,
+    "Size": 512,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80a01"
+  },
+  {
+    "Registry": "conan-local",
+    "Name": "conan_export.tgz",
+    "Uri": "/zlib/1.2.13/_/_/9a0b1c2d3e4f5061728394a5b6c7d8e9/export/conan_export.tgz",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80a02"
+  },
+  {
+    "Registry": "conan-local",
+    "Name": "conanmanifest.txt",
+    "Uri": "/zlib/1.2.13/_/_/9a0b1c2d3e4f5061728394a5b6c7d8e9/export/conanmanifest.txt",
+    "Folder": false,
+    "Size": 256,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80a03"
+  },
+  {
+    "Registry": "conan-local",
+    "Name": ".conan_metadata.json",
+    "Uri": "/zlib/1.2.13/_/_/9a0b1c2d3e4f5061728394a5b6c7d8e9/index/.conan_metadata.json",
+    "Folder": false,
+    "Size": 64,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80a04"
+  },
+  {
+    "Registry": "conan-local",
+    "Name": "conaninfo.txt",
+    "Uri": "/zlib/1.2.13/_/_/9a0b1c2d3e4f5061728394a5b6c7d8e9/package/abcabcabcabcabcabcabcabcabcabcabcabcabca/1f2e3d4c5b6a7988990a1b2c3d4e5f60/conaninfo.txt",
+    "Folder": false,
+    "Size": 300,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80a05"
+  },
+  {
+    "Registry": "conan-local",
+    "Name": "conan_package.tgz",
+    "Uri": "/zlib/1.2.13/_/_/9a0b1c2d3e4f5061728394a5b6c7d8e9/package/abcabcabcabcabcabcabcabcabcabcabcabcabca/1f2e3d4c5b6a7988990a1b2c3d4e5f60/conan_package.tgz",
+    "Folder": false,
+    "Size": 4096,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80a06"
+  },
+  {
+    "Registry": "conan-local",
+    "Name": "conanmanifest.txt",
+    "Uri": "/zlib/1.2.13/_/_/9a0b1c2d3e4f5061728394a5b6c7d8e9/package/abcabcabcabcabcabcabcabcabcabcabcabcabca/1f2e3d4c5b6a7988990a1b2c3d4e5f60/conanmanifest.txt",
+    "Folder": false,
+    "Size": 128,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80a07"
+  },
+  {
+    "Registry": "conan-local",
+    "Name": "conanfile.py",
+    "Uri": "/mylib/2.0/acme/stable/0011223344556677889900aabbccddee/export/conanfile.py",
+    "Folder": false,
+    "Size": 640,
+    "LastModified": "2023-02-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80b01"
+  },
+  {
+    "Registry": "conan-local",
+    "Name": "conanmanifest.txt",
+    "Uri": "/mylib/2.0/acme/stable/0011223344556677889900aabbccddee/export/conanmanifest.txt",
+    "Folder": false,
+    "Size": 200,
+    "LastModified": "2023-02-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80b02"
+  }
+]

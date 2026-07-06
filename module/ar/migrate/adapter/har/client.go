@@ -523,6 +523,93 @@ func (c *client) uploadCondaFile(
 	return nil
 }
 
+// uploadConanFile PUTs a single Conan file to its recipe (RREV) or package
+// (PKGID/PREV) revision path via the Conan v2 endpoints. Coordinates and the
+// source SHA1 are carried in metadata; the SHA1 rides as X-Checksum-Sha1 so the
+// server can verify the upload. A 409 (immutable-revision conflict) maps to
+// ErrArtifactAlreadyExists so the caller can skip it.
+func (c *client) uploadConanFile(
+	registry string,
+	file io.ReadCloser,
+	metadata map[string]interface{},
+) error {
+	defer file.Close()
+
+	get := func(key string) string {
+		if metadata == nil {
+			return ""
+		}
+		if v, ok := metadata[key].(string); ok {
+			return v
+		}
+		return ""
+	}
+
+	name := get("name")
+	version := get("version")
+	rrev := get("rrev")
+	filename := get("filename")
+	if name == "" || version == "" || rrev == "" || filename == "" {
+		return fmt.Errorf("conan upload: missing required coordinates (name/version/rrev/filename)")
+	}
+
+	user := get("user")
+	if user == "" {
+		user = "_"
+	}
+	channel := get("channel")
+	if channel == "" {
+		channel = "_"
+	}
+
+	sha1 := get("sha1")
+	reqEditor := func(_ context.Context, req *http2.Request) error {
+		if sha1 != "" {
+			req.Header.Set("X-Checksum-Sha1", sha1)
+		}
+		return nil
+	}
+
+	var statusCode int
+	var respBody []byte
+	if get("layer") == "package" {
+		pkgid := get("pkgid")
+		prev := get("prev")
+		if pkgid == "" || prev == "" {
+			return fmt.Errorf("conan upload: missing pkgid/prev for package-layer file %q", filename)
+		}
+		resp, err := c.pkgClient.UploadConanPackageFileWithBodyWithResponse(
+			context.Background(), config.Global.AccountID, registry,
+			name, version, user, channel, rrev, pkgid, prev, filename,
+			"application/octet-stream", file, reqEditor)
+		if err != nil {
+			return fmt.Errorf("failed to upload conan package file %q: %w", filename, err)
+		}
+		statusCode = resp.StatusCode()
+		respBody = resp.Body
+	} else {
+		resp, err := c.pkgClient.UploadConanRecipeFileWithBodyWithResponse(
+			context.Background(), config.Global.AccountID, registry,
+			name, version, user, channel, rrev, filename,
+			"application/octet-stream", file, reqEditor)
+		if err != nil {
+			return fmt.Errorf("failed to upload conan recipe file %q: %w", filename, err)
+		}
+		statusCode = resp.StatusCode()
+		respBody = resp.Body
+	}
+
+	switch {
+	case statusCode == http2.StatusConflict:
+		return types.ErrArtifactAlreadyExists
+	case statusCode >= 200 && statusCode <= 299:
+		return nil
+	default:
+		return fmt.Errorf("failed to upload conan file %q, status code: %d, response: %s",
+			filename, statusCode, string(respBody))
+	}
+}
+
 func (c *client) uploadComposerFile(
 	registry string,
 	filename string,
