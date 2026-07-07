@@ -118,6 +118,13 @@ func (c *client) GetFile(registry string, path string) (io.ReadCloser, http2.Hea
 		return nil, nil, fmt.Errorf("failed to create request for file '%s': %w", path, err)
 	}
 
+	// Read the artifact without bumping its "last downloaded" stats, otherwise a
+	// migration pass would reset every file's last-download timestamp and break
+	// downstream downloadedAfter date filtering.
+	q := req.URL.Query()
+	q.Set("skipUpdateStats", "true")
+	req.URL.RawQuery = q.Encode()
+
 	// Execute request with our client (which handles authentication)
 	resp, err := c.client.Do(req)
 	if err != nil {
