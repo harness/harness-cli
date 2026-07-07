@@ -234,6 +234,11 @@ func (r *Package) Migrate(ctx context.Context) error {
 	}
 
 	if r.artifactType == types.DOCKER || r.artifactType == types.HELM {
+		if r.config.DryRun {
+			logger.Info().Msgf("Dry-run: would copy repository %s/%s to %s", r.srcRegistry, r.pkg.Name, r.destRegistry)
+			return nil
+		}
+
 		srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.sourcePackageHostname, r.pkg.Name)
 		dstImage, _ := r.destAdapter.GetOCIImagePath(r.destRegistry, "", r.pkg.Name)
 
@@ -334,6 +339,10 @@ func (r *Package) Migrate(ctx context.Context) error {
 }
 
 func (r *Package) migrateLegacyHelm(ctx context.Context) error {
+	if r.config.DryRun {
+		log.Info().Ctx(ctx).Msgf("Dry-run: would migrate legacy helm chart %s", r.pkg.URL)
+		return nil
+	}
 	file, _, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.URL)
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download helm chart %s", r.pkg.URL)
@@ -526,6 +535,10 @@ func (r *Package) migrateHelmHTTPProv(ctx context.Context) {
 }
 
 func (r *Package) migrateConda(ctx context.Context) error {
+	if r.config.DryRun {
+		log.Info().Ctx(ctx).Msgf("Dry-run: would migrate conda package %s", r.pkg.Path)
+		return nil
+	}
 	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.Path)
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download conda package %s", r.pkg.Path)
@@ -570,6 +583,10 @@ func (r *Package) migrateConda(ctx context.Context) error {
 }
 
 func (r *Package) migrateRPM(ctx context.Context) error {
+	if r.config.DryRun {
+		log.Info().Ctx(ctx).Msgf("Dry-run: would migrate RPM package %s", r.pkg.URL)
+		return nil
+	}
 	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.URL)
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download RPM package %s", r.pkg.URL)
@@ -602,6 +619,10 @@ func (r *Package) migrateRPM(ctx context.Context) error {
 }
 
 func (r *Package) migrateDebian(ctx context.Context) error {
+	if r.config.DryRun {
+		log.Info().Ctx(ctx).Msgf("Dry-run: would migrate Debian package %s", r.pkg.URL)
+		return nil
+	}
 	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.URL)
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download Debian package %s", r.pkg.URL)
@@ -741,6 +762,10 @@ func (r *Package) migrateDebian(ctx context.Context) error {
 }
 
 func (r *Package) migrateComposer(ctx context.Context) error {
+	if r.config.DryRun {
+		log.Info().Ctx(ctx).Msgf("Dry-run: would migrate Composer package %s", r.pkg.URL)
+		return nil
+	}
 	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.URL)
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download Composer package %s", r.pkg.URL)
@@ -773,6 +798,10 @@ func (r *Package) migrateComposer(ctx context.Context) error {
 }
 
 func (r *Package) migrateSwift(ctx context.Context) error {
+	if r.config.DryRun {
+		log.Info().Ctx(ctx).Msgf("Dry-run: would migrate Swift package %s", r.pkg.URL)
+		return nil
+	}
 	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.URL)
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download Swift package %s", r.pkg.URL)

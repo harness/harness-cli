@@ -277,7 +277,7 @@ var testSearchedFiles = []types.SearchedFile{
 
 func TestFilterFilesByTime_NoFilter(t *testing.T) {
 	mapping := &types.RegistryMapping{}
-	got := FilterFilesByTime(testSearchedFiles, mapping)
+	got := CreateMapOfFilteredFile(testSearchedFiles, mapping)
 	assert.Empty(t, got, "no filter should return empty map")
 }
 
@@ -327,8 +327,8 @@ func TestFilterFilesByTime_IncludeCreatedAfter(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			mapping := &types.RegistryMapping{IncludeCreatedAfter: ptrTime(tc.threshold)}
-			got := FilterFilesByTime(testSearchedFiles, mapping)
+			mapping := &types.RegistryMapping{DateFilter: &types.DateFilter{Match: types.DateFilterMatchAny, CreatedAfter: ptrTime(tc.threshold)}}
+			got := CreateMapOfFilteredFile(testSearchedFiles, mapping)
 			var uris []string
 			for u := range got {
 				uris = append(uris, u)
@@ -380,8 +380,8 @@ func TestFilterFilesByTime_IncludeAccessedAfter(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			mapping := &types.RegistryMapping{IncludeAccessedAfter: ptrTime(tc.threshold)}
-			got := FilterFilesByTime(testSearchedFiles, mapping)
+			mapping := &types.RegistryMapping{DateFilter: &types.DateFilter{Match: types.DateFilterMatchAny, DownloadedAfter: ptrTime(tc.threshold)}}
+			got := CreateMapOfFilteredFile(testSearchedFiles, mapping)
 			var uris []string
 			for u := range got {
 				uris = append(uris, u)
@@ -399,18 +399,18 @@ func TestFilterFilesByTime_InvalidDateSkipped(t *testing.T) {
 	}
 	threshold := mustTime("2020-01-01T00:00:00Z")
 
-	t.Run("IncludeCreatedAfter skips invalid created date", func(t *testing.T) {
-		mapping := &types.RegistryMapping{IncludeCreatedAfter: ptrTime(threshold)}
-		got := FilterFilesByTime(files, mapping)
+	t.Run("createdAfter skips invalid created date", func(t *testing.T) {
+		mapping := &types.RegistryMapping{DateFilter: &types.DateFilter{Match: types.DateFilterMatchAny, CreatedAfter: ptrTime(threshold)}}
+		got := CreateMapOfFilteredFile(files, mapping)
 		// "a.nupkg" has bad created → skipped; "b" and "c" have valid created → matched
 		assert.Contains(t, got, "/b/1.0.0/b.nupkg")
 		assert.Contains(t, got, "/c/1.0.0/c.nupkg")
 		assert.NotContains(t, got, "/a/1.0.0/a.nupkg")
 	})
 
-	t.Run("IncludeAccessedAfter skips invalid downloaded date", func(t *testing.T) {
-		mapping := &types.RegistryMapping{IncludeAccessedAfter: ptrTime(threshold)}
-		got := FilterFilesByTime(files, mapping)
+	t.Run("downloadedAfter skips invalid downloaded date", func(t *testing.T) {
+		mapping := &types.RegistryMapping{DateFilter: &types.DateFilter{Match: types.DateFilterMatchAny, DownloadedAfter: ptrTime(threshold)}}
+		got := CreateMapOfFilteredFile(files, mapping)
 		// "a.nupkg" bad downloaded → skipped; "b.nupkg" bad downloaded → skipped; "c.nupkg" valid → matched
 		assert.Contains(t, got, "/c/1.0.0/c.nupkg")
 		assert.NotContains(t, got, "/a/1.0.0/a.nupkg")
@@ -418,14 +418,119 @@ func TestFilterFilesByTime_InvalidDateSkipped(t *testing.T) {
 	})
 }
 
-func TestFilterFilesByTime_CreatedAfterTakesPriorityOverAccessedAfter(t *testing.T) {
-	threshold := mustTime("2025-01-01T00:00:00Z")
-	// All files have created < threshold, so IncludeCreatedAfter returns 0.
-	// If IncludeAccessedAfter were evaluated, it would return matches.
-	mapping := &types.RegistryMapping{
-		IncludeCreatedAfter:  ptrTime(threshold),
-		IncludeAccessedAfter: ptrTime(mustTime("2020-01-01T00:00:00Z")),
+func TestFilterFilesByTime_AnyMatch_BothFilters(t *testing.T) {
+	// createdAfter=2023-01-01: nuspec(1.0.0), nupkg.sha512(2.0.0), nuspec(2.0.0) — 3 files
+	// downloadedAfter=2026-06-01: nupkg.sha512(2.0.0), nuspec(2.0.0) — 2 files
+	// ANY union: 3 unique files
+	mapping := &types.RegistryMapping{DateFilter: &types.DateFilter{
+		Match:           types.DateFilterMatchAny,
+		CreatedAfter:    ptrTime(mustTime("2023-01-01T00:00:00Z")),
+		DownloadedAfter: ptrTime(mustTime("2026-06-01T00:00:00Z")),
+	}}
+	got := CreateMapOfFilteredFile(testSearchedFiles, mapping)
+	var uris []string
+	for u := range got {
+		uris = append(uris, u)
 	}
-	got := FilterFilesByTime(testSearchedFiles, mapping)
-	assert.Empty(t, got, "IncludeCreatedAfter branch should be evaluated first; no files created after 2025")
+	assert.ElementsMatch(t, []string{
+		"/foo/pkg/1.0.0/pkg.1.0.0.nuspec",
+		"/foo/pkg/2.0.0/pkg.2.0.0.nupkg.sha512",
+		"/foo/pkg/2.0.0/pkg.2.0.0.nuspec",
+	}, uris)
+}
+
+func TestFilterFilesByTime_AllMatch_BothFilters(t *testing.T) {
+	// createdAfter=2023-01-01: nuspec(1.0.0), nupkg.sha512(2.0.0), nuspec(2.0.0)
+	// downloadedAfter=2026-06-01: nupkg.sha512(2.0.0), nuspec(2.0.0)
+	// ALL intersection: nupkg.sha512(2.0.0), nuspec(2.0.0) — 2 files
+	mapping := &types.RegistryMapping{DateFilter: &types.DateFilter{
+		Match:           types.DateFilterMatchAll,
+		CreatedAfter:    ptrTime(mustTime("2023-01-01T00:00:00Z")),
+		DownloadedAfter: ptrTime(mustTime("2026-06-01T00:00:00Z")),
+	}}
+	got := CreateMapOfFilteredFile(testSearchedFiles, mapping)
+	var uris []string
+	for u := range got {
+		uris = append(uris, u)
+	}
+	assert.ElementsMatch(t, []string{
+		"/foo/pkg/2.0.0/pkg.2.0.0.nupkg.sha512",
+		"/foo/pkg/2.0.0/pkg.2.0.0.nuspec",
+	}, uris)
+}
+
+// ── ValidateDateFilter ────────────────────────────────────────────────────────
+
+func TestValidateDateFilter(t *testing.T) {
+	createdAfter := mustTime("2024-01-01T00:00:00Z")
+	downloadedAfter := mustTime("2024-06-01T00:00:00Z")
+
+	tests := []struct {
+		name    string
+		df      *types.DateFilter
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "valid ANY with createdAfter only",
+			df:      &types.DateFilter{Match: types.DateFilterMatchAny, CreatedAfter: &createdAfter},
+			wantErr: false,
+		},
+		{
+			name:    "valid ANY with downloadedAfter only",
+			df:      &types.DateFilter{Match: types.DateFilterMatchAny, DownloadedAfter: &downloadedAfter},
+			wantErr: false,
+		},
+		{
+			name:    "valid ANY with both dates",
+			df:      &types.DateFilter{Match: types.DateFilterMatchAny, CreatedAfter: &createdAfter, DownloadedAfter: &downloadedAfter},
+			wantErr: false,
+		},
+		{
+			name:    "valid ALL with createdAfter only",
+			df:      &types.DateFilter{Match: types.DateFilterMatchAll, CreatedAfter: &createdAfter},
+			wantErr: false,
+		},
+		{
+			name:    "valid ALL with both dates",
+			df:      &types.DateFilter{Match: types.DateFilterMatchAll, CreatedAfter: &createdAfter, DownloadedAfter: &downloadedAfter},
+			wantErr: false,
+		},
+		{
+			name:    "invalid match value",
+			df:      &types.DateFilter{Match: "INVALID", CreatedAfter: &createdAfter},
+			wantErr: true,
+			errMsg:  "dateFilter.match must be 'ANY' or 'ALL'",
+		},
+		{
+			name:    "empty match value",
+			df:      &types.DateFilter{Match: "", CreatedAfter: &createdAfter},
+			wantErr: true,
+			errMsg:  "dateFilter.match must be 'ANY' or 'ALL'",
+		},
+		{
+			name:    "no dates provided",
+			df:      &types.DateFilter{Match: types.DateFilterMatchAny},
+			wantErr: true,
+			errMsg:  "neither createdAfter nor downloadedAfter is specified",
+		},
+		{
+			name:    "invalid match and no dates",
+			df:      &types.DateFilter{Match: "NONE"},
+			wantErr: true,
+			errMsg:  "dateFilter.match must be 'ANY' or 'ALL'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateDateFilter(tt.df)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

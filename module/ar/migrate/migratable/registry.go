@@ -162,10 +162,10 @@ func (r *Registry) Migrate(ctx context.Context) error {
 
 	if util.IsTimeBasedFilterPresent(r.mapping) {
 
-		//both cannot be present in config
-		if r.mapping.IncludeCreatedAfter != nil && r.mapping.IncludeAccessedAfter != nil {
-			logger.Error().Msgf("Either IncludeCreatedAfter or IncludeAccessedAfter is supported at a time for %s", r.artifactType)
-			return fmt.Errorf("failed in validating config file for %s ", r.artifactType)
+		df := r.mapping.DateFilter
+		if err := util.ValidateDateFilter(df); err != nil {
+			logger.Error().Err(err).Msg("Date filter validation failed")
+			return err
 		}
 
 		searchedFiles, err2 := r.srcAdapter.SearchFiles(r.srcRegistry)
@@ -173,13 +173,12 @@ func (r *Registry) Migrate(ctx context.Context) error {
 			logger.Error().Msgf("Failed to search files from registry %s", r.srcRegistry)
 			return fmt.Errorf("search files from registry %s failed: %w", r.srcRegistry, err2)
 		}
-		logger.Info().Msgf("Applying  time based filter")
-		filteredURIs := util.FilterFilesByTime(searchedFiles, r.mapping)
-		//logger.Info().Msgf("Time-based filter matched %d file(s): %v", len(filteredURIs), filteredURIs)
-		logger.Info().Msgf("Time-based filter matched %d file(s): out of  %d", len(filteredURIs), len(searchedFiles))
+		logger.Info().Msgf("Applying time based filter (match: %s)", df.Match)
+		filteredURIs := util.CreateMapOfFilteredFile(searchedFiles, r.mapping)
+		logger.Info().Msgf("Time-based filter include %d file(s): out of  %d", len(filteredURIs), len(searchedFiles))
 		originalCount := len(files)
 		files = util.FilterFilesByDate(files, filteredURIs)
-		logger.Info().Msgf("Filtered files by date: %d -> %d", originalCount, len(files))
+		logger.Info().Msgf("Count of filtered files by date filter out of: %d -> %d", originalCount, len(files))
 	}
 
 	// Filter files based on include/exclude patterns

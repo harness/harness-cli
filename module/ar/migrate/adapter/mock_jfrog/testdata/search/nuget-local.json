@@ -14,30 +14,6 @@
     },
     {
       "repo": "nuget-local",
-      "path": "foo/company.grpc.pkg/1.0.0",
-      "name": "company.grpc.pkg.1.0.0.nupkg.sha512",
-      "created": "2023-01-01T00:00:00.000Z",
-      "modified": "2023-01-01T00:00:00.000Z",
-      "stats": [
-        {
-          "downloaded": "2023-01-01T00:00:00.000Z"
-        }
-      ]
-    },
-    {
-      "repo": "nuget-local",
-      "path": "foo/company.grpc.pkg/1.0.0",
-      "name": "company.grpc.pkg.nuspec",
-      "created": "2023-01-01T00:00:00.000Z",
-      "modified": "2023-01-01T00:00:00.000Z",
-      "stats": [
-        {
-          "downloaded": "2022-06-22T17:58:42.000Z"
-        }
-      ]
-    },
-    {
-      "repo": "nuget-local",
       "path": "foo/company.grpc.pkg/2.0.0",
       "name": "company.grpc.pkg.2.0.0.nupkg",
       "created": "2020-02-01T00:00:00.000Z",
@@ -57,6 +33,30 @@
       "stats": [
         {
           "downloaded": "2026-05-01T18:00:11.000Z"
+        }
+      ]
+    },
+    {
+      "repo": "nuget-local",
+      "path": "foo/company.grpc.pkg/1.0.0",
+      "name": "company.grpc.pkg.1.0.0.nupkg.sha512",
+      "created": "2023-01-01T00:00:00.000Z",
+      "modified": "2023-01-01T00:00:00.000Z",
+      "stats": [
+        {
+          "downloaded": "2023-01-01T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "repo": "nuget-local",
+      "path": "foo/company.grpc.pkg/1.0.0",
+      "name": "company.grpc.pkg.nuspec",
+      "created": "2023-01-01T00:00:00.000Z",
+      "modified": "2023-01-01T00:00:00.000Z",
+      "stats": [
+        {
+          "downloaded": "2022-06-22T17:58:42.000Z"
         }
       ]
     },

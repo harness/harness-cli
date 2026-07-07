@@ -163,7 +163,11 @@ func IsPackageLevelFilterableArtifact(artifactType types.ArtifactType) bool {
 }
 
 func IsTimeBasedFilterPresent(mapping *types.RegistryMapping) bool {
-	return mapping.IncludeCreatedAfter != nil || mapping.IncludeAccessedAfter != nil
+	if mapping.DateFilter != nil {
+		return true
+	}
+	return false
+
 }
 
 // support * and ?
