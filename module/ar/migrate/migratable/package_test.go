@@ -335,6 +335,9 @@ func TestMigrateHelmHTTPChartUploadFails(t *testing.T) {
 // core of the MANIFEST_UNKNOWN fix: one orphaned JFrog tag must not abort the
 // whole image.
 func TestIsStaleSourceManifestErr(t *testing.T) {
+	const srcHost = "src.registry.example"
+	const dstHost = "dst.registry.example"
+
 	// transportErr builds a *transport.Error carrying a single diagnostic code,
 	// mirroring what go-containerregistry surfaces from a registry v2 response.
 	transportErr := func(code transport.ErrorCode, status int) *transport.Error {
@@ -342,6 +345,13 @@ func TestIsStaleSourceManifestErr(t *testing.T) {
 			Errors:     []transport.Diagnostic{{Code: code, Message: string(code)}},
 			StatusCode: status,
 		}
+	}
+	// withHost attaches the failing request's host so the classifier can tell a
+	// source-fetch failure from a destination-push failure.
+	withHost := func(terr *transport.Error, host string) *transport.Error {
+		req, _ := http.NewRequest(http.MethodGet, "https://"+host+"/v2/repo/manifests/tag", nil)
+		terr.Request = req
+		return terr
 	}
 
 	tests := []struct {
@@ -368,11 +378,34 @@ func TestIsStaleSourceManifestErr(t *testing.T) {
 			fmt.Errorf("copying tag: %w", transportErr(transport.ManifestUnknownErrorCode, http.StatusNotFound)),
 			true,
 		},
+		// Host discrimination: crane.Copy conflates source-fetch and
+		// destination-push errors, so the same 404-class code means "skip"
+		// against the source but "genuine failure" against the destination.
+		{
+			"manifest unknown from SOURCE host is skippable",
+			withHost(transportErr(transport.ManifestUnknownErrorCode, http.StatusNotFound), srcHost),
+			true,
+		},
+		{
+			"manifest unknown from DESTINATION host is a real failure",
+			withHost(transportErr(transport.ManifestUnknownErrorCode, http.StatusNotFound), dstHost),
+			false,
+		},
+		{
+			"blob unknown from DESTINATION push is a real failure",
+			withHost(transportErr(transport.BlobUnknownErrorCode, http.StatusNotFound), dstHost),
+			false,
+		},
+		{
+			"bare 404 from DESTINATION push is a real failure",
+			withHost(&transport.Error{StatusCode: http.StatusNotFound}, dstHost),
+			false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isStaleSourceManifestErr(tt.err); got != tt.want {
+			if got := isStaleSourceManifestErr(tt.err, srcHost); got != tt.want {
 				t.Errorf("isStaleSourceManifestErr(%v) = %v, want %v", tt.err, got, tt.want)
 			}
 		})

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -36,6 +37,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/errgroup"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
 )
@@ -303,10 +305,12 @@ func (r *Package) Migrate(ctx context.Context) error {
 // and aborts every remaining tag, marking the whole image as failed.
 //
 // So we only pay for isolation when we have to: if the bulk copy fails, we fall
-// back to copyTagsIndividually, which walks the tags one at a time, skips any
-// whose SOURCE manifest is missing/orphaned, and lets the rest through. Either
-// way the image contributes exactly ONE stat (success or fail) — the same
-// granularity as before, not one per tag.
+// back to copyTagsIndividually, which walks the tags in parallel, skips any
+// whose SOURCE manifest is missing/orphaned, and lets the rest through. The
+// image contributes exactly ONE stat — the same granularity as before, not one
+// per tag — but that stat is honest: it is only Success when at least one tag
+// actually migrated (or every tag was already present), Fail on a genuine
+// per-tag failure, and Skip when there was nothing to do.
 func (r *Package) migrateOCI(ctx context.Context, logger zerolog.Logger) {
 	srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.sourcePackageHostname, r.pkg.Name)
 	dstImage, _ := r.destAdapter.GetOCIImagePath(r.destRegistry, "", r.pkg.Name)
@@ -348,118 +352,178 @@ func (r *Package) migrateOCI(ctx context.Context, logger zerolog.Logger) {
 		pterm.Success.Println(fmt.Sprintf("Copy repository %s to %s completed", srcImage, dstImage))
 		r.stats.FileStats = append(r.stats.FileStats, stat)
 		return
-	} else {
-		log.Warn().Ctx(ctx).Err(err).
-			Msgf("Bulk copy of %s failed; retrying tag-by-tag to isolate stale/orphaned tags", srcImage)
-		pterm.Warning.Println(fmt.Sprintf(
-			"Bulk copy of %s failed (%v); retrying tag-by-tag", srcImage, err))
 	}
+	log.Warn().Ctx(ctx).
+		Msgf("Bulk copy of %s failed; retrying tag-by-tag to isolate stale/orphaned tags", srcImage)
+	pterm.Warning.Println(fmt.Sprintf("Bulk copy of %s failed; retrying tag-by-tag", srcImage))
 
 	// Slow path: a bad tag took down the bulk copy. Retry per tag so orphaned
 	// source manifests are skipped and the rest of the image still migrates.
 	// Tags already pushed by the bulk attempt are skipped by no-clobber.
-	if err := r.copyTagsIndividually(ctx, logger, srcImage, dstImage, craneOpts); err != nil {
-		log.Error().Ctx(ctx).Err(err).Msgf("Failed to copy repository %s to %s %v", srcImage, dstImage, err)
+	res, err := r.copyTagsIndividually(ctx, logger, srcImage, dstImage, craneOpts)
+	switch {
+	case err != nil:
+		log.Error().Ctx(ctx).Err(err).Msgf("Failed to copy repository %s to %s", srcImage, dstImage)
 		pterm.Error.Println(fmt.Sprintf("Failed to copy repository %s to %s", srcImage, dstImage))
 		stat.Error = err.Error()
 		stat.Status = types.StatusFail
-	} else {
+	case res.migrated == 0 && res.skipped == 0:
+		// No tags at all: nothing was copied and nothing was pre-existing.
+		// Recording Success here would mask a source that resolved to an empty
+		// repository, so mark it Skip instead.
+		stat.Status = types.StatusSkip
+		pterm.Warning.Println(fmt.Sprintf("Repository %s had no tags to copy", srcImage))
+	case res.migrated == 0:
+		// Every tag was already present (or an orphaned source we skipped); the
+		// image is effectively in sync, so this is a success.
+		pterm.Success.Println(fmt.Sprintf(
+			"Copy repository %s to %s completed (all %d tags already present/skipped)", srcImage, dstImage, res.skipped))
+	default:
 		pterm.Success.Println(fmt.Sprintf("Copy repository %s to %s completed", srcImage, dstImage))
 	}
 	r.stats.FileStats = append(r.stats.FileStats, stat)
 }
 
+// copyResult summarises the outcome of a per-tag copy pass so the caller can
+// choose a single honest image-level stat.
+type copyResult struct {
+	migrated int
+	skipped  int
+	failed   int
+	total    int
+}
+
 // copyTagsIndividually copies each tag of an image independently so one bad tag
-// cannot abort the rest. A tag whose SOURCE manifest is missing/orphaned is
-// skipped; any other per-tag error is a genuine failure. It returns a non-nil
+// cannot abort the rest. The tags are copied in parallel (bounded by the
+// configured concurrency), but — unlike the bulk path — a single tag's failure
+// never cancels its siblings. A tag whose SOURCE manifest is missing/orphaned is
+// skipped; a tag already present at the destination is skipped (no-clobber); any
+// other per-tag error is a genuine failure. It returns a summary plus a non-nil
 // error iff at least one tag genuinely failed, so the caller can set a single
 // image-level stat — this function does NOT touch r.stats.FileStats itself.
 func (r *Package) copyTagsIndividually(
 	ctx context.Context, logger zerolog.Logger, srcImage, dstImage string, craneOpts []crane.Option,
-) error {
+) (copyResult, error) {
+	var res copyResult
+
+	// Resolve the SOURCE registry host once. crane.Copy conflates source-fetch
+	// and destination-push errors into one *transport.Error, so we key the
+	// stale-manifest classifier on the failing request's host: only a not-found
+	// against the SOURCE is a stale/orphaned manifest we may skip.
+	srcHost := ""
+	if srcRepo, perr := name.NewRepository(srcImage, crane.GetOptions(craneOpts...).Name...); perr == nil {
+		srcHost = srcRepo.RegistryStr()
+	}
+
 	// Enumerate source tags. A failure here is a genuine image-level failure
 	// (auth, DNS, repository gone) — there is nothing to iterate.
 	tags, err := crane.ListTags(srcImage, craneOpts...)
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to list tags for %s", srcImage)
-		return fmt.Errorf("list source tags for %s: %w", srcImage, err)
+		return res, fmt.Errorf("list source tags for %s: %w", srcImage, err)
+	}
+	res.total = len(tags)
+
+	// No-clobber is left to crane.Copy (craneOpts still carries WithNoClobber):
+	// an already-present destination tag comes back as a "refusing to clobber"
+	// error, which we count as skipped. This avoids a second, divergent
+	// destination tag-listing here.
+	var (
+		mu         sync.Mutex
+		failedErrs []error
+	)
+	g, _ := errgroup.WithContext(ctx)
+	if r.config.Concurrency > 0 {
+		g.SetLimit(r.config.Concurrency)
 	}
 
-	// Honour no-clobber: pre-list destination tags once so already-migrated tags
-	// (including any pushed by the failed bulk attempt) are skipped without a
-	// per-tag HEAD. Best-effort — a listing failure (e.g. the destination
-	// repository does not exist yet) just means nothing to skip.
-	existing := map[string]struct{}{}
-	if !r.config.Overwrite {
-		if dstTags, derr := crane.ListTags(dstImage, craneOpts...); derr == nil {
-			for _, t := range dstTags {
-				existing[t] = struct{}{}
-			}
-		} else {
-			logger.Debug().Err(derr).Msgf("Could not list destination tags for %s (assuming none exist yet)", dstImage)
-		}
-	}
-
-	var migrated, skipped int
-	var failedErrs []error
 	for _, tag := range tags {
-		src := fmt.Sprintf("%s:%s", srcImage, tag)
-		dst := fmt.Sprintf("%s:%s", dstImage, tag)
+		g.Go(func() error {
+			src := fmt.Sprintf("%s:%s", srcImage, tag)
+			dst := fmt.Sprintf("%s:%s", dstImage, tag)
 
-		if _, ok := existing[tag]; ok {
-			skipped++
-			logger.Info().Ctx(ctx).Msgf("Skipping %s: already exists at destination (no-clobber)", dst)
-			continue
-		}
+			copyErr := crane.Copy(src, dst, craneOpts...)
 
-		if copyErr := crane.Copy(src, dst, craneOpts...); copyErr != nil {
-			if isStaleSourceManifestErr(copyErr) {
-				// Orphaned/stale source manifest — the registry tag references a
-				// manifest digest that no longer exists. Skip this tag and keep
-				// migrating the rest of the image.
-				skipped++
+			mu.Lock()
+			defer mu.Unlock()
+			switch {
+			case copyErr == nil:
+				res.migrated++
+				pterm.Success.Println(fmt.Sprintf("Copied %s to %s", src, dst))
+			case isAlreadyExistsErr(copyErr):
+				res.skipped++
+				logger.Info().Ctx(ctx).Msgf("Skipping %s: already exists at destination (no-clobber)", dst)
+			case isStaleSourceManifestErr(copyErr, srcHost):
+				// Orphaned/stale SOURCE manifest — the registry tag references a
+				// manifest digest that no longer exists at the source. Skip this
+				// tag and keep migrating the rest of the image.
+				res.skipped++
 				logger.Warn().Ctx(ctx).Err(copyErr).
 					Msgf("Skipping tag %s: source manifest missing/orphaned", src)
 				pterm.Warning.Println(fmt.Sprintf("Skipping %s: source manifest missing/orphaned (%v)", src, copyErr))
-			} else {
+			default:
 				failedErrs = append(failedErrs, fmt.Errorf("%s: %w", tag, copyErr))
 				logger.Error().Ctx(ctx).Err(copyErr).Msgf("Failed to copy tag %s to %s", src, dst)
 				pterm.Error.Println(fmt.Sprintf("Failed to copy %s to %s", src, dst))
 			}
-		} else {
-			migrated++
-			pterm.Success.Println(fmt.Sprintf("Copied %s to %s", src, dst))
-		}
+			// Never return the error: a per-tag failure must not cancel the
+			// group and abort the remaining tags — isolation is the whole point.
+			return nil
+		})
 	}
+	_ = g.Wait()
+	res.failed = len(failedErrs)
 
 	logger.Info().Ctx(ctx).
-		Int("migrated", migrated).
-		Int("skipped", skipped).
-		Int("failed", len(failedErrs)).
-		Int("total_tags", len(tags)).
+		Int("migrated", res.migrated).
+		Int("skipped", res.skipped).
+		Int("failed", res.failed).
+		Int("total_tags", res.total).
 		Msgf("Completed per-tag OCI repository copy %s to %s", srcImage, dstImage)
 	pterm.Info.Println(fmt.Sprintf(
 		"Repository %s: %d migrated, %d skipped, %d failed (of %d tags)",
-		r.pkg.Name, migrated, skipped, len(failedErrs), len(tags)))
+		r.pkg.Name, res.migrated, res.skipped, res.failed, res.total))
 
 	if len(failedErrs) > 0 {
-		return fmt.Errorf("%d of %d tags failed to copy: %w", len(failedErrs), len(tags), errors.Join(failedErrs...))
+		return res, fmt.Errorf("%d of %d tags failed to copy: %w", len(failedErrs), res.total, errors.Join(failedErrs...))
 	}
-	return nil
+	return res, nil
+}
+
+// isAlreadyExistsErr reports whether err is crane.Copy's no-clobber signal that
+// the destination tag already exists. crane returns a plain formatted error
+// ("refusing to clobber existing tag ...") for this case rather than a
+// transport.Error, so we match on that stable message. This is tied to the
+// crane version pinned in go.mod.
+func isAlreadyExistsErr(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "refusing to clobber")
 }
 
 // isStaleSourceManifestErr reports whether err indicates that the SOURCE
 // manifest/blob a tag points at does not exist. These are the Docker registry
 // v2 error codes returned when a referenced manifest/blob is gone, plus a bare
 // 404 with no structured body. Such tags are safe to skip so the rest of the
-// image can migrate; any other error (auth, quota, network, destination-side
-// push failure) is a real failure and must NOT be swallowed.
-func isStaleSourceManifestErr(err error) bool {
+// image can migrate.
+//
+// crane.Copy pulls from the source (including lazy child-manifest fetches while
+// pushing a manifest list) and pushes to the destination, surfacing both as one
+// *transport.Error. So a not-found-class error is only treated as a stale SOURCE
+// manifest when the failing request targeted the source registry (srcHost); the
+// same code from the DESTINATION push is a genuine failure and must NOT be
+// swallowed. When the request host cannot be determined we fall back to the
+// error code/status alone.
+func isStaleSourceManifestErr(err error, srcHost string) bool {
 	if err == nil {
 		return false
 	}
 	var terr *transport.Error
 	if !errors.As(err, &terr) {
+		return false
+	}
+	if srcHost != "" && terr.Request != nil && terr.Request.URL != nil &&
+		terr.Request.URL.Host != srcHost {
+		// The failing request went to a registry other than the source (i.e. the
+		// destination push) — not a stale source manifest.
 		return false
 	}
 	for _, d := range terr.Errors {
