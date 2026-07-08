@@ -12,6 +12,7 @@ import (
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 
 	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	"github.com/rs/zerolog"
 )
 
@@ -325,6 +326,56 @@ func TestMigrateHelmHTTPChartUploadFails(t *testing.T) {
 	}
 	if len(dest.uploaded) != 0 {
 		t.Errorf("no successful uploads expected, got %v", dest.uploaded)
+	}
+}
+
+// TestIsStaleSourceManifestErr verifies the classifier that decides whether a
+// per-tag copy failure is a stale/orphaned SOURCE manifest (skip the tag, keep
+// migrating the image) versus a genuine failure (record Failed). This is the
+// core of the MANIFEST_UNKNOWN fix: one orphaned JFrog tag must not abort the
+// whole image.
+func TestIsStaleSourceManifestErr(t *testing.T) {
+	// transportErr builds a *transport.Error carrying a single diagnostic code,
+	// mirroring what go-containerregistry surfaces from a registry v2 response.
+	transportErr := func(code transport.ErrorCode, status int) *transport.Error {
+		return &transport.Error{
+			Errors:     []transport.Diagnostic{{Code: code, Message: string(code)}},
+			StatusCode: status,
+		}
+	}
+
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"manifest unknown (the reported bug)", transportErr(transport.ManifestUnknownErrorCode, http.StatusNotFound), true},
+		{"manifest blob unknown", transportErr(transport.ManifestBlobUnknownErrorCode, http.StatusNotFound), true},
+		{"blob unknown", transportErr(transport.BlobUnknownErrorCode, http.StatusNotFound), true},
+		{"name unknown", transportErr(transport.NameUnknownErrorCode, http.StatusNotFound), true},
+		{
+			"bare 404 with no structured body",
+			&transport.Error{StatusCode: http.StatusNotFound},
+			true,
+		},
+		{"unauthorized is a real failure", transportErr(transport.UnauthorizedErrorCode, http.StatusUnauthorized), false},
+		{"denied is a real failure", transportErr(transport.DeniedErrorCode, http.StatusForbidden), false},
+		{"too many requests is a real failure", transportErr(transport.TooManyRequestsErrorCode, http.StatusTooManyRequests), false},
+		{"non-transport error", fmt.Errorf("dial tcp: connection refused"), false},
+		{
+			"wrapped manifest unknown is still detected",
+			fmt.Errorf("copying tag: %w", transportErr(transport.ManifestUnknownErrorCode, http.StatusNotFound)),
+			true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isStaleSourceManifestErr(tt.err); got != tt.want {
+				t.Errorf("isStaleSourceManifestErr(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
 	}
 }
 

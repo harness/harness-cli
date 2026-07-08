@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path"
 	"strings"
@@ -28,6 +29,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	"github.com/google/go-containerregistry/pkg/v1/static"
 	types2 "github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/google/uuid"
@@ -239,55 +241,7 @@ func (r *Package) Migrate(ctx context.Context) error {
 			return nil
 		}
 
-		srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.sourcePackageHostname, r.pkg.Name)
-		dstImage, _ := r.destAdapter.GetOCIImagePath(r.destRegistry, "", r.pkg.Name)
-
-		pterm.Info.Println(fmt.Sprintf("Copying repository %s to %s", srcImage, dstImage))
-		logger.Info().Ctx(ctx).Msgf("Copying repository %s to %s", srcImage, dstImage)
-
-		stat := types.FileStat{
-			Name:     r.pkg.Name,
-			Registry: r.srcRegistry,
-			Uri:      srcImage,
-			Size:     0,
-			Status:   types.StatusSuccess,
-		}
-
-		keyChain, err := lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.sourcePackageHostname)
-		if err != nil {
-			log.Error().Ctx(ctx).Err(err).Msgf("Failed to create keyChain: %v", err)
-			pterm.Error.Println(fmt.Sprintf("Failed to create keyChain: %v", err))
-			stat.Error = err.Error()
-			stat.Status = types.StatusFail
-		}
-
-		craneOpts := []crane.Option{
-			crane.WithUserAgent("harness-cli"),
-			crane.WithContext(ctx),
-			crane.WithJobs(r.config.Concurrency),
-			crane.WithNoClobber(!r.config.Overwrite),
-			crane.WithAuthFromKeychain(keyChain),
-		}
-
-		if r.srcAdapter.GetConfig().Insecure {
-			craneOpts = append(craneOpts, crane.Insecure)
-		}
-
-		err = crane.CopyRepository(
-			srcImage,
-			dstImage,
-			craneOpts...,
-		)
-
-		if err != nil {
-			log.Error().Ctx(ctx).Err(err).Msgf("Failed to copy repository %s to %s %v", srcImage, dstImage, err)
-			pterm.Error.Println(fmt.Sprintf("Failed to copy repository %s to %s", srcImage, dstImage))
-			stat.Error = err.Error()
-			stat.Status = types.StatusFail
-		} else {
-			pterm.Success.Println(fmt.Sprintf("Copy repository %s to %s completed", srcImage, dstImage))
-		}
-		r.stats.FileStats = append(r.stats.FileStats, stat)
+		r.migrateOCI(ctx, logger)
 
 	} else if r.artifactType == types.HELM_LEGACY {
 		// TODO: Replace by providing function to this migration job instead of complete implementation here.
@@ -336,6 +290,173 @@ func (r *Package) Migrate(ctx context.Context) error {
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed package migration step")
 	return nil
+}
+
+// migrateOCI copies a Docker/Helm-OCI image repository from source to
+// destination one tag at a time.
+//
+// It deliberately does NOT use crane.CopyRepository: that helper copies every
+// tag inside a single errgroup, so the first tag whose manifest cannot be
+// fetched (e.g. a stale JFrog tag folder whose list.manifest.json references a
+// platform-manifest digest that was garbage-collected when a newer image was
+// pushed — the registry answers MANIFEST_UNKNOWN) cancels the shared context
+// and aborts every remaining tag, marking the whole image as failed (AH: 10
+// build-images consistently failing on the daily migration).
+//
+// Instead we iterate tags and copy each independently. A tag whose SOURCE
+// manifest is missing/orphaned is recorded as Skipped and the loop continues;
+// any other per-tag error is recorded as Failed and the loop continues. One bad
+// tag can no longer take down the rest of the image, and the summary shows
+// exactly which tags moved, which were skipped, and why.
+func (r *Package) migrateOCI(ctx context.Context, logger zerolog.Logger) {
+	srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.sourcePackageHostname, r.pkg.Name)
+	dstImage, _ := r.destAdapter.GetOCIImagePath(r.destRegistry, "", r.pkg.Name)
+
+	pterm.Info.Println(fmt.Sprintf("Copying repository %s to %s", srcImage, dstImage))
+	logger.Info().Ctx(ctx).Msgf("Copying repository %s to %s", srcImage, dstImage)
+
+	keyChain, err := lib.CreateCraneKeychain(r.srcAdapter, r.destAdapter, r.sourcePackageHostname)
+	if err != nil {
+		log.Error().Ctx(ctx).Err(err).Msgf("Failed to create keyChain: %v", err)
+		pterm.Error.Println(fmt.Sprintf("Failed to create keyChain: %v", err))
+		r.stats.FileStats = append(r.stats.FileStats, types.FileStat{
+			Name:     r.pkg.Name,
+			Registry: r.srcRegistry,
+			Uri:      srcImage,
+			Status:   types.StatusFail,
+			Error:    err.Error(),
+		})
+		return
+	}
+
+	craneOpts := []crane.Option{
+		crane.WithUserAgent("harness-cli"),
+		crane.WithContext(ctx),
+		crane.WithJobs(r.config.Concurrency),
+		crane.WithNoClobber(!r.config.Overwrite),
+		crane.WithAuthFromKeychain(keyChain),
+	}
+	if r.srcAdapter.GetConfig().Insecure {
+		craneOpts = append(craneOpts, crane.Insecure)
+	}
+
+	// Enumerate source tags. A failure here is a genuine image-level failure
+	// (auth, DNS, repository gone) — there is nothing to iterate, so record one
+	// Failed stat for the image and return.
+	tags, err := crane.ListTags(srcImage, craneOpts...)
+	if err != nil {
+		log.Error().Ctx(ctx).Err(err).Msgf("Failed to list tags for %s", srcImage)
+		pterm.Error.Println(fmt.Sprintf("Failed to list tags for %s: %v", srcImage, err))
+		r.stats.FileStats = append(r.stats.FileStats, types.FileStat{
+			Name:     r.pkg.Name,
+			Registry: r.srcRegistry,
+			Uri:      srcImage,
+			Status:   types.StatusFail,
+			Error:    err.Error(),
+		})
+		return
+	}
+
+	// Honour no-clobber: pre-list destination tags once so already-migrated tags
+	// are skipped without a per-tag HEAD. Best-effort — a listing failure (e.g.
+	// the destination repository does not exist yet) just means nothing to skip.
+	existing := map[string]struct{}{}
+	if !r.config.Overwrite {
+		if dstTags, derr := crane.ListTags(dstImage, craneOpts...); derr == nil {
+			for _, t := range dstTags {
+				existing[t] = struct{}{}
+			}
+		} else {
+			logger.Debug().Err(derr).Msgf("Could not list destination tags for %s (assuming none exist yet)", dstImage)
+		}
+	}
+
+	var migrated, skipped, failed int
+	for _, tag := range tags {
+		src := fmt.Sprintf("%s:%s", srcImage, tag)
+		dst := fmt.Sprintf("%s:%s", dstImage, tag)
+
+		if _, ok := existing[tag]; ok {
+			// Pre() already records existing destination tags as Skipped; avoid
+			// double-counting by only logging here.
+			logger.Info().Ctx(ctx).Msgf("Skipping %s: already exists at destination (no-clobber)", dst)
+			continue
+		}
+
+		stat := types.FileStat{
+			Name:     r.pkg.Name,
+			Registry: r.srcRegistry,
+			Uri:      src,
+			Status:   types.StatusSuccess,
+		}
+
+		if copyErr := crane.Copy(src, dst, craneOpts...); copyErr != nil {
+			if isStaleSourceManifestErr(copyErr) {
+				// Orphaned/stale source manifest — the JFrog catalog references a
+				// platform-manifest digest that no longer exists. Skip this tag
+				// and keep migrating the rest of the image.
+				stat.Status = types.StatusSkip
+				stat.Error = copyErr.Error()
+				skipped++
+				logger.Warn().Ctx(ctx).Err(copyErr).
+					Msgf("Skipping tag %s: source manifest missing/orphaned (stale JFrog reference)", src)
+				pterm.Warning.Println(fmt.Sprintf("Skipping %s: source manifest missing/orphaned (%v)", src, copyErr))
+			} else {
+				stat.Status = types.StatusFail
+				stat.Error = copyErr.Error()
+				failed++
+				logger.Error().Ctx(ctx).Err(copyErr).Msgf("Failed to copy tag %s to %s", src, dst)
+				pterm.Error.Println(fmt.Sprintf("Failed to copy %s to %s", src, dst))
+			}
+		} else {
+			migrated++
+			pterm.Success.Println(fmt.Sprintf("Copied %s to %s", src, dst))
+		}
+		r.stats.FileStats = append(r.stats.FileStats, stat)
+	}
+
+	logger.Info().Ctx(ctx).
+		Int("migrated", migrated).
+		Int("skipped", skipped).
+		Int("failed", failed).
+		Int("total_tags", len(tags)).
+		Msgf("Completed OCI repository copy %s to %s", srcImage, dstImage)
+	pterm.Info.Println(fmt.Sprintf(
+		"Repository %s: %d migrated, %d skipped, %d failed (of %d tags)",
+		r.pkg.Name, migrated, skipped, failed, len(tags)))
+}
+
+// isStaleSourceManifestErr reports whether err indicates that the SOURCE
+// manifest/blob a tag points at does not exist — the signature of a stale JFrog
+// tag folder whose list.manifest.json references a platform-manifest digest that
+// was garbage-collected. These are the Docker registry v2 error codes returned
+// when a referenced manifest/blob is gone, plus a bare 404 with no structured
+// body. Such tags are safe to skip so the rest of the image can migrate; any
+// other error (auth, quota, network, destination-side push failure) is a real
+// failure and must NOT be swallowed.
+func isStaleSourceManifestErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	var terr *transport.Error
+	if !errors.As(err, &terr) {
+		return false
+	}
+	for _, d := range terr.Errors {
+		switch d.Code {
+		case transport.ManifestUnknownErrorCode,
+			transport.ManifestBlobUnknownErrorCode,
+			transport.BlobUnknownErrorCode,
+			transport.NameUnknownErrorCode:
+			return true
+		}
+	}
+	// A 404 with no machine-readable error body (some registries/proxies return
+	// a bare Not Found) is treated as a missing source manifest too.
+	if len(terr.Errors) == 0 && terr.StatusCode == http.StatusNotFound {
+		return true
+	}
+	return false
 }
 
 func (r *Package) migrateLegacyHelm(ctx context.Context) error {
