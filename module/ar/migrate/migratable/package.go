@@ -298,11 +298,9 @@ func (r *Package) Migrate(ctx context.Context) error {
 // The fast path is crane.CopyRepository, which copies every tag in parallel and
 // is the well-tested common case. Its weakness is all-or-nothing: it runs every
 // tag inside a single errgroup, so the first tag whose manifest cannot be
-// fetched (e.g. a stale JFrog tag folder whose list.manifest.json references a
-// platform-manifest digest that was garbage-collected when a newer image was
-// pushed — the registry answers MANIFEST_UNKNOWN) cancels the shared context
-// and aborts every remaining tag, marking the whole image as failed (AH: 10
-// build-images consistently failing on the daily migration).
+// fetched (e.g. an orphaned tag whose manifest was garbage-collected at the
+// source — the registry answers MANIFEST_UNKNOWN) cancels the shared context
+// and aborts every remaining tag, marking the whole image as failed.
 //
 // So we only pay for isolation when we have to: if the bulk copy fails, we fall
 // back to copyTagsIndividually, which walks the tags one at a time, skips any
@@ -372,11 +370,10 @@ func (r *Package) migrateOCI(ctx context.Context, logger zerolog.Logger) {
 }
 
 // copyTagsIndividually copies each tag of an image independently so one bad tag
-// cannot abort the rest. A tag whose SOURCE manifest is missing/orphaned (a
-// stale JFrog reference) is skipped; any other per-tag error is a genuine
-// failure. It returns a non-nil error iff at least one tag genuinely failed, so
-// the caller can set a single image-level stat — this function does NOT touch
-// r.stats.FileStats itself.
+// cannot abort the rest. A tag whose SOURCE manifest is missing/orphaned is
+// skipped; any other per-tag error is a genuine failure. It returns a non-nil
+// error iff at least one tag genuinely failed, so the caller can set a single
+// image-level stat — this function does NOT touch r.stats.FileStats itself.
 func (r *Package) copyTagsIndividually(
 	ctx context.Context, logger zerolog.Logger, srcImage, dstImage string, craneOpts []crane.Option,
 ) error {
@@ -417,12 +414,12 @@ func (r *Package) copyTagsIndividually(
 
 		if copyErr := crane.Copy(src, dst, craneOpts...); copyErr != nil {
 			if isStaleSourceManifestErr(copyErr) {
-				// Orphaned/stale source manifest — the JFrog catalog references a
-				// platform-manifest digest that no longer exists. Skip this tag
-				// and keep migrating the rest of the image.
+				// Orphaned/stale source manifest — the registry tag references a
+				// manifest digest that no longer exists. Skip this tag and keep
+				// migrating the rest of the image.
 				skipped++
 				logger.Warn().Ctx(ctx).Err(copyErr).
-					Msgf("Skipping tag %s: source manifest missing/orphaned (stale JFrog reference)", src)
+					Msgf("Skipping tag %s: source manifest missing/orphaned", src)
 				pterm.Warning.Println(fmt.Sprintf("Skipping %s: source manifest missing/orphaned (%v)", src, copyErr))
 			} else {
 				failedErrs = append(failedErrs, fmt.Errorf("%s: %w", tag, copyErr))
@@ -452,13 +449,11 @@ func (r *Package) copyTagsIndividually(
 }
 
 // isStaleSourceManifestErr reports whether err indicates that the SOURCE
-// manifest/blob a tag points at does not exist — the signature of a stale JFrog
-// tag folder whose list.manifest.json references a platform-manifest digest that
-// was garbage-collected. These are the Docker registry v2 error codes returned
-// when a referenced manifest/blob is gone, plus a bare 404 with no structured
-// body. Such tags are safe to skip so the rest of the image can migrate; any
-// other error (auth, quota, network, destination-side push failure) is a real
-// failure and must NOT be swallowed.
+// manifest/blob a tag points at does not exist. These are the Docker registry
+// v2 error codes returned when a referenced manifest/blob is gone, plus a bare
+// 404 with no structured body. Such tags are safe to skip so the rest of the
+// image can migrate; any other error (auth, quota, network, destination-side
+// push failure) is a real failure and must NOT be swallowed.
 func isStaleSourceManifestErr(err error) bool {
 	if err == nil {
 		return false
@@ -543,8 +538,7 @@ func (r *Package) migrateLegacyHelm(ctx context.Context) error {
 }
 
 // migrateHelmHTTP migrates a single Helm chart (and its optional .prov sidecar)
-// from a source provider (JFrog/MOCK_JFROG/Nexus) into a HAR HELM_HTTP
-// registry.
+// from a source registry into a HAR HELM_HTTP registry.
 //
 // The flow is provider-agnostic: it only relies on srcAdapter.DownloadFile
 // against pkg.URL (the chart) and pkg.URL+".prov" (the sidecar). The chart is
@@ -571,10 +565,9 @@ func (r *Package) migrateHelmHTTP(ctx context.Context) error {
 	}
 
 	// Canonical upload name: "<name>-<version>.tgz". pkg.Name may carry a nested
-	// directory prefix (e.g. "ChartA/ChartB/abc") from the JFrog adapter's
-	// getNestedName, which is preserved verbatim so the upload mirrors the
-	// source layout; the server strips the prefix and validates the leaf
-	// against Chart.yaml.
+	// directory prefix (e.g. "ChartA/ChartB/abc") preserved verbatim so the
+	// upload mirrors the source layout; the server strips the prefix and
+	// validates the leaf against Chart.yaml.
 	chartFile := util.GetChartFileName(r.pkg.Name, r.pkg.Version)
 
 	title := fmt.Sprintf("%s (%s)", r.pkg.Name, common.GetSize(int64(r.pkg.Size)))
