@@ -441,3 +441,185 @@ func TestNewPushNpmCmd_CustomPkgUrl(t *testing.T) {
 		t.Fatalf("unexpected error with custom pkg-url: %v", err)
 	}
 }
+
+func TestNewPushNpmCmd_ScopedPackage_Success(t *testing.T) {
+	// Test lines 200-229: scoped package upload path
+	srv := withNpmServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		// Verify the URL contains the scoped package structure
+		if !strings.Contains(r.URL.Path, "/@test/") {
+			t.Errorf("expected scoped package URL structure, got: %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	_ = srv
+
+	path := writeNpmTarball(t, map[string]string{
+		"package/package.json": `{
+  "name": "@test/scoped-package",
+  "version": "1.0.0"
+}`,
+	})
+	if err := runNpmCmd(t, "test-registry", path); err != nil {
+		t.Fatalf("unexpected error for scoped package: %v", err)
+	}
+}
+
+func TestNewPushNpmCmd_ScopedPackage_InvalidFormat(t *testing.T) {
+	// Test lines 203-206: invalid scoped package format
+	// Note: We need to create a package.json with @ but no /,
+	// but the check happens after metadata fetch, so we mock that failure path
+	srv := withNpmServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			// Return 404 for metadata check
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		t.Fatal("server should not be hit for upload with invalid scoped package format")
+	})
+	_ = srv
+
+	// Create a tarball with a malformed scoped name (@ without proper /)
+	// We'll manually build this to bypass npm's validation
+	path := writeNpmTarball(t, map[string]string{
+		"package/package.json": `{
+  "name": "@",
+  "version": "1.0.0"
+}`,
+	})
+	err := runNpmCmd(t, "test-registry", path)
+	if err == nil {
+		t.Fatal("expected error for invalid scoped package format")
+	}
+	// The error could be from the invalid name or from the split failing
+	if !strings.Contains(err.Error(), "invalid") && !strings.Contains(err.Error(), "name") {
+		t.Errorf("error should mention validation failure, got: %v", err)
+	}
+}
+
+func TestNewPushNpmCmd_ScopedPackage_UploadError(t *testing.T) {
+	// Test lines 224-227: scoped package upload error handling
+	srv := withNpmServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"server error"}`))
+	})
+	_ = srv
+
+	path := writeNpmTarball(t, map[string]string{
+		"package/package.json": `{
+  "name": "@test/scoped-package",
+  "version": "1.0.0"
+}`,
+	})
+	err := runNpmCmd(t, "test-registry", path)
+	if err == nil {
+		t.Fatal("expected error for scoped package upload failure")
+	}
+	if !strings.Contains(err.Error(), "failed to upload NPM package") {
+		t.Errorf("error should mention upload failure, got: %v", err)
+	}
+}
+
+func TestNewPushNpmCmd_MissingPkgUrl(t *testing.T) {
+	// Test lines 123-126: missing pkg-url error
+	origPkg := config.Global.Registry.PkgURL
+	config.Global.Registry.PkgURL = ""
+	defer func() {
+		config.Global.Registry.PkgURL = origPkg
+	}()
+
+	path := writeNpmTarball(t, map[string]string{
+		"package/package.json": `{
+  "name": "test-package",
+  "version": "1.0.0"
+}`,
+	})
+	err := runNpmCmd(t, "test-registry", path)
+	if err == nil {
+		t.Fatal("expected error for missing pkg-url")
+	}
+	if !strings.Contains(err.Error(), "pkg-url must be set") {
+		t.Errorf("error should mention pkg-url requirement, got: %v", err)
+	}
+}
+
+func TestNewPushNpmCmd_InvalidMetadataJSON(t *testing.T) {
+	// Test lines 160-162: JSON unmarshal error
+	srv := withNpmServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{invalid json`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	_ = srv
+
+	path := writeNpmTarball(t, map[string]string{
+		"package/package.json": `{
+  "name": "test-package",
+  "version": "1.0.0"
+}`,
+	})
+	err := runNpmCmd(t, "test-registry", path)
+	if err == nil {
+		t.Fatal("expected error for invalid metadata JSON")
+	}
+}
+
+func TestNewPushNpmCmd_UnscopedPackage_UploadError(t *testing.T) {
+	// Test lines 244-247: unscoped package upload error (ensure else branch is hit)
+	srv := withNpmServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		// Return error for upload
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"bad request"}`))
+	})
+	_ = srv
+
+	path := writeNpmTarball(t, map[string]string{
+		"package/package.json": `{
+  "name": "unscoped-package",
+  "version": "1.0.0"
+}`,
+	})
+	err := runNpmCmd(t, "test-registry", path)
+	if err == nil {
+		t.Fatal("expected error for unscoped package upload failure")
+	}
+	if !strings.Contains(err.Error(), "failed to upload NPM package") {
+		t.Errorf("error should mention upload failure, got: %v", err)
+	}
+}
+
+func TestNewPushNpmCmd_ScopedPackage_201Created(t *testing.T) {
+	// Test scoped package with 201 Created response
+	srv := withNpmServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+	})
+	_ = srv
+
+	path := writeNpmTarball(t, map[string]string{
+		"package/package.json": `{
+  "name": "@test/scoped-package",
+  "version": "1.0.0"
+}`,
+	})
+	if err := runNpmCmd(t, "test-registry", path); err != nil {
+		t.Fatalf("expected success on 201, got error: %v", err)
+	}
+}
