@@ -19,3 +19,4 @@ module/ar/migrate/adapter/mock_jfrog/testdata/binary/
 dry-run-output/
 # goreleaser output
 dist/
+.planning/
