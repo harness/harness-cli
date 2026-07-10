@@ -814,6 +814,7 @@ func (r *Package) migrateSwift(ctx context.Context) error {
 // forwarded so the destination can verify each upload.
 func (r *Package) migrateConan(ctx context.Context) error {
 	if r.config.DryRun {
+		r.logger.Info().Msgf("Dry-run: skipping Conan migration for reference %s", r.pkg.Name)
 		return nil
 	}
 

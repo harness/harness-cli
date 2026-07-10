@@ -19,11 +19,19 @@ import (
 // for an absent user/channel.
 const (
 	ConanPlaceholder  = "_"
-	conanManifestFile = "conanmanifest.txt"
+	ConanManifestFile = "conanmanifest.txt"
+	ConanFilePy       = "conanfile.py"
+	ConanInfoTxt      = "conaninfo.txt"
+
+	// Tarball prefixes; each may appear at most once per revision, in any one of
+	// the allowed compression variants.
+	ConanTarballExport  = "conan_export"
+	ConanTarballSources = "conan_sources"
+	ConanTarballPackage = "conan_package"
+
+	// Layer markers used only when parsing the JFrog source path layout.
 	conanExportMarker = "export"
 	conanPkgMarker    = "package"
-	conanFilePy       = "conanfile.py"
-	conanInfoTxt      = "conaninfo.txt"
 
 	// segments preceding the layer marker: {name}/{version}/{user}/{channel}/{rrev}
 	conanRefSegmentsBeforeMarker = 5
@@ -219,8 +227,8 @@ func sortConanEntries(entries []ConanFileEntry) {
 		if aKey != bKey {
 			return aKey < bKey
 		}
-		aManifest := a.FileName == conanManifestFile
-		bManifest := b.FileName == conanManifestFile
+		aManifest := a.FileName == ConanManifestFile
+		bManifest := b.FileName == ConanManifestFile
 		if aManifest != bManifest {
 			// manifest sorts last within the group
 			return !aManifest
@@ -233,22 +241,22 @@ func sortConanEntries(entries []ConanFileEntry) {
 // mirroring the destination server's recipe filename rule.
 func IsConanRecipeFile(name string) bool {
 	name = path.Base(name)
-	if name == conanFilePy || name == conanManifestFile {
+	if name == ConanFilePy || name == ConanManifestFile {
 		return true
 	}
 	prefix, ok := conanTarballPrefix(name)
-	return ok && (prefix == "conan_export" || prefix == "conan_sources")
+	return ok && (prefix == ConanTarballExport || prefix == ConanTarballSources)
 }
 
 // IsConanPackageFile reports whether name is a canonical package-layer file,
 // mirroring the destination server's package filename rule.
 func IsConanPackageFile(name string) bool {
 	name = path.Base(name)
-	if name == conanInfoTxt || name == conanManifestFile {
+	if name == ConanInfoTxt || name == ConanManifestFile {
 		return true
 	}
 	prefix, ok := conanTarballPrefix(name)
-	return ok && prefix == "conan_package"
+	return ok && prefix == ConanTarballPackage
 }
 
 // conanTarballPrefix returns the prefix of a "<prefix>.<ext>" tarball when <ext>

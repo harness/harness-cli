@@ -15,6 +15,7 @@ import (
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
+	conanutil "github.com/harness/harness-cli/module/ar/migrate/util"
 	"github.com/harness/harness-cli/util/common/auth"
 )
 
@@ -103,7 +104,7 @@ func TestParseConanReference(t *testing.T) {
 func TestOrderConanFiles_ManifestLast(t *testing.T) {
 	in := []string{"/x/conanmanifest.txt", "/x/conanfile.py", "/x/conan_export.tgz"}
 	got := orderConanFiles(in)
-	if filepath.Base(got[len(got)-1]) != conanManifestFile {
+	if filepath.Base(got[len(got)-1]) != conanutil.ConanManifestFile {
 		t.Errorf("conanmanifest.txt must be last, got order: %v", got)
 	}
 	// Non-manifest files must be sorted deterministically.
@@ -114,7 +115,7 @@ func TestOrderConanFiles_ManifestLast(t *testing.T) {
 }
 
 func TestConanRevisionFromManifest(t *testing.T) {
-	dir := writeConanDir(t, map[string]string{conanManifestFile: "1700000000\nconanfile.py: abc\n"})
+	dir := writeConanDir(t, map[string]string{conanutil.ConanManifestFile: "1700000000\nconanfile.py: abc\n"})
 	got, err := conanRevisionFromManifest(dir)
 	if err != nil {
 		t.Fatalf("conanRevisionFromManifest: %v", err)
@@ -127,20 +128,20 @@ func TestConanRevisionFromManifest(t *testing.T) {
 
 func TestCollectConanLayerFiles_RequiresManifest(t *testing.T) {
 	dir := writeConanDir(t, map[string]string{"conanfile.py": "content"})
-	if _, _, err := collectConanLayerFiles(dir, isValidConanRecipeFile); err == nil {
+	if _, _, err := collectConanLayerFiles(dir, conanutil.IsConanRecipeFile); err == nil {
 		t.Fatal("expected error when conanmanifest.txt missing")
 	}
 }
 
 func TestCollectConanLayerFiles_SkipsUnknownFiles(t *testing.T) {
 	dir := writeConanDir(t, map[string]string{
-		"conanfile.py":     "x",
-		conanManifestFile:  "1700000000\nconanfile.py: abc\n",
-		"conan_export.tgz": "tgz",
-		".DS_Store":        "junk",
-		"README.md":        "docs",
+		"conanfile.py":              "x",
+		conanutil.ConanManifestFile: "1700000000\nconanfile.py: abc\n",
+		"conan_export.tgz":          "tgz",
+		".DS_Store":                 "junk",
+		"README.md":                 "docs",
 	})
-	files, skipped, err := collectConanLayerFiles(dir, isValidConanRecipeFile)
+	files, skipped, err := collectConanLayerFiles(dir, conanutil.IsConanRecipeFile)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -155,26 +156,26 @@ func TestCollectConanLayerFiles_SkipsUnknownFiles(t *testing.T) {
 func TestIsValidConanLayerFile(t *testing.T) {
 	recipeValid := []string{"conanfile.py", "conanmanifest.txt", "conan_export.tgz", "conan_sources.txz", "conan_sources.tzst"}
 	for _, n := range recipeValid {
-		if !isValidConanRecipeFile(n) {
-			t.Errorf("isValidConanRecipeFile(%q) = false, want true", n)
+		if !conanutil.IsConanRecipeFile(n) {
+			t.Errorf("conanutil.IsConanRecipeFile(%q) = false, want true", n)
 		}
 	}
 	recipeInvalid := []string{"conaninfo.txt", "conan_package.tgz", ".DS_Store", "conanfile.txt", "conan_export.tar.gz", "conan_export.zip"}
 	for _, n := range recipeInvalid {
-		if isValidConanRecipeFile(n) {
-			t.Errorf("isValidConanRecipeFile(%q) = true, want false", n)
+		if conanutil.IsConanRecipeFile(n) {
+			t.Errorf("conanutil.IsConanRecipeFile(%q) = true, want false", n)
 		}
 	}
 	pkgValid := []string{"conaninfo.txt", "conanmanifest.txt", "conan_package.tgz"}
 	for _, n := range pkgValid {
-		if !isValidConanPackageFile(n) {
-			t.Errorf("isValidConanPackageFile(%q) = false, want true", n)
+		if !conanutil.IsConanPackageFile(n) {
+			t.Errorf("conanutil.IsConanPackageFile(%q) = false, want true", n)
 		}
 	}
 	pkgInvalid := []string{"conanfile.py", "conan_export.tgz", "conan_package.zip"}
 	for _, n := range pkgInvalid {
-		if isValidConanPackageFile(n) {
-			t.Errorf("isValidConanPackageFile(%q) = true, want false", n)
+		if conanutil.IsConanPackageFile(n) {
+			t.Errorf("conanutil.IsConanPackageFile(%q) = true, want false", n)
 		}
 	}
 }
@@ -186,9 +187,9 @@ func TestNewPushConanCmd_SkipsStrayFiles(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 	dir := writeConanDir(t, map[string]string{
-		"conanfile.py":    "x",
-		conanManifestFile: "1700000000\nconanfile.py: abc\n",
-		".DS_Store":       "junk",
+		"conanfile.py":              "x",
+		conanutil.ConanManifestFile: "1700000000\nconanfile.py: abc\n",
+		".DS_Store":                 "junk",
 	})
 	if err := runConanCmd(t, "test-registry", "zlib/1.3", dir); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -211,9 +212,9 @@ func TestNewPushConanCmd_RecipeOnly_Success(t *testing.T) {
 	})
 
 	dir := writeConanDir(t, map[string]string{
-		"conanfile.py":     "from conan import ConanFile",
-		conanManifestFile:  "1700000000\nconanfile.py: abc\n",
-		"conan_export.tgz": "fake-tgz",
+		"conanfile.py":              "from conan import ConanFile",
+		conanutil.ConanManifestFile: "1700000000\nconanfile.py: abc\n",
+		"conan_export.tgz":          "fake-tgz",
 	})
 
 	if err := runConanCmd(t, "test-registry", "zlib/1.3@myuser/stable", dir); err != nil {
@@ -223,7 +224,7 @@ func TestNewPushConanCmd_RecipeOnly_Success(t *testing.T) {
 		t.Fatalf("expected 3 uploads, got %d: %v", len(uploaded), uploaded)
 	}
 	// Last upload must be the manifest (finalization marker).
-	if !strings.HasSuffix(uploaded[len(uploaded)-1], "/"+conanManifestFile) {
+	if !strings.HasSuffix(uploaded[len(uploaded)-1], "/"+conanutil.ConanManifestFile) {
 		t.Errorf("last upload should be conanmanifest.txt, got: %s", uploaded[len(uploaded)-1])
 	}
 	// Path must contain the reference coordinates + recipe revision.
@@ -244,13 +245,13 @@ func TestNewPushConanCmd_RecipeAndPackage_Success(t *testing.T) {
 	})
 
 	recipeDir := writeConanDir(t, map[string]string{
-		"conanfile.py":    "from conan import ConanFile",
-		conanManifestFile: "1700000000\nconanfile.py: abc\n",
+		"conanfile.py":              "from conan import ConanFile",
+		conanutil.ConanManifestFile: "1700000000\nconanfile.py: abc\n",
 	})
 	pkgDir := writeConanDir(t, map[string]string{
-		"conaninfo.txt":     "[settings]",
-		conanManifestFile:   "1700000001\nconaninfo.txt: def\n",
-		"conan_package.tgz": "fake-pkg-tgz",
+		"conaninfo.txt":             "[settings]",
+		conanutil.ConanManifestFile: "1700000001\nconaninfo.txt: def\n",
+		"conan_package.tgz":         "fake-pkg-tgz",
 	})
 	pkgID := strings.Repeat("a", 40)
 
@@ -279,8 +280,8 @@ func TestNewPushConanCmd_ServerError(t *testing.T) {
 		_, _ = w.Write([]byte(`{"message":"exists"}`))
 	})
 	dir := writeConanDir(t, map[string]string{
-		"conanfile.py":    "x",
-		conanManifestFile: "1700000000\nconanfile.py: abc\n",
+		"conanfile.py":              "x",
+		conanutil.ConanManifestFile: "1700000000\nconanfile.py: abc\n",
 	})
 	err := runConanCmd(t, "test-registry", "zlib/1.3", dir)
 	if err == nil {
@@ -296,8 +297,8 @@ func TestNewPushConanCmd_InvalidReference(t *testing.T) {
 		t.Fatal("server should not be hit for invalid reference")
 	})
 	dir := writeConanDir(t, map[string]string{
-		"conanfile.py":    "x",
-		conanManifestFile: "1700000000\nconanfile.py: abc\n",
+		"conanfile.py":              "x",
+		conanutil.ConanManifestFile: "1700000000\nconanfile.py: abc\n",
 	})
 	if err := runConanCmd(t, "test-registry", "not-a-valid-ref", dir); err == nil {
 		t.Fatal("expected error for invalid reference")
@@ -309,12 +310,12 @@ func TestNewPushConanCmd_PackageDirRequiresPackageID(t *testing.T) {
 		t.Fatal("server should not be hit when package-id is missing")
 	})
 	recipeDir := writeConanDir(t, map[string]string{
-		"conanfile.py":    "x",
-		conanManifestFile: "1700000000\nconanfile.py: abc\n",
+		"conanfile.py":              "x",
+		conanutil.ConanManifestFile: "1700000000\nconanfile.py: abc\n",
 	})
 	pkgDir := writeConanDir(t, map[string]string{
-		"conaninfo.txt":   "[settings]",
-		conanManifestFile: "1700000001\nconaninfo.txt: def\n",
+		"conaninfo.txt":             "[settings]",
+		conanutil.ConanManifestFile: "1700000001\nconaninfo.txt: def\n",
 	})
 	err := runConanCmd(t, "test-registry", "zlib/1.3", recipeDir, "--package-dir", pkgDir)
 	if err == nil {
@@ -340,8 +341,8 @@ func TestNewPushConanCmd_ChecksumHeaderSet(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 	dir := writeConanDir(t, map[string]string{
-		"conanfile.py":    "x",
-		conanManifestFile: "1700000000\nconanfile.py: abc\n",
+		"conanfile.py":              "x",
+		conanutil.ConanManifestFile: "1700000000\nconanfile.py: abc\n",
 	})
 	if err := runConanCmd(t, "test-registry", "zlib/1.3", dir); err != nil {
 		t.Fatalf("unexpected error: %v", err)
