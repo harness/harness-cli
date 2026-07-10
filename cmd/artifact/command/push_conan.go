@@ -15,31 +15,16 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
+	conanutil "github.com/harness/harness-cli/module/ar/migrate/util"
 	"github.com/harness/harness-cli/util/common/errors"
 	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/spf13/cobra"
 )
 
-const (
-	// conanPlaceholder is used in Conan v2 URLs when user/channel are absent.
-	conanPlaceholder = "_"
-	// conanManifestFile is the finalization marker; uploaded last per layer.
-	conanManifestFile             = "conanmanifest.txt"
-	conanExpectedNumberOfArgument = 3
-
-	// Canonical Conan file names, per layer.
-	conanFilePy  = "conanfile.py"  // recipe layer
-	conanInfoTxt = "conaninfo.txt" // package layer
-
-	// Tarball prefixes, per layer.
-	conanTarballExport  = "conan_export"  // recipe layer
-	conanTarballSources = "conan_sources" // recipe layer
-	conanTarballPackage = "conan_package" // package layer
-)
-
-// Allowed tarball compression variants.
-var conanTarballExtensions = map[string]bool{".tgz": true, ".txz": true, ".tzst": true}
+// conanExpectedNumberOfArgument is the positional arg count: <registry_name> <reference> <recipe_dir>.
+// Canonical file names, tarball prefixes and the "_" placeholder live in the shared conanutil package.
+const conanExpectedNumberOfArgument = 3
 
 // Validation patterns, matching the server's Conan reference model.
 var (
@@ -47,15 +32,6 @@ var (
 	conanRevisionPattern  = regexp.MustCompile(`^([a-f0-9]{32}|[a-f0-9]{40})$`)  // RREV/PREV
 	conanPackageIDPattern = regexp.MustCompile(`^[a-f0-9]{40}$`)                 // PKGID
 )
-
-// conanReference holds the parsed coordinates of a Conan reference
-// (name/version[@user/channel]).
-type conanReference struct {
-	Name    string
-	Version string
-	User    string
-	Channel string
-}
 
 // NewPushConanCmd pushes a Conan package (v2 protocol): each recipe- and package-layer
 // file is PUT to its revision path, with conanmanifest.txt last (finalization marker).
@@ -98,7 +74,7 @@ func NewPushConanCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 
 			// Unrecognised files (e.g. .DS_Store) are skipped to avoid a server 400.
-			recipeFiles, recipeSkipped, err := collectConanLayerFiles(recipeDir, isValidConanRecipeFile)
+			recipeFiles, recipeSkipped, err := collectConanLayerFiles(recipeDir, conanutil.IsConanRecipeFile)
 			if err != nil {
 				progress.Error("Failed to read recipe directory")
 				return errors.NewValidationError("recipe_dir", err.Error())
@@ -135,7 +111,7 @@ func NewPushConanCmd(c *cmdutils.Factory) *cobra.Command {
 						fmt.Sprintf("package id must be a 40-char SHA-1, got: %s", packageID))
 				}
 				var packageSkipped []string
-				packageFiles, packageSkipped, err = collectConanLayerFiles(packageDir, isValidConanPackageFile)
+				packageFiles, packageSkipped, err = collectConanLayerFiles(packageDir, conanutil.IsConanPackageFile)
 				if err != nil {
 					progress.Error("Failed to read package directory")
 					return errors.NewValidationError("package-dir", err.Error())
@@ -158,7 +134,7 @@ func NewPushConanCmd(c *cmdutils.Factory) *cobra.Command {
 				}
 			}
 
-			progress.Success(fmt.Sprintf("Validated Conan reference %s", ref.String()))
+			progress.Success(fmt.Sprintf("Validated Conan reference %s", ref.Display()))
 
 			// Recipe layer (manifest last).
 			progress.Step(fmt.Sprintf("Uploading recipe files (rrev %s)", recipeRevision))
@@ -179,7 +155,7 @@ func NewPushConanCmd(c *cmdutils.Factory) *cobra.Command {
 				}
 			}
 
-			progress.Success(fmt.Sprintf("Successfully uploaded Conan package %s to registry '%s'", ref.String(), registryName))
+			progress.Success(fmt.Sprintf("Successfully uploaded Conan package %s to registry '%s'", ref.Display(), registryName))
 			return nil
 		},
 	}
@@ -192,23 +168,10 @@ func NewPushConanCmd(c *cmdutils.Factory) *cobra.Command {
 	return cmd
 }
 
-// String renders the reference as name/version[@user/channel].
-func (r conanReference) String() string {
-	if r.hasUserChannel() {
-		return fmt.Sprintf("%s/%s@%s/%s", r.Name, r.Version, r.User, r.Channel)
-	}
-	return fmt.Sprintf("%s/%s", r.Name, r.Version)
-}
-
-// hasUserChannel reports whether the reference carries a non-placeholder user/channel.
-func (r conanReference) hasUserChannel() bool {
-	return r.User != conanPlaceholder || r.Channel != conanPlaceholder
-}
-
 // parseConanReference parses name/version[@user/channel], defaulting absent
 // user/channel to the "_" placeholder.
-func parseConanReference(reference string) (conanReference, error) {
-	ref := conanReference{User: conanPlaceholder, Channel: conanPlaceholder}
+func parseConanReference(reference string) (conanutil.ConanRef, error) {
+	ref := conanutil.ConanRef{User: conanutil.ConanPlaceholder, Channel: conanutil.ConanPlaceholder}
 
 	nameVersion := reference
 	if at := strings.Index(reference, "@"); at >= 0 {
@@ -216,28 +179,28 @@ func parseConanReference(reference string) (conanReference, error) {
 		userChannel := reference[at+1:]
 		uc := strings.Split(userChannel, "/")
 		if len(uc) != 2 || uc[0] == "" || uc[1] == "" {
-			return conanReference{}, fmt.Errorf("user/channel must be of the form user/channel, got: %q", userChannel)
+			return conanutil.ConanRef{}, fmt.Errorf("user/channel must be of the form user/channel, got: %q", userChannel)
 		}
 		ref.User, ref.Channel = uc[0], uc[1]
 	}
 
 	nv := strings.Split(nameVersion, "/")
 	if len(nv) != 2 || nv[0] == "" || nv[1] == "" {
-		return conanReference{}, fmt.Errorf("reference must be of the form name/version[@user/channel], got: %q", reference)
+		return conanutil.ConanRef{}, fmt.Errorf("reference must be of the form name/version[@user/channel], got: %q", reference)
 	}
 	ref.Name, ref.Version = nv[0], nv[1]
 
 	if !conanNamePattern.MatchString(ref.Name) {
-		return conanReference{}, fmt.Errorf("invalid Conan package name: %q", ref.Name)
+		return conanutil.ConanRef{}, fmt.Errorf("invalid Conan package name: %q", ref.Name)
 	}
 	if !conanNamePattern.MatchString(ref.Version) {
-		return conanReference{}, fmt.Errorf("invalid Conan package version: %q", ref.Version)
+		return conanutil.ConanRef{}, fmt.Errorf("invalid Conan package version: %q", ref.Version)
 	}
-	if ref.User != conanPlaceholder && !conanNamePattern.MatchString(ref.User) {
-		return conanReference{}, fmt.Errorf("invalid Conan user: %q", ref.User)
+	if ref.User != conanutil.ConanPlaceholder && !conanNamePattern.MatchString(ref.User) {
+		return conanutil.ConanRef{}, fmt.Errorf("invalid Conan user: %q", ref.User)
 	}
-	if ref.Channel != conanPlaceholder && !conanNamePattern.MatchString(ref.Channel) {
-		return conanReference{}, fmt.Errorf("invalid Conan channel: %q", ref.Channel)
+	if ref.Channel != conanutil.ConanPlaceholder && !conanNamePattern.MatchString(ref.Channel) {
+		return conanutil.ConanRef{}, fmt.Errorf("invalid Conan channel: %q", ref.Channel)
 	}
 
 	return ref, nil
@@ -269,44 +232,17 @@ func collectConanLayerFiles(dir string, isValid func(string) bool) (files []stri
 			skipped = append(skipped, name)
 			continue
 		}
-		if name == conanManifestFile {
+		if name == conanutil.ConanManifestFile {
 			hasManifest = true
 		}
 		files = append(files, filepath.Join(dir, name))
 	}
 
 	if !hasManifest {
-		return nil, skipped, fmt.Errorf("%s not found in directory: %s", conanManifestFile, dir)
+		return nil, skipped, fmt.Errorf("%s not found in directory: %s", conanutil.ConanManifestFile, dir)
 	}
 
 	return files, skipped, nil
-}
-
-// conanTarballPrefix returns the prefix of a "<prefix>.<ext>" tarball, if <ext> is allowed.
-func conanTarballPrefix(name string) (string, bool) {
-	ext := filepath.Ext(name)
-	if !conanTarballExtensions[ext] {
-		return "", false
-	}
-	return strings.TrimSuffix(name, ext), true
-}
-
-// isValidConanRecipeFile mirrors the server's recipe-layer filename rule.
-func isValidConanRecipeFile(name string) bool {
-	if name == conanFilePy || name == conanManifestFile {
-		return true
-	}
-	prefix, ok := conanTarballPrefix(name)
-	return ok && (prefix == conanTarballExport || prefix == conanTarballSources)
-}
-
-// isValidConanPackageFile mirrors the server's package-layer filename rule.
-func isValidConanPackageFile(name string) bool {
-	if name == conanInfoTxt || name == conanManifestFile {
-		return true
-	}
-	prefix, ok := conanTarballPrefix(name)
-	return ok && prefix == conanTarballPackage
 }
 
 // orderConanFiles sorts files deterministically with conanmanifest.txt last.
@@ -314,8 +250,8 @@ func orderConanFiles(files []string) []string {
 	ordered := make([]string, len(files))
 	copy(ordered, files)
 	sort.Slice(ordered, func(i, j int) bool {
-		iManifest := filepath.Base(ordered[i]) == conanManifestFile
-		jManifest := filepath.Base(ordered[j]) == conanManifestFile
+		iManifest := filepath.Base(ordered[i]) == conanutil.ConanManifestFile
+		jManifest := filepath.Base(ordered[j]) == conanutil.ConanManifestFile
 		if iManifest != jManifest {
 			return !iManifest // non-manifest files sort before the manifest
 		}
@@ -326,9 +262,9 @@ func orderConanFiles(files []string) []string {
 
 // conanRevisionFromManifest derives a revision as the hex MD5 of conanmanifest.txt.
 func conanRevisionFromManifest(dir string) (string, error) {
-	data, err := os.ReadFile(filepath.Join(dir, conanManifestFile))
+	data, err := os.ReadFile(filepath.Join(dir, conanutil.ConanManifestFile))
 	if err != nil {
-		return "", fmt.Errorf("failed to read %s: %w", conanManifestFile, err)
+		return "", fmt.Errorf("failed to read %s: %w", conanutil.ConanManifestFile, err)
 	}
 	sum := md5.Sum(data) //nolint:gosec // Conan revision model.
 	return hex.EncodeToString(sum[:]), nil
@@ -338,7 +274,7 @@ func conanRevisionFromManifest(dir string) (string, error) {
 func uploadConanRecipeFile(
 	c *cmdutils.Factory,
 	registryName string,
-	ref conanReference,
+	ref conanutil.ConanRef,
 	rrev string,
 	filePath string,
 	progress *p.ConsoleReporter,
@@ -384,7 +320,7 @@ func uploadConanRecipeFile(
 func uploadConanPackageFile(
 	c *cmdutils.Factory,
 	registryName string,
-	ref conanReference,
+	ref conanutil.ConanRef,
 	rrev string,
 	pkgID string,
 	prev string,

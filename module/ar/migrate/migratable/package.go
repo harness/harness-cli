@@ -260,6 +260,8 @@ func (r *Package) Migrate(ctx context.Context) error {
 		r.migrateComposer(ctx)
 	} else if r.artifactType == types.SWIFT {
 		r.migrateSwift(ctx)
+	} else if r.artifactType == types.CONAN {
+		r.migrateConan(ctx)
 	} else {
 		versions, err := r.srcAdapter.GetVersions(r.pkg, r.node, r.srcRegistry, r.pkg.Name, r.artifactType)
 		if err != nil {
@@ -1033,6 +1035,90 @@ func (r *Package) migrateSwift(ctx context.Context) error {
 		pterm.Success.Println(title)
 	}
 	r.stats.FileStats = append(r.stats.FileStats, stat)
+	return nil
+}
+
+// migrateConan migrates every file of a single Conan reference
+// (name/version[@user/channel]). The reference subtree (r.node) is parsed into
+// recipe- and package-layer files, which are uploaded in an order that places
+// each conanmanifest.txt last within its revision group (the finalization
+// marker the server expects last). The source SHA1 from the JFrog listing is
+// forwarded so the destination can verify each upload.
+func (r *Package) migrateConan(ctx context.Context) error {
+	if r.config.DryRun {
+		r.logger.Info().Msgf("Dry-run: skipping Conan migration for reference %s", r.pkg.Name)
+		return nil
+	}
+
+	files, err := tree.GetAllFiles(r.node)
+	if err != nil {
+		log.Error().Ctx(ctx).Err(err).Msgf("Failed to list files for Conan reference %s", r.pkg.Name)
+		return fmt.Errorf("get files for conan reference %s: %w", r.pkg.Name, err)
+	}
+
+	entries := util.ParseConanEntries(files)
+	if len(entries) == 0 {
+		r.logger.Warn().Msgf("No Conan files found for reference %s", r.pkg.Name)
+		return nil
+	}
+
+	for _, entry := range entries {
+		file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, entry.Uri)
+		if err != nil {
+			log.Error().Ctx(ctx).Err(err).Msgf("Failed to download Conan file %s", entry.Uri)
+			pterm.Error.Println(fmt.Sprintf("Failed to download Conan file %s", entry.Uri))
+			r.stats.FileStats = append(r.stats.FileStats, types.FileStat{
+				Name:     entry.FileName,
+				Registry: r.srcRegistry,
+				Uri:      entry.Uri,
+				Size:     int64(entry.Size),
+				Status:   types.StatusFail,
+				Error:    err.Error(),
+			})
+			continue
+		}
+
+		metadata := map[string]interface{}{
+			"layer":    string(entry.Layer),
+			"name":     entry.Reference.Name,
+			"version":  entry.Reference.Version,
+			"user":     entry.Reference.User,
+			"channel":  entry.Reference.Channel,
+			"rrev":     entry.RRev,
+			"pkgid":    entry.PkgID,
+			"prev":     entry.PRev,
+			"filename": entry.FileName,
+			"sha1":     entry.SHA1,
+		}
+
+		title := fmt.Sprintf("%s (%s)", entry.FileName, common.GetSize(int64(entry.Size)))
+		pterm.Info.Println(fmt.Sprintf("Copying Conan file %s from %s to %s", entry.FileName, r.srcRegistry, r.destRegistry))
+		err = r.destAdapter.UploadFile(r.destRegistry, file, &types.File{Name: entry.FileName, Uri: entry.Uri}, header,
+			entry.Reference.Name, entry.Reference.Version, types.CONAN, metadata)
+
+		stat := types.FileStat{
+			Name:     entry.FileName,
+			Registry: r.srcRegistry,
+			Uri:      entry.Uri,
+			Size:     int64(entry.Size),
+			Status:   types.StatusSuccess,
+		}
+		if err != nil {
+			if errors.Is(err, types.ErrArtifactAlreadyExists) {
+				stat.Status = types.StatusSkip
+				pterm.Info.Println(fmt.Sprintf("%s already exists, skipping", title))
+			} else {
+				r.logger.Error().Err(err).Msgf("Failed to upload Conan file %s", entry.FileName)
+				stat.Status = types.StatusFail
+				stat.Error = err.Error()
+				pterm.Error.Println(title)
+			}
+		} else {
+			pterm.Success.Println(title)
+		}
+		r.stats.FileStats = append(r.stats.FileStats, stat)
+	}
+
 	return nil
 }
 

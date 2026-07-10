@@ -96,5 +96,12 @@
     "url": "http://localhost:8081/artifactory/helm-http-local",
     "description": "Mock Helm HTTP Local Repository",
     "packageType": "HELM"
+  },
+  "conan-local": {
+    "key": "conan-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/conan-local",
+    "description": "Mock Conan Local Repository",
+    "packageType": "conan"
   }
 }
