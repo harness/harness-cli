@@ -179,10 +179,11 @@ func (m *MigrationService) writeDryRunOutput(logger zerolog.Logger) error {
 	}
 	logger.Info().Str("path", dirStructPath).Int("total_registries", len(m.dryRunStats.Directories)).Msg("Directory structure written")
 
-	// Compute summary from available stats
+	// Compute summary from directory structure (filtered files)
 	totalRegistries := len(m.dryRunStats.Directories)
 	totalPackages := 0
 	totalVersions := 0
+	filteredFiles := 0
 	for _, reg := range m.dryRunStats.Directories {
 		if reg == nil {
 			continue
@@ -193,18 +194,34 @@ func (m *MigrationService) writeDryRunOutput(logger zerolog.Logger) error {
 				continue
 			}
 			totalVersions += len(pkg.Versions)
+			for _, ver := range pkg.Versions {
+				if ver == nil {
+					continue
+				}
+				filteredFiles += len(ver.Files)
+			}
 		}
 	}
-	totalFiles := len(m.dryRunStats.Files)
-
-	fmt.Printf("\n=== Dry Run Summary ===\n")
-	fmt.Printf("  %-15s %d\n", "Registries :", totalRegistries)
-	fmt.Printf("  %-15s %d\n", "Packages   :", totalPackages)
-	fmt.Printf("  %-15s %d\n", "Versions   :", totalVersions)
-	fmt.Printf("  %-15s %d\n", "Files      :", totalFiles)
+	totalSourceFiles := len(m.dryRunStats.Files)
 	fmt.Printf("\nOutput files:\n")
 	fmt.Printf("  File list          : %s\n", fileListPath)
 	fmt.Printf("  Directory structure: %s\n", dirStructPath)
+
+	fmt.Printf("\n==== Dry Run Summary ====\n")
+	fmt.Printf("  %-30s %d\n", "Files found in source registry :", totalSourceFiles)
+	fmt.Printf("  (see detail at %s)\n", fileListPath)
+	fmt.Println()
+	migratedCount := filteredFiles
+	migratedLabel := "Files that passed all filters (To be migrated)   :"
+	if filteredFiles == 0 && totalPackages > 0 {
+		migratedCount = totalPackages
+		migratedLabel = "Packages that passed all filters (To be migrated) :"
+	}
+	fmt.Printf("  %-50s %d\n", migratedLabel, migratedCount)
+	fmt.Printf("  (see detail at %s)\n", dirStructPath)
+	fmt.Printf("  %-30s %d\n", "Registries :", totalRegistries)
+	fmt.Printf("  %-30s %d\n", "Packages   :", totalPackages)
+	fmt.Printf("  %-30s %d\n", "Versions   :", totalVersions)
 
 	return nil
 }
