@@ -17,6 +17,7 @@ import (
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	conanutil "github.com/harness/harness-cli/module/ar/migrate/util"
 	"github.com/harness/harness-cli/util/common/auth"
+	p "github.com/harness/harness-cli/util/common/progress"
 )
 
 // withConanServer spins up a stub server and points the global config at it
@@ -79,7 +80,10 @@ func TestParseConanReference(t *testing.T) {
 		{in: "zlib/1.3@myuser/stable", name: "zlib", version: "1.3", user: "myuser", channel: "stable"},
 		{in: "zlib", wantErr: true},
 		{in: "zlib/1.3@myuser", wantErr: true},
-		{in: "Zlib/1.3", wantErr: true}, // uppercase not allowed
+		{in: "Zlib/1.3", wantErr: true},                 // uppercase name not allowed
+		{in: "zlib/V1", wantErr: true},                  // uppercase version not allowed
+		{in: "zlib/1.3@BadUser/stable", wantErr: true},  // uppercase user not allowed
+		{in: "zlib/1.3@user/BadChannel", wantErr: true}, // uppercase channel not allowed
 		{in: "zlib/1.3@/stable", wantErr: true},
 		{in: "", wantErr: true},
 	}
@@ -349,5 +353,183 @@ func TestNewPushConanCmd_ChecksumHeaderSet(t *testing.T) {
 	}
 	if sawSha1 == "" {
 		t.Error("X-Checksum-Sha1 header was not set")
+	}
+}
+
+func TestCollectConanLayerFiles_Errors(t *testing.T) {
+	// Nonexistent directory.
+	if _, _, err := collectConanLayerFiles(filepath.Join(t.TempDir(), "missing"), conanutil.IsConanRecipeFile); err == nil {
+		t.Error("expected error for nonexistent directory")
+	}
+	// Path is a file, not a directory.
+	dir := writeConanDir(t, map[string]string{"conanfile.py": "x"})
+	filePath := filepath.Join(dir, "conanfile.py")
+	if _, _, err := collectConanLayerFiles(filePath, conanutil.IsConanRecipeFile); err == nil {
+		t.Error("expected error when path is not a directory")
+	}
+}
+
+func TestConanRevisionFromManifest_MissingManifest(t *testing.T) {
+	dir := writeConanDir(t, map[string]string{"conanfile.py": "x"})
+	if _, err := conanRevisionFromManifest(dir); err == nil {
+		t.Error("expected error when conanmanifest.txt is absent")
+	}
+}
+
+func TestOpenConanFile_Errors(t *testing.T) {
+	progress := p.NewConsoleReporter()
+	// Nonexistent file.
+	if _, _, _, err := openConanFile(filepath.Join(t.TempDir(), "missing"), progress); err == nil {
+		t.Error("expected error for nonexistent file")
+	}
+	// Directory instead of a file.
+	if _, _, _, err := openConanFile(t.TempDir(), progress); err == nil {
+		t.Error("expected error when path is a directory")
+	}
+}
+
+func TestNewPushConanCmd_InvalidRecipeRevision(t *testing.T) {
+	withConanServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("server should not be hit for invalid recipe revision")
+	})
+	dir := writeConanDir(t, map[string]string{
+		"conanfile.py":              "x",
+		conanutil.ConanManifestFile: "1700000000\nconanfile.py: abc\n",
+	})
+	err := runConanCmd(t, "test-registry", "zlib/1.3", dir, "--recipe-revision", "not-a-revision")
+	if err == nil {
+		t.Fatal("expected error for invalid recipe revision")
+	}
+	if !strings.Contains(err.Error(), "recipe revision") {
+		t.Errorf("error should mention recipe revision, got: %v", err)
+	}
+}
+
+func TestNewPushConanCmd_NonexistentRecipeDir(t *testing.T) {
+	withConanServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("server should not be hit when recipe dir is invalid")
+	})
+	err := runConanCmd(t, "test-registry", "zlib/1.3", filepath.Join(t.TempDir(), "missing"))
+	if err == nil {
+		t.Fatal("expected error for nonexistent recipe dir")
+	}
+}
+
+func TestNewPushConanCmd_InvalidPackageID(t *testing.T) {
+	withConanServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("server should not be hit for invalid package id")
+	})
+	recipeDir := writeConanDir(t, map[string]string{
+		"conanfile.py":              "x",
+		conanutil.ConanManifestFile: "1700000000\nconanfile.py: abc\n",
+	})
+	pkgDir := writeConanDir(t, map[string]string{
+		"conaninfo.txt":             "[settings]",
+		conanutil.ConanManifestFile: "1700000001\nconaninfo.txt: def\n",
+	})
+	err := runConanCmd(t, "test-registry", "zlib/1.3", recipeDir,
+		"--package-dir", pkgDir, "--package-id", "not-a-sha")
+	if err == nil {
+		t.Fatal("expected error for invalid package id")
+	}
+	if !strings.Contains(err.Error(), "package id") {
+		t.Errorf("error should mention package id, got: %v", err)
+	}
+}
+
+func TestNewPushConanCmd_InvalidPackageRevision(t *testing.T) {
+	withConanServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("server should not be hit for invalid package revision")
+	})
+	recipeDir := writeConanDir(t, map[string]string{
+		"conanfile.py":              "x",
+		conanutil.ConanManifestFile: "1700000000\nconanfile.py: abc\n",
+	})
+	pkgDir := writeConanDir(t, map[string]string{
+		"conaninfo.txt":             "[settings]",
+		conanutil.ConanManifestFile: "1700000001\nconaninfo.txt: def\n",
+	})
+	err := runConanCmd(t, "test-registry", "zlib/1.3", recipeDir,
+		"--package-dir", pkgDir, "--package-id", strings.Repeat("a", 40),
+		"--package-revision", "not-a-revision")
+	if err == nil {
+		t.Fatal("expected error for invalid package revision")
+	}
+	if !strings.Contains(err.Error(), "package revision") {
+		t.Errorf("error should mention package revision, got: %v", err)
+	}
+}
+
+func TestNewPushConanCmd_NonexistentPackageDir(t *testing.T) {
+	withConanServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("server should not be hit when package dir is invalid")
+	})
+	recipeDir := writeConanDir(t, map[string]string{
+		"conanfile.py":              "x",
+		conanutil.ConanManifestFile: "1700000000\nconanfile.py: abc\n",
+	})
+	err := runConanCmd(t, "test-registry", "zlib/1.3", recipeDir,
+		"--package-dir", filepath.Join(t.TempDir(), "missing"),
+		"--package-id", strings.Repeat("a", 40))
+	if err == nil {
+		t.Fatal("expected error for nonexistent package dir")
+	}
+}
+
+func TestNewPushConanCmd_SkipsStrayPackageFiles(t *testing.T) {
+	var packagePaths []string
+	withConanServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/packages/") {
+			packagePaths = append(packagePaths, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	recipeDir := writeConanDir(t, map[string]string{
+		"conanfile.py":              "x",
+		conanutil.ConanManifestFile: "1700000000\nconanfile.py: abc\n",
+	})
+	pkgDir := writeConanDir(t, map[string]string{
+		"conaninfo.txt":             "[settings]",
+		conanutil.ConanManifestFile: "1700000001\nconaninfo.txt: def\n",
+		".DS_Store":                 "junk",
+	})
+	if err := runConanCmd(t, "test-registry", "zlib/1.3", recipeDir,
+		"--package-dir", pkgDir, "--package-id", strings.Repeat("a", 40)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, path := range packagePaths {
+		if strings.HasSuffix(path, "/.DS_Store") {
+			t.Fatalf(".DS_Store should have been skipped, uploads: %v", packagePaths)
+		}
+	}
+	if len(packagePaths) != 2 {
+		t.Errorf("expected 2 package uploads, got %d: %v", len(packagePaths), packagePaths)
+	}
+}
+
+func TestNewPushConanCmd_PackageUploadError(t *testing.T) {
+	withConanServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/packages/") {
+			w.WriteHeader(http.StatusConflict)
+			_, _ = w.Write([]byte(`{"message":"boom"}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	recipeDir := writeConanDir(t, map[string]string{
+		"conanfile.py":              "x",
+		conanutil.ConanManifestFile: "1700000000\nconanfile.py: abc\n",
+	})
+	pkgDir := writeConanDir(t, map[string]string{
+		"conaninfo.txt":             "[settings]",
+		conanutil.ConanManifestFile: "1700000001\nconaninfo.txt: def\n",
+	})
+	err := runConanCmd(t, "test-registry", "zlib/1.3", recipeDir,
+		"--package-dir", pkgDir, "--package-id", strings.Repeat("a", 40))
+	if err == nil {
+		t.Fatal("expected error for failed package upload")
+	}
+	if !strings.Contains(err.Error(), "failed to push package file") {
+		t.Errorf("error should mention package push failure, got: %v", err)
 	}
 }
