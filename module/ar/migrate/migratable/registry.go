@@ -139,25 +139,21 @@ func (r *Registry) Migrate(ctx context.Context) error {
 	// In dry-run mode, collect all files and initialize directory entry for this registry
 	if r.config.DryRun && r.dryRunStats != nil {
 		// Add all files to the file list
+		entries := make([]types.DryRunFileEntry, 0, len(files))
 		for _, file := range files {
-			entry := types.DryRunFileEntry{
+			entries = append(entries, types.DryRunFileEntry{
 				Registry:     r.srcRegistry,
 				Name:         file.Name,
 				Uri:          file.Uri,
 				Size:         file.Size,
 				LastModified: file.LastModified,
-			}
-			r.dryRunStats.Files = append(r.dryRunStats.Files, entry)
+			})
 		}
+		r.dryRunStats.AddFiles(entries...)
 		logger.Info().Msgf("Dry-run: collected %d files from registry %s", len(files), r.srcRegistry)
 
 		// Initialize directory entry for this registry
-		if r.dryRunStats.Directories[r.srcRegistry] == nil {
-			r.dryRunStats.Directories[r.srcRegistry] = &types.DryRunDirectoryEntry{
-				Registry: r.srcRegistry,
-				Packages: make(map[string]*types.DryRunPackageEntry),
-			}
-		}
+		r.dryRunStats.EnsureRegistry(r.srcRegistry)
 	}
 
 	if util.IsTimeBasedFilterPresent(r.mapping) {

@@ -1260,26 +1260,7 @@ func check(err error, context string) {
 
 // addPackageToDryRunDirectory adds package to the directory structure
 func (r *Package) addPackageToDryRunDirectory() {
-	if r.dryRunStats == nil {
-		return
-	}
-
-	// Ensure registry entry exists (should already be created by Registry)
-	if r.dryRunStats.Directories[r.srcRegistry] == nil {
-		r.dryRunStats.Directories[r.srcRegistry] = &types.DryRunDirectoryEntry{
-			Registry: r.srcRegistry,
-			Packages: make(map[string]*types.DryRunPackageEntry),
-		}
-	}
-	dirEntry := r.dryRunStats.Directories[r.srcRegistry]
-
-	// Add package entry if not exists
-	if dirEntry.Packages[r.pkg.Name] == nil {
-		dirEntry.Packages[r.pkg.Name] = &types.DryRunPackageEntry{
-			Name:     r.pkg.Name,
-			Versions: make(map[string]*types.DryRunVersionEntry),
-		}
-	}
+	r.dryRunStats.EnsurePackage(r.srcRegistry, r.pkg.Name)
 }
 
 // Post Any post processing work
