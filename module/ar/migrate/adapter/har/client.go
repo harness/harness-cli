@@ -171,7 +171,7 @@ func (c *client) uploadMavenFile(
 	file io.ReadCloser,
 ) error {
 	fileUri := strings.TrimPrefix(f.Uri, "/")
-	url := fmt.Sprintf("%s/maven/%s/%s/%s", c.url, config.Global.AccountID, registry, fileUri)
+	url := fmt.Sprintf("%s/pkg/%s/%s/maven/%s", c.url, config.Global.AccountID, registry, fileUri)
 	// Create request
 	req, err := http2.NewRequest(http2.MethodPut, url, file)
 	if err != nil {
