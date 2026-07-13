@@ -21,7 +21,7 @@ func newTestClient(t *testing.T, serverURL string) *client {
 	if err != nil {
 		t.Fatalf("new pkg client: %v", err)
 	}
-	return &client{pkgClient: pc, url: serverURL}
+	return &client{pkgClient: pc, url: serverURL, rawPkgHTTPClient: http.DefaultClient}
 }
 
 // TestUploadRawFile covers the generic raw upload path, which RAW artifacts use

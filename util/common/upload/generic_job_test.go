@@ -14,8 +14,6 @@ import (
 
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/config"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
-	"github.com/harness/harness-cli/util/common/auth"
 )
 
 // withFakePkgServer spins up a stub package server, points config.Global at
@@ -51,18 +49,8 @@ func writeTempFile(t *testing.T, contents string) (string, int64) {
 	return p, int64(len(contents))
 }
 
-func createTestPkgClient(t *testing.T) *pkgclient.ClientWithResponses {
-	t.Helper()
-	client, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-		auth.GetAuthOptionARPKG())
-	if err != nil {
-		t.Fatalf("failed to create test client: %v", err)
-	}
-	return client
-}
-
 func TestGenericUpload_Success(t *testing.T) {
-	_, hits := withFakePkgServer(t, func(hit int, w http.ResponseWriter, r *http.Request) {
+	srv, hits := withFakePkgServer(t, func(hit int, w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPut {
 			t.Errorf("expected PUT, got %s", r.Method)
 		}
@@ -70,8 +58,7 @@ func TestGenericUpload_Success(t *testing.T) {
 	})
 
 	path, size := writeTempFile(t, "hello world")
-	pkgClient := createTestPkgClient(t)
-	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size, utils.FileChecksums{}, pkgClient)
+	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size, utils.FileChecksums{}, config.Global.Registry.PkgURL, srv.Client())
 
 	if err := job.Upload(context.Background()); err != nil {
 		t.Fatalf("expected success, got %v", err)
@@ -82,13 +69,12 @@ func TestGenericUpload_Success(t *testing.T) {
 }
 
 func TestGenericUpload_Success_201Created(t *testing.T) {
-	_, _ = withFakePkgServer(t, func(hit int, w http.ResponseWriter, r *http.Request) {
+	srv, _ := withFakePkgServer(t, func(hit int, w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 	})
 
 	path, size := writeTempFile(t, "data")
-	pkgClient := createTestPkgClient(t)
-	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size, utils.FileChecksums{}, pkgClient)
+	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size, utils.FileChecksums{}, config.Global.Registry.PkgURL, srv.Client())
 
 	if err := job.Upload(context.Background()); err != nil {
 		t.Fatalf("expected success on 201, got %v", err)
@@ -96,13 +82,12 @@ func TestGenericUpload_Success_201Created(t *testing.T) {
 }
 
 func TestGenericUpload_FailsOn4xx(t *testing.T) {
-	_, hits := withFakePkgServer(t, func(hit int, w http.ResponseWriter, r *http.Request) {
+	srv, hits := withFakePkgServer(t, func(hit int, w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 	})
 
 	path, size := writeTempFile(t, "data")
-	pkgClient := createTestPkgClient(t)
-	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size, utils.FileChecksums{}, pkgClient)
+	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size, utils.FileChecksums{}, config.Global.Registry.PkgURL, srv.Client())
 
 	err := job.Upload(context.Background())
 	if err == nil {
@@ -114,13 +99,12 @@ func TestGenericUpload_FailsOn4xx(t *testing.T) {
 }
 
 func TestGenericUpload_FailsOn5xx(t *testing.T) {
-	_, _ = withFakePkgServer(t, func(hit int, w http.ResponseWriter, r *http.Request) {
+	srv, _ := withFakePkgServer(t, func(hit int, w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 
 	path, size := writeTempFile(t, "data")
-	pkgClient := createTestPkgClient(t)
-	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size, utils.FileChecksums{}, pkgClient)
+	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size, utils.FileChecksums{}, config.Global.Registry.PkgURL, srv.Client())
 
 	if err := job.Upload(context.Background()); err == nil {
 		t.Fatal("expected error on 500, got nil")
@@ -128,13 +112,12 @@ func TestGenericUpload_FailsOn5xx(t *testing.T) {
 }
 
 func TestGenericUpload_FailsOnMissingFile(t *testing.T) {
-	_, _ = withFakePkgServer(t, func(hit int, w http.ResponseWriter, r *http.Request) {
+	srv, _ := withFakePkgServer(t, func(hit int, w http.ResponseWriter, r *http.Request) {
 		t.Fatalf("server should not be hit when file is missing")
 	})
 
-	pkgClient := createTestPkgClient(t)
 	job := NewGenericUploadJob("ghost.bin", "/path/that/does/not/exist.bin",
-		"pkg/v1/ghost.bin", "myreg", "pkg", "v1", 0, utils.FileChecksums{}, pkgClient)
+		"pkg/v1/ghost.bin", "myreg", "pkg", "v1", 0, utils.FileChecksums{}, config.Global.Registry.PkgURL, srv.Client())
 
 	err := job.Upload(context.Background())
 	if err == nil {
@@ -147,7 +130,7 @@ func TestGenericUpload_FailsOnMissingFile(t *testing.T) {
 
 func TestGenericUpload_RespectsContextCancel(t *testing.T) {
 	stop := make(chan struct{})
-	_, _ = withFakePkgServer(t, func(hit int, w http.ResponseWriter, r *http.Request) {
+	srv, _ := withFakePkgServer(t, func(hit int, w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-r.Context().Done():
 		case <-stop:
@@ -156,8 +139,7 @@ func TestGenericUpload_RespectsContextCancel(t *testing.T) {
 	t.Cleanup(func() { close(stop) })
 
 	path, size := writeTempFile(t, "data")
-	pkgClient := createTestPkgClient(t)
-	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size, utils.FileChecksums{}, pkgClient)
+	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size, utils.FileChecksums{}, config.Global.Registry.PkgURL, srv.Client())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {

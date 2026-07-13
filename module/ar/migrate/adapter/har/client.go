@@ -50,6 +50,29 @@ func retryingArHTTPClient() *http2.Client {
 	return std
 }
 
+// rawPkgHTTPClient returns a retry-enabled *http.Client that injects the same
+// auth headers as auth.GetAuthOptionARPKG (x-api-key + Authorization for JWT
+// tokens). Used for raw/generic file uploads that bypass the generated client.
+func rawPkgHTTPClient() *http2.Client {
+	c := retryingPkgHTTPClient()
+	c.Transport = &pkgAuthTransport{wrapped: c.Transport}
+	return c
+}
+
+// pkgAuthTransport mirrors the auth injected by auth.GetAuthOptionARPKG.
+type pkgAuthTransport struct {
+	wrapped http2.RoundTripper
+}
+
+func (t *pkgAuthTransport) RoundTrip(req *http2.Request) (*http2.Response, error) {
+	r := req.Clone(req.Context())
+	r.Header.Set("x-api-key", config.Global.AuthToken)
+	if strings.HasPrefix(config.Global.AuthToken, auth.JWTTokenPrefix) {
+		r.Header.Set("Authorization", config.Global.AuthToken)
+	}
+	return t.wrapped.RoundTrip(r)
+}
+
 // newClient constructs a jfrog client
 func newClient(reg *types.RegistryConfig) *client {
 	username, token := "", ""
@@ -72,43 +95,51 @@ func newClient(reg *types.RegistryConfig) *client {
 			},
 			xApiKey.NewAuthorizer(token),
 		),
-		pkgClient: pkgClient,
-		url:       reg.Endpoint,
-		insecure:  true,
-		username:  username,
-		password:  token,
-		apiClient: arClient,
+		pkgClient:         pkgClient,
+		rawPkgHTTPClient:  rawPkgHTTPClient(),
+		url:               reg.Endpoint,
+		insecure:          true,
+		username:          username,
+		password:          token,
+		apiClient:         arClient,
 	}
 }
 
 type client struct {
-	apiClient *ar.ClientWithResponses
-	client    *http.Client
-	url       string
-	insecure  bool
-	username  string
-	password  string
-	pkgClient *pkgclient.ClientWithResponses
+	apiClient        *ar.ClientWithResponses
+	client           *http.Client
+	rawPkgHTTPClient *http2.Client
+	url              string
+	insecure         bool
+	username         string
+	password         string
+	pkgClient        *pkgclient.ClientWithResponses
 }
 
 func (c *client) uploadGenericFile(registry, artifactName, version string, f *types.File, file io.ReadCloser) error {
-	// For generic, include package/version as path segments: {package}/{version}/{filepath}
 	fileUri := strings.TrimPrefix(f.Uri, "/")
 	fullPath := fmt.Sprintf("%s/%s/%s", artifactName, version, fileUri)
 	defer file.Close()
 
-	_, err2 := c.pkgClient.UploadGenericFileToPathWithBodyWithResponse(
-		context.Background(),
-		config.Global.AccountID,
-		registry,
-		fullPath,
-		"application/octet-stream",
-		file)
-
-	if err2 != nil {
-		return fmt.Errorf("failed to upload file '%s/%s': %w", artifactName, version, err2)
+	base := strings.TrimRight(c.url, "/")
+	url := fmt.Sprintf("%s/pkg/%s/%s/files/%s", base, config.Global.AccountID, registry, fullPath)
+	req, err := http2.NewRequest(http2.MethodPut, url, file)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
 	}
+	req.Header.Set("Content-Type", "application/octet-stream")
 
+	resp, err := c.rawPkgHTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to upload file '%s/%s': %w", artifactName, version, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to upload file '%s/%s', status code: %d, response: %s",
+			artifactName, version, resp.StatusCode, string(body))
+	}
 	return nil
 }
 
@@ -116,50 +147,57 @@ func (c *client) headRawFile(registryRef string, fileUri string) (bool, error) {
 	fileUri = strings.TrimPrefix(fileUri, "/")
 	parts := strings.Split(registryRef, "/")
 	registry := parts[len(parts)-1]
-	resp, err := c.pkgClient.HeadGenericFileAtPathWithResponse(
-		context.Background(),
-		config.Global.AccountID,
-		registry,
-		fileUri,
-	)
+
+	base := strings.TrimRight(c.url, "/")
+	url := fmt.Sprintf("%s/pkg/%s/%s/files/%s", base, config.Global.AccountID, registry, fileUri)
+	req, err := http2.NewRequest(http2.MethodHead, url, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.rawPkgHTTPClient.Do(req)
 	if err != nil {
 		return false, fmt.Errorf("failed to HEAD raw file '%s': %w", fileUri, err)
 	}
+	defer resp.Body.Close()
 
-	if resp.StatusCode() == http2.StatusOK {
+	switch resp.StatusCode {
+	case http2.StatusOK:
 		return true, nil
-	}
-	if resp.StatusCode() == http2.StatusNotFound {
+	case http2.StatusNotFound:
 		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code %d for HEAD on raw file '%s'", resp.StatusCode, fileUri)
 	}
-	return false, fmt.Errorf("unexpected status code %d for HEAD on raw file '%s'", resp.StatusCode(), fileUri)
 }
 
 func (c *client) uploadRawFile(registry string, f *types.File, file io.ReadCloser) error {
 	fileUri := strings.TrimPrefix(f.Uri, "/")
 	defer file.Close()
 
-	resp, err := c.pkgClient.UploadGenericFileToPathWithBodyWithResponse(
-		context.Background(),
-		config.Global.AccountID,
-		registry,
-		fileUri,
-		"application/octet-stream",
-		file,
-	)
+	base := strings.TrimRight(c.url, "/")
+	url := fmt.Sprintf("%s/pkg/%s/%s/files/%s", base, config.Global.AccountID, registry, fileUri)
+	req, err := http2.NewRequest(http2.MethodPut, url, file)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	resp, err := c.rawPkgHTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to upload raw file '%s': %w", fileUri, err)
 	}
+	defer resp.Body.Close()
 
-	sc := resp.StatusCode()
 	switch {
-	case sc == http2.StatusConflict:
+	case resp.StatusCode == http2.StatusConflict:
 		return types.ErrArtifactAlreadyExists
-	case sc >= 200 && sc <= 299:
+	case resp.StatusCode >= 200 && resp.StatusCode <= 299:
 		return nil
 	default:
+		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to upload raw file '%s', status code: %d, response: %s",
-			fileUri, sc, string(resp.Body))
+			fileUri, resp.StatusCode, string(body))
 	}
 }
 
