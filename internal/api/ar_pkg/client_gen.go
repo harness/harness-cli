@@ -277,6 +277,9 @@ type ClientInterface interface {
 	// UploadMavenPackageWithBody request with any body
 	UploadMavenPackageWithBody(ctx context.Context, accountId string, registry string, groupId string, artifactId string, version string, file string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// UploadScopedNPMPackageWithBody request with any body
+	UploadScopedNPMPackageWithBody(ctx context.Context, accountId string, registry string, scope string, pPackage string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DownloadNPMPackageMetadata request
 	DownloadNPMPackageMetadata(ctx context.Context, accountId string, registry string, pPackage string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -508,6 +511,18 @@ func (c *Client) UploadMavenMetadataXmlWithBody(ctx context.Context, accountId s
 
 func (c *Client) UploadMavenPackageWithBody(ctx context.Context, accountId string, registry string, groupId string, artifactId string, version string, file string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadMavenPackageRequestWithBody(c.Server, accountId, registry, groupId, artifactId, version, file, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadScopedNPMPackageWithBody(ctx context.Context, accountId string, registry string, scope string, pPackage string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadScopedNPMPackageRequestWithBody(c.Server, accountId, registry, scope, pPackage, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1734,6 +1749,63 @@ func NewUploadMavenPackageRequestWithBody(server string, accountId string, regis
 	return req, nil
 }
 
+// NewUploadScopedNPMPackageRequestWithBody generates requests for UploadScopedNPMPackage with any type of body
+func NewUploadScopedNPMPackageRequestWithBody(server string, accountId string, registry string, scope string, pPackage string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "registry", runtime.ParamLocationPath, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "scope", runtime.ParamLocationPath, scope)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "package", runtime.ParamLocationPath, pPackage)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pkg/%s/%s/npm/@%s/%s", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewDownloadNPMPackageMetadataRequest generates requests for DownloadNPMPackageMetadata
 func NewDownloadNPMPackageMetadataRequest(server string, accountId string, registry string, pPackage string) (*http.Request, error) {
 	var err error
@@ -2215,6 +2287,9 @@ type ClientWithResponsesInterface interface {
 	// UploadMavenPackageWithBodyWithResponse request with any body
 	UploadMavenPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, groupId string, artifactId string, version string, file string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadMavenPackageResp, error)
 
+	// UploadScopedNPMPackageWithBodyWithResponse request with any body
+	UploadScopedNPMPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, scope string, pPackage string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadScopedNPMPackageResp, error)
+
 	// DownloadNPMPackageMetadataWithResponse request
 	DownloadNPMPackageMetadataWithResponse(ctx context.Context, accountId string, registry string, pPackage string, reqEditors ...RequestEditorFn) (*DownloadNPMPackageMetadataResp, error)
 
@@ -2618,6 +2693,27 @@ func (r UploadMavenPackageResp) StatusCode() int {
 	return 0
 }
 
+type UploadScopedNPMPackageResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadScopedNPMPackageResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadScopedNPMPackageResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type DownloadNPMPackageMetadataResp struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2946,6 +3042,15 @@ func (c *ClientWithResponses) UploadMavenPackageWithBodyWithResponse(ctx context
 		return nil, err
 	}
 	return ParseUploadMavenPackageResp(rsp)
+}
+
+// UploadScopedNPMPackageWithBodyWithResponse request with arbitrary body returning *UploadScopedNPMPackageResp
+func (c *ClientWithResponses) UploadScopedNPMPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, scope string, pPackage string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadScopedNPMPackageResp, error) {
+	rsp, err := c.UploadScopedNPMPackageWithBody(ctx, accountId, registry, scope, pPackage, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadScopedNPMPackageResp(rsp)
 }
 
 // DownloadNPMPackageMetadataWithResponse request returning *DownloadNPMPackageMetadataResp
@@ -3301,6 +3406,22 @@ func ParseUploadMavenPackageResp(rsp *http.Response) (*UploadMavenPackageResp, e
 	}
 
 	response := &UploadMavenPackageResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseUploadScopedNPMPackageResp parses an HTTP response from a UploadScopedNPMPackageWithResponse call
+func ParseUploadScopedNPMPackageResp(rsp *http.Response) (*UploadScopedNPMPackageResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadScopedNPMPackageResp{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

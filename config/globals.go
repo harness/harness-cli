@@ -36,6 +36,7 @@ type MigrateConfig struct {
 	Concurrency int
 	Overwrite   bool
 	DryRun      bool
+	Summary     bool
 }
 
 // StatusConfig holds status command specific configurations

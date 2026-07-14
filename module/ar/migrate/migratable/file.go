@@ -493,36 +493,12 @@ func generatePythonMetadataMap(metadata string, path string) (map[string]interfa
 
 // addFileToDryRunDirectory adds file name to the directory structure
 func (r *File) addFileToDryRunDirectory() {
-	if r.dryRunStats == nil || r.file == nil {
+	if r.file == nil {
 		return
 	}
 
-	// Ensure registry, package, and version entries exist
-	if r.dryRunStats.Directories[r.srcRegistry] == nil {
-		r.dryRunStats.Directories[r.srcRegistry] = &types.DryRunDirectoryEntry{
-			Registry: r.srcRegistry,
-			Packages: make(map[string]*types.DryRunPackageEntry),
-		}
-	}
-	dirEntry := r.dryRunStats.Directories[r.srcRegistry]
-
-	if dirEntry.Packages[r.pkg.Name] == nil {
-		dirEntry.Packages[r.pkg.Name] = &types.DryRunPackageEntry{
-			Name:     r.pkg.Name,
-			Versions: make(map[string]*types.DryRunVersionEntry),
-		}
-	}
-	pkgEntry := dirEntry.Packages[r.pkg.Name]
-
-	if pkgEntry.Versions[r.version.Name] == nil {
-		pkgEntry.Versions[r.version.Name] = &types.DryRunVersionEntry{
-			Name:  r.version.Name,
-			Files: make([]types.DryRunVersionFileEntry, 0),
-		}
-	}
-	versionEntry := pkgEntry.Versions[r.version.Name]
-
-	// Add file with full details to the version's file list
+	// Add file with full details to the version's file list, creating the
+	// registry/package/version entries if necessary.
 	fileEntry := types.DryRunVersionFileEntry{
 		Name:         r.file.Name,
 		Registry:     r.srcRegistry,
@@ -530,7 +506,7 @@ func (r *File) addFileToDryRunDirectory() {
 		Size:         r.file.Size,
 		LastModified: r.file.LastModified,
 	}
-	versionEntry.Files = append(versionEntry.Files, fileEntry)
+	r.dryRunStats.AddVersionFile(r.srcRegistry, r.pkg.Name, r.version.Name, fileEntry)
 }
 
 func (r *File) Post(ctx context.Context) error {

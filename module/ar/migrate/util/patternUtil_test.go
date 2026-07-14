@@ -70,23 +70,28 @@ func TestIsTimeBasedFilterPresent(t *testing.T) {
 		want    bool
 	}{
 		{
-			name:    "both nil — no filter",
+			name:    "no dateFilter — no filter",
 			mapping: &types.RegistryMapping{},
 			want:    false,
 		},
 		{
-			name:    "IncludeCreatedAfter set",
-			mapping: &types.RegistryMapping{IncludeCreatedAfter: &someTime},
+			name:    "DateFilter present but no dates",
+			mapping: &types.RegistryMapping{DateFilter: &types.DateFilter{Match: types.DateFilterMatchAny}},
 			want:    true,
 		},
 		{
-			name:    "IncludeAccessedAfter set",
-			mapping: &types.RegistryMapping{IncludeAccessedAfter: &someTime},
+			name:    "DateFilter with createdAfter set",
+			mapping: &types.RegistryMapping{DateFilter: &types.DateFilter{Match: types.DateFilterMatchAny, CreatedAfter: &someTime}},
 			want:    true,
 		},
 		{
-			name:    "both set",
-			mapping: &types.RegistryMapping{IncludeCreatedAfter: &someTime, IncludeAccessedAfter: &someTime},
+			name:    "DateFilter with downloadedAfter set",
+			mapping: &types.RegistryMapping{DateFilter: &types.DateFilter{Match: types.DateFilterMatchAny, DownloadedAfter: &someTime}},
+			want:    true,
+		},
+		{
+			name:    "DateFilter with both set",
+			mapping: &types.RegistryMapping{DateFilter: &types.DateFilter{Match: types.DateFilterMatchAll, CreatedAfter: &someTime, DownloadedAfter: &someTime}},
 			want:    true,
 		},
 	}

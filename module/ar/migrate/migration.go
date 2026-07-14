@@ -103,26 +103,43 @@ func (m *MigrationService) Run(ctx context.Context) error {
 		return m.writeDryRunOutput(logger)
 	}
 
-	printer.Print(transferStats.FileStats, 0, 0, int64(len(transferStats.FileStats)), false, [][]string{
-		{"Name", "Name"},
-		{"Registry", "Registry"},
-		{"Size", "Size"},
-		{"Status", "Status"},
-		{"Uri", "Uri"},
-		{"Error", "Error"},
-	})
-
-	// Log the same data as JSON
-	if jsonData, err := json.MarshalIndent(transferStats.FileStats, "", "  "); err == nil {
-		logger.Info().
-			RawJSON("file_stats", jsonData).
-			Int("total_files", len(transferStats.FileStats)).
-			Msg("Migration file statistics")
+	if m.config.Summary {
+		printSummary(transferStats.FileStats)
 	} else {
-		logger.Error().Err(err).Msg("Failed to marshal file stats to JSON")
+		printer.Print(transferStats.FileStats, 0, 0, int64(len(transferStats.FileStats)), false, [][]string{
+			{"Name", "Name"},
+			{"Registry", "Registry"},
+			{"Size", "Size"},
+			{"Status", "Status"},
+			{"Uri", "Uri"},
+			{"Error", "Error"},
+		})
+
+		// Log the same data as JSON
+		if jsonData, err := json.MarshalIndent(transferStats.FileStats, "", "  "); err == nil {
+			logger.Info().
+				RawJSON("file_stats", jsonData).
+				Int("total_files", len(transferStats.FileStats)).
+				Msg("Migration file statistics")
+		} else {
+			logger.Error().Err(err).Msg("Failed to marshal file stats to JSON")
+		}
 	}
 
 	return nil
+}
+
+func printSummary(fileStats []types.FileStat) {
+	counts := make(map[types.Status]int)
+	for _, f := range fileStats {
+		counts[f.Status]++
+	}
+
+	fmt.Println("\nMigration Summary of total files finalized for upload :")
+	fmt.Printf("  %-10s %d\n", "Success :", counts[types.StatusSuccess])
+	fmt.Printf("  %-10s %d\n", "Skipped :", counts[types.StatusSkip])
+	fmt.Printf("  %-10s %d\n", "Failed  :", counts[types.StatusFail])
+	fmt.Printf("  %-10s %d\n", "Total   :", len(fileStats))
 }
 
 // writeDryRunOutput writes the dry-run output files
@@ -162,10 +179,49 @@ func (m *MigrationService) writeDryRunOutput(logger zerolog.Logger) error {
 	}
 	logger.Info().Str("path", dirStructPath).Int("total_registries", len(m.dryRunStats.Directories)).Msg("Directory structure written")
 
-	fmt.Printf("\n=== Dry Run Complete ===\n")
-	fmt.Printf("Total files found: %d\n", len(m.dryRunStats.Files))
-	fmt.Printf("File list written to: %s\n", fileListPath)
-	fmt.Printf("Directory structure written to: %s\n", dirStructPath)
+	// Compute summary from directory structure (filtered files)
+	totalRegistries := len(m.dryRunStats.Directories)
+	totalPackages := 0
+	totalVersions := 0
+	filteredFiles := 0
+	for _, reg := range m.dryRunStats.Directories {
+		if reg == nil {
+			continue
+		}
+		totalPackages += len(reg.Packages)
+		for _, pkg := range reg.Packages {
+			if pkg == nil {
+				continue
+			}
+			totalVersions += len(pkg.Versions)
+			for _, ver := range pkg.Versions {
+				if ver == nil {
+					continue
+				}
+				filteredFiles += len(ver.Files)
+			}
+		}
+	}
+	totalSourceFiles := len(m.dryRunStats.Files)
+	fmt.Printf("\nOutput files:\n")
+	fmt.Printf("  File list          : %s\n", fileListPath)
+	fmt.Printf("  Directory structure: %s\n", dirStructPath)
+
+	fmt.Printf("\n==== Dry Run Summary ====\n")
+	fmt.Printf("  %-30s %d\n", "Files found in source registry :", totalSourceFiles)
+	fmt.Printf("  (see detail at %s)\n", fileListPath)
+	fmt.Println()
+	migratedCount := filteredFiles
+	migratedLabel := "Files that passed all filters (To be migrated)   :"
+	if filteredFiles == 0 && totalPackages > 0 {
+		migratedCount = totalPackages
+		migratedLabel = "Packages that passed all filters (To be migrated) :"
+	}
+	fmt.Printf("  %-50s %d\n", migratedLabel, migratedCount)
+	fmt.Printf("  (see detail at %s)\n", dirStructPath)
+	fmt.Printf("  %-30s %d\n", "Registries :", totalRegistries)
+	fmt.Printf("  %-30s %d\n", "Packages   :", totalPackages)
+	fmt.Printf("  %-30s %d\n", "Versions   :", totalVersions)
 
 	return nil
 }

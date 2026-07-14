@@ -50,6 +50,29 @@ func retryingArHTTPClient() *http2.Client {
 	return std
 }
 
+// rawPkgHTTPClient returns a retry-enabled *http.Client that injects the same
+// auth headers as auth.GetAuthOptionARPKG (x-api-key + Authorization for JWT
+// tokens). Used for raw/generic file uploads that bypass the generated client.
+func rawPkgHTTPClient() *http2.Client {
+	c := retryingPkgHTTPClient()
+	c.Transport = &pkgAuthTransport{wrapped: c.Transport}
+	return c
+}
+
+// pkgAuthTransport mirrors the auth injected by auth.GetAuthOptionARPKG.
+type pkgAuthTransport struct {
+	wrapped http2.RoundTripper
+}
+
+func (t *pkgAuthTransport) RoundTrip(req *http2.Request) (*http2.Response, error) {
+	r := req.Clone(req.Context())
+	r.Header.Set("x-api-key", config.Global.AuthToken)
+	if strings.HasPrefix(config.Global.AuthToken, auth.JWTTokenPrefix) {
+		r.Header.Set("Authorization", config.Global.AuthToken)
+	}
+	return t.wrapped.RoundTrip(r)
+}
+
 // newClient constructs a jfrog client
 func newClient(reg *types.RegistryConfig) *client {
 	username, token := "", ""
@@ -72,43 +95,51 @@ func newClient(reg *types.RegistryConfig) *client {
 			},
 			xApiKey.NewAuthorizer(token),
 		),
-		pkgClient: pkgClient,
-		url:       reg.Endpoint,
-		insecure:  true,
-		username:  username,
-		password:  token,
-		apiClient: arClient,
+		pkgClient:         pkgClient,
+		rawPkgHTTPClient:  rawPkgHTTPClient(),
+		url:               reg.Endpoint,
+		insecure:          true,
+		username:          username,
+		password:          token,
+		apiClient:         arClient,
 	}
 }
 
 type client struct {
-	apiClient *ar.ClientWithResponses
-	client    *http.Client
-	url       string
-	insecure  bool
-	username  string
-	password  string
-	pkgClient *pkgclient.ClientWithResponses
+	apiClient        *ar.ClientWithResponses
+	client           *http.Client
+	rawPkgHTTPClient *http2.Client
+	url              string
+	insecure         bool
+	username         string
+	password         string
+	pkgClient        *pkgclient.ClientWithResponses
 }
 
 func (c *client) uploadGenericFile(registry, artifactName, version string, f *types.File, file io.ReadCloser) error {
-	// For generic, include package/version as path segments: {package}/{version}/{filepath}
 	fileUri := strings.TrimPrefix(f.Uri, "/")
 	fullPath := fmt.Sprintf("%s/%s/%s", artifactName, version, fileUri)
 	defer file.Close()
 
-	_, err2 := c.pkgClient.UploadGenericFileToPathWithBodyWithResponse(
-		context.Background(),
-		config.Global.AccountID,
-		registry,
-		fullPath,
-		"application/octet-stream",
-		file)
-
-	if err2 != nil {
-		return fmt.Errorf("failed to upload file '%s/%s': %w", artifactName, version, err2)
+	base := strings.TrimRight(c.url, "/")
+	url := fmt.Sprintf("%s/pkg/%s/%s/files/%s", base, config.Global.AccountID, registry, fullPath)
+	req, err := http2.NewRequest(http2.MethodPut, url, file)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
 	}
+	req.Header.Set("Content-Type", "application/octet-stream")
 
+	resp, err := c.rawPkgHTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to upload file '%s/%s': %w", artifactName, version, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to upload file '%s/%s', status code: %d, response: %s",
+			artifactName, version, resp.StatusCode, string(body))
+	}
 	return nil
 }
 
@@ -116,50 +147,57 @@ func (c *client) headRawFile(registryRef string, fileUri string) (bool, error) {
 	fileUri = strings.TrimPrefix(fileUri, "/")
 	parts := strings.Split(registryRef, "/")
 	registry := parts[len(parts)-1]
-	resp, err := c.pkgClient.HeadGenericFileAtPathWithResponse(
-		context.Background(),
-		config.Global.AccountID,
-		registry,
-		fileUri,
-	)
+
+	base := strings.TrimRight(c.url, "/")
+	url := fmt.Sprintf("%s/pkg/%s/%s/files/%s", base, config.Global.AccountID, registry, fileUri)
+	req, err := http2.NewRequest(http2.MethodHead, url, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.rawPkgHTTPClient.Do(req)
 	if err != nil {
 		return false, fmt.Errorf("failed to HEAD raw file '%s': %w", fileUri, err)
 	}
+	defer resp.Body.Close()
 
-	if resp.StatusCode() == http2.StatusOK {
+	switch resp.StatusCode {
+	case http2.StatusOK:
 		return true, nil
-	}
-	if resp.StatusCode() == http2.StatusNotFound {
+	case http2.StatusNotFound:
 		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code %d for HEAD on raw file '%s'", resp.StatusCode, fileUri)
 	}
-	return false, fmt.Errorf("unexpected status code %d for HEAD on raw file '%s'", resp.StatusCode(), fileUri)
 }
 
 func (c *client) uploadRawFile(registry string, f *types.File, file io.ReadCloser) error {
 	fileUri := strings.TrimPrefix(f.Uri, "/")
 	defer file.Close()
 
-	resp, err := c.pkgClient.UploadGenericFileToPathWithBodyWithResponse(
-		context.Background(),
-		config.Global.AccountID,
-		registry,
-		fileUri,
-		"application/octet-stream",
-		file,
-	)
+	base := strings.TrimRight(c.url, "/")
+	url := fmt.Sprintf("%s/pkg/%s/%s/files/%s", base, config.Global.AccountID, registry, fileUri)
+	req, err := http2.NewRequest(http2.MethodPut, url, file)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	resp, err := c.rawPkgHTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to upload raw file '%s': %w", fileUri, err)
 	}
+	defer resp.Body.Close()
 
-	sc := resp.StatusCode()
 	switch {
-	case sc == http2.StatusConflict:
+	case resp.StatusCode == http2.StatusConflict:
 		return types.ErrArtifactAlreadyExists
-	case sc >= 200 && sc <= 299:
+	case resp.StatusCode >= 200 && resp.StatusCode <= 299:
 		return nil
 	default:
+		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to upload raw file '%s', status code: %d, response: %s",
-			fileUri, sc, string(resp.Body))
+			fileUri, resp.StatusCode, string(body))
 	}
 }
 
@@ -171,7 +209,7 @@ func (c *client) uploadMavenFile(
 	file io.ReadCloser,
 ) error {
 	fileUri := strings.TrimPrefix(f.Uri, "/")
-	url := fmt.Sprintf("%s/maven/%s/%s/%s", c.url, config.Global.AccountID, registry, fileUri)
+	url := fmt.Sprintf("%s/pkg/%s/%s/maven/%s", c.url, config.Global.AccountID, registry, fileUri)
 	// Create request
 	req, err := http2.NewRequest(http2.MethodPut, url, file)
 	if err != nil {
@@ -521,6 +559,93 @@ func (c *client) uploadCondaFile(
 			fileUri, resp.StatusCode, string(body))
 	}
 	return nil
+}
+
+// uploadConanFile PUTs a single Conan file to its recipe (RREV) or package
+// (PKGID/PREV) revision path via the Conan v2 endpoints. Coordinates and the
+// source SHA1 are carried in metadata; the SHA1 rides as X-Checksum-Sha1 so the
+// server can verify the upload. A 409 (immutable-revision conflict) maps to
+// ErrArtifactAlreadyExists so the caller can skip it.
+func (c *client) uploadConanFile(
+	registry string,
+	file io.ReadCloser,
+	metadata map[string]interface{},
+) error {
+	defer file.Close()
+
+	get := func(key string) string {
+		if metadata == nil {
+			return ""
+		}
+		if v, ok := metadata[key].(string); ok {
+			return v
+		}
+		return ""
+	}
+
+	name := get("name")
+	version := get("version")
+	rrev := get("rrev")
+	filename := get("filename")
+	if name == "" || version == "" || rrev == "" || filename == "" {
+		return fmt.Errorf("conan upload: missing required coordinates (name/version/rrev/filename)")
+	}
+
+	user := get("user")
+	if user == "" {
+		user = "_"
+	}
+	channel := get("channel")
+	if channel == "" {
+		channel = "_"
+	}
+
+	sha1 := get("sha1")
+	reqEditor := func(_ context.Context, req *http2.Request) error {
+		if sha1 != "" {
+			req.Header.Set("X-Checksum-Sha1", sha1)
+		}
+		return nil
+	}
+
+	var statusCode int
+	var respBody []byte
+	if get("layer") == "package" {
+		pkgid := get("pkgid")
+		prev := get("prev")
+		if pkgid == "" || prev == "" {
+			return fmt.Errorf("conan upload: missing pkgid/prev for package-layer file %q", filename)
+		}
+		resp, err := c.pkgClient.UploadConanPackageFileWithBodyWithResponse(
+			context.Background(), config.Global.AccountID, registry,
+			name, version, user, channel, rrev, pkgid, prev, filename,
+			"application/octet-stream", file, reqEditor)
+		if err != nil {
+			return fmt.Errorf("failed to upload conan package file %q: %w", filename, err)
+		}
+		statusCode = resp.StatusCode()
+		respBody = resp.Body
+	} else {
+		resp, err := c.pkgClient.UploadConanRecipeFileWithBodyWithResponse(
+			context.Background(), config.Global.AccountID, registry,
+			name, version, user, channel, rrev, filename,
+			"application/octet-stream", file, reqEditor)
+		if err != nil {
+			return fmt.Errorf("failed to upload conan recipe file %q: %w", filename, err)
+		}
+		statusCode = resp.StatusCode()
+		respBody = resp.Body
+	}
+
+	switch {
+	case statusCode == http2.StatusConflict:
+		return types.ErrArtifactAlreadyExists
+	case statusCode >= 200 && statusCode <= 299:
+		return nil
+	default:
+		return fmt.Errorf("failed to upload conan file %q, status code: %d, response: %s",
+			filename, statusCode, string(respBody))
+	}
 }
 
 func (c *client) uploadComposerFile(

@@ -15,8 +15,6 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
-	"github.com/harness/harness-cli/util/common/auth"
 	"github.com/harness/harness-cli/util/common/upload"
 )
 
@@ -64,14 +62,8 @@ func writeFile(t *testing.T, dir, name, body string) string {
 	return p
 }
 
-func createTestPkgClient(t *testing.T) *pkgclient.ClientWithResponses {
-	t.Helper()
-	client, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-		auth.GetAuthOptionARPKG())
-	if err != nil {
-		t.Fatalf("failed to create test client: %v", err)
-	}
-	return client
+func testHTTPClient() *http.Client {
+	return http.DefaultClient
 }
 
 func TestCollectGenericUploadJobs_SingleFile(t *testing.T) {
@@ -81,9 +73,9 @@ func TestCollectGenericUploadJobs_SingleFile(t *testing.T) {
 
 	dir := t.TempDir()
 	file := writeFile(t, dir, "standalone.zip", "stub")
-	pkgClient := createTestPkgClient(t)
+	httpClient := testHTTPClient()
 
-	jobs, stats, err := collectGenericUploadJobs([]string{file}, "myreg", "web", "1.0.0", false, pkgClient)
+	jobs, stats, err := collectGenericUploadJobs([]string{file}, "myreg", "web", "1.0.0", false, config.Global.Registry.PkgURL, httpClient)
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
@@ -106,9 +98,9 @@ func TestCollectGenericUploadJobs_MultipleFiles(t *testing.T) {
 	a := writeFile(t, dir, "a.zip", "a")
 	b := writeFile(t, dir, "b.txt", "b")
 	c := writeFile(t, dir, "c.json", "c")
-	pkgClient := createTestPkgClient(t)
+	httpClient := testHTTPClient()
 
-	jobs, stats, err := collectGenericUploadJobs([]string{a, b, c}, "myreg", "web", "1.0.0", false, pkgClient)
+	jobs, stats, err := collectGenericUploadJobs([]string{a, b, c}, "myreg", "web", "1.0.0", false, config.Global.Registry.PkgURL, httpClient)
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
@@ -135,9 +127,9 @@ func TestCollectGenericUploadJobs_DirectoryPreservesBasename(t *testing.T) {
 		"index.html":          "ok",
 		"assets/css/main.css": "css",
 	})
-	pkgClient := createTestPkgClient(t)
+	httpClient := testHTTPClient()
 
-	jobs, stats, err := collectGenericUploadJobs([]string{root}, "myreg", "web", "2.1.0", false, pkgClient)
+	jobs, stats, err := collectGenericUploadJobs([]string{root}, "myreg", "web", "2.1.0", false, config.Global.Registry.PkgURL, httpClient)
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
@@ -167,9 +159,9 @@ func TestCollectGenericUploadJobs_DeeplyNestedDir(t *testing.T) {
 		"assets/js/vendor/lib.js":        "vendor",
 		"images/icons/sub/sub2/icon.png": "deep",
 	})
-	pkgClient := createTestPkgClient(t)
+	httpClient := testHTTPClient()
 
-	jobs, stats, err := collectGenericUploadJobs([]string{root}, "myreg", "web", "2.1.0", false, pkgClient)
+	jobs, stats, err := collectGenericUploadJobs([]string{root}, "myreg", "web", "2.1.0", false, config.Global.Registry.PkgURL, httpClient)
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
@@ -202,9 +194,9 @@ func TestCollectGenericUploadJobs_MixedFileAndDir(t *testing.T) {
 		"index.html":          "ok",
 		"assets/css/main.css": "css",
 	})
-	pkgClient := createTestPkgClient(t)
+	httpClient := testHTTPClient()
 
-	jobs, stats, err := collectGenericUploadJobs([]string{standalone, tree}, "myreg", "web", "1.0.0", false, pkgClient)
+	jobs, stats, err := collectGenericUploadJobs([]string{standalone, tree}, "myreg", "web", "1.0.0", false, config.Global.Registry.PkgURL, httpClient)
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
@@ -236,9 +228,9 @@ func TestCollectGenericUploadJobs_SkipsHiddenByDefault(t *testing.T) {
 		".cache/sub/deep.bin": "skip",
 		"sub/normal.txt":      "ok",
 	})
-	pkgClient := createTestPkgClient(t)
+	httpClient := testHTTPClient()
 
-	jobs, stats, err := collectGenericUploadJobs([]string{root}, "myreg", "web", "2.1.0", false, pkgClient)
+	jobs, stats, err := collectGenericUploadJobs([]string{root}, "myreg", "web", "2.1.0", false, config.Global.Registry.PkgURL, httpClient)
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
@@ -262,9 +254,9 @@ func TestCollectGenericUploadJobs_IncludesHiddenWhenFlagSet(t *testing.T) {
 		".dotfile":         "kept",
 		".cache/inner.bin": "kept",
 	})
-	pkgClient := createTestPkgClient(t)
+	httpClient := testHTTPClient()
 
-	jobs, _, err := collectGenericUploadJobs([]string{root}, "myreg", "web", "2.1.0", true, pkgClient)
+	jobs, _, err := collectGenericUploadJobs([]string{root}, "myreg", "web", "2.1.0", true, config.Global.Registry.PkgURL, httpClient)
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
@@ -286,8 +278,8 @@ func TestCollectGenericUploadJobs_EmptyDirectoryYieldsZeroJobs(t *testing.T) {
 	})
 
 	root := t.TempDir()
-	pkgClient := createTestPkgClient(t)
-	jobs, stats, err := collectGenericUploadJobs([]string{root}, "myreg", "web", "1.0.0", false, pkgClient)
+	httpClient := testHTTPClient()
+	jobs, stats, err := collectGenericUploadJobs([]string{root}, "myreg", "web", "1.0.0", false, config.Global.Registry.PkgURL, httpClient)
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
@@ -300,9 +292,9 @@ func TestCollectGenericUploadJobs_NonExistentPath(t *testing.T) {
 	withGenericServer(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	pkgClient := createTestPkgClient(t)
+	httpClient := testHTTPClient()
 
-	_, _, err := collectGenericUploadJobs([]string{"/this/path/does/not/exist"}, "myreg", "web", "1.0.0", false, pkgClient)
+	_, _, err := collectGenericUploadJobs([]string{"/this/path/does/not/exist"}, "myreg", "web", "1.0.0", false, config.Global.Registry.PkgURL, httpClient)
 	if err == nil {
 		t.Fatal("expected error for non-existent path, got nil")
 	}
@@ -326,9 +318,9 @@ func TestCollectGenericUploadJobs_SkipsSymlinks(t *testing.T) {
 	if err := os.Symlink(filepath.Join(root, "target", "file.txt"), filepath.Join(root, "link.txt")); err != nil {
 		t.Fatalf("symlink: %v", err)
 	}
-	pkgClient := createTestPkgClient(t)
+	httpClient := testHTTPClient()
 
-	jobs, stats, err := collectGenericUploadJobs([]string{root}, "myreg", "web", "1.0.0", false, pkgClient)
+	jobs, stats, err := collectGenericUploadJobs([]string{root}, "myreg", "web", "1.0.0", false, config.Global.Registry.PkgURL, httpClient)
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
@@ -350,8 +342,8 @@ func TestCollectGenericUploadJobs_PopulatesIDAndSize(t *testing.T) {
 	root := makeTree(t, map[string]string{
 		"foo.txt": "12345",
 	})
-	pkgClient := createTestPkgClient(t)
-	jobs, _, err := collectGenericUploadJobs([]string{root}, "myreg", "web", "1.0.0", false, pkgClient)
+	httpClient := testHTTPClient()
+	jobs, _, err := collectGenericUploadJobs([]string{root}, "myreg", "web", "1.0.0", false, config.Global.Registry.PkgURL, httpClient)
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
@@ -388,15 +380,15 @@ func TestCollectGenericUploadJobs_FileAndDirCanShareLayout(t *testing.T) {
 	withGenericServer(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	pkgClient := createTestPkgClient(t)
+	httpClient := testHTTPClient()
 
 	// File-only input.
-	fileJobs, _, err := collectGenericUploadJobs([]string{file}, "myreg", "web", "1.0.0", false, pkgClient)
+	fileJobs, _, err := collectGenericUploadJobs([]string{file}, "myreg", "web", "1.0.0", false, config.Global.Registry.PkgURL, httpClient)
 	if err != nil {
 		t.Fatalf("file collect: %v", err)
 	}
 	// Directory input (containing the same file).
-	dirJobs, _, err := collectGenericUploadJobs([]string{deep}, "myreg", "web", "1.0.0", false, pkgClient)
+	dirJobs, _, err := collectGenericUploadJobs([]string{deep}, "myreg", "web", "1.0.0", false, config.Global.Registry.PkgURL, httpClient)
 	if err != nil {
 		t.Fatalf("dir collect: %v", err)
 	}
@@ -458,16 +450,7 @@ func runGenericCmd(t *testing.T, args ...string) (string, error) {
 		doneCh <- buf.String()
 	}()
 
-	factory := &cmdutils.Factory{
-		PkgHttpClient: func() *pkgclient.ClientWithResponses {
-			client, err := pkgclient.NewClientWithResponses(config.Global.Registry.PkgURL,
-				auth.GetAuthOptionARPKG())
-			if err != nil {
-				t.Fatalf("failed to create pkg client: %v", err)
-			}
-			return client
-		},
-	}
+	factory := &cmdutils.Factory{}
 	cmd := NewPushGenericCmd(factory)
 	cmd.SetArgs(args)
 	cmd.SetOut(new(bytes.Buffer))
@@ -710,9 +693,9 @@ func TestCollectFromPath_IrregularFileRejected(t *testing.T) {
 	withGenericServer(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	pkgClient := createTestPkgClient(t)
+	httpClient := testHTTPClient()
 
-	_, _, err := collectGenericUploadJobs([]string{fifo}, "myreg", "web", "1.0.0", false, pkgClient)
+	_, _, err := collectGenericUploadJobs([]string{fifo}, "myreg", "web", "1.0.0", false, config.Global.Registry.PkgURL, httpClient)
 	if err == nil {
 		t.Fatal("expected error for non-regular file (named pipe)")
 	}

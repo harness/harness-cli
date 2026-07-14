@@ -155,7 +155,7 @@ func IsFileLevelFilterableArtifact(artifactType types.ArtifactType) bool {
 func IsPackageLevelFilterableArtifact(artifactType types.ArtifactType) bool {
 
 	switch artifactType {
-	case types.DOCKER, types.HELM, types.HELM_LEGACY, types.HELM_HTTP, types.RPM, types.CONDA, types.COMPOSER, types.SWIFT:
+	case types.DOCKER, types.HELM, types.HELM_LEGACY, types.HELM_HTTP, types.RPM, types.CONDA, types.COMPOSER, types.SWIFT, types.CONAN:
 		return true
 	default:
 		return false
@@ -163,7 +163,11 @@ func IsPackageLevelFilterableArtifact(artifactType types.ArtifactType) bool {
 }
 
 func IsTimeBasedFilterPresent(mapping *types.RegistryMapping) bool {
-	return mapping.IncludeCreatedAfter != nil || mapping.IncludeAccessedAfter != nil
+	if mapping.DateFilter != nil {
+		return true
+	}
+	return false
+
 }
 
 // support * and ?

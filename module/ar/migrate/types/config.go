@@ -47,6 +47,7 @@ type Config struct {
 	Concurrency int               `yaml:"concurrency"`
 	Overwrite   bool              `yaml:"overwrite"`
 	DryRun      bool              `yaml:"dryRun"`
+	Summary     bool              `yaml:"summary"`
 	Source      RegistryConfig    `yaml:"source"`
 	Dest        RegistryConfig    `yaml:"destination"`
 	Mappings    []RegistryMapping `yaml:"mappings"`
@@ -58,6 +59,20 @@ type RegistryConfig struct {
 	Type        RegistryType      `yaml:"type"`
 	Credentials CredentialsConfig `yaml:"credentials,omitempty"`
 	Insecure    bool              `yaml:"insecure" default:"false"`
+}
+
+type DateFilterMatch string
+
+const (
+	DateFilterMatchAny DateFilterMatch = "ANY"
+	DateFilterMatchAll DateFilterMatch = "ALL"
+)
+
+// DateFilter defines the time-based filtering criteria for a registry mapping
+type DateFilter struct {
+	Match           DateFilterMatch `yaml:"match"`
+	CreatedAfter    *time.Time      `yaml:"createdAfter"`
+	DownloadedAfter *time.Time      `yaml:"downloadedAfter"`
 }
 
 // RegistryMapping defines the mapping between source and destination registries
@@ -73,9 +88,8 @@ type RegistryMapping struct {
 	IncludePatterns []string `yaml:"includePatterns"`
 	ExcludePatterns []string `yaml:"excludePatterns"`
 	//Optional
-	SourcePackageHostname string     `yaml:"sourcePackageHostname"`
-	IncludeCreatedAfter   *time.Time `yaml:"includeCreatedAfter"`
-	IncludeAccessedAfter  *time.Time `yaml:"includeAccessedAfter"`
+	SourcePackageHostname string      `yaml:"sourcePackageHostname"`
+	DateFilter            *DateFilter `yaml:"dateFilter"`
 }
 
 // CredentialsConfig defines the credential configuration

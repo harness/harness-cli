@@ -326,6 +326,23 @@ func (c *mockClient) loadBinaryContent() {
 
 	c.binaryContent["rpm-local/mockpkg-1.0.0-1.x86_64.rpm"] =
 		createMockRPM("mockpkg", "1.0.0", "1", "x86_64")
+
+	// Conan v2 files — opaque bytes keyed by their repo-relative Uri. Enumeration
+	// derives the download key from the file Uri, so every canonical file listed
+	// in conan-local.json needs matching content here.
+	conanFiles := []string{
+		"zlib/1.2.13/_/_/9a0b1c2d3e4f5061728394a5b6c7d8e9/export/conanfile.py",
+		"zlib/1.2.13/_/_/9a0b1c2d3e4f5061728394a5b6c7d8e9/export/conan_export.tgz",
+		"zlib/1.2.13/_/_/9a0b1c2d3e4f5061728394a5b6c7d8e9/export/conanmanifest.txt",
+		"zlib/1.2.13/_/_/9a0b1c2d3e4f5061728394a5b6c7d8e9/package/abcabcabcabcabcabcabcabcabcabcabcabcabca/1f2e3d4c5b6a7988990a1b2c3d4e5f60/conaninfo.txt",
+		"zlib/1.2.13/_/_/9a0b1c2d3e4f5061728394a5b6c7d8e9/package/abcabcabcabcabcabcabcabcabcabcabcabcabca/1f2e3d4c5b6a7988990a1b2c3d4e5f60/conan_package.tgz",
+		"zlib/1.2.13/_/_/9a0b1c2d3e4f5061728394a5b6c7d8e9/package/abcabcabcabcabcabcabcabcabcabcabcabcabca/1f2e3d4c5b6a7988990a1b2c3d4e5f60/conanmanifest.txt",
+		"mylib/2.0/acme/stable/0011223344556677889900aabbccddee/export/conanfile.py",
+		"mylib/2.0/acme/stable/0011223344556677889900aabbccddee/export/conanmanifest.txt",
+	}
+	for _, uri := range conanFiles {
+		c.binaryContent["conan-local/"+uri] = []byte("mock conan content: " + uri)
+	}
 }
 
 func (c *mockClient) GetRegistries() ([]jfrog.JFrogRepository, error) {

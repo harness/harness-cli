@@ -562,6 +562,16 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			})
 		}
 		log.Info().Msgf("Found %d PUPPET packages", len(packages))
+	} else if artifactType == types.CONAN {
+		// One package per distinct Conan reference (name/version[@user/channel]).
+		// The reference subtree carries every RREV/PKGID/PREV file, migrated by
+		// migrateConan.
+		files, err := tree.GetAllFiles(root)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+		packages = append(packages, util.GetConanPackages(files, registry)...)
+		log.Info().Msgf("Found %d CONAN packages", len(packages))
 	} else {
 		return []types.Package{}, errors.New("unknown artifact type")
 	}

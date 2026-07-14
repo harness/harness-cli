@@ -267,34 +267,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 
 // addVersionToDryRunDirectory adds version to the directory structure
 func (r *Version) addVersionToDryRunDirectory() {
-	if r.dryRunStats == nil {
-		return
-	}
-
-	// Ensure registry and package entries exist
-	if r.dryRunStats.Directories[r.srcRegistry] == nil {
-		r.dryRunStats.Directories[r.srcRegistry] = &types.DryRunDirectoryEntry{
-			Registry: r.srcRegistry,
-			Packages: make(map[string]*types.DryRunPackageEntry),
-		}
-	}
-	dirEntry := r.dryRunStats.Directories[r.srcRegistry]
-
-	if dirEntry.Packages[r.pkg.Name] == nil {
-		dirEntry.Packages[r.pkg.Name] = &types.DryRunPackageEntry{
-			Name:     r.pkg.Name,
-			Versions: make(map[string]*types.DryRunVersionEntry),
-		}
-	}
-	pkgEntry := dirEntry.Packages[r.pkg.Name]
-
-	// Add version entry if not exists
-	if pkgEntry.Versions[r.version.Name] == nil {
-		pkgEntry.Versions[r.version.Name] = &types.DryRunVersionEntry{
-			Name:  r.version.Name,
-			Files: make([]types.DryRunVersionFileEntry, 0),
-		}
-	}
+	r.dryRunStats.EnsureVersion(r.srcRegistry, r.pkg.Name, r.version.Name)
 }
 
 // Post Any post processing work

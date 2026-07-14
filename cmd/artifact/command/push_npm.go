@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
@@ -192,27 +193,71 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 			//Re-initializing pkgClient with progress reader for upload tracking
 			pkgClient = f.PkgHttpClientWithProgress(progress, bufferSize, fileInfo.Name())
 
-			resp, err := pkgClient.UploadNPMPackageWithBodyWithResponse(
-				context.Background(),
-				config.Global.AccountID,
-				registryName,
-				pkgName,
-				"application/json",
-				pr,
-				func(ctx context.Context, req *http.Request) error {
-					utils.SetChecksumHeaders(req.Header, checksums)
-					return nil
-				},
-			)
-			if err != nil {
-				progress.Error("Failed to upload NPM package")
-				return fmt.Errorf("failed to upload NPM package: %w", err)
+			// Check if this is a scoped package (e.g., @scope/package)
+			var statusCode int
+			var respBody []byte
+
+			// Validate scoped package format
+			if strings.HasPrefix(pkgName, "@") {
+				if !strings.Contains(pkgName, "/") {
+					progress.Error("Invalid scoped package name format")
+					return fmt.Errorf("invalid scoped package name: %s (scoped packages must be in format @scope/package)", pkgName)
+				}
+				// Scoped package: split into scope and package name
+				parts := strings.SplitN(pkgName[1:], "/", 2) // Remove @ and split
+				if len(parts) != 2 {
+					progress.Error("Invalid scoped package name format")
+					return fmt.Errorf("invalid scoped package name: %s", pkgName)
+				}
+				scope := parts[0]
+				packageName := parts[1]
+
+				progress.Step(fmt.Sprintf("Uploading scoped package @%s/%s", scope, packageName))
+				scopedResp, err := pkgClient.UploadScopedNPMPackageWithBodyWithResponse(
+					context.Background(),
+					config.Global.AccountID,
+					registryName,
+					scope,
+					packageName,
+					"application/json",
+					pr,
+					func(ctx context.Context, req *http.Request) error {
+						utils.SetChecksumHeaders(req.Header, checksums)
+						return nil
+					},
+				)
+				if err != nil {
+					progress.Error("Failed to upload NPM package")
+					return fmt.Errorf("failed to upload NPM package: %w", err)
+				}
+				statusCode = scopedResp.StatusCode()
+				respBody = scopedResp.Body
+			} else {
+				// Unscoped package: use the original endpoint
+				unscopedResp, err := pkgClient.UploadNPMPackageWithBodyWithResponse(
+					context.Background(),
+					config.Global.AccountID,
+					registryName,
+					pkgName,
+					"application/json",
+					pr,
+					func(ctx context.Context, req *http.Request) error {
+						utils.SetChecksumHeaders(req.Header, checksums)
+						return nil
+					},
+				)
+				if err != nil {
+					progress.Error("Failed to upload NPM package")
+					return fmt.Errorf("failed to upload NPM package: %w", err)
+				}
+				statusCode = unscopedResp.StatusCode()
+				respBody = unscopedResp.Body
 			}
 
 			// Check response
-			if resp.StatusCode() != http.StatusOK && resp.StatusCode() != http.StatusCreated {
+			if statusCode != http.StatusOK && statusCode != http.StatusCreated {
 				progress.Error("Upload failed")
-				return fmt.Errorf("failed to upload NPM package: %s \n response: %s", resp.Status(), resp.Body)
+				return fmt.Errorf("failed to upload NPM package: %d \n response: %s", statusCode, string(respBody))
 			}
 
 			progress.Success(fmt.Sprintf("Successfully uploaded NPM package '%s@%s' to registry '%s'", pkgName, version, registryName))
