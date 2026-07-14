@@ -1,0 +1,29 @@
+[
+  {
+    "Registry": "go-local",
+    "Name": "v1.0.0.zip",
+    "Uri": "/github.com/example/mod/@v/v1.0.0.zip",
+    "Folder": false,
+    "Size": 512,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80760"
+  },
+  {
+    "Registry": "go-local",
+    "Name": "v1.0.0.mod",
+    "Uri": "/github.com/example/mod/@v/v1.0.0.mod",
+    "Folder": false,
+    "Size": 32,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80761"
+  },
+  {
+    "Registry": "go-local",
+    "Name": "v1.0.0.info",
+    "Uri": "/github.com/example/mod/@v/v1.0.0.info",
+    "Folder": false,
+    "Size": 48,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80762"
+  }
+]

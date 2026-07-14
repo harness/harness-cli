@@ -19,6 +19,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/google/rpmpack"
+	"github.com/klauspost/compress/zstd"
 )
 
 var baseDir = filepath.Join("module", "ar", "migrate", "adapter", "mock_jfrog", "testdata", "binary")
@@ -103,6 +106,12 @@ func main() {
 		{"content/raw-local/assets/images/logo.png",
 			[]byte("fake-png-content-for-testing")},
 
+		// Generic registry — arbitrary files uploaded under default/default/<uri>
+		{"content/generic-local/data/config.json",
+			[]byte(`{"env":"test","build":42}`)},
+		{"content/generic-local/bin/run.sh",
+			[]byte("#!/bin/sh\necho mock generic artifact\n")},
+
 		// Debian repository metadata
 		{"content/debian-local/dists/bookworm/InRelease", []byte(`-----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA512
@@ -157,6 +166,24 @@ Files:
 
 `))},
 
+		// RPM repository metadata (repomd.xml points at the gzipped primary index)
+		{"content/rpm-local/repodata/repomd.xml",
+			[]byte(`<?xml version="1.0" encoding="UTF-8"?><repomd xmlns="http://linux.duke.edu/metadata/repo"><data type="primary"><location href="repodata/primary.xml.gz"/></data></repomd>`)},
+		{"content/rpm-local/repodata/primary.xml.gz", gzipContent([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<metadata xmlns="http://linux.duke.edu/metadata/common" xmlns:rpm="http://linux.duke.edu/metadata/rpm" packages="1">
+  <package type="rpm">
+    <name>mockpkg</name>
+    <arch>x86_64</arch>
+    <version epoch="0" ver="1.0.0" rel="1"/>
+    <location href="mockpkg-1.0.0-1.x86_64.rpm"/>
+    <size package="0"/>
+  </package>
+</metadata>`))},
+
+		// Conda repository metadata (repodata.json maps the .conda leaf to name/version/subdir)
+		{"content/conda-local/linux-64/repodata.json",
+			[]byte(`{"info":{"subdir":"linux-64"},"packages":{},"packages.conda":{"mockpkg-1.2.0-0.conda":{"name":"mockpkg","version":"1.2.0","build":"0","build_number":0,"subdir":"linux-64","depends":[]}}}`)},
+
 		// ── Binary packages ──
 
 		// NPM tarballs
@@ -187,6 +214,36 @@ Files:
 		{"puppet-local/puppetlabs/stdlib/puppetlabs-stdlib-9.4.1.tar.gz", puppetTarGz("puppetlabs", "stdlib", "9.4.1")},
 		{"puppet-local/puppetlabs/stdlib/puppetlabs-stdlib-9.5.0.tar.gz", puppetTarGz("puppetlabs", "stdlib", "9.5.0")},
 		{"puppet-local/puppetlabs/apache/puppetlabs-apache-12.3.0.tar.gz", puppetTarGz("puppetlabs", "apache", "12.3.0")},
+
+		// Maven artifacts (standard groupId/artifactId/version path layout)
+		{"maven-local/com/example/sample/1.0/sample-1.0.jar", mavenJarBytes()},
+		{"maven-local/com/example/sample/1.0/sample-1.0.pom", mavenPom("com.example", "sample", "1.0")},
+
+		// Python source distributions (sdist tar.gz whose PKG-INFO drives dest name/version)
+		{"python-local/requests/2.28.0/requests-2.28.0.tar.gz", pythonSdist("requests", "2.28.0")},
+		{"python-local/requests/2.29.0/requests-2.29.0.tar.gz", pythonSdist("requests", "2.29.0")},
+
+		// Swift source archives (zip with Package.swift)
+		{"swift-local/myscope/harness/1.0.0/harness-1.0.0.zip", swiftZip("harness", "1.0.0")},
+		{"swift-local/myscope/harness/1.0.1/harness-1.0.1.zip", swiftZip("harness", "1.0.1")},
+		{"swift-local/swift/trial/trial-1.0.2.zip", swiftZip("trial", "1.0.2")},
+
+		// Helm legacy chart (index.yaml enumerated; chart tgz carries Chart.yaml)
+		{"helm-legacy-local/nginx-8.2.0.tgz", helmChartTgz("nginx", "8.2.0")},
+
+		// Go module (zip + mod + info under the module's /@v/ directory)
+		{"go-local/github.com/example/mod/@v/v1.0.0.zip", goModZip("github.com/example/mod", "v1.0.0")},
+		{"go-local/github.com/example/mod/@v/v1.0.0.mod", goModFile("github.com/example/mod")},
+		{"go-local/github.com/example/mod/@v/v1.0.0.info", goInfoFile("v1.0.0")},
+
+		// RPM package (a real, parseable RPM so HAR can index its NEVRA)
+		{"rpm-local/mockpkg-1.0.0-1.x86_64.rpm", rpmBytes("mockpkg", "1.0.0", "1", "x86_64")},
+
+		// Conda package (.conda = zip of zstd-compressed info/pkg tarballs)
+		{"conda-local/linux-64/mockpkg-1.2.0-0.conda", condaPackage("mockpkg", "1.2.0", "0", "linux-64")},
+
+		// Composer package (zip whose composer.json drives the dest name/version)
+		{"composer-local/vendor-package-1.0.0.zip", composerPackageZip("vendor/package", "1.0.0")},
 	}
 
 	for _, e := range entries {
@@ -367,5 +424,179 @@ func debSourceTarGz(name, version string) []byte {
 
 	tw.Close()
 	gw.Close()
+	return buf.Bytes()
+}
+
+// mavenJarBytes creates a minimal valid JAR (a ZIP with a manifest).
+func mavenJarBytes() []byte {
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	f, _ := w.Create("META-INF/MANIFEST.MF")
+	f.Write([]byte("Manifest-Version: 1.0\nCreated-By: mock-init\n"))
+	w.Close()
+	return buf.Bytes()
+}
+
+// mavenPom creates a minimal Maven POM for the given coordinates.
+func mavenPom(group, artifact, version string) []byte {
+	return []byte(fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>%s</groupId>
+  <artifactId>%s</artifactId>
+  <version>%s</version>
+  <packaging>jar</packaging>
+</project>`, group, artifact, version))
+}
+
+// pythonSdist creates a minimal Python source distribution (.tar.gz) containing
+// a PKG-INFO file whose Name/Version the migration reads to name the artifact.
+func pythonSdist(name, version string) []byte {
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gw)
+
+	pkgInfo := fmt.Sprintf("Metadata-Version: 2.1\nName: %s\nVersion: %s\nSummary: Mock Python package for migration testing\n",
+		name, version)
+	writetar(tw, fmt.Sprintf("%s-%s/PKG-INFO", name, version), pkgInfo)
+
+	tw.Close()
+	gw.Close()
+	return buf.Bytes()
+}
+
+// swiftZip creates a minimal Swift source archive (a ZIP with Package.swift).
+func swiftZip(name, version string) []byte {
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	f, _ := w.Create("Package.swift")
+	f.Write([]byte(fmt.Sprintf("// swift-tools-version:5.5\n// %s %s\nimport PackageDescription\n", name, version)))
+	w.Close()
+	return buf.Bytes()
+}
+
+// helmChartTgz creates a valid Helm chart .tgz containing a Chart.yaml at
+// "<name>/Chart.yaml" whose name/version match the arguments.
+func helmChartTgz(name, version string) []byte {
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gw)
+
+	chartYaml := fmt.Sprintf("apiVersion: v2\nname: %s\nversion: %s\ndescription: Mock Helm chart for migration testing\ntype: application\n",
+		name, version)
+	writetar(tw, name+"/Chart.yaml", chartYaml)
+
+	tw.Close()
+	gw.Close()
+	return buf.Bytes()
+}
+
+// goModZip creates a minimal Go module zip. Go module zips store files under a
+// "<module>@<version>/" prefix and must contain a go.mod declaring the module.
+func goModZip(module, version string) []byte {
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	prefix := fmt.Sprintf("%s@%s/", module, version)
+	if f, err := w.Create(prefix + "go.mod"); err == nil {
+		f.Write([]byte(fmt.Sprintf("module %s\n\ngo 1.20\n", module)))
+	}
+	if f, err := w.Create(prefix + "doc.go"); err == nil {
+		f.Write([]byte("// Package mod is a mock Go module for migration testing.\npackage mod\n"))
+	}
+	w.Close()
+	return buf.Bytes()
+}
+
+func goModFile(module string) []byte {
+	return []byte(fmt.Sprintf("module %s\n\ngo 1.20\n", module))
+}
+
+func goInfoFile(version string) []byte {
+	return []byte(fmt.Sprintf(`{"Version":%q,"Time":"2023-01-01T00:00:00Z"}`, version))
+}
+
+// rpmBytes builds a real, parseable minimal RPM via rpmpack so the destination
+// can index its NEVRA (name/version/release/arch).
+func rpmBytes(name, version, release, arch string) []byte {
+	r, err := rpmpack.NewRPM(rpmpack.RPMMetaData{
+		Name:    name,
+		Version: version,
+		Release: release,
+		Arch:    arch,
+	})
+	if err != nil {
+		panic(fmt.Sprintf("rpmpack.NewRPM: %v", err))
+	}
+	r.AddFile(rpmpack.RPMFile{
+		Name: "/usr/share/mockpkg/README",
+		Body: []byte("mock rpm payload for migration testing\n"),
+		Mode: 0644,
+	})
+	var buf bytes.Buffer
+	if err := r.Write(&buf); err != nil {
+		panic(fmt.Sprintf("rpm write: %v", err))
+	}
+	return buf.Bytes()
+}
+
+// condaPackage builds a minimal .conda archive: a ZIP containing zstd-compressed
+// info/ and pkg/ tarballs. The destination reads name/version/subdir from
+// info/index.json inside the info tarball.
+func condaPackage(name, version, build, subdir string) []byte {
+	infoTar := zstdTar(map[string]string{
+		"info/index.json": fmt.Sprintf(
+			`{"name":%q,"version":%q,"build":%q,"build_number":0,"subdir":%q,"depends":[]}`,
+			name, version, build, subdir),
+	})
+	pkgTar := zstdTar(map[string]string{
+		"site-packages/mockpkg/__init__.py": "# mock conda payload\n",
+	})
+
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	if f, err := w.Create("metadata.json"); err == nil {
+		f.Write([]byte(`{"conda_pkg_format_version":2}`))
+	}
+	if f, err := w.Create(fmt.Sprintf("info-%s-%s-%s.tar.zst", name, version, build)); err == nil {
+		f.Write(infoTar)
+	}
+	if f, err := w.Create(fmt.Sprintf("pkg-%s-%s-%s.tar.zst", name, version, build)); err == nil {
+		f.Write(pkgTar)
+	}
+	w.Close()
+	return buf.Bytes()
+}
+
+// zstdTar builds a tar of the given files and compresses it with zstd.
+func zstdTar(files map[string]string) []byte {
+	var tarBuf bytes.Buffer
+	tw := tar.NewWriter(&tarBuf)
+	for name, content := range files {
+		tw.WriteHeader(&tar.Header{Name: name, Mode: 0644, Size: int64(len(content))})
+		tw.Write([]byte(content))
+	}
+	tw.Close()
+
+	var out bytes.Buffer
+	zw, err := zstd.NewWriter(&out)
+	if err != nil {
+		panic(fmt.Sprintf("zstd writer: %v", err))
+	}
+	zw.Write(tarBuf.Bytes())
+	zw.Close()
+	return out.Bytes()
+}
+
+// composerPackageZip builds a Composer package zip containing a composer.json
+// whose name/version the destination reads to identify the artifact.
+func composerPackageZip(name, version string) []byte {
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	if f, err := w.Create("composer.json"); err == nil {
+		f.Write([]byte(fmt.Sprintf(
+			`{"name":%q,"version":%q,"type":"library","description":"Mock Composer package for migration testing"}`,
+			name, version)))
+	}
+	w.Close()
 	return buf.Bytes()
 }

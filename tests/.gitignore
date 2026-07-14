@@ -1,0 +1,6 @@
+# The repository-root .gitignore has an unanchored "harness" rule (intended for
+# a build artifact at the repo root) which, because gitignore matches path
+# components at any depth, unintentionally ignores this tests/harness/ package.
+# Re-include the directory and its contents so the e2e harness sources are tracked.
+!harness/
+!harness/**

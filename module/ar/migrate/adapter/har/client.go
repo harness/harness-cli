@@ -921,20 +921,63 @@ func (c *client) artifactGetFilesForVersion(
 	return allFileNames, nil
 }
 
+func registrySpaceRef() string {
+	parts := []string{config.Global.AccountID}
+	if config.Global.OrgID != "" {
+		parts = append(parts, config.Global.OrgID)
+		if config.Global.ProjectID != "" {
+			parts = append(parts, config.Global.ProjectID)
+		}
+	}
+	return strings.Join(parts, "/")
+}
+
 func (c *client) getRegistry(
 	ctx context.Context,
 	registry string,
 ) (types.RegistryInfo, error) {
+	registryRef := registrySpaceRef() + "/" + registry
+
+	response, err := c.apiClient.GetRegistryWithResponse(ctx, registryRef)
+	if err != nil {
+		return types.RegistryInfo{}, fmt.Errorf("failed to get registry %q: %w", registry, err)
+	}
+	if response.StatusCode() == http2.StatusOK && response.JSON200 != nil {
+		reg := response.JSON200.Data
+		regType := ""
+		if reg.Config != nil {
+			regType = string(reg.Config.Type)
+		}
+		return types.RegistryInfo{
+			Type: regType,
+			URL:  reg.Url,
+			Path: registryRef,
+		}, nil
+	}
+	if response.StatusCode() != http2.StatusNotFound {
+		return types.RegistryInfo{}, fmt.Errorf("failed to get registry %q: status code %d: %s",
+			registry, response.StatusCode(), strings.TrimSpace(string(response.Body)))
+	}
+
+	// Fallback: list within the configured space only. Never use scope=descendants
+	// here — on large accounts that recursive scan can exceed the AR client timeout.
+	return c.findRegistryInSpace(ctx, registrySpaceRef(), registry)
+}
+
+func (c *client) findRegistryInSpace(
+	ctx context.Context,
+	spaceRef, registry string,
+) (types.RegistryInfo, error) {
 	page := int64(0)
 	size := int64(100)
+	none := ar.GetAllRegistriesParamsScopeNone
 	for {
-		descendants := ar.GetAllRegistriesParamsScopeDescendants
-		response, err := c.apiClient.GetAllRegistriesWithResponse(ctx, config.Global.AccountID,
+		response, err := c.apiClient.GetAllRegistriesWithResponse(ctx, spaceRef,
 			&ar.GetAllRegistriesParams{
 				Page:       &page,
 				Size:       &size,
 				SearchTerm: &registry,
-				Scope:      &descendants,
+				Scope:      &none,
 			})
 		if err != nil {
 			return types.RegistryInfo{}, fmt.Errorf("failed to get registry %q: %w", registry, err)
@@ -953,10 +996,11 @@ func (c *client) getRegistry(
 			if v.Identifier != registry {
 				continue
 			}
+			path := registryRefFromMetadata(spaceRef, registry, v.Path)
 			return types.RegistryInfo{
 				Type: string(v.Type),
 				URL:  v.Url,
-				Path: *v.Path,
+				Path: path,
 			}, nil
 		}
 		if len(registries) < int(size) || (nil != data.Data.PageCount && nil != data.Data.PageIndex && (*data.Data.PageIndex+1 >= *data.Data.PageCount)) {
@@ -965,6 +1009,13 @@ func (c *client) getRegistry(
 		page++
 	}
 	return types.RegistryInfo{}, fmt.Errorf("failed to find registry '%s'", registry)
+}
+
+func registryRefFromMetadata(spaceRef, identifier string, path *string) string {
+	if path != nil && *path != "" {
+		return *path
+	}
+	return spaceRef + "/" + identifier
 }
 
 func (c *client) artifactVersionExists(

@@ -1,0 +1,20 @@
+[
+  {
+    "Registry": "conda-local",
+    "Name": "repodata.json",
+    "Uri": "/linux-64/repodata.json",
+    "Folder": false,
+    "Size": 256,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80780"
+  },
+  {
+    "Registry": "conda-local",
+    "Name": "mockpkg-1.2.0-0.conda",
+    "Uri": "/linux-64/mockpkg-1.2.0-0.conda",
+    "Folder": false,
+    "Size": 1024,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80781"
+  }
+]

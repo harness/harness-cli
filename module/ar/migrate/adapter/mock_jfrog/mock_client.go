@@ -13,6 +13,7 @@ import (
 	http2 "net/http"
 	"strings"
 
+	"github.com/google/rpmpack"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter/jfrog"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 )
@@ -157,27 +158,39 @@ func (c *mockClient) loadContent() {
 		loaded++
 		return nil
 	})
+
+	// Always merge programmatic defaults for keys not already present. A partial
+	// mock-init embed (some content/ files on disk at compile time, others not)
+	// must not skip required fixtures such as python-local/.pypi or
+	// helm-http-local/index.yaml.
+	c.seedDefaultFileContent()
 	if loaded > 0 {
 		return
 	}
+}
 
-	// Fallback: generate content programmatically when testdata/binary/
-	// doesn't exist (e.g. fresh clone without running `make mock-init`).
-	c.fileContent["maven-local/.pypi/simple.html"] =
-		[]byte(`<html><body><a href="requests/">requests</a><br/><a href="flask/">flask</a><br/></body></html>`)
-	c.fileContent["maven-local/repodata/repomd.xml"] =
-		[]byte(`<?xml version="1.0" encoding="UTF-8"?><repomd><data type="primary"><location href="repodata/primary.xml.gz"/></data></repomd>`)
-	c.fileContent["maven-local/index.yaml"] =
-		[]byte("apiVersion: v1\nentries:\n  nginx:\n    - name: nginx\n      version: 1.0.0\n      urls:\n        - charts/nginx-1.0.0.tgz\n")
-	c.fileContent["helm-legacy-local/index.yaml"] =
-		[]byte("apiVersion: v1\nentries:\n  nginx:\n    - name: nginx\n      version: 8.2.0\n      urls:\n        - nginx-8.2.0.tgz\n")
+func (c *mockClient) seedDefaultFileContent() {
+	set := func(key string, data []byte) {
+		if _, exists := c.fileContent[key]; !exists {
+			c.fileContent[key] = data
+		}
+	}
+
+	set("maven-local/.pypi/simple.html",
+		[]byte(`<html><body><a href="requests/">requests</a><br/><a href="flask/">flask</a><br/></body></html>`))
+	set("maven-local/repodata/repomd.xml",
+		[]byte(`<?xml version="1.0" encoding="UTF-8"?><repomd><data type="primary"><location href="repodata/primary.xml.gz"/></data></repomd>`))
+	set("maven-local/index.yaml",
+		[]byte("apiVersion: v1\nentries:\n  nginx:\n    - name: nginx\n      version: 1.0.0\n      urls:\n        - charts/nginx-1.0.0.tgz\n"))
+	set("helm-legacy-local/index.yaml",
+		[]byte("apiVersion: v1\nentries:\n  nginx:\n    - name: nginx\n      version: 8.2.0\n      urls:\n        - nginx-8.2.0.tgz\n"))
 	// HELM_HTTP index lists only the flat nginx chart (with a relative URL, the
 	// JFrog default since Artifactory 7.59.5). The nested abc chart and the
 	// orphan chart are intentionally absent so the hybrid tree sweep recovers
 	// them — exercising index+tree dedup.
-	c.fileContent["helm-http-local/index.yaml"] =
-		[]byte("apiVersion: v1\nentries:\n  nginx:\n    - name: nginx\n      version: 1.0.0\n      urls:\n        - nginx-1.0.0.tgz\n")
-	c.fileContent["dart-local/sample_dart_pkg"] = []byte(`{
+	set("helm-http-local/index.yaml",
+		[]byte("apiVersion: v1\nentries:\n  nginx:\n    - name: nginx\n      version: 1.0.0\n      urls:\n        - nginx-1.0.0.tgz\n"))
+	set("dart-local/sample_dart_pkg", []byte(`{
   "name": "sample_dart_pkg",
   "latest": {
     "version": "1.1.0",
@@ -188,8 +201,8 @@ func (c *mockClient) loadContent() {
     { "version": "1.0.0", "pubspec": { "name": "sample_dart_pkg", "version": "1.0.0", "description": "A sample Dart package for testing migration" }, "archive_url": "http://localhost:8081/artifactory/dart-local/packages/sample_dart_pkg/versions/1.0.0.tar.gz" },
     { "version": "1.1.0", "pubspec": { "name": "sample_dart_pkg", "version": "1.1.0", "description": "A sample Dart package for testing migration" }, "archive_url": "http://localhost:8081/artifactory/dart-local/packages/sample_dart_pkg/versions/1.1.0.tar.gz" }
   ]
-}`)
-	c.fileContent["npm-local/@har/sample-package"] = []byte(`{
+}`))
+	set("npm-local/@har/sample-package", []byte(`{
   "name": "@har/sample-package",
   "description": "A sample NPM package for testing migration",
   "dist-tags": { "latest": "2.0.0", "beta": "2.0.0" },
@@ -201,8 +214,8 @@ func (c *mockClient) loadContent() {
     "3.0.0-rc.1": { "name": "@har/sample-package", "version": "3.0.0-rc.1", "dist": { "tarball": "http://localhost:8081/artifactory/npm-local/sample-package/-/sample-package-3.0.0-rc.1.tgz", "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80714" } }
   },
   "time": { "created": "2023-01-01T00:00:00.000Z", "modified": "2023-05-01T00:00:00.000Z" }
-}`)
-	c.fileContent["npm-local/lodash"] = []byte(`{
+}`))
+	set("npm-local/lodash", []byte(`{
   "name": "lodash",
   "description": "Lodash modular utilities",
   "dist-tags": { "latest": "4.17.21", "alpha": "4.17.21-alpha.0" },
@@ -210,12 +223,11 @@ func (c *mockClient) loadContent() {
     "4.17.21-alpha.0": { "name": "lodash", "version": "4.17.21-alpha.0", "dist": { "tarball": "http://localhost:8081/artifactory/npm-local/lodash/-/lodash-4.17.21-alpha.0.tgz", "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80715" } }
   },
   "time": { "created": "2023-06-01T00:00:00.000Z", "modified": "2023-06-01T00:00:00.000Z" }
-}`)
-	c.fileContent["python-local/.pypi/simple.html"] =
-		[]byte(`<html><body><a href="requests/">requests</a><br/></body></html>`)
-	c.fileContent["python-local/.pypi/requests/requests.html"] =
-		[]byte(`<html><body><a href="../requests-2.28.0.tar.gz#sha256=abc123">requests-2.28.0.tar.gz</a><br/><a href="../requests-2.29.0.tar.gz#sha256=def456">requests-2.29.0.tar.gz</a><br/></body></html>`)
-	fmt.Printf("DEBUG: Loaded %d file content entries\n", len(c.fileContent))
+}`))
+	set("python-local/.pypi/simple.html",
+		[]byte(`<html><body><a href="requests/">requests</a><br/></body></html>`))
+	set("python-local/.pypi/requests/requests.html",
+		[]byte(`<html><body><a href="../requests-2.28.0.tar.gz#sha256=abc123">requests-2.28.0.tar.gz</a><br/><a href="../requests-2.29.0.tar.gz#sha256=def456">requests-2.29.0.tar.gz</a><br/></body></html>`))
 }
 
 func (c *mockClient) loadBinaryContent() {
@@ -225,6 +237,10 @@ func (c *mockClient) loadBinaryContent() {
 	_ = fs.WalkDir(testdataFS, "testdata/binary", func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
+		}
+		// Text/index fixtures live under content/ and are loaded by loadContent.
+		if strings.Contains(path, "/content/") {
+			return nil
 		}
 		data, err := testdataFS.ReadFile(path)
 		if err != nil {
@@ -307,6 +323,9 @@ func (c *mockClient) loadBinaryContent() {
 	// to the already-uploaded chart.
 	c.binaryContent["helm-http-local/nginx-1.0.0.tgz.prov"] =
 		[]byte("-----BEGIN PGP SIGNED MESSAGE-----\nmock provenance for nginx-1.0.0\n-----END PGP SIGNATURE-----\n")
+
+	c.binaryContent["rpm-local/mockpkg-1.0.0-1.x86_64.rpm"] =
+		createMockRPM("mockpkg", "1.0.0", "1", "x86_64")
 }
 
 func (c *mockClient) GetRegistries() ([]jfrog.JFrogRepository, error) {
@@ -567,5 +586,27 @@ func createNpmPackageTgz(packageName, version, description string) []byte {
 	tarWriter.Close()
 	gzWriter.Close()
 
+	return buf.Bytes()
+}
+
+func createMockRPM(name, version, release, arch string) []byte {
+	r, err := rpmpack.NewRPM(rpmpack.RPMMetaData{
+		Name:    name,
+		Version: version,
+		Release: release,
+		Arch:    arch,
+	})
+	if err != nil {
+		panic(fmt.Sprintf("rpmpack.NewRPM: %v", err))
+	}
+	r.AddFile(rpmpack.RPMFile{
+		Name: "/usr/share/" + name + "/README",
+		Body: []byte("mock rpm payload for migration testing\n"),
+		Mode: 0644,
+	})
+	var buf bytes.Buffer
+	if err := r.Write(&buf); err != nil {
+		panic(fmt.Sprintf("rpm write: %v", err))
+	}
 	return buf.Bytes()
 }

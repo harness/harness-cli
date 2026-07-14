@@ -1,0 +1,20 @@
+[
+  {
+    "Registry": "generic-local",
+    "Name": "config.json",
+    "Uri": "/data/config.json",
+    "Folder": false,
+    "Size": 25,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80750"
+  },
+  {
+    "Registry": "generic-local",
+    "Name": "run.sh",
+    "Uri": "/bin/run.sh",
+    "Folder": false,
+    "Size": 40,
+    "LastModified": "2023-02-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80751"
+  }
+]

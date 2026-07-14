@@ -1,0 +1,29 @@
+[
+  {
+    "Registry": "rpm-local",
+    "Name": "repomd.xml",
+    "Uri": "/repodata/repomd.xml",
+    "Folder": false,
+    "Size": 256,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80770"
+  },
+  {
+    "Registry": "rpm-local",
+    "Name": "primary.xml.gz",
+    "Uri": "/repodata/primary.xml.gz",
+    "Folder": false,
+    "Size": 320,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80771"
+  },
+  {
+    "Registry": "rpm-local",
+    "Name": "mockpkg-1.0.0-1.x86_64.rpm",
+    "Uri": "/mockpkg-1.0.0-1.x86_64.rpm",
+    "Folder": false,
+    "Size": 1024,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80772"
+  }
+]
