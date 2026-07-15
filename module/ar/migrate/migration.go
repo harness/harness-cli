@@ -103,10 +103,11 @@ func (m *MigrationService) Run(ctx context.Context) error {
 		return m.writeDryRunOutput(logger)
 	}
 
+	fileStats := transferStats.Snapshot()
 	if m.config.Summary {
-		printSummary(transferStats.FileStats)
+		printSummary(fileStats)
 	} else {
-		printer.Print(transferStats.FileStats, 0, 0, int64(len(transferStats.FileStats)), false, [][]string{
+		printer.Print(fileStats, 0, 0, int64(len(fileStats)), false, [][]string{
 			{"Name", "Name"},
 			{"Registry", "Registry"},
 			{"Size", "Size"},
@@ -116,10 +117,10 @@ func (m *MigrationService) Run(ctx context.Context) error {
 		})
 
 		// Log the same data as JSON
-		if jsonData, err := json.MarshalIndent(transferStats.FileStats, "", "  "); err == nil {
+		if jsonData, err := json.MarshalIndent(fileStats, "", "  "); err == nil {
 			logger.Info().
 				RawJSON("file_stats", jsonData).
-				Int("total_files", len(transferStats.FileStats)).
+				Int("total_files", len(fileStats)).
 				Msg("Migration file statistics")
 		} else {
 			logger.Error().Err(err).Msg("Failed to marshal file stats to JSON")

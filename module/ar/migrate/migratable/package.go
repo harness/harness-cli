@@ -148,7 +148,7 @@ func (r *Package) Pre(ctx context.Context) error {
 				Size:     int64(r.pkg.Size),
 				Status:   types.StatusSkip,
 			}
-			r.stats.FileStats = append(r.stats.FileStats, stat)
+			r.stats.Add(stat)
 			return nil
 		}
 	}
@@ -202,7 +202,7 @@ func (r *Package) Pre(ctx context.Context) error {
 					Size:     0,
 					Status:   types.StatusSkip,
 				}
-				r.stats.FileStats = append(r.stats.FileStats, stat)
+				r.stats.Add(stat)
 			}
 		}
 
@@ -341,7 +341,7 @@ func (r *Package) migrateOCI(ctx context.Context, logger zerolog.Logger) {
 		pterm.Error.Println(fmt.Sprintf("Failed to create keyChain: %v", err))
 		stat.Error = err.Error()
 		stat.Status = types.StatusFail
-		r.stats.FileStats = append(r.stats.FileStats, stat)
+		r.stats.Add(stat)
 		return
 	}
 
@@ -359,14 +359,14 @@ func (r *Package) migrateOCI(ctx context.Context, logger zerolog.Logger) {
 	if !r.config.Overwrite {
 		res, tagErr := r.copyTagsIndividually(ctx, logger, srcImage, dstImage, craneOpts)
 		r.finishOCICopy(ctx, &stat, res, tagErr, srcImage, dstImage)
-		r.stats.FileStats = append(r.stats.FileStats, stat)
+		r.stats.Add(stat)
 		return
 	}
 
 	// Fast path: bulk parallel copy of every tag.
 	if err := crane.CopyRepository(srcImage, dstImage, craneOpts...); err == nil {
 		pterm.Success.Println(fmt.Sprintf("Copy repository %s to %s completed", srcImage, dstImage))
-		r.stats.FileStats = append(r.stats.FileStats, stat)
+		r.stats.Add(stat)
 		return
 	}
 	log.Warn().Ctx(ctx).
@@ -377,7 +377,7 @@ func (r *Package) migrateOCI(ctx context.Context, logger zerolog.Logger) {
 	// source manifests are skipped and the rest of the image still migrates.
 	res, tagErr := r.copyTagsIndividually(ctx, logger, srcImage, dstImage, craneOpts)
 	r.finishOCICopy(ctx, &stat, res, tagErr, srcImage, dstImage)
-	r.stats.FileStats = append(r.stats.FileStats, stat)
+	r.stats.Add(stat)
 }
 
 // finishOCICopy sets stat's Status/Error from a copyTagsIndividually result,
@@ -656,12 +656,12 @@ func (r *Package) migrateLegacyHelm(ctx context.Context) error {
 		pterm.Error.Println(fmt.Sprintf("Failed to push helm chart %s to %s", r.pkg.Name, refStr))
 		stat.Error = err.Error()
 		stat.Status = types.StatusFail
-		r.stats.FileStats = append(r.stats.FileStats, stat)
+		r.stats.Add(stat)
 		return err
 	}
 
 	pterm.Success.Println(fmt.Sprintf("Successfully pushed helm chart %s to %s", r.pkg.Name, refStr))
-	r.stats.FileStats = append(r.stats.FileStats, stat)
+	r.stats.Add(stat)
 	return nil
 }
 
@@ -681,7 +681,7 @@ func (r *Package) migrateHelmHTTP(ctx context.Context) error {
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download helm chart %s", r.pkg.URL)
 		pterm.Error.Println(fmt.Sprintf("Failed to download helm chart %s", r.pkg.URL))
-		r.stats.FileStats = append(r.stats.FileStats, types.FileStat{
+		r.stats.Add(types.FileStat{
 			Name:     r.pkg.Name,
 			Registry: r.srcRegistry,
 			Uri:      r.pkg.URL,
@@ -721,20 +721,20 @@ func (r *Package) migrateHelmHTTP(ctx context.Context) error {
 		if errors.Is(err, types.ErrArtifactAlreadyExists) {
 			stat.Status = types.StatusSkip
 			pterm.Info.Println(fmt.Sprintf("%s already exists, skipping", title))
-			r.stats.FileStats = append(r.stats.FileStats, stat)
+			r.stats.Add(stat)
 			return nil
 		}
 		r.logger.Error().Err(err).Msg("Failed to upload helm chart")
 		stat.Status = types.StatusFail
 		stat.Error = err.Error()
 		pterm.Error.Println(title)
-		r.stats.FileStats = append(r.stats.FileStats, stat)
+		r.stats.Add(stat)
 		// Do not attempt the provenance upload if the chart failed — the server
 		// would reject a .prov with no chart (ErrChartNotFoundForProvenance).
 		return err
 	}
 	pterm.Success.Println(title)
-	r.stats.FileStats = append(r.stats.FileStats, stat)
+	r.stats.Add(stat)
 
 	// Provenance is best-effort and only attempted after a successful chart
 	// upload. A missing .prov is the normal case and must not be recorded as a
@@ -798,7 +798,7 @@ func (r *Package) migrateHelmHTTPProv(ctx context.Context) {
 	} else {
 		pterm.Success.Println(fmt.Sprintf("Successfully uploaded provenance %s", provName))
 	}
-	r.stats.FileStats = append(r.stats.FileStats, stat)
+	r.stats.Add(stat)
 }
 
 func (r *Package) migrateConda(ctx context.Context) error {
@@ -845,7 +845,7 @@ func (r *Package) migrateConda(ctx context.Context) error {
 	} else {
 		pterm.Success.Println(title)
 	}
-	r.stats.FileStats = append(r.stats.FileStats, stat)
+	r.stats.Add(stat)
 	return nil
 }
 
@@ -881,7 +881,7 @@ func (r *Package) migrateRPM(ctx context.Context) error {
 	} else {
 		pterm.Success.Println(title)
 	}
-	r.stats.FileStats = append(r.stats.FileStats, stat)
+	r.stats.Add(stat)
 	return nil
 }
 
@@ -940,7 +940,7 @@ func (r *Package) migrateDebian(ctx context.Context) error {
 	} else {
 		pterm.Success.Println(title)
 	}
-	r.stats.FileStats = append(r.stats.FileStats, stat)
+	r.stats.Add(stat)
 
 	// If this is a .dsc file and upload was successful, upload associated source files
 	if isDscFile && err == nil {
@@ -967,7 +967,7 @@ func (r *Package) migrateDebian(ctx context.Context) error {
 				if err != nil {
 					log.Error().Ctx(ctx).Err(err).Msgf("Failed to download source file %s", srcFilePath)
 					pterm.Error.Println(fmt.Sprintf("Failed to download source file %s", srcFilePath))
-					r.stats.FileStats = append(r.stats.FileStats, types.FileStat{
+					r.stats.Add(types.FileStat{
 						Name:     srcFileName,
 						Registry: r.srcRegistry,
 						Uri:      srcFilePath,
@@ -1020,7 +1020,7 @@ func (r *Package) migrateDebian(ctx context.Context) error {
 				} else {
 					pterm.Success.Println(srcTitle)
 				}
-				r.stats.FileStats = append(r.stats.FileStats, srcStat)
+				r.stats.Add(srcStat)
 			}
 		}
 	}
@@ -1060,7 +1060,7 @@ func (r *Package) migrateComposer(ctx context.Context) error {
 	} else {
 		pterm.Success.Println(title)
 	}
-	r.stats.FileStats = append(r.stats.FileStats, stat)
+	r.stats.Add(stat)
 	return nil
 }
 
@@ -1096,7 +1096,7 @@ func (r *Package) migrateSwift(ctx context.Context) error {
 	} else {
 		pterm.Success.Println(title)
 	}
-	r.stats.FileStats = append(r.stats.FileStats, stat)
+	r.stats.Add(stat)
 	return nil
 }
 
@@ -1129,7 +1129,7 @@ func (r *Package) migrateConan(ctx context.Context) error {
 		if err != nil {
 			log.Error().Ctx(ctx).Err(err).Msgf("Failed to download Conan file %s", entry.Uri)
 			pterm.Error.Println(fmt.Sprintf("Failed to download Conan file %s", entry.Uri))
-			r.stats.FileStats = append(r.stats.FileStats, types.FileStat{
+			r.stats.Add(types.FileStat{
 				Name:     entry.FileName,
 				Registry: r.srcRegistry,
 				Uri:      entry.Uri,
@@ -1178,7 +1178,7 @@ func (r *Package) migrateConan(ctx context.Context) error {
 		} else {
 			pterm.Success.Println(title)
 		}
-		r.stats.FileStats = append(r.stats.FileStats, stat)
+		r.stats.Add(stat)
 	}
 
 	return nil
