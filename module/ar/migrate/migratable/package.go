@@ -299,20 +299,27 @@ func (r *Package) Migrate(ctx context.Context) error {
 // migrateOCI copies a Docker/Helm-OCI image repository from source to
 // destination.
 //
-// The fast path is crane.CopyRepository, which copies every tag in parallel and
-// is the well-tested common case. Its weakness is all-or-nothing: it runs every
-// tag inside a single errgroup, so the first tag whose manifest cannot be
-// fetched (e.g. an orphaned tag whose manifest was garbage-collected at the
-// source — the registry answers MANIFEST_UNKNOWN) cancels the shared context
-// and aborts every remaining tag, marking the whole image as failed.
+// When Overwrite is true, every tag is pushed unconditionally, so the fast
+// path is crane.CopyRepository, which copies every tag in parallel and is the
+// well-tested common case. Its weakness is all-or-nothing: it runs every tag
+// inside a single errgroup, so the first tag whose manifest cannot be fetched
+// (e.g. an orphaned tag whose manifest was garbage-collected at the source —
+// the registry answers MANIFEST_UNKNOWN) cancels the shared context and
+// aborts every remaining tag, marking the whole image as failed. If the bulk
+// copy fails, we fall back to copyTagsIndividually.
 //
-// So we only pay for isolation when we have to: if the bulk copy fails, we fall
-// back to copyTagsIndividually, which walks the tags in parallel, skips any
-// whose SOURCE manifest is missing/orphaned, and lets the rest through. The
-// image contributes exactly ONE stat — the same granularity as before, not one
-// per tag — but that stat is honest: it is only Success when at least one tag
-// actually migrated (or every tag was already present), Fail on a genuine
-// per-tag failure, and Skip when there was nothing to do.
+// When Overwrite is false, we skip the bulk fast path entirely: its no-clobber
+// check only tests whether a destination tag NAME exists, so it can never
+// detect a tag that was re-pointed to a different digest at the source (e.g.
+// a "latest" tag moved to a new image) — that tag would be skipped and go
+// stale at the destination forever. Instead we go straight to
+// copyTagsIndividually, which compares source/destination digests per tag and
+// pushes only when the tag is missing or its digest differs, so a moved tag
+// is corrected without needing Overwrite to be true.
+//
+// Either way, the image contributes exactly ONE stat: Success when at least
+// one tag migrated or every tag was already in sync/present, Fail on a
+// genuine per-tag failure, and Skip when there was nothing to do.
 func (r *Package) migrateOCI(ctx context.Context, logger zerolog.Logger) {
 	srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.sourcePackageHostname, r.pkg.Name)
 	dstImage, _ := r.destAdapter.GetOCIImagePath(r.destRegistry, "", r.pkg.Name)
@@ -349,6 +356,13 @@ func (r *Package) migrateOCI(ctx context.Context, logger zerolog.Logger) {
 		craneOpts = append(craneOpts, crane.Insecure)
 	}
 
+	if !r.config.Overwrite {
+		res, tagErr := r.copyTagsIndividually(ctx, logger, srcImage, dstImage, craneOpts)
+		r.finishOCICopy(ctx, &stat, res, tagErr, srcImage, dstImage)
+		r.stats.FileStats = append(r.stats.FileStats, stat)
+		return
+	}
+
 	// Fast path: bulk parallel copy of every tag.
 	if err := crane.CopyRepository(srcImage, dstImage, craneOpts...); err == nil {
 		pterm.Success.Println(fmt.Sprintf("Copy repository %s to %s completed", srcImage, dstImage))
@@ -361,8 +375,19 @@ func (r *Package) migrateOCI(ctx context.Context, logger zerolog.Logger) {
 
 	// Slow path: a bad tag took down the bulk copy. Retry per tag so orphaned
 	// source manifests are skipped and the rest of the image still migrates.
-	// Tags already pushed by the bulk attempt are skipped by no-clobber.
-	res, err := r.copyTagsIndividually(ctx, logger, srcImage, dstImage, craneOpts)
+	res, tagErr := r.copyTagsIndividually(ctx, logger, srcImage, dstImage, craneOpts)
+	r.finishOCICopy(ctx, &stat, res, tagErr, srcImage, dstImage)
+	r.stats.FileStats = append(r.stats.FileStats, stat)
+}
+
+// finishOCICopy sets stat's Status/Error from a copyTagsIndividually result,
+// preserving the single-stat-per-image contract described on migrateOCI:
+// Success when at least one tag migrated or all tags were already in
+// sync/skipped, Skip when there was nothing to do at all, Fail on a genuine
+// per-tag failure.
+func (r *Package) finishOCICopy(
+	ctx context.Context, stat *types.FileStat, res copyResult, err error, srcImage, dstImage string,
+) {
 	switch {
 	case err != nil:
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to copy repository %s to %s", srcImage, dstImage)
@@ -376,14 +401,13 @@ func (r *Package) migrateOCI(ctx context.Context, logger zerolog.Logger) {
 		stat.Status = types.StatusSkip
 		pterm.Warning.Println(fmt.Sprintf("Repository %s had no tags to copy", srcImage))
 	case res.migrated == 0:
-		// Every tag was already present (or an orphaned source we skipped); the
-		// image is effectively in sync, so this is a success.
+		// Every tag was already in sync (or an orphaned source we skipped); the
+		// image is effectively up to date, so this is a success.
 		pterm.Success.Println(fmt.Sprintf(
-			"Copy repository %s to %s completed (all %d tags already present/skipped)", srcImage, dstImage, res.skipped))
+			"Copy repository %s to %s completed (all %d tags already in sync/skipped)", srcImage, dstImage, res.skipped))
 	default:
 		pterm.Success.Println(fmt.Sprintf("Copy repository %s to %s completed", srcImage, dstImage))
 	}
-	r.stats.FileStats = append(r.stats.FileStats, stat)
 }
 
 // copyResult summarises the outcome of a per-tag copy pass so the caller can
@@ -396,13 +420,22 @@ type copyResult struct {
 }
 
 // copyTagsIndividually copies each tag of an image independently so one bad tag
-// cannot abort the rest. The tags are copied in parallel (bounded by the
-// configured concurrency), but — unlike the bulk path — a single tag's failure
-// never cancels its siblings. A tag whose SOURCE manifest is missing/orphaned is
-// skipped; a tag already present at the destination is skipped (no-clobber); any
-// other per-tag error is a genuine failure. It returns a summary plus a non-nil
-// error iff at least one tag genuinely failed, so the caller can set a single
-// image-level stat — this function does NOT touch r.stats.FileStats itself.
+// cannot abort the rest, and so a tag whose source digest has changed (e.g. a
+// tag re-pointed to a different image) is still corrected at the destination.
+//
+// The tags are copied in parallel (bounded by the configured concurrency), but
+// — unlike the bulk path — a single tag's failure never cancels its siblings.
+// For each tag, the source and destination digests are compared (via a cheap
+// HEAD, crane.Digest) rather than relying on crane's name-based no-clobber:
+//   - destination tag missing, or its digest differs from the source → push
+//     (this is what corrects a moved tag without needing Overwrite).
+//   - destination digest already matches the source → skip, no push needed.
+//   - a tag whose SOURCE manifest is missing/orphaned is skipped.
+//   - any other error is a genuine failure.
+//
+// It returns a summary plus a non-nil error iff at least one tag genuinely
+// failed, so the caller can set a single image-level stat — this function does
+// NOT touch r.stats.FileStats itself.
 func (r *Package) copyTagsIndividually(
 	ctx context.Context, logger zerolog.Logger, srcImage, dstImage string, craneOpts []crane.Option,
 ) (copyResult, error) {
@@ -426,10 +459,12 @@ func (r *Package) copyTagsIndividually(
 	}
 	res.total = len(tags)
 
-	// No-clobber is left to crane.Copy (craneOpts still carries WithNoClobber):
-	// an already-present destination tag comes back as a "refusing to clobber"
-	// error, which we count as skipped. This avoids a second, divergent
-	// destination tag-listing here.
+	// Push must be able to overwrite a destination tag whose digest differs
+	// from the source, so no-clobber is dropped here — the digest comparison
+	// below is what decides whether a push happens, replacing name-based
+	// no-clobber as the skip mechanism.
+	pushOpts := withoutNoClobber(craneOpts)
+
 	var (
 		mu         sync.Mutex
 		failedErrs []error
@@ -444,7 +479,36 @@ func (r *Package) copyTagsIndividually(
 			src := fmt.Sprintf("%s:%s", srcImage, tag)
 			dst := fmt.Sprintf("%s:%s", dstImage, tag)
 
-			copyErr := crane.Copy(src, dst, craneOpts...)
+			srcDigest, digestErr := crane.Digest(src, craneOpts...)
+			if digestErr != nil {
+				mu.Lock()
+				defer mu.Unlock()
+				if isStaleSourceManifestErr(digestErr, srcHost) {
+					res.skipped++
+					logger.Warn().Ctx(ctx).Err(digestErr).
+						Msgf("Skipping tag %s: source manifest missing/orphaned", src)
+					pterm.Warning.Println(fmt.Sprintf("Skipping %s: source manifest missing/orphaned (%v)", src, digestErr))
+				} else {
+					failedErrs = append(failedErrs, fmt.Errorf("%s: resolve source digest: %w", tag, digestErr))
+					logger.Error().Ctx(ctx).Err(digestErr).Msgf("Failed to resolve source digest for %s", src)
+					pterm.Error.Println(fmt.Sprintf("Failed to resolve source digest for %s", src))
+				}
+				return nil
+			}
+
+			dstDigest, dstErr := crane.Digest(dst, craneOpts...)
+			if dstErr == nil && dstDigest == srcDigest {
+				mu.Lock()
+				res.skipped++
+				logger.Info().Ctx(ctx).Msgf("Skipping %s: destination already in sync (%s)", dst, dstDigest)
+				mu.Unlock()
+				return nil
+			}
+
+			// Destination tag missing, or present with a different digest (e.g.
+			// the tag was moved to a new image at the source) — push to bring it
+			// in sync.
+			copyErr := crane.Copy(src, dst, pushOpts...)
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -452,9 +516,6 @@ func (r *Package) copyTagsIndividually(
 			case copyErr == nil:
 				res.migrated++
 				pterm.Success.Println(fmt.Sprintf("Copied %s to %s", src, dst))
-			case isAlreadyExistsErr(copyErr):
-				res.skipped++
-				logger.Info().Ctx(ctx).Msgf("Skipping %s: already exists at destination (no-clobber)", dst)
 			case isStaleSourceManifestErr(copyErr, srcHost):
 				// Orphaned/stale SOURCE manifest — the registry tag references a
 				// manifest digest that no longer exists at the source. Skip this
@@ -492,13 +553,14 @@ func (r *Package) copyTagsIndividually(
 	return res, nil
 }
 
-// isAlreadyExistsErr reports whether err is crane.Copy's no-clobber signal that
-// the destination tag already exists. crane returns a plain formatted error
-// ("refusing to clobber existing tag ...") for this case rather than a
-// transport.Error, so we match on that stable message. This is tied to the
-// crane version pinned in go.mod.
-func isAlreadyExistsErr(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "refusing to clobber")
+// withoutNoClobber returns craneOpts with no-clobber forced off, appended
+// last so it wins over any earlier WithNoClobber(true) in the slice. Used for
+// the actual push once the digest comparison in copyTagsIndividually has
+// already decided a push is needed — no-clobber must not then refuse it.
+func withoutNoClobber(craneOpts []crane.Option) []crane.Option {
+	out := make([]crane.Option, len(craneOpts), len(craneOpts)+1)
+	copy(out, craneOpts)
+	return append(out, crane.WithNoClobber(false))
 }
 
 // isStaleSourceManifestErr reports whether err indicates that the SOURCE
