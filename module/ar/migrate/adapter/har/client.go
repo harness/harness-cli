@@ -1092,6 +1092,67 @@ func (c *client) getRegistry(
 	return types.RegistryInfo{}, fmt.Errorf("failed to find registry '%s'", registry)
 }
 
+func (c *client) createRegistry(
+	registryIdentifier string,
+	artifactType types.ArtifactType,
+) (bool, error) {
+	ctx := context.Background()
+
+	// Map migration artifact type to Harness PackageType
+	var packageType ar.PackageType
+	switch artifactType {
+	case types.DOCKER:
+		packageType = ar.DOCKER
+	case types.MAVEN:
+		packageType = ar.MAVEN
+	case types.NPM:
+		packageType = ar.PackageType("NPM")
+	case types.PYTHON:
+		packageType = ar.PackageType("PYTHON")
+	case types.NUGET:
+		packageType = ar.PackageType("NUGET")
+	case types.HELM, types.HELM_LEGACY, types.HELM_HTTP:
+		packageType = ar.HELM
+	case types.GENERIC, types.RAW:
+		packageType = ar.GENERIC
+	default:
+		return false, fmt.Errorf("unsupported artifact type for registry creation: %s", artifactType)
+	}
+
+	// Create the registry
+	spaceRef := config.Global.AccountID
+
+	// For standard (non-virtual/non-upstream) registries, Config should be nil
+	// The error "registry config is required" suggests we might need to check
+	// if registry already exists in a different way
+	response, err := c.apiClient.CreateRegistryWithResponse(ctx,
+		&ar.CreateRegistryParams{
+			SpaceRef: &spaceRef,
+		},
+		ar.RegistryRequest{
+			Identifier:  registryIdentifier,
+			PackageType: packageType,
+			Config:      nil, // nil for standard registries
+		},
+	)
+
+	if err != nil {
+		return false, fmt.Errorf("failed to create registry %q: %w", registryIdentifier, err)
+	}
+
+	if response.StatusCode() == http2.StatusCreated || response.StatusCode() == http2.StatusOK {
+		return true, nil
+	}
+
+	// If registry already exists, that's okay
+	if response.StatusCode() == http2.StatusConflict {
+		return false, nil
+	}
+
+	return false, fmt.Errorf("failed to create registry %q: status code %d: %s",
+		registryIdentifier, response.StatusCode(), string(response.Body))
+}
+
 func (c *client) artifactVersionExists(
 	ctx context.Context,
 	registryRef, pkg, version string,

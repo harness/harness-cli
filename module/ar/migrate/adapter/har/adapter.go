@@ -94,8 +94,8 @@ func (a *adapter) ValidateCredentials() (bool, error) { return false, nil }
 func (a *adapter) GetRegistry(ctx context.Context, registry string) (types.RegistryInfo, error) {
 	return a.client.getRegistry(ctx, registry)
 }
-func (a *adapter) CreateRegistryIfDoesntExist(registryRef string) (bool, error) {
-	return false, nil
+func (a *adapter) CreateRegistryIfDoesntExist(registryRef string, artifactType types.ArtifactType) (bool, error) {
+	return a.client.createRegistry(registryRef, artifactType)
 }
 func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, root *types.TreeNode) (
 	[]types.Package,

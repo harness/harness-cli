@@ -31,7 +31,9 @@ func (noopAdapter) ValidateCredentials() (bool, error)         { return true, ni
 func (noopAdapter) GetRegistry(context.Context, string) (types.RegistryInfo, error) {
 	return types.RegistryInfo{}, nil
 }
-func (noopAdapter) CreateRegistryIfDoesntExist(string) (bool, error) { return false, nil }
+func (noopAdapter) CreateRegistryIfDoesntExist(string, types.ArtifactType) (bool, error) {
+	return false, nil
+}
 func (noopAdapter) GetPackages(string, types.ArtifactType, *types.TreeNode) ([]types.Package, error) {
 	return nil, nil
 }
