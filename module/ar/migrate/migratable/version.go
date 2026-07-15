@@ -113,9 +113,9 @@ func (r *Version) Pre(ctx context.Context) error {
 		if err != nil {
 			logger.Warn().Err(err).Msg("Failed to get existing files, will proceed with migration")
 		} else {
-			// Populate existingFileMap with file name
+			// Populate existingFileMap with file name (lowercase normalized for consistent lookup)
 			for _, fileName := range existingFiles {
-				r.existingFileMap[fileName] = true
+				r.existingFileMap[strings.ToLower(fileName)] = true
 			}
 			logger.Info().Msgf("Found %d existing files for version %s", len(r.existingFileMap), r.version.Name)
 		}
