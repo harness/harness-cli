@@ -13,12 +13,23 @@ type stubHandler struct {
 
 func (s stubHandler) Type() types.ArtifactType { return s.typ }
 
-func resetRegistry() {
+// resetRegistry swaps in a fresh empty registry for the duration of the
+// calling test and restores the previous registry (e.g. the init()-populated
+// production registry) via t.Cleanup. This keeps the package's tests
+// order-independent: Go compiles test files alphabetically, so without a
+// restore, handler_test.go's tests would run before matrix_test.go and leave
+// `registry` permanently empty.
+func resetRegistry(t *testing.T) {
+	t.Helper()
+	saved := registry
 	registry = map[types.ArtifactType]Handler{}
+	t.Cleanup(func() {
+		registry = saved
+	})
 }
 
 func TestRegisterGetRoundTrip(t *testing.T) {
-	resetRegistry()
+	resetRegistry(t)
 
 	typ := types.ArtifactType("HANDLER_TEST_OK")
 	h := stubHandler{typ: typ}
@@ -40,7 +51,7 @@ func TestRegisterGetRoundTrip(t *testing.T) {
 }
 
 func TestRegisterDuplicate(t *testing.T) {
-	resetRegistry()
+	resetRegistry(t)
 
 	typ := types.ArtifactType("HANDLER_TEST_DUP")
 	h := stubHandler{typ: typ}
@@ -55,7 +66,7 @@ func TestRegisterDuplicate(t *testing.T) {
 }
 
 func TestRegisterEmptyType(t *testing.T) {
-	resetRegistry()
+	resetRegistry(t)
 
 	h := stubHandler{typ: types.ArtifactType("")}
 
@@ -65,7 +76,7 @@ func TestRegisterEmptyType(t *testing.T) {
 }
 
 func TestRegisterNilHandler(t *testing.T) {
-	resetRegistry()
+	resetRegistry(t)
 
 	if err := Register(nil); err == nil {
 		t.Fatal("expected error registering nil handler, got nil")
@@ -73,7 +84,7 @@ func TestRegisterNilHandler(t *testing.T) {
 }
 
 func TestGetUnregistered(t *testing.T) {
-	resetRegistry()
+	resetRegistry(t)
 
 	h, err := Get(types.ArtifactType("HANDLER_TEST_MISSING"))
 	if h != nil {
