@@ -22,6 +22,7 @@ import (
 	_ "github.com/harness/harness-cli/module/ar/migrate/adapter/jfrog"
 	_ "github.com/harness/harness-cli/module/ar/migrate/adapter/mock_jfrog"
 	_ "github.com/harness/harness-cli/module/ar/migrate/adapter/nexus"
+	_ "github.com/harness/harness-cli/module/ar/migrate/handler"
 )
 
 // MigrationService handles the migration process
