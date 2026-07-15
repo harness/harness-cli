@@ -192,7 +192,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 					Size:     int64(file.Size),
 					Status:   types.StatusSkip,
 				}
-				r.stats.FileStats = append(r.stats.FileStats, stat)
+				r.stats.Add(stat)
 				continue
 			}
 

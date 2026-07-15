@@ -81,7 +81,33 @@ type FileStat struct {
 }
 
 type TransferStats struct {
+	mu        sync.Mutex
 	FileStats []FileStat
+}
+
+// Add appends a single FileStat under the lock. Safe for concurrent use across
+// many file jobs since TransferStats is always shared via a pointer.
+func (s *TransferStats) Add(stat FileStat) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.FileStats = append(s.FileStats, stat)
+}
+
+// Snapshot returns an independent copy of the current FileStats under the
+// lock. Always returns a non-nil slice (len 0 for a fresh/nil TransferStats)
+// so downstream marshalling/reporting never has to nil-check.
+func (s *TransferStats) Snapshot() []FileStat {
+	if s == nil {
+		return make([]FileStat, 0)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]FileStat, len(s.FileStats))
+	copy(out, s.FileStats)
+	return out
 }
 
 type RegistryInfo struct {

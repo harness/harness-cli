@@ -51,12 +51,20 @@ func (e *Engine) Execute(ctx context.Context) error {
 	errCh := make(chan error, len(e.jobs))
 	var wg sync.WaitGroup
 
+dispatch:
 	for i, jb := range e.jobs {
 		i, jb := i, jb
+
+		select {
+		case sem <- struct{}{}: // acquire
+		case <-ctx.Done():
+			mainLogger.Warn().Msg("Context cancelled; stopping job dispatch")
+			break dispatch
+		}
+
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			sem <- struct{}{}        // acquire
 			defer func() { <-sem }() // release
 
 			info := jb.Info()
