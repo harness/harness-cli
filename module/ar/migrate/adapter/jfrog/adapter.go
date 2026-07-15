@@ -13,6 +13,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	adp "github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/tree"
@@ -54,8 +55,10 @@ func (f factory) Create(ctx context.Context, config types.RegistryConfig) (adp.A
 }
 
 type adapter struct {
-	client Client
-	reg    types.RegistryConfig
+	client       Client
+	reg          types.RegistryConfig
+	nugetIndexMu sync.Mutex
+	nugetIndex   map[string]map[string]map[string][]*types.File // registry -> pkg -> version -> files
 }
 
 func newAdapter(config types.RegistryConfig) (adp.Adapter, error) {
@@ -102,6 +105,50 @@ func (a *adapter) GetRegistry(ctx context.Context, registry string) (types.Regis
 }
 func (a *adapter) CreateRegistryIfDoesntExist(registry string) (bool, error) { return false, nil }
 
+// nugetRegistryIndex returns a cached per-registry index of NUGET files, lazily built and
+// mutex-guarded for concurrent access. The index maps package -> version -> []*File.
+func (a *adapter) nugetRegistryIndex(registry string, root *types.TreeNode) (map[string]map[string][]*types.File, error) {
+	a.nugetIndexMu.Lock()
+	defer a.nugetIndexMu.Unlock()
+
+	// Lazily initialize the outer map
+	if a.nugetIndex == nil {
+		a.nugetIndex = make(map[string]map[string]map[string][]*types.File)
+	}
+
+	// Return cached index if present
+	if idx, ok := a.nugetIndex[registry]; ok {
+		return idx, nil
+	}
+
+	// Build the index from the full file tree
+	files, err := tree.GetAllFiles(root)
+	if err != nil {
+		return nil, fmt.Errorf("get all files: %w", err)
+	}
+
+	idx := make(map[string]map[string][]*types.File)
+	for _, file := range files {
+		if file.Folder {
+			continue
+		}
+
+		pkgName, version, ok := util.ParseNugetFileNameWithPath(file.Uri)
+		if !ok {
+			continue
+		}
+
+		if idx[pkgName] == nil {
+			idx[pkgName] = make(map[string][]*types.File)
+		}
+		idx[pkgName][version] = append(idx[pkgName][version], file)
+	}
+
+	// Cache and return
+	a.nugetIndex[registry] = idx
+	return idx, nil
+}
+
 func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, root *types.TreeNode) (
 	[]types.Package,
 	error,
@@ -122,27 +169,13 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			Size:     -1,
 		})
 	} else if artifactType == types.NUGET {
-		// Extract unique package names from NUGET files in the tree
-		files, err := tree.GetAllFiles(root)
+		// Get the cached index and build packages from its top-level keys
+		idx, err := a.nugetRegistryIndex(registry, root)
 		if err != nil {
-			return nil, fmt.Errorf("get all files: %w", err)
+			return nil, err
 		}
 
-		pkgMap := make(map[string]bool)
-		for _, file := range files {
-			if file.Folder {
-				continue
-			}
-
-			pkgName, _, ok := util.ParseNugetFileNameWithPath(file.Uri)
-
-			if !ok {
-				continue
-			}
-			pkgMap[pkgName] = true
-		}
-
-		for pkgName := range pkgMap {
+		for pkgName := range idx {
 			packages = append(packages, types.Package{
 				Registry: registry,
 				Path:     "/",
@@ -1029,27 +1062,14 @@ func (a *adapter) GetVersions(
 	}
 
 	if artifactType == types.NUGET {
-		// Extract versions for this NUGET package from the file tree
-		files, err := tree.GetAllFiles(node)
+		// Get the cached index and build versions from the package's version keys
+		idx, err := a.nugetRegistryIndex(registry, node)
 		if err != nil {
-			return nil, fmt.Errorf("get all files: %w", err)
-		}
-
-		versionMap := make(map[string]bool)
-		for _, file := range files {
-			if file.Folder {
-				continue
-			}
-
-			pkgName, version, ok := util.ParseNugetFileNameWithPath(file.Uri)
-			if !ok || pkgName != pkg {
-				continue
-			}
-			versionMap[version] = true
+			return nil, err
 		}
 
 		var versions []types.Version
-		for version := range versionMap {
+		for version := range idx[pkg] {
 			versions = append(versions, types.Version{
 				Registry: registry,
 				Pkg:      pkg,
