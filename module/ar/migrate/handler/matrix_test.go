@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"testing"
 
 	"github.com/harness/harness-cli/module/ar/migrate/types"
@@ -41,7 +42,6 @@ func TestHandlerMatrix(t *testing.T) {
 	}
 
 	for _, row := range table {
-		row := row
 		t.Run(string(row.typ), func(t *testing.T) {
 			h, err := Get(row.typ)
 			if err != nil {
@@ -83,10 +83,10 @@ func TestHandlerMatrixStranglerInvariant(t *testing.T) {
 		t.Fatalf("Get(NUGET) returned unexpected error: %v", err)
 	}
 
-	if err := h.MigratePackage(nil, nil); err != ErrNotImplemented {
+	if err := h.MigratePackage(context.Background(), nil); err != ErrNotImplemented {
 		t.Errorf("MigratePackage() = %v, want ErrNotImplemented", err)
 	}
-	if err := h.MigrateFile(nil, nil); err != ErrNotImplemented {
+	if err := h.MigrateFile(context.Background(), nil); err != ErrNotImplemented {
 		t.Errorf("MigrateFile() = %v, want ErrNotImplemented", err)
 	}
 }
