@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	adp "github.com/harness/harness-cli/module/ar/migrate/adapter"
@@ -486,7 +487,10 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 		}
 		return packages, nil
 	} else if artifactType == types.COMPOSER {
-		leaves, _ := tree.GetAllFiles(root)
+		leaves, err := tree.GetAllFiles(root)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
 		pkgMap := make(map[string]bool)
 		for _, leaf := range leaves {
 			if leaf.Folder {
@@ -1246,8 +1250,14 @@ func (a *adapter) GetVersions(
 			versionMap[version] = true
 		}
 
+		versionKeys := make([]string, 0, len(versionMap))
+		for v := range versionMap {
+			versionKeys = append(versionKeys, v)
+		}
+		sort.Strings(versionKeys)
+
 		var versions []types.Version
-		for version := range versionMap {
+		for _, version := range versionKeys {
 			versions = append(versions, types.Version{
 				Registry: registry,
 				Pkg:      pkg,

@@ -20,6 +20,7 @@ func TestParseComposerFileName(t *testing.T) {
 		{"no version", "vendor-package.zip", "", "", false},
 		{"invalid version", "vendor-package-notaversion.zip", "", "", false},
 		{"single segment", "package-1.0.0.zip", "", "", false},
+		{"multi hyphen name", "acme-corp-billing-sdk-1.0.0.zip", "acme-corp-billing-sdk", "1.0.0", true},
 	}
 
 	for _, tt := range tests {
