@@ -64,7 +64,7 @@ nfpms:
       {{- end }}_
       {{- if eq .Arch "amd64" }}amd64
       {{- else }}{{ .Arch }}{{ end }}
-    bindir: /usr/local/bin
+    bindir: /usr/bin
 
 checksum:
   name_template: "checksums.txt"
@@ -135,4 +135,3 @@ changelog:
       - '^chore:'
       - Merge pull request
       - Merge branch
-
