@@ -14,7 +14,6 @@ import (
 	"sync"
 
 	"github.com/harness/harness-cli/config"
-	"github.com/harness/harness-cli/internal/api/ar"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	adp "github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
@@ -43,11 +42,12 @@ type adapter struct {
 	logger    zerolog.Logger
 	pkgClient *pkgclient.ClientWithResponses
 
-	// ociPrefixMu guards ociPrefixCache, which maps registryRef → OCI path
-	// prefix returned by GetClientSetupDetails (e.g. "oci"). Cached per-registry
-	// to avoid repeated API calls during tag-by-tag migration.
-	ociPrefixMu    sync.Mutex
-	ociPrefixCache map[string]string
+	// registryURLMu guards registryURLCache, which maps registry name → the
+	// URL returned by getRegistry (e.g. "https://host/oci/helmoci"). Populated
+	// by GetRegistry during the pre-migration step and read by GetOCIImagePath
+	// to derive the correct OCI path prefix without a second API call.
+	registryURLMu    sync.Mutex
+	registryURLCache map[string]string
 }
 
 func (a *adapter) SearchFiles(registry string) ([]types.SearchedFile, error) {
@@ -71,11 +71,11 @@ func newAdapter(config2 types.RegistryConfig) (adp.Adapter, error) {
 		Str("adapter", "HAR").
 		Logger()
 	return &adapter{
-		client:         c,
-		pkgClient:      pkgClient,
-		reg:            config2,
-		logger:         logger,
-		ociPrefixCache: make(map[string]string),
+		client:           c,
+		pkgClient:        pkgClient,
+		reg:              config2,
+		logger:           logger,
+		registryURLCache: make(map[string]string),
 	}, nil
 }
 
@@ -92,7 +92,18 @@ func (a *adapter) GetConfig() types.RegistryConfig {
 }
 func (a *adapter) ValidateCredentials() (bool, error) { return false, nil }
 func (a *adapter) GetRegistry(ctx context.Context, registry string) (types.RegistryInfo, error) {
-	return a.client.getRegistry(ctx, registry)
+	info, err := a.client.getRegistry(ctx, registry)
+	if err != nil {
+		return info, err
+	}
+	// Cache the URL so GetOCIImagePath can derive the correct prefix without
+	// an extra API call.
+	if info.URL != "" {
+		a.registryURLMu.Lock()
+		a.registryURLCache[registry] = info.URL
+		a.registryURLMu.Unlock()
+	}
+	return info, nil
 }
 func (a *adapter) CreateRegistryIfDoesntExist(registryRef string) (bool, error) {
 	return false, nil
@@ -176,106 +187,39 @@ func (a *adapter) GetOCIImagePath(registry string, _ string, image string) (stri
 	parse, _ := url.Parse(a.reg.Endpoint)
 	host := parse.Host
 
-	prefix, err := a.ociPrefix(registry)
-	if err != nil {
-		// Fall back to the account-ID-based path used before vanity URL support.
-		a.logger.Warn().Err(err).Msgf(
-			"Could not resolve OCI prefix from client-setup API for registry %s; falling back to account-ID prefix", registry)
-		prefix = strings.ToLower(config.Global.AccountID)
-	}
+	prefix := a.ociPrefixFromCache(registry)
 	return util.GenOCIImagePath(host, prefix, registry, image), nil
 }
 
-// ociPrefix returns the OCI path prefix for registry by calling the
-// GetClientSetupDetails API and parsing the helm push/pull URL from the
-// response. Results are cached per registry so each registry is only queried
-// once per migration run.
-func (a *adapter) ociPrefix(registryRef string) (string, error) {
-	a.ociPrefixMu.Lock()
-	defer a.ociPrefixMu.Unlock()
-
-	if prefix, ok := a.ociPrefixCache[registryRef]; ok {
-		return prefix, nil
-	}
-
-	ctx := context.Background()
-	resp, err := a.client.apiClient.GetClientSetupDetailsWithResponse(ctx, registryRef, &ar.GetClientSetupDetailsParams{})
-	if err != nil {
-		return "", fmt.Errorf("GetClientSetupDetails request failed: %w", err)
-	}
-	if resp.JSON200 == nil {
-		return "", fmt.Errorf("GetClientSetupDetails returned status %s", resp.Status())
-	}
-
-	prefix, err := extractOCIPrefix(resp.JSON200.Data, registryRef)
-	if err != nil {
-		return "", err
-	}
-
-	a.ociPrefixCache[registryRef] = prefix
-	return prefix, nil
-}
-
-// extractOCIPrefix scans the ClientSetupDetails sections for a command that
-// contains an "oci://" URL and derives the path prefix that sits between the
-// hostname and the registry name.
+// ociPrefixFromCache derives the OCI path prefix (e.g. "oci" or lowercased
+// accountID) from the registry URL cached by GetRegistry during the pre-step.
 //
-// Example command value: "helm push <CHART_TGZ_FILE> oci://har-automation.harness.io/oci/my-registry"
-// For registryRef "account123/my-registry" the returned prefix is "oci".
-func extractOCIPrefix(details ar.ClientSetupDetails, registryRef string) (string, error) {
-	// registryRef is "accountID/registryName" — we only need the leaf name.
-	registryName := registryRef
-	if idx := strings.LastIndex(registryRef, "/"); idx >= 0 {
-		registryName = registryRef[idx+1:]
-	}
+// Example: URL "https://ancestry.harness.io/oci/helmoci", registry "helmoci"
+// → strip scheme+host → "/oci/helmoci" → strip last segment → "/oci" → "oci"
+//
+// Falls back to the lowercased accountID when no cached URL is available,
+// which preserves the behaviour on environments where VanityURLRegistryEnabled
+// is off and the pre-step was skipped (e.g. dry-run).
+func (a *adapter) ociPrefixFromCache(registry string) string {
+	a.registryURLMu.Lock()
+	registryURL := a.registryURLCache[registry]
+	a.registryURLMu.Unlock()
 
-	for _, section := range details.Sections {
-		cfg, err := section.AsClientSetupStepConfig()
-		if err != nil || cfg.Steps == nil {
-			continue
-		}
-		for _, step := range *cfg.Steps {
-			if step.Commands == nil {
-				continue
-			}
-			for _, cmd := range *step.Commands {
-				if cmd.Value == nil {
-					continue
-				}
-				prefix, ok := ociPrefixFromCommand(*cmd.Value, registryName)
-				if ok {
-					return prefix, nil
-				}
+	if registryURL != "" {
+		parsed, err := url.Parse(registryURL)
+		if err == nil {
+			// path is e.g. "/oci/helmoci" — strip the last segment (registry name)
+			// to get the prefix segment(s).
+			p := strings.TrimSuffix(parsed.Path, "/"+registry)
+			p = strings.Trim(p, "/")
+			if p != "" {
+				return p
 			}
 		}
 	}
-	return "", fmt.Errorf("no OCI push/pull URL found in client-setup details for registry %s", registryRef)
-}
 
-// ociPrefixFromCommand extracts the path segment(s) between the hostname and
-// the registry name from an "oci://" URL embedded in a setup command string.
-// Returns ("", false) when the string contains no matching URL.
-func ociPrefixFromCommand(cmdValue, registryName string) (string, bool) {
-	const scheme = "oci://"
-	idx := strings.Index(cmdValue, scheme)
-	if idx < 0 {
-		return "", false
-	}
-	rest := cmdValue[idx+len(scheme):]
-	// rest is "host/prefix/registryName [optional-suffix]" — take only the URL token.
-	if sp := strings.IndexAny(rest, " \t\n"); sp >= 0 {
-		rest = rest[:sp]
-	}
-	// rest is now "host/prefix/registryName"
-	parts := strings.SplitN(rest, "/", 3) // ["host", "prefix", "registryName"]
-	if len(parts) < 3 {
-		return "", false
-	}
-	// Verify the last part starts with the registry name we expect.
-	if !strings.HasPrefix(parts[2], registryName) {
-		return "", false
-	}
-	return parts[1], true
+	// Fallback: accountID-based prefix (FF disabled or pre-step not yet run).
+	return strings.ToLower(config.Global.AccountID)
 }
 
 func (a *adapter) AddNPMTag(registry string, name string, version string, uri string) error {
