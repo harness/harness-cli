@@ -1374,11 +1374,12 @@ func (a *adapter) FileExists(
 	return false, fmt.Errorf("not implemented")
 }
 
-func (a *adapter) GetAllFilesForVersion(
+func (a *adapter) BuildExistingIndex(
 	ctx context.Context,
-	registryRef, pkg, version string,
-) ([]string, error) {
-	return nil, fmt.Errorf("not implemented")
+	registryName string,
+	concurrency int,
+) (*types.ExistingIndex, error) {
+	return nil, nil
 }
 
 type repomdData struct {

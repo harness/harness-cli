@@ -93,7 +93,7 @@ func TestDisplayBlockedScanResults(t *testing.T) {
 
 		pkgName := "lodash"
 		version := "4.17.21"
-		scanStatus := ar_v3.ALLOWED
+		scanStatus := ar_v3.BulkScanResultItemScanStatusALLOWED
 
 		scans := []ar_v3.BulkScanResultItem{
 			{
@@ -118,7 +118,7 @@ func TestDisplayBlockedScanResults(t *testing.T) {
 
 		pkgName := "bad-pkg"
 		version := "1.0.0"
-		scanStatus := ar_v3.BLOCKED
+		scanStatus := ar_v3.BulkScanResultItemScanStatusBLOCKED
 
 		scans := []ar_v3.BulkScanResultItem{
 			{
@@ -146,7 +146,7 @@ func TestDisplayBlockedScanResults(t *testing.T) {
 
 		pkgName := "bad-pkg"
 		version := "1.0.0"
-		scanStatus := ar_v3.BLOCKED
+		scanStatus := ar_v3.BulkScanResultItemScanStatusBLOCKED
 		scanID := uuid.New()
 
 		scans := []ar_v3.BulkScanResultItem{

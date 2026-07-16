@@ -3,6 +3,7 @@ package migratable
 import (
 	"context"
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
@@ -208,6 +209,19 @@ func (r *Registry) Migrate(ctx context.Context) error {
 		}
 	}
 
+	// Build destination index once per registry when overwrite=false
+	var existingIndex *types.ExistingIndex
+	if !r.config.Overwrite && !r.config.DryRun && indexApplicable(r.artifactType) {
+		name := registryLeafName(r.destRegistry, r.registry.Path)
+		idx, err := r.destAdapter.BuildExistingIndex(ctx, name, r.config.Concurrency)
+		if err != nil {
+			logger.Warn().Err(err).Msg("Failed to build destination index; falling back to per-version lookups")
+		} else {
+			existingIndex = idx
+			logger.Info().Msgf("Built destination index for registry %s", name)
+		}
+	}
+
 	var jobs []engine.Job
 	for _, pkg := range pkgs {
 		treeNode, err2 := tree.GetNodeForPath(root, pkg.Path)
@@ -216,7 +230,7 @@ func (r *Registry) Migrate(ctx context.Context) error {
 			return fmt.Errorf("get node for path %s failed: %w", pkg.Path, err2)
 		}
 		job := NewPackageJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.sourcePackageHostname, r.destRegistry, r.artifactType, pkg, treeNode,
-			r.stats, r.mapping, r.config, r.registry, r.dryRunStats)
+			r.stats, r.mapping, r.config, r.registry, r.dryRunStats, existingIndex)
 		jobs = append(jobs, job)
 	}
 
@@ -249,4 +263,23 @@ func (r *Registry) Post(ctx context.Context) error {
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed registry post-migration step")
 	return nil
+}
+
+// indexApplicable reports whether Version.Pre consults the file index for this type.
+// Must exactly equal the set Version.Pre checks today (version.go:109 exclusions).
+func indexApplicable(t types.ArtifactType) bool {
+	switch t {
+	case types.GENERIC, types.RAW, types.PYTHON, types.NUGET, types.DART, types.PUPPET, types.NPM, types.MAVEN:
+		return true
+	default:
+		return false
+	}
+}
+
+// registryLeafName extracts the registry leaf name for v3 API matching.
+func registryLeafName(destRegistry, regPath string) string {
+	if regPath != "" {
+		return path.Base(regPath)
+	}
+	return destRegistry
 }

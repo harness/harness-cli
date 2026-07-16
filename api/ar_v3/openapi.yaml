@@ -206,6 +206,130 @@ paths:
               schema:
                 $ref: "#/components/schemas/V3Error"
           description: Error response.
+  /registries:
+    get:
+      x-internal: false
+      summary: List registries
+      description: Lists registries.
+      operationId: ListRegistriesV3
+      tags:
+        - Registry V3
+      parameters:
+        - $ref: "#/components/parameters/AccountIdentifier"
+        - $ref: "#/components/parameters/OrgIdentifier"
+        - $ref: "#/components/parameters/ProjectIdentifier"
+        - $ref: "#/components/parameters/PackageTypesListParam"
+        - $ref: "#/components/parameters/RegistryTypeParam"
+        - $ref: "#/components/parameters/MetadataFilterListParam"
+        - $ref: "#/components/parameters/RegistryScope"
+        - $ref: "#/components/parameters/DeleteFilterParam"
+        - $ref: "#/components/parameters/PageNumber"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/SortParam"
+        - $ref: "#/components/parameters/SearchTerm"
+        - $ref: "#/components/parameters/IncludeMetaParam"
+      responses:
+        200:
+          $ref: "#/components/responses/ListRegistryResponse"
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V3Error"
+          description: Error response.
+  /packages:
+    get:
+      x-internal: false
+      summary: List Packages
+      description: Lists Packages
+      operationId: ListPackagesV3
+      tags:
+        - Registry V3
+      parameters:
+        - $ref: "#/components/parameters/AccountIdentifier"
+        - $ref: "#/components/parameters/OrgIdentifier"
+        - $ref: "#/components/parameters/ProjectIdentifier"
+        - $ref: "#/components/parameters/RegistryIdsListParam"
+        - $ref: "#/components/parameters/MetadataFilterListParam"
+        - $ref: "#/components/parameters/PackageKindQueryParam"
+        - $ref: "#/components/parameters/PackageTypesListParam"
+        - $ref: "#/components/parameters/DeleteFilterParam"
+        - $ref: "#/components/parameters/PageNumber"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/SortParam"
+        - $ref: "#/components/parameters/SearchTerm"
+        - $ref: "#/components/parameters/IncludeMetaParam"
+      responses:
+        200:
+          $ref: "#/components/responses/ListPackageResponse"
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V3Error"
+          description: Error response.
+  /files:
+    get:
+      x-internal: false
+      summary: Search Files
+      description: List files.
+      operationId: ListFilesV3
+      tags:
+        - Registry V3
+      parameters:
+        - $ref: "#/components/parameters/AccountIdentifier"
+        - $ref: "#/components/parameters/OrgIdentifier"
+        - $ref: "#/components/parameters/ProjectIdentifier"
+        - $ref: "#/components/parameters/RegistryIdOptionalParam"
+        - $ref: "#/components/parameters/PackageIdOptionalParam"
+        - $ref: "#/components/parameters/VersionIdOptionalParam"
+        - $ref: "#/components/parameters/ConanRecipeRevisionOptionalParam"
+        - $ref: "#/components/parameters/ConanPackageRevisionOptionalParam"
+        - $ref: "#/components/parameters/PageNumber"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/SortParam"
+        - $ref: "#/components/parameters/SearchTerm"
+      responses:
+        200:
+          $ref: "#/components/responses/ListFilesResponse"
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V3Error"
+          description: Error response.
+  /versions:
+    get:
+      x-internal: false
+      summary: List versions of packages
+      description: Lists versions of packages
+      operationId: ListVersionsV3
+      tags:
+        - Registry V3
+      parameters:
+        - $ref: "#/components/parameters/AccountIdentifier"
+        - $ref: "#/components/parameters/OrgIdentifier"
+        - $ref: "#/components/parameters/ProjectIdentifier"
+        - $ref: "#/components/parameters/RegistryIdsListParam"
+        - $ref: "#/components/parameters/PackageIdsListParam"
+        - $ref: "#/components/parameters/PackageTypesListParam"
+        - $ref: "#/components/parameters/DeleteFilterParam"
+        - $ref: "#/components/parameters/MetadataFilterListParam"
+        - $ref: "#/components/parameters/PageNumber"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/SortParam"
+        - $ref: "#/components/parameters/SearchTerm"
+        - $ref: "#/components/parameters/IncludeMetaParam"
+        - $ref: "#/components/parameters/UploadedByParam"
+      responses:
+        200:
+          $ref: "#/components/responses/ListVersionResponse"
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V3Error"
+          description: Error response.
 components:
   requestBodies:
     BuildInfoRequest:
@@ -233,6 +357,70 @@ components:
           schema:
             $ref: "#/components/schemas/BulkDeleteRequest"
   responses:
+    ListRegistryResponse:
+      description: Response containing list of registries
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/PageInfo"
+              - type: object
+                required: [ items ]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Registry"
+                  meta:
+                    $ref: "#/components/schemas/Meta"
+    ListPackageResponse:
+      description: Response containing list of packages
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/PageInfo"
+              - type: object
+                required: [ items ]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Package"
+                  meta:
+                    $ref: "#/components/schemas/Meta"
+    ListFilesResponse:
+      description: Response containing list of files
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/PageInfo"
+              - type: object
+                required: [ items ]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FileMetadata"
+                  meta:
+                    $ref: "#/components/schemas/Meta"
+    ListVersionResponse:
+      description: Response containing list of versions
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/PageInfo"
+              - type: object
+                required: [ items ]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Version"
+                  meta:
+                    $ref: "#/components/schemas/Meta"
     ListArtifactScanResponse:
       description: Response containing list of artifact scan
       content:
@@ -884,6 +1072,288 @@ components:
         - registryId
         - policySets
         - scanStatus
+    Registry:
+      type: object
+      description: Registry Metadata
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        packageType:
+          $ref: "#/components/schemas/PackageType"
+        type:
+          $ref: "#/components/schemas/RegistryType"
+        path:
+          type: string
+        url:
+          type: string
+        size:
+          type: string
+        isPublic:
+          type: boolean
+        artifactsCount:
+          type: integer
+          format: int64
+        packageCount:
+          type: integer
+          format: int64
+        downloadCount:
+          type: integer
+          format: int64
+        deletedAt:
+          $ref: "#/components/schemas/DeletedAtMs"
+        deletedBy:
+          $ref: "#/components/schemas/UserInfo"
+        modifiedAt:
+          $ref: "#/components/schemas/LastModifiedAtMs"
+        modifiedBy:
+          $ref: "#/components/schemas/UserInfo"
+      required:
+        - id
+        - name
+        - type
+        - packageType
+        - isPublic
+        - url
+    Package:
+      type: object
+      description: Package Metadata
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        packageType:
+          $ref: "#/components/schemas/PackageType"
+        packageKind:
+          $ref: "#/components/schemas/PackageKind"
+        registryId:
+          type: string
+          format: uuid
+        registryName:
+          type: string
+        isPublic:
+          type: boolean
+        isQuarantined:
+          type: boolean
+        quarantineReason:
+          type: string
+        latestVersion:
+          type: string
+        latestVersionArtifactKey:
+          type: object
+          additionalProperties: true
+        downloadCount:
+          type: integer
+          format: int64
+        deletedAt:
+          $ref: "#/components/schemas/DeletedAtMs"
+        deletedBy:
+          $ref: "#/components/schemas/UserInfo"
+        modifiedAt:
+          $ref: "#/components/schemas/LastModifiedAtMs"
+        modifiedBy:
+          $ref: "#/components/schemas/UserInfo"
+      required:
+        - id
+        - name
+        - packageType
+        - registryId
+        - registryName
+        - isPublic
+        - latestVersion
+    FileMetadata:
+      type: object
+      description: File Metadata
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        path:
+          type: string
+        downloadUrl:
+          type: string
+        size:
+          type: string
+        md5:
+          type: string
+        sha1:
+          type: string
+        sha256:
+          type: string
+        sha512:
+          type: string
+        createdAt:
+          $ref: "#/components/schemas/LastModifiedAtMs"
+        createdBy:
+          $ref: "#/components/schemas/UserInfo"
+      required:
+        - id
+        - name
+        - path
+        - createdAt
+        - sha1
+        - sha256
+        - sha512
+        - md5
+        - size
+    Version:
+      type: object
+      description: Version metadata
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        packageId:
+          type: string
+          format: uuid
+        packageName:
+          type: string
+        packageType:
+          $ref: "#/components/schemas/PackageType"
+        packageKind:
+          $ref: "#/components/schemas/PackageKind"
+        registryId:
+          type: string
+          format: uuid
+        registryName:
+          type: string
+        registryType:
+          $ref: "#/components/schemas/RegistryType"
+        size:
+          type: string
+        fileCount:
+          type: integer
+        downloadCount:
+          type: integer
+          format: int64
+        isQuarantined:
+          type: boolean
+        quarantineReason:
+          type: string
+        firewallMode:
+          type: string
+          enum:
+            - ENABLED
+            - QUARANTINE
+            - ALLOW
+        scanStatus:
+          type: string
+          enum:
+            - ALLOWED
+            - BLOCKED
+            - WARN
+            - UNKNOWN
+        scanID:
+          type: string
+          format: uuid
+        lastScannedAt:
+          type: string
+        pullCommand:
+          type: string
+        artifactKey:
+          type: object
+          additionalProperties: true
+        deploymentMetadata:
+          type: object
+          properties:
+            prodEnvCount:
+              type: integer
+            nonProdEnvCount:
+              type: integer
+          required:
+            - prodEnvCount
+            - nonProdEnvCount
+        deletedAt:
+          $ref: "#/components/schemas/DeletedAtMs"
+        deletedBy:
+          $ref: "#/components/schemas/UserInfo"
+        modifiedAt:
+          $ref: "#/components/schemas/LastModifiedAtMs"
+        modifiedBy:
+          $ref: "#/components/schemas/UserInfo"
+        createdAt:
+          $ref: "#/components/schemas/LastModifiedAtMs"
+        createdBy:
+          $ref: "#/components/schemas/UserInfo"
+        pushedBy:
+          $ref: "#/components/schemas/UserInfo"
+      required:
+        - id
+        - name
+        - packageType
+        - registryId
+        - registryName
+        - packageId
+        - packageName
+        - registryType
+    UserInfo:
+      type: object
+      description: Structured user information for a principal
+      properties:
+        uid:
+          type: string
+          description: Principal unique identifier (username)
+        display_name:
+          type: string
+          description: Human-readable display name
+        email:
+          type: string
+          description: Email address
+        type:
+          type: string
+          description: Principal type (user, service, service_account)
+    PageInfo:
+      type: object
+      description: |
+        Pagination metadata.
+        - `page` selects which page of results to return (0 = first page).
+        - `size` controls how many items are returned per page.
+        - `hasMore` is true if more results exist after this page.
+      properties:
+        page:
+          type: integer
+          format: int64
+          description: The current page (0-indexed)
+          example: 0
+        size:
+          type: integer
+          format: int64
+          description: Number of items per page
+          example: 20
+        hasMore:
+          type: boolean
+          description: True if more results exist after this page.
+          example: true
+      required:
+        - page
+        - size
+        - hasMore
+    Meta:
+      type: object
+      description: Metadata about the list response
+      properties:
+        activeCount:
+          type: integer
+          format: int64
+          description: Count of active (non-deleted) entities
+          example: 95
+        deletedCount:
+          type: integer
+          format: int64
+          description: Count of soft-deleted entities
+          example: 5
+      required:
+        - activeCount
+        - deletedCount
   parameters:
     AccountIdentifier:
       name: account_identifier
@@ -1282,3 +1752,122 @@ components:
       schema:
         type: boolean
         default: false
+    PackageTypesListParam:
+      name: package_types
+      in: query
+      required: false
+      description: Registry Package Type
+      schema:
+        type: array
+        items:
+          type: string
+    RegistryIdsListParam:
+      name: registry_ids
+      in: query
+      required: false
+      description: |
+        Unique id for the registry.
+        Note: This parameter should have one id if package query param is provided
+      schema:
+        type: array
+        items:
+          type: string
+          format: uuid
+      example:
+        - "12345678-1234-1234-1234-123456789012"
+        - "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    PackageIdsListParam:
+      name: package_ids
+      in: query
+      required: false
+      description: |
+        Unique id for the package.
+      schema:
+        type: array
+        items:
+          type: string
+          format: uuid
+      example:
+        - "12345678-1234-1234-1234-123456789012"
+        - "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    RegistryIdOptionalParam:
+      name: registry_id
+      in: query
+      required: false
+      description: |
+        Unique id for the registry.
+      schema:
+        type: string
+      example: "12345678-1234-1234-1234-123456789012"
+    PackageIdOptionalParam:
+      name: package_id
+      in: query
+      required: false
+      description: |
+        Unique identifier for the package.
+      schema:
+        type: string
+    VersionIdOptionalParam:
+      name: version_id
+      in: query
+      required: false
+      description: |
+        Unique identifier for the version.
+      schema:
+        type: string
+    ConanRecipeRevisionOptionalParam:
+      name: recipe_revision_id
+      in: query
+      required: false
+      description: |
+        Internal UUID of the Conan recipe revision (RREV) row. Resolves file paths via
+        node_entity_mapping. Requires version_id.
+        Mutually exclusive with package_revision_id.
+      schema:
+        type: string
+    ConanPackageRevisionOptionalParam:
+      name: package_revision_id
+      in: query
+      required: false
+      description: |
+        Internal UUID of the Conan package revision (PREV) row. Resolves file paths via
+        node_entity_mapping. Requires version_id.
+        Mutually exclusive with recipe_revision_id.
+      schema:
+        type: string
+    IncludeMetaParam:
+      name: include_meta
+      in: query
+      required: false
+      description: |
+        When `true`, include the `meta` object (e.g. active/deleted counts)
+        in the response.
+      schema:
+        type: boolean
+        default: false
+    SortParam:
+      name: sort
+      in: query
+      required: false
+      description: |
+        The sort for the results.
+        Accepted pattern: `sort_field:sort_order` where sort_field is the field name
+        and sort_order is either `asc` or `desc`.
+
+        Examples: `name:asc`, `modifiedAt:desc`
+      schema:
+        type: string
+    UploadedByParam:
+      name: uploaded_by
+      in: query
+      required: false
+      description: |
+        Filter by uploaded by user ID.
+
+        Example: `uploaded_by=123`
+      schema:
+        type: array
+        items:
+          type: integer
+          format: int64
+          example: 123

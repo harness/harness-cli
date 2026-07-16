@@ -15,6 +15,7 @@ import (
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/internal/api/ar"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
+	"github.com/harness/harness-cli/internal/api/ar_v3"
 	"github.com/harness/harness-cli/module/ar/migrate/http"
 	"github.com/harness/harness-cli/module/ar/migrate/http/auth/xApiKey"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
@@ -22,6 +23,9 @@ import (
 
 	"github.com/google/uuid"
 	retryablehttp "github.com/hashicorp/go-retryablehttp"
+	openapi_types "github.com/oapi-codegen/runtime/types"
+	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/errgroup"
 )
 
 func retryingPkgHTTPClient() *http2.Client {
@@ -84,6 +88,10 @@ func newClient(reg *types.RegistryConfig) *client {
 		ar.WithHTTPClient(retryingArHTTPClient()),
 		auth.GetXApiKeyOptionAR())
 
+	arV3Client, _ := ar_v3.NewClientWithResponses(config.Global.APIBaseURL+"/gateway/har/api/v3",
+		ar_v3.WithHTTPClient(retryingArHTTPClient()),
+		auth.GetXApiKeyOptionARV3())
+
 	pkgClient, _ := pkgclient.NewClientWithResponses(reg.Endpoint,
 		pkgclient.WithHTTPClient(retryingPkgHTTPClient()),
 		auth.GetAuthOptionARPKG())
@@ -95,18 +103,20 @@ func newClient(reg *types.RegistryConfig) *client {
 			},
 			xApiKey.NewAuthorizer(token),
 		),
-		pkgClient:         pkgClient,
-		rawPkgHTTPClient:  rawPkgHTTPClient(),
-		url:               reg.Endpoint,
-		insecure:          true,
-		username:          username,
-		password:          token,
-		apiClient:         arClient,
+		pkgClient:        pkgClient,
+		rawPkgHTTPClient: rawPkgHTTPClient(),
+		url:              reg.Endpoint,
+		insecure:         true,
+		username:         username,
+		password:         token,
+		apiClient:        arClient,
+		arV3Client:       arV3Client,
 	}
 }
 
 type client struct {
 	apiClient        *ar.ClientWithResponses
+	arV3Client       *ar_v3.ClientWithResponses
 	client           *http.Client
 	rawPkgHTTPClient *http2.Client
 	url              string
@@ -1011,85 +1021,235 @@ func (c *client) artifactFileExists(
 	return false, nil
 }
 
-func (c *client) artifactGetFilesForVersion(
-	ctx context.Context,
-	registryRef, pkg, version string,
-) ([]string, error) {
+func (c *client) buildExistingIndex(
+	ctx context.Context, registryName string, concurrency int,
+) (*types.ExistingIndex, error) {
+	// Step 1: Resolve registry name -> registry object
+	reg, err := c.resolveRegistry(ctx, registryName)
+	if err != nil {
+		return nil, fmt.Errorf("registry resolution failed: %w", err)
+	}
+	regID := reg.Id
+
+	// HACK: the v3 batch endpoints require org/project identifiers, but the
+	// migration config does not carry them. Derive them from the resolved
+	// registry Path (`<accountID>/<?org>/<?project>/<registry>`) instead.
+	orgID, projectID := orgProjectFromPath(reg.Path)
+
+	// Step 2: Enumerate all versions for this registry
+	versions, err := c.listAllVersionsV3(ctx, regID, orgID, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list versions: %w", err)
+	}
+
+	idx := types.NewExistingIndex()
+
+	// Keep only versions that may carry files; the index tracks files only, so
+	// zero-file versions contribute nothing. Fetch when FileCount > 0 or nil
+	// (unknown).
+	var versionsNeedingFiles []ar_v3.Version
+	for _, v := range versions {
+		if v.FileCount == nil || *v.FileCount > 0 {
+			versionsNeedingFiles = append(versionsNeedingFiles, v)
+		}
+	}
+
+	// Step 3: Fetch files per non-empty version, bounded concurrency
+	g, gctx := errgroup.WithContext(ctx)
+	if concurrency > 0 {
+		g.SetLimit(concurrency)
+	}
+	for _, v := range versionsNeedingFiles {
+		v := v
+		g.Go(func() error {
+			names, err := c.listFilesV3ForVersion(gctx, regID, v.Id, orgID, projectID)
+			if err != nil {
+				// Best-effort: log & continue; a miss only causes an idempotent re-upload
+				log.Warn().Err(err).
+					Str("package", v.PackageName).
+					Str("version", v.Name).
+					Msg("Failed to fetch files for version during index build")
+				return nil
+			}
+			for _, name := range names {
+				// Store the HAR path verbatim; ExistingIndex.HasFile owns the
+				// reverse conversion to source-relative form at lookup time, so
+				// all per-type path logic lives in one place (existing_index.go).
+				idx.AddFile(v.PackageName, v.Name, name)
+			}
+			return nil
+		})
+	}
+	_ = g.Wait()
+
+	return idx, nil
+}
+
+// orgProjectFromPath derives the org and project identifiers from a registry
+// Path of the form `<accountID>/<?org>/<?project>/<registry>`, where org and
+// project are optional. Returns (nil, nil) when the scope is account-level.
+//
+// Layouts:
+//
+//	accountID/registry                 → (nil, nil)
+//	accountID/org/registry             → (org, nil)
+//	accountID/org/project/registry     → (org, project)
+func orgProjectFromPath(path *string) (orgID, projectID *string) {
+	if path == nil {
+		return nil, nil
+	}
+	parts := strings.Split(strings.Trim(*path, "/"), "/")
+	switch len(parts) {
+	case 3:
+		org := parts[1]
+		return &org, nil
+	case 4:
+		org := parts[1]
+		project := parts[2]
+		return &org, &project
+	default:
+		// 2 (account/registry) or any unexpected shape → account scope.
+		return nil, nil
+	}
+}
+
+// resolveRegistry looks up a registry by name via the ar_v3 API and returns
+// the full registry object (Id, Type, Url, Path, …) so callers needing any of
+// those fields make a single call instead of separate v1/v3 lookups.
+//
+// HACK: hardcoded to always return a fixed test registry, bypassing the real
+// lookup below. Remove once done testing.
+func (c *client) resolveRegistry(ctx context.Context, registryName string) (ar_v3.Registry, error) {
+
 	page := int64(0)
 	size := int64(100)
+
+	accountID := config.Global.AccountID
+	var orgID, projectID *string
+	if config.Global.OrgID != "" {
+		orgID = &config.Global.OrgID
+	}
+	if config.Global.ProjectID != "" {
+		projectID = &config.Global.ProjectID
+	}
+
+	d := ar_v3.ListRegistriesV3ParamsScopeDescendants
+
+	for {
+		params := &ar_v3.ListRegistriesV3Params{
+			AccountIdentifier: accountID,
+			OrgIdentifier:     orgID,
+			ProjectIdentifier: projectID,
+			SearchTerm:        &registryName,
+			Page:              &page,
+			Size:              &size,
+			Scope:             &d,
+		}
+
+		resp, err := c.arV3Client.ListRegistriesV3WithResponse(ctx, params)
+		if err != nil {
+			return ar_v3.Registry{}, fmt.Errorf("ListRegistriesV3 failed: %w", err)
+		}
+		if resp.StatusCode() != http2.StatusOK {
+			return ar_v3.Registry{}, fmt.Errorf("ListRegistriesV3 returned %s", resp.Status())
+		}
+
+		body := resp.JSON200
+		for _, reg := range body.Items {
+			if reg.Name == registryName {
+				return reg, nil
+			}
+		}
+
+		if !body.HasMore || len(body.Items) == 0 {
+			break
+		}
+		page++
+	}
+
+	return ar_v3.Registry{}, fmt.Errorf("registry %q not found", registryName)
+}
+
+func (c *client) listAllVersionsV3(ctx context.Context, regID openapi_types.UUID, orgID, projectID *string) ([]ar_v3.Version, error) {
+	page := int64(0)
+	size := int64(100)
+
+	accountID := config.Global.AccountID
+
+	registryIDs := &[]openapi_types.UUID{regID}
+
+	var allVersions []ar_v3.Version
+	for {
+		params := &ar_v3.ListVersionsV3Params{
+			AccountIdentifier: accountID,
+			OrgIdentifier:     orgID,
+			ProjectIdentifier: projectID,
+			RegistryIds:       registryIDs,
+			Page:              &page,
+			Size:              &size,
+		}
+
+		resp, err := c.arV3Client.ListVersionsV3WithResponse(ctx, params)
+		if err != nil {
+			return nil, fmt.Errorf("ListVersionsV3 failed: %w", err)
+		}
+		if resp.StatusCode() != http2.StatusOK {
+			return nil, fmt.Errorf("ListVersionsV3 returned %s", resp.Status())
+		}
+
+		body := resp.JSON200
+		allVersions = append(allVersions, body.Items...)
+
+		if !body.HasMore || len(body.Items) == 0 {
+			break
+		}
+		page++
+	}
+
+	return allVersions, nil
+}
+
+func (c *client) listFilesV3ForVersion(ctx context.Context, regID openapi_types.UUID, versionID openapi_types.UUID, orgID, projectID *string) ([]string, error) {
+	page := int64(0)
+	size := int64(100)
+
+	accountID := config.Global.AccountID
+
+	regIDStr := regID.String()
+	versionIDStr := versionID.String()
 
 	var allFileNames []string
 	for {
-		response, err := c.apiClient.GetArtifactFilesWithResponse(ctx, registryRef, pkg, version,
-			&ar.GetArtifactFilesParams{
-				Page:      &page,
-				Size:      &size,
-				SortOrder: nil,
-				SortField: nil,
-			})
-		if err != nil {
-			return allFileNames, fmt.Errorf("failed to get artifact files: %w", err)
+		params := &ar_v3.ListFilesV3Params{
+			AccountIdentifier: accountID,
+			OrgIdentifier:     orgID,
+			ProjectIdentifier: projectID,
+			RegistryId:        &regIDStr,
+			VersionId:         &versionIDStr,
+			Page:              &page,
+			Size:              &size,
 		}
-		if response.StatusCode() != http2.StatusOK {
-			return allFileNames, fmt.Errorf("failed to get artifact files: %s", response.Status())
-		}
-		data := response.JSON200
 
-		for _, v := range data.Data.Files {
-			allFileNames = append(allFileNames, v.Name)
+		resp, err := c.arV3Client.ListFilesV3WithResponse(ctx, params)
+		if err != nil {
+			return nil, fmt.Errorf("ListFilesV3 failed: %w", err)
 		}
-		if len(data.Data.Files) < int(size) || (nil != data.Data.PageCount && nil != data.Data.PageIndex && (*data.Data.PageIndex+1 >= *data.Data.PageCount)) {
+		if resp.StatusCode() != http2.StatusOK {
+			return nil, fmt.Errorf("ListFilesV3 returned %s", resp.Status())
+		}
+
+		body := resp.JSON200
+		for _, f := range body.Items {
+			allFileNames = append(allFileNames, f.Path)
+		}
+
+		if !body.HasMore || len(body.Items) == 0 {
 			break
 		}
 		page++
 	}
+
 	return allFileNames, nil
-}
-
-func (c *client) getRegistry(
-	ctx context.Context,
-	registry string,
-) (types.RegistryInfo, error) {
-	page := int64(0)
-	size := int64(100)
-	for {
-		descendants := ar.GetAllRegistriesParamsScopeDescendants
-		response, err := c.apiClient.GetAllRegistriesWithResponse(ctx, config.Global.AccountID,
-			&ar.GetAllRegistriesParams{
-				Page:       &page,
-				Size:       &size,
-				SearchTerm: &registry,
-				Scope:      &descendants,
-			})
-		if err != nil {
-			return types.RegistryInfo{}, fmt.Errorf("failed to get registry %q: %w", registry, err)
-		}
-		if response.StatusCode() != http2.StatusOK {
-			return types.RegistryInfo{}, fmt.Errorf("failed to get registry %q: status code %d: %s",
-				registry, response.StatusCode(), strings.TrimSpace(string(response.Body)))
-		}
-		data := response.JSON200
-		if data == nil {
-			return types.RegistryInfo{}, fmt.Errorf("failed to get data for registry: %s", response.Status())
-		}
-		registries := data.Data.Registries
-
-		for _, v := range registries {
-			if v.Identifier != registry {
-				continue
-			}
-			return types.RegistryInfo{
-				Type: string(v.Type),
-				URL:  v.Url,
-				Path: *v.Path,
-			}, nil
-		}
-		if len(registries) < int(size) || (nil != data.Data.PageCount && nil != data.Data.PageIndex && (*data.Data.PageIndex+1 >= *data.Data.PageCount)) {
-			break
-		}
-		page++
-	}
-	return types.RegistryInfo{}, fmt.Errorf("failed to find registry '%s'", registry)
 }
 
 func (c *client) artifactVersionExists(

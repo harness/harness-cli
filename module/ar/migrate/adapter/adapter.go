@@ -55,10 +55,16 @@ type Adapter interface {
 		fileName *types.File,
 		artifactType types.ArtifactType,
 	) (bool, error)
-	GetAllFilesForVersion(
+	// BuildExistingIndex returns a snapshot of everything already present at the
+	// destination registry (pkg -> version -> files). registryName is the destination
+	// registry leaf name. Returns (nil, error) on failure; a nil index disables the
+	// client-side skip so callers just attempt the (idempotent) upload. concurrency
+	// bounds parallel per-version file fetches.
+	BuildExistingIndex(
 		ctx context.Context,
-		registryRef, pkg, version string,
-	) ([]string, error)
+		registryName string,
+		concurrency int,
+	) (*types.ExistingIndex, error)
 	CreateVersion(
 		registry string,
 		artifactName string,

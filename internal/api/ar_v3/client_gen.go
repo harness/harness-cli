@@ -64,10 +64,10 @@ const (
 
 // Defines values for BulkScanResultItemScanStatus.
 const (
-	ALLOWED BulkScanResultItemScanStatus = "ALLOWED"
-	BLOCKED BulkScanResultItemScanStatus = "BLOCKED"
-	UNKNOWN BulkScanResultItemScanStatus = "UNKNOWN"
-	WARN    BulkScanResultItemScanStatus = "WARN"
+	BulkScanResultItemScanStatusALLOWED BulkScanResultItemScanStatus = "ALLOWED"
+	BulkScanResultItemScanStatusBLOCKED BulkScanResultItemScanStatus = "BLOCKED"
+	BulkScanResultItemScanStatusUNKNOWN BulkScanResultItemScanStatus = "UNKNOWN"
+	BulkScanResultItemScanStatusWARN    BulkScanResultItemScanStatus = "WARN"
 )
 
 // Defines values for PolicyFailureDetailCategory.
@@ -78,6 +78,34 @@ const (
 	Unknown    PolicyFailureDetailCategory = "Unknown"
 )
 
+// Defines values for RegistryType.
+const (
+	RegistryTypeUPSTREAM RegistryType = "UPSTREAM"
+	RegistryTypeVIRTUAL  RegistryType = "VIRTUAL"
+)
+
+// Defines values for VersionFirewallMode.
+const (
+	ALLOW      VersionFirewallMode = "ALLOW"
+	ENABLED    VersionFirewallMode = "ENABLED"
+	QUARANTINE VersionFirewallMode = "QUARANTINE"
+)
+
+// Defines values for VersionScanStatus.
+const (
+	VersionScanStatusALLOWED VersionScanStatus = "ALLOWED"
+	VersionScanStatusBLOCKED VersionScanStatus = "BLOCKED"
+	VersionScanStatusUNKNOWN VersionScanStatus = "UNKNOWN"
+	VersionScanStatusWARN    VersionScanStatus = "WARN"
+)
+
+// Defines values for DeleteFilterParam.
+const (
+	DeleteFilterParamExclude DeleteFilterParam = "exclude"
+	DeleteFilterParamInclude DeleteFilterParam = "include"
+	DeleteFilterParamOnly    DeleteFilterParam = "only"
+)
+
 // Defines values for RegistryScope.
 const (
 	RegistryScopeAncestors   RegistryScope = "ancestors"
@@ -85,10 +113,43 @@ const (
 	RegistryScopeNone        RegistryScope = "none"
 )
 
+// Defines values for RegistryTypeParam.
+const (
+	RegistryTypeParamUPSTREAM RegistryTypeParam = "UPSTREAM"
+	RegistryTypeParamVIRTUAL  RegistryTypeParam = "VIRTUAL"
+)
+
 // Defines values for SortOrder.
 const (
 	SortOrderASC  SortOrder = "ASC"
 	SortOrderDESC SortOrder = "DESC"
+)
+
+// Defines values for ListPackagesV3ParamsDeleted.
+const (
+	ListPackagesV3ParamsDeletedExclude ListPackagesV3ParamsDeleted = "exclude"
+	ListPackagesV3ParamsDeletedInclude ListPackagesV3ParamsDeleted = "include"
+	ListPackagesV3ParamsDeletedOnly    ListPackagesV3ParamsDeleted = "only"
+)
+
+// Defines values for ListRegistriesV3ParamsType.
+const (
+	UPSTREAM ListRegistriesV3ParamsType = "UPSTREAM"
+	VIRTUAL  ListRegistriesV3ParamsType = "VIRTUAL"
+)
+
+// Defines values for ListRegistriesV3ParamsScope.
+const (
+	ListRegistriesV3ParamsScopeAncestors   ListRegistriesV3ParamsScope = "ancestors"
+	ListRegistriesV3ParamsScopeDescendants ListRegistriesV3ParamsScope = "descendants"
+	ListRegistriesV3ParamsScopeNone        ListRegistriesV3ParamsScope = "none"
+)
+
+// Defines values for ListRegistriesV3ParamsDeleted.
+const (
+	ListRegistriesV3ParamsDeletedExclude ListRegistriesV3ParamsDeleted = "exclude"
+	ListRegistriesV3ParamsDeletedInclude ListRegistriesV3ParamsDeleted = "include"
+	ListRegistriesV3ParamsDeletedOnly    ListRegistriesV3ParamsDeleted = "only"
 )
 
 // Defines values for GetArtifactScansParamsSortOrder.
@@ -99,9 +160,16 @@ const (
 
 // Defines values for GetArtifactScansParamsScope.
 const (
-	GetArtifactScansParamsScopeAncestors   GetArtifactScansParamsScope = "ancestors"
-	GetArtifactScansParamsScopeDescendants GetArtifactScansParamsScope = "descendants"
-	GetArtifactScansParamsScopeNone        GetArtifactScansParamsScope = "none"
+	Ancestors   GetArtifactScansParamsScope = "ancestors"
+	Descendants GetArtifactScansParamsScope = "descendants"
+	None        GetArtifactScansParamsScope = "none"
+)
+
+// Defines values for ListVersionsV3ParamsDeleted.
+const (
+	ListVersionsV3ParamsDeletedExclude ListVersionsV3ParamsDeleted = "exclude"
+	ListVersionsV3ParamsDeletedInclude ListVersionsV3ParamsDeleted = "include"
+	ListVersionsV3ParamsDeletedOnly    ListVersionsV3ParamsDeleted = "only"
 )
 
 // ApiErrors defines model for ApiErrors.
@@ -317,6 +385,27 @@ type BulkScanResultItem struct {
 // BulkScanResultItemScanStatus Scan status
 type BulkScanResultItemScanStatus string
 
+// DeletedAtMs Unix timestamp in milliseconds when the resource was soft-deleted
+type DeletedAtMs = int64
+
+// FileMetadata File Metadata
+type FileMetadata struct {
+	// CreatedAt Unix timestamp in milliseconds when the resource was last modified
+	CreatedAt *LastModifiedAtMs `json:"createdAt"`
+
+	// CreatedBy Structured user information for a principal
+	CreatedBy   *UserInfo `json:"createdBy,omitempty"`
+	DownloadUrl *string   `json:"downloadUrl,omitempty"`
+	Id          string    `json:"id"`
+	Md5         string    `json:"md5"`
+	Name        string    `json:"name"`
+	Path        string    `json:"path"`
+	Sha1        string    `json:"sha1"`
+	Sha256      string    `json:"sha256"`
+	Sha512      string    `json:"sha512"`
+	Size        string    `json:"size"`
+}
+
 // FixVersionDetails Fix version Details
 type FixVersionDetails struct {
 	// CurrentVersion The current version
@@ -329,6 +418,9 @@ type FixVersionDetails struct {
 	FixVersionAvailable bool `json:"fixVersionAvailable"`
 }
 
+// LastModifiedAtMs Unix timestamp in milliseconds when the resource was last modified
+type LastModifiedAtMs = int64
+
 // LicensePolicyFailureDetailConfig License-specific failure detail payload.
 type LicensePolicyFailureDetailConfig struct {
 	// AllowedLicenses Allowed license list.
@@ -336,6 +428,46 @@ type LicensePolicyFailureDetailConfig struct {
 
 	// BlockedLicense Blocked license.
 	BlockedLicense string `json:"blockedLicense"`
+}
+
+// Meta Metadata about the list response
+type Meta struct {
+	// ActiveCount Count of active (non-deleted) entities
+	ActiveCount int64 `json:"activeCount"`
+
+	// DeletedCount Count of soft-deleted entities
+	DeletedCount int64 `json:"deletedCount"`
+}
+
+// Package Package Metadata
+type Package struct {
+	// DeletedAt Unix timestamp in milliseconds when the resource was soft-deleted
+	DeletedAt *DeletedAtMs `json:"deletedAt"`
+
+	// DeletedBy Structured user information for a principal
+	DeletedBy                *UserInfo               `json:"deletedBy,omitempty"`
+	DownloadCount            *int64                  `json:"downloadCount,omitempty"`
+	Id                       openapi_types.UUID      `json:"id"`
+	IsPublic                 bool                    `json:"isPublic"`
+	IsQuarantined            *bool                   `json:"isQuarantined,omitempty"`
+	LatestVersion            string                  `json:"latestVersion"`
+	LatestVersionArtifactKey *map[string]interface{} `json:"latestVersionArtifactKey,omitempty"`
+
+	// ModifiedAt Unix timestamp in milliseconds when the resource was last modified
+	ModifiedAt *LastModifiedAtMs `json:"modifiedAt"`
+
+	// ModifiedBy Structured user information for a principal
+	ModifiedBy *UserInfo `json:"modifiedBy,omitempty"`
+	Name       string    `json:"name"`
+
+	// PackageKind refers to package kind which is being used in huggingface packages for model, dataset
+	PackageKind *PackageKind `json:"packageKind,omitempty"`
+
+	// PackageType Package type. Known values include: DOCKER, MAVEN, PYTHON, GENERIC, HELM, NUGET, NPM, RPM, CARGO, COMPOSER, GO, HUGGINGFACE, CONDA, DART, SWIFT. This field is extensible; clients must handle unknown values.
+	PackageType      PackageType        `json:"packageType"`
+	QuarantineReason *string            `json:"quarantineReason,omitempty"`
+	RegistryId       openapi_types.UUID `json:"registryId"`
+	RegistryName     string             `json:"registryName"`
 }
 
 // PackageAgeViolationPolicyFailureDetailConfig Package age violation failure detail payload.
@@ -347,8 +479,26 @@ type PackageAgeViolationPolicyFailureDetailConfig struct {
 	PublishedOn string `json:"publishedOn"`
 }
 
+// PackageKind refers to package kind which is being used in huggingface packages for model, dataset
+type PackageKind = string
+
 // PackageType Package type. Known values include: DOCKER, MAVEN, PYTHON, GENERIC, HELM, NUGET, NPM, RPM, CARGO, COMPOSER, GO, HUGGINGFACE, CONDA, DART, SWIFT. This field is extensible; clients must handle unknown values.
 type PackageType = string
+
+// PageInfo Pagination metadata.
+// - `page` selects which page of results to return (0 = first page).
+// - `size` controls how many items are returned per page.
+// - `hasMore` is true if more results exist after this page.
+type PageInfo struct {
+	// HasMore True if more results exist after this page.
+	HasMore bool `json:"hasMore"`
+
+	// Page The current page (0-indexed)
+	Page int64 `json:"page"`
+
+	// Size Number of items per page
+	Size int64 `json:"size"`
+}
 
 // PipelineContext Pipeline execution context
 type PipelineContext struct {
@@ -398,6 +548,41 @@ type PolicySetFailureDetail struct {
 	PolicySetRef string `json:"policySetRef"`
 }
 
+// Registry Registry Metadata
+type Registry struct {
+	ArtifactsCount *int64 `json:"artifactsCount,omitempty"`
+
+	// DeletedAt Unix timestamp in milliseconds when the resource was soft-deleted
+	DeletedAt *DeletedAtMs `json:"deletedAt"`
+
+	// DeletedBy Structured user information for a principal
+	DeletedBy     *UserInfo          `json:"deletedBy,omitempty"`
+	Description   *string            `json:"description,omitempty"`
+	DownloadCount *int64             `json:"downloadCount,omitempty"`
+	Id            openapi_types.UUID `json:"id"`
+	IsPublic      bool               `json:"isPublic"`
+
+	// ModifiedAt Unix timestamp in milliseconds when the resource was last modified
+	ModifiedAt *LastModifiedAtMs `json:"modifiedAt"`
+
+	// ModifiedBy Structured user information for a principal
+	ModifiedBy   *UserInfo `json:"modifiedBy,omitempty"`
+	Name         string    `json:"name"`
+	PackageCount *int64    `json:"packageCount,omitempty"`
+
+	// PackageType Package type. Known values include: DOCKER, MAVEN, PYTHON, GENERIC, HELM, NUGET, NPM, RPM, CARGO, COMPOSER, GO, HUGGINGFACE, CONDA, DART, SWIFT. This field is extensible; clients must handle unknown values.
+	PackageType PackageType `json:"packageType"`
+	Path        *string     `json:"path,omitempty"`
+	Size        *string     `json:"size,omitempty"`
+
+	// Type refers to type of registry i.e virtual or upstream
+	Type RegistryType `json:"type"`
+	Url  string       `json:"url"`
+}
+
+// RegistryType refers to type of registry i.e virtual or upstream
+type RegistryType string
+
 // RootPackage Root package of the build
 type RootPackage struct {
 	// Name Name of the root package
@@ -437,10 +622,86 @@ type SecurityPolicyFailureVulnerability struct {
 	CvssThreshold float64 `json:"cvssThreshold"`
 }
 
+// UserInfo Structured user information for a principal
+type UserInfo struct {
+	// DisplayName Human-readable display name
+	DisplayName *string `json:"display_name,omitempty"`
+
+	// Email Email address
+	Email *string `json:"email,omitempty"`
+
+	// Type Principal type (user, service, service_account)
+	Type *string `json:"type,omitempty"`
+
+	// Uid Principal unique identifier (username)
+	Uid *string `json:"uid,omitempty"`
+}
+
 // V3Error An error response from the Stripe API
 type V3Error struct {
 	Error ApiErrors `json:"error"`
 }
+
+// Version Version metadata
+type Version struct {
+	ArtifactKey *map[string]interface{} `json:"artifactKey,omitempty"`
+
+	// CreatedAt Unix timestamp in milliseconds when the resource was last modified
+	CreatedAt *LastModifiedAtMs `json:"createdAt"`
+
+	// CreatedBy Structured user information for a principal
+	CreatedBy *UserInfo `json:"createdBy,omitempty"`
+
+	// DeletedAt Unix timestamp in milliseconds when the resource was soft-deleted
+	DeletedAt *DeletedAtMs `json:"deletedAt"`
+
+	// DeletedBy Structured user information for a principal
+	DeletedBy          *UserInfo `json:"deletedBy,omitempty"`
+	DeploymentMetadata *struct {
+		NonProdEnvCount int `json:"nonProdEnvCount"`
+		ProdEnvCount    int `json:"prodEnvCount"`
+	} `json:"deploymentMetadata,omitempty"`
+	DownloadCount *int64               `json:"downloadCount,omitempty"`
+	FileCount     *int                 `json:"fileCount,omitempty"`
+	FirewallMode  *VersionFirewallMode `json:"firewallMode,omitempty"`
+	Id            openapi_types.UUID   `json:"id"`
+	IsQuarantined *bool                `json:"isQuarantined,omitempty"`
+	LastScannedAt *string              `json:"lastScannedAt,omitempty"`
+
+	// ModifiedAt Unix timestamp in milliseconds when the resource was last modified
+	ModifiedAt *LastModifiedAtMs `json:"modifiedAt"`
+
+	// ModifiedBy Structured user information for a principal
+	ModifiedBy *UserInfo          `json:"modifiedBy,omitempty"`
+	Name       string             `json:"name"`
+	PackageId  openapi_types.UUID `json:"packageId"`
+
+	// PackageKind refers to package kind which is being used in huggingface packages for model, dataset
+	PackageKind *PackageKind `json:"packageKind,omitempty"`
+	PackageName string       `json:"packageName"`
+
+	// PackageType Package type. Known values include: DOCKER, MAVEN, PYTHON, GENERIC, HELM, NUGET, NPM, RPM, CARGO, COMPOSER, GO, HUGGINGFACE, CONDA, DART, SWIFT. This field is extensible; clients must handle unknown values.
+	PackageType PackageType `json:"packageType"`
+	PullCommand *string     `json:"pullCommand,omitempty"`
+
+	// PushedBy Structured user information for a principal
+	PushedBy         *UserInfo          `json:"pushedBy,omitempty"`
+	QuarantineReason *string            `json:"quarantineReason,omitempty"`
+	RegistryId       openapi_types.UUID `json:"registryId"`
+	RegistryName     string             `json:"registryName"`
+
+	// RegistryType refers to type of registry i.e virtual or upstream
+	RegistryType RegistryType        `json:"registryType"`
+	ScanID       *openapi_types.UUID `json:"scanID,omitempty"`
+	ScanStatus   *VersionScanStatus  `json:"scanStatus,omitempty"`
+	Size         *string             `json:"size,omitempty"`
+}
+
+// VersionFirewallMode defines model for Version.FirewallMode.
+type VersionFirewallMode string
+
+// VersionScanStatus defines model for Version.ScanStatus.
+type VersionScanStatus string
 
 // PolicySets List of opa policy sets.
 type PolicySets = []struct {
@@ -454,14 +715,41 @@ type PolicySets = []struct {
 // AccountIdentifier defines model for AccountIdentifier.
 type AccountIdentifier = string
 
+// ConanPackageRevisionOptionalParam defines model for ConanPackageRevisionOptionalParam.
+type ConanPackageRevisionOptionalParam = string
+
+// ConanRecipeRevisionOptionalParam defines model for ConanRecipeRevisionOptionalParam.
+type ConanRecipeRevisionOptionalParam = string
+
+// DeleteFilterParam defines model for DeleteFilterParam.
+type DeleteFilterParam string
+
 // EvaluationIdParam defines model for EvaluationIdParam.
 type EvaluationIdParam = string
+
+// IncludeMetaParam defines model for IncludeMetaParam.
+type IncludeMetaParam = bool
+
+// MetadataFilterListParam defines model for MetadataFilterListParam.
+type MetadataFilterListParam = []string
 
 // OrgIdentifier defines model for OrgIdentifier.
 type OrgIdentifier = string
 
+// PackageIdOptionalParam defines model for PackageIdOptionalParam.
+type PackageIdOptionalParam = string
+
+// PackageIdsListParam defines model for PackageIdsListParam.
+type PackageIdsListParam = []openapi_types.UUID
+
+// PackageKindQueryParam defines model for PackageKindQueryParam.
+type PackageKindQueryParam = string
+
 // PackageTypeListParam defines model for PackageTypeListParam.
 type PackageTypeListParam = []string
+
+// PackageTypesListParam defines model for PackageTypesListParam.
+type PackageTypesListParam = []string
 
 // PageNumber defines model for PageNumber.
 type PageNumber = int64
@@ -478,8 +766,17 @@ type ProjectIdentifier = string
 // RegistryIdListParam defines model for RegistryIdListParam.
 type RegistryIdListParam = []openapi_types.UUID
 
+// RegistryIdOptionalParam defines model for RegistryIdOptionalParam.
+type RegistryIdOptionalParam = string
+
+// RegistryIdsListParam defines model for RegistryIdsListParam.
+type RegistryIdsListParam = []openapi_types.UUID
+
 // RegistryScope defines model for RegistryScope.
 type RegistryScope string
+
+// RegistryTypeParam defines model for RegistryTypeParam.
+type RegistryTypeParam string
 
 // ScanIDParam defines model for ScanIDParam.
 type ScanIDParam = string
@@ -498,6 +795,15 @@ type SortField = string
 
 // SortOrder defines model for SortOrder.
 type SortOrder string
+
+// SortParam defines model for SortParam.
+type SortParam = string
+
+// UploadedByParam defines model for UploadedByParam.
+type UploadedByParam = []int64
+
+// VersionIdOptionalParam defines model for VersionIdOptionalParam.
+type VersionIdOptionalParam = string
 
 // ArtifactScanDetailsResponse defines model for ArtifactScanDetailsResponse.
 type ArtifactScanDetailsResponse struct {
@@ -544,6 +850,70 @@ type ListArtifactScanResponse struct {
 	PageSize int `json:"pageSize"`
 }
 
+// ListFilesResponse defines model for ListFilesResponse.
+type ListFilesResponse struct {
+	// HasMore True if more results exist after this page.
+	HasMore bool           `json:"hasMore"`
+	Items   []FileMetadata `json:"items"`
+
+	// Meta Metadata about the list response
+	Meta *Meta `json:"meta,omitempty"`
+
+	// Page The current page (0-indexed)
+	Page int64 `json:"page"`
+
+	// Size Number of items per page
+	Size int64 `json:"size"`
+}
+
+// ListPackageResponse defines model for ListPackageResponse.
+type ListPackageResponse struct {
+	// HasMore True if more results exist after this page.
+	HasMore bool      `json:"hasMore"`
+	Items   []Package `json:"items"`
+
+	// Meta Metadata about the list response
+	Meta *Meta `json:"meta,omitempty"`
+
+	// Page The current page (0-indexed)
+	Page int64 `json:"page"`
+
+	// Size Number of items per page
+	Size int64 `json:"size"`
+}
+
+// ListRegistryResponse defines model for ListRegistryResponse.
+type ListRegistryResponse struct {
+	// HasMore True if more results exist after this page.
+	HasMore bool       `json:"hasMore"`
+	Items   []Registry `json:"items"`
+
+	// Meta Metadata about the list response
+	Meta *Meta `json:"meta,omitempty"`
+
+	// Page The current page (0-indexed)
+	Page int64 `json:"page"`
+
+	// Size Number of items per page
+	Size int64 `json:"size"`
+}
+
+// ListVersionResponse defines model for ListVersionResponse.
+type ListVersionResponse struct {
+	// HasMore True if more results exist after this page.
+	HasMore bool      `json:"hasMore"`
+	Items   []Version `json:"items"`
+
+	// Meta Metadata about the list response
+	Meta *Meta `json:"meta,omitempty"`
+
+	// Page The current page (0-indexed)
+	Page int64 `json:"page"`
+
+	// Size Number of items per page
+	Size int64 `json:"size"`
+}
+
 // BuildInfoRequest Request to add build info
 type BuildInfoRequest = BuildInfoRequestInput
 
@@ -568,6 +938,203 @@ type BulkDeleteArtifactsParams struct {
 	// Example: `my_project` or `frontend_services`
 	ProjectIdentifier *ProjectIdentifier `form:"project_identifier,omitempty" json:"project_identifier,omitempty"`
 }
+
+// ListFilesV3Params defines parameters for ListFilesV3.
+type ListFilesV3Params struct {
+	// AccountIdentifier Unique identifier for the Harness account.
+	AccountIdentifier AccountIdentifier `form:"account_identifier" json:"account_identifier"`
+
+	// OrgIdentifier Unique identifier for the organization within the account.
+	//
+	// Example: `default` or `engineering_org`
+	OrgIdentifier *OrgIdentifier `form:"org_identifier,omitempty" json:"org_identifier,omitempty"`
+
+	// ProjectIdentifier Unique identifier for the project within the organization.
+	//
+	// Example: `my_project` or `frontend_services`
+	ProjectIdentifier *ProjectIdentifier `form:"project_identifier,omitempty" json:"project_identifier,omitempty"`
+
+	// RegistryId Unique id for the registry.
+	RegistryId *RegistryIdOptionalParam `form:"registry_id,omitempty" json:"registry_id,omitempty"`
+
+	// PackageId Unique identifier for the package.
+	PackageId *PackageIdOptionalParam `form:"package_id,omitempty" json:"package_id,omitempty"`
+
+	// VersionId Unique identifier for the version.
+	VersionId *VersionIdOptionalParam `form:"version_id,omitempty" json:"version_id,omitempty"`
+
+	// RecipeRevisionId Internal UUID of the Conan recipe revision (RREV) row. Resolves file paths via
+	// node_entity_mapping. Requires version_id.
+	// Mutually exclusive with package_revision_id.
+	RecipeRevisionId *ConanRecipeRevisionOptionalParam `form:"recipe_revision_id,omitempty" json:"recipe_revision_id,omitempty"`
+
+	// PackageRevisionId Internal UUID of the Conan package revision (PREV) row. Resolves file paths via
+	// node_entity_mapping. Requires version_id.
+	// Mutually exclusive with recipe_revision_id.
+	PackageRevisionId *ConanPackageRevisionOptionalParam `form:"package_revision_id,omitempty" json:"package_revision_id,omitempty"`
+
+	// Page The page number for pagination (0-indexed).
+	//
+	// Used to navigate through large result sets. Combined with `size` parameter
+	// to control which subset of results to return.
+	//
+	// Example: `page=0` returns the first page, `page=1` returns the second page
+	Page *PageNumber `form:"page,omitempty" json:"page,omitempty"`
+
+	// Size The number of items to return per page.
+	//
+	// Controls the page size for paginated results.
+	//
+	// Example: `size=50` returns up to 50 items per page
+	Size *PageSize `form:"size,omitempty" json:"size,omitempty"`
+
+	// Sort The sort for the results.
+	// Accepted pattern: `sort_field:sort_order` where sort_field is the field name
+	// and sort_order is either `asc` or `desc`.
+	//
+	// Examples: `name:asc`, `modifiedAt:desc`
+	Sort *SortParam `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// SearchTerm Search term for filtering results.
+	//
+	// Example: `search_term=prod` might match keys like "production", "prod-env", etc.
+	SearchTerm *SearchTerm `form:"search_term,omitempty" json:"search_term,omitempty"`
+}
+
+// ListPackagesV3Params defines parameters for ListPackagesV3.
+type ListPackagesV3Params struct {
+	// AccountIdentifier Unique identifier for the Harness account.
+	AccountIdentifier AccountIdentifier `form:"account_identifier" json:"account_identifier"`
+
+	// OrgIdentifier Unique identifier for the organization within the account.
+	//
+	// Example: `default` or `engineering_org`
+	OrgIdentifier *OrgIdentifier `form:"org_identifier,omitempty" json:"org_identifier,omitempty"`
+
+	// ProjectIdentifier Unique identifier for the project within the organization.
+	//
+	// Example: `my_project` or `frontend_services`
+	ProjectIdentifier *ProjectIdentifier `form:"project_identifier,omitempty" json:"project_identifier,omitempty"`
+
+	// RegistryIds Unique id for the registry.
+	// Note: This parameter should have one id if package query param is provided
+	RegistryIds *RegistryIdsListParam `form:"registry_ids,omitempty" json:"registry_ids,omitempty"`
+
+	// Metadata Filter by metadata using key:value format
+	Metadata *MetadataFilterListParam `form:"metadata,omitempty" json:"metadata,omitempty"`
+
+	// PackageKind refers to package kind which is being used in huggingface packages for model, dataset
+	PackageKind *PackageKindQueryParam `form:"package_kind,omitempty" json:"package_kind,omitempty"`
+
+	// PackageTypes Registry Package Type
+	PackageTypes *PackageTypesListParam       `form:"package_types,omitempty" json:"package_types,omitempty"`
+	Deleted      *ListPackagesV3ParamsDeleted `form:"deleted,omitempty" json:"deleted,omitempty"`
+
+	// Page The page number for pagination (0-indexed).
+	//
+	// Used to navigate through large result sets. Combined with `size` parameter
+	// to control which subset of results to return.
+	//
+	// Example: `page=0` returns the first page, `page=1` returns the second page
+	Page *PageNumber `form:"page,omitempty" json:"page,omitempty"`
+
+	// Size The number of items to return per page.
+	//
+	// Controls the page size for paginated results.
+	//
+	// Example: `size=50` returns up to 50 items per page
+	Size *PageSize `form:"size,omitempty" json:"size,omitempty"`
+
+	// Sort The sort for the results.
+	// Accepted pattern: `sort_field:sort_order` where sort_field is the field name
+	// and sort_order is either `asc` or `desc`.
+	//
+	// Examples: `name:asc`, `modifiedAt:desc`
+	Sort *SortParam `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// SearchTerm Search term for filtering results.
+	//
+	// Example: `search_term=prod` might match keys like "production", "prod-env", etc.
+	SearchTerm *SearchTerm `form:"search_term,omitempty" json:"search_term,omitempty"`
+
+	// IncludeMeta When `true`, include the `meta` object (e.g. active/deleted counts)
+	// in the response.
+	IncludeMeta *IncludeMetaParam `form:"include_meta,omitempty" json:"include_meta,omitempty"`
+}
+
+// ListPackagesV3ParamsDeleted defines parameters for ListPackagesV3.
+type ListPackagesV3ParamsDeleted string
+
+// ListRegistriesV3Params defines parameters for ListRegistriesV3.
+type ListRegistriesV3Params struct {
+	// AccountIdentifier Unique identifier for the Harness account.
+	AccountIdentifier AccountIdentifier `form:"account_identifier" json:"account_identifier"`
+
+	// OrgIdentifier Unique identifier for the organization within the account.
+	//
+	// Example: `default` or `engineering_org`
+	OrgIdentifier *OrgIdentifier `form:"org_identifier,omitempty" json:"org_identifier,omitempty"`
+
+	// ProjectIdentifier Unique identifier for the project within the organization.
+	//
+	// Example: `my_project` or `frontend_services`
+	ProjectIdentifier *ProjectIdentifier `form:"project_identifier,omitempty" json:"project_identifier,omitempty"`
+
+	// PackageTypes Registry Package Type
+	PackageTypes *PackageTypesListParam `form:"package_types,omitempty" json:"package_types,omitempty"`
+
+	// Type Registry Type
+	Type *ListRegistriesV3ParamsType `form:"type,omitempty" json:"type,omitempty"`
+
+	// Metadata Filter by metadata using key:value format
+	Metadata *MetadataFilterListParam `form:"metadata,omitempty" json:"metadata,omitempty"`
+
+	// Scope **Scope of registries to list**
+	// * **none** – current space only (default)   * **ancestors** – current space **plus** all parent spaces   * **descendants** – current space **plus** all child spaces
+	// If omitted, `none` is assumed.
+	Scope   *ListRegistriesV3ParamsScope   `form:"scope,omitempty" json:"scope,omitempty"`
+	Deleted *ListRegistriesV3ParamsDeleted `form:"deleted,omitempty" json:"deleted,omitempty"`
+
+	// Page The page number for pagination (0-indexed).
+	//
+	// Used to navigate through large result sets. Combined with `size` parameter
+	// to control which subset of results to return.
+	//
+	// Example: `page=0` returns the first page, `page=1` returns the second page
+	Page *PageNumber `form:"page,omitempty" json:"page,omitempty"`
+
+	// Size The number of items to return per page.
+	//
+	// Controls the page size for paginated results.
+	//
+	// Example: `size=50` returns up to 50 items per page
+	Size *PageSize `form:"size,omitempty" json:"size,omitempty"`
+
+	// Sort The sort for the results.
+	// Accepted pattern: `sort_field:sort_order` where sort_field is the field name
+	// and sort_order is either `asc` or `desc`.
+	//
+	// Examples: `name:asc`, `modifiedAt:desc`
+	Sort *SortParam `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// SearchTerm Search term for filtering results.
+	//
+	// Example: `search_term=prod` might match keys like "production", "prod-env", etc.
+	SearchTerm *SearchTerm `form:"search_term,omitempty" json:"search_term,omitempty"`
+
+	// IncludeMeta When `true`, include the `meta` object (e.g. active/deleted counts)
+	// in the response.
+	IncludeMeta *IncludeMetaParam `form:"include_meta,omitempty" json:"include_meta,omitempty"`
+}
+
+// ListRegistriesV3ParamsType defines parameters for ListRegistriesV3.
+type ListRegistriesV3ParamsType string
+
+// ListRegistriesV3ParamsScope defines parameters for ListRegistriesV3.
+type ListRegistriesV3ParamsScope string
+
+// ListRegistriesV3ParamsDeleted defines parameters for ListRegistriesV3.
+type ListRegistriesV3ParamsDeleted string
 
 // GetArtifactScansParams defines parameters for GetArtifactScans.
 type GetArtifactScansParams struct {
@@ -700,6 +1267,75 @@ type GetSystemInfoParams struct {
 	// AccountIdentifier Unique identifier for the Harness account.
 	AccountIdentifier AccountIdentifier `form:"account_identifier" json:"account_identifier"`
 }
+
+// ListVersionsV3Params defines parameters for ListVersionsV3.
+type ListVersionsV3Params struct {
+	// AccountIdentifier Unique identifier for the Harness account.
+	AccountIdentifier AccountIdentifier `form:"account_identifier" json:"account_identifier"`
+
+	// OrgIdentifier Unique identifier for the organization within the account.
+	//
+	// Example: `default` or `engineering_org`
+	OrgIdentifier *OrgIdentifier `form:"org_identifier,omitempty" json:"org_identifier,omitempty"`
+
+	// ProjectIdentifier Unique identifier for the project within the organization.
+	//
+	// Example: `my_project` or `frontend_services`
+	ProjectIdentifier *ProjectIdentifier `form:"project_identifier,omitempty" json:"project_identifier,omitempty"`
+
+	// RegistryIds Unique id for the registry.
+	// Note: This parameter should have one id if package query param is provided
+	RegistryIds *RegistryIdsListParam `form:"registry_ids,omitempty" json:"registry_ids,omitempty"`
+
+	// PackageIds Unique id for the package.
+	PackageIds *PackageIdsListParam `form:"package_ids,omitempty" json:"package_ids,omitempty"`
+
+	// PackageTypes Registry Package Type
+	PackageTypes *PackageTypesListParam       `form:"package_types,omitempty" json:"package_types,omitempty"`
+	Deleted      *ListVersionsV3ParamsDeleted `form:"deleted,omitempty" json:"deleted,omitempty"`
+
+	// Metadata Filter by metadata using key:value format
+	Metadata *MetadataFilterListParam `form:"metadata,omitempty" json:"metadata,omitempty"`
+
+	// Page The page number for pagination (0-indexed).
+	//
+	// Used to navigate through large result sets. Combined with `size` parameter
+	// to control which subset of results to return.
+	//
+	// Example: `page=0` returns the first page, `page=1` returns the second page
+	Page *PageNumber `form:"page,omitempty" json:"page,omitempty"`
+
+	// Size The number of items to return per page.
+	//
+	// Controls the page size for paginated results.
+	//
+	// Example: `size=50` returns up to 50 items per page
+	Size *PageSize `form:"size,omitempty" json:"size,omitempty"`
+
+	// Sort The sort for the results.
+	// Accepted pattern: `sort_field:sort_order` where sort_field is the field name
+	// and sort_order is either `asc` or `desc`.
+	//
+	// Examples: `name:asc`, `modifiedAt:desc`
+	Sort *SortParam `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// SearchTerm Search term for filtering results.
+	//
+	// Example: `search_term=prod` might match keys like "production", "prod-env", etc.
+	SearchTerm *SearchTerm `form:"search_term,omitempty" json:"search_term,omitempty"`
+
+	// IncludeMeta When `true`, include the `meta` object (e.g. active/deleted counts)
+	// in the response.
+	IncludeMeta *IncludeMetaParam `form:"include_meta,omitempty" json:"include_meta,omitempty"`
+
+	// UploadedBy Filter by uploaded by user ID.
+	//
+	// Example: `uploaded_by=123`
+	UploadedBy *UploadedByParam `form:"uploaded_by,omitempty" json:"uploaded_by,omitempty"`
+}
+
+// ListVersionsV3ParamsDeleted defines parameters for ListVersionsV3.
+type ListVersionsV3ParamsDeleted string
 
 // AddBuildInfoJSONRequestBody defines body for AddBuildInfo for application/json ContentType.
 type AddBuildInfoJSONRequestBody = BuildInfoRequestInput
@@ -978,6 +1614,15 @@ type ClientInterface interface {
 
 	BulkDeleteArtifacts(ctx context.Context, params *BulkDeleteArtifactsParams, body BulkDeleteArtifactsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListFilesV3 request
+	ListFilesV3(ctx context.Context, params *ListFilesV3Params, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListPackagesV3 request
+	ListPackagesV3(ctx context.Context, params *ListPackagesV3Params, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListRegistriesV3 request
+	ListRegistriesV3(ctx context.Context, params *ListRegistriesV3Params, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetArtifactScans request
 	GetArtifactScans(ctx context.Context, params *GetArtifactScansParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -999,6 +1644,9 @@ type ClientInterface interface {
 
 	// GetSystemInfo request
 	GetSystemInfo(ctx context.Context, params *GetSystemInfoParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListVersionsV3 request
+	ListVersionsV3(ctx context.Context, params *ListVersionsV3Params, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) AddBuildInfoWithBody(ctx context.Context, params *AddBuildInfoParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1039,6 +1687,42 @@ func (c *Client) BulkDeleteArtifactsWithBody(ctx context.Context, params *BulkDe
 
 func (c *Client) BulkDeleteArtifacts(ctx context.Context, params *BulkDeleteArtifactsParams, body BulkDeleteArtifactsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewBulkDeleteArtifactsRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListFilesV3(ctx context.Context, params *ListFilesV3Params, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListFilesV3Request(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListPackagesV3(ctx context.Context, params *ListPackagesV3Params, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListPackagesV3Request(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListRegistriesV3(ctx context.Context, params *ListRegistriesV3Params, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListRegistriesV3Request(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1135,6 +1819,18 @@ func (c *Client) GetArtifactScanDetails(ctx context.Context, scanId ScanIDParam,
 
 func (c *Client) GetSystemInfo(ctx context.Context, params *GetSystemInfoParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetSystemInfoRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListVersionsV3(ctx context.Context, params *ListVersionsV3Params, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListVersionsV3Request(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1289,6 +1985,701 @@ func NewBulkDeleteArtifactsRequestWithBody(server string, params *BulkDeleteArti
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListFilesV3Request generates requests for ListFilesV3
+func NewListFilesV3Request(server string, params *ListFilesV3Params) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/files")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "account_identifier", runtime.ParamLocationQuery, params.AccountIdentifier); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if params.OrgIdentifier != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "org_identifier", runtime.ParamLocationQuery, *params.OrgIdentifier); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ProjectIdentifier != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "project_identifier", runtime.ParamLocationQuery, *params.ProjectIdentifier); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.RegistryId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "registry_id", runtime.ParamLocationQuery, *params.RegistryId); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.PackageId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "package_id", runtime.ParamLocationQuery, *params.PackageId); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.VersionId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "version_id", runtime.ParamLocationQuery, *params.VersionId); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.RecipeRevisionId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "recipe_revision_id", runtime.ParamLocationQuery, *params.RecipeRevisionId); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.PackageRevisionId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "package_revision_id", runtime.ParamLocationQuery, *params.PackageRevisionId); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Page != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page", runtime.ParamLocationQuery, *params.Page); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Size != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "size", runtime.ParamLocationQuery, *params.Size); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Sort != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sort", runtime.ParamLocationQuery, *params.Sort); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.SearchTerm != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search_term", runtime.ParamLocationQuery, *params.SearchTerm); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListPackagesV3Request generates requests for ListPackagesV3
+func NewListPackagesV3Request(server string, params *ListPackagesV3Params) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/packages")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "account_identifier", runtime.ParamLocationQuery, params.AccountIdentifier); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if params.OrgIdentifier != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "org_identifier", runtime.ParamLocationQuery, *params.OrgIdentifier); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ProjectIdentifier != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "project_identifier", runtime.ParamLocationQuery, *params.ProjectIdentifier); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.RegistryIds != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "registry_ids", runtime.ParamLocationQuery, *params.RegistryIds); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Metadata != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "metadata", runtime.ParamLocationQuery, *params.Metadata); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.PackageKind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "package_kind", runtime.ParamLocationQuery, *params.PackageKind); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.PackageTypes != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "package_types", runtime.ParamLocationQuery, *params.PackageTypes); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Deleted != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "deleted", runtime.ParamLocationQuery, *params.Deleted); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Page != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page", runtime.ParamLocationQuery, *params.Page); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Size != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "size", runtime.ParamLocationQuery, *params.Size); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Sort != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sort", runtime.ParamLocationQuery, *params.Sort); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.SearchTerm != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search_term", runtime.ParamLocationQuery, *params.SearchTerm); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeMeta != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "include_meta", runtime.ParamLocationQuery, *params.IncludeMeta); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListRegistriesV3Request generates requests for ListRegistriesV3
+func NewListRegistriesV3Request(server string, params *ListRegistriesV3Params) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/registries")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "account_identifier", runtime.ParamLocationQuery, params.AccountIdentifier); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if params.OrgIdentifier != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "org_identifier", runtime.ParamLocationQuery, *params.OrgIdentifier); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ProjectIdentifier != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "project_identifier", runtime.ParamLocationQuery, *params.ProjectIdentifier); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.PackageTypes != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "package_types", runtime.ParamLocationQuery, *params.PackageTypes); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Type != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "type", runtime.ParamLocationQuery, *params.Type); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Metadata != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "metadata", runtime.ParamLocationQuery, *params.Metadata); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Scope != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "scope", runtime.ParamLocationQuery, *params.Scope); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Deleted != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "deleted", runtime.ParamLocationQuery, *params.Deleted); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Page != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page", runtime.ParamLocationQuery, *params.Page); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Size != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "size", runtime.ParamLocationQuery, *params.Size); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Sort != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sort", runtime.ParamLocationQuery, *params.Sort); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.SearchTerm != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search_term", runtime.ParamLocationQuery, *params.SearchTerm); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeMeta != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "include_meta", runtime.ParamLocationQuery, *params.IncludeMeta); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -1891,6 +3282,259 @@ func NewGetSystemInfoRequest(server string, params *GetSystemInfoParams) (*http.
 	return req, nil
 }
 
+// NewListVersionsV3Request generates requests for ListVersionsV3
+func NewListVersionsV3Request(server string, params *ListVersionsV3Params) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/versions")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "account_identifier", runtime.ParamLocationQuery, params.AccountIdentifier); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if params.OrgIdentifier != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "org_identifier", runtime.ParamLocationQuery, *params.OrgIdentifier); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ProjectIdentifier != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "project_identifier", runtime.ParamLocationQuery, *params.ProjectIdentifier); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.RegistryIds != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "registry_ids", runtime.ParamLocationQuery, *params.RegistryIds); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.PackageIds != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "package_ids", runtime.ParamLocationQuery, *params.PackageIds); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.PackageTypes != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "package_types", runtime.ParamLocationQuery, *params.PackageTypes); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Deleted != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "deleted", runtime.ParamLocationQuery, *params.Deleted); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Metadata != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "metadata", runtime.ParamLocationQuery, *params.Metadata); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Page != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page", runtime.ParamLocationQuery, *params.Page); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Size != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "size", runtime.ParamLocationQuery, *params.Size); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Sort != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sort", runtime.ParamLocationQuery, *params.Sort); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.SearchTerm != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search_term", runtime.ParamLocationQuery, *params.SearchTerm); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeMeta != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "include_meta", runtime.ParamLocationQuery, *params.IncludeMeta); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.UploadedBy != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "uploaded_by", runtime.ParamLocationQuery, *params.UploadedBy); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -1944,6 +3588,15 @@ type ClientWithResponsesInterface interface {
 
 	BulkDeleteArtifactsWithResponse(ctx context.Context, params *BulkDeleteArtifactsParams, body BulkDeleteArtifactsJSONRequestBody, reqEditors ...RequestEditorFn) (*BulkDeleteArtifactsResp, error)
 
+	// ListFilesV3WithResponse request
+	ListFilesV3WithResponse(ctx context.Context, params *ListFilesV3Params, reqEditors ...RequestEditorFn) (*ListFilesV3Resp, error)
+
+	// ListPackagesV3WithResponse request
+	ListPackagesV3WithResponse(ctx context.Context, params *ListPackagesV3Params, reqEditors ...RequestEditorFn) (*ListPackagesV3Resp, error)
+
+	// ListRegistriesV3WithResponse request
+	ListRegistriesV3WithResponse(ctx context.Context, params *ListRegistriesV3Params, reqEditors ...RequestEditorFn) (*ListRegistriesV3Resp, error)
+
 	// GetArtifactScansWithResponse request
 	GetArtifactScansWithResponse(ctx context.Context, params *GetArtifactScansParams, reqEditors ...RequestEditorFn) (*GetArtifactScansResp, error)
 
@@ -1965,6 +3618,9 @@ type ClientWithResponsesInterface interface {
 
 	// GetSystemInfoWithResponse request
 	GetSystemInfoWithResponse(ctx context.Context, params *GetSystemInfoParams, reqEditors ...RequestEditorFn) (*GetSystemInfoResp, error)
+
+	// ListVersionsV3WithResponse request
+	ListVersionsV3WithResponse(ctx context.Context, params *ListVersionsV3Params, reqEditors ...RequestEditorFn) (*ListVersionsV3Resp, error)
 }
 
 type AddBuildInfoResp struct {
@@ -2006,6 +3662,75 @@ func (r BulkDeleteArtifactsResp) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r BulkDeleteArtifactsResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListFilesV3Resp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListFilesResponse
+	JSONDefault  *V3Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListFilesV3Resp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListFilesV3Resp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListPackagesV3Resp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListPackageResponse
+	JSONDefault  *V3Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListPackagesV3Resp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListPackagesV3Resp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListRegistriesV3Resp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListRegistryResponse
+	JSONDefault  *V3Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListRegistriesV3Resp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListRegistriesV3Resp) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -2150,6 +3875,29 @@ func (r GetSystemInfoResp) StatusCode() int {
 	return 0
 }
 
+type ListVersionsV3Resp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListVersionResponse
+	JSONDefault  *V3Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListVersionsV3Resp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListVersionsV3Resp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // AddBuildInfoWithBodyWithResponse request with arbitrary body returning *AddBuildInfoResp
 func (c *ClientWithResponses) AddBuildInfoWithBodyWithResponse(ctx context.Context, params *AddBuildInfoParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddBuildInfoResp, error) {
 	rsp, err := c.AddBuildInfoWithBody(ctx, params, contentType, body, reqEditors...)
@@ -2182,6 +3930,33 @@ func (c *ClientWithResponses) BulkDeleteArtifactsWithResponse(ctx context.Contex
 		return nil, err
 	}
 	return ParseBulkDeleteArtifactsResp(rsp)
+}
+
+// ListFilesV3WithResponse request returning *ListFilesV3Resp
+func (c *ClientWithResponses) ListFilesV3WithResponse(ctx context.Context, params *ListFilesV3Params, reqEditors ...RequestEditorFn) (*ListFilesV3Resp, error) {
+	rsp, err := c.ListFilesV3(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListFilesV3Resp(rsp)
+}
+
+// ListPackagesV3WithResponse request returning *ListPackagesV3Resp
+func (c *ClientWithResponses) ListPackagesV3WithResponse(ctx context.Context, params *ListPackagesV3Params, reqEditors ...RequestEditorFn) (*ListPackagesV3Resp, error) {
+	rsp, err := c.ListPackagesV3(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListPackagesV3Resp(rsp)
+}
+
+// ListRegistriesV3WithResponse request returning *ListRegistriesV3Resp
+func (c *ClientWithResponses) ListRegistriesV3WithResponse(ctx context.Context, params *ListRegistriesV3Params, reqEditors ...RequestEditorFn) (*ListRegistriesV3Resp, error) {
+	rsp, err := c.ListRegistriesV3(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListRegistriesV3Resp(rsp)
 }
 
 // GetArtifactScansWithResponse request returning *GetArtifactScansResp
@@ -2254,6 +4029,15 @@ func (c *ClientWithResponses) GetSystemInfoWithResponse(ctx context.Context, par
 	return ParseGetSystemInfoResp(rsp)
 }
 
+// ListVersionsV3WithResponse request returning *ListVersionsV3Resp
+func (c *ClientWithResponses) ListVersionsV3WithResponse(ctx context.Context, params *ListVersionsV3Params, reqEditors ...RequestEditorFn) (*ListVersionsV3Resp, error) {
+	rsp, err := c.ListVersionsV3(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListVersionsV3Resp(rsp)
+}
+
 // ParseAddBuildInfoResp parses an HTTP response from a AddBuildInfoWithResponse call
 func ParseAddBuildInfoResp(rsp *http.Response) (*AddBuildInfoResp, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -2296,6 +4080,105 @@ func ParseBulkDeleteArtifactsResp(rsp *http.Response) (*BulkDeleteArtifactsResp,
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest V3Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListFilesV3Resp parses an HTTP response from a ListFilesV3WithResponse call
+func ParseListFilesV3Resp(rsp *http.Response) (*ListFilesV3Resp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListFilesV3Resp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListFilesResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest V3Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListPackagesV3Resp parses an HTTP response from a ListPackagesV3WithResponse call
+func ParseListPackagesV3Resp(rsp *http.Response) (*ListPackagesV3Resp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListPackagesV3Resp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListPackageResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest V3Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListRegistriesV3Resp parses an HTTP response from a ListRegistriesV3WithResponse call
+func ParseListRegistriesV3Resp(rsp *http.Response) (*ListRegistriesV3Resp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListRegistriesV3Resp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListRegistryResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -2494,6 +4377,39 @@ func ParseGetSystemInfoResp(rsp *http.Response) (*GetSystemInfoResp, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest V3Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListVersionsV3Resp parses an HTTP response from a ListVersionsV3WithResponse call
+func ParseListVersionsV3Resp(rsp *http.Response) (*ListVersionsV3Resp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListVersionsV3Resp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListVersionResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

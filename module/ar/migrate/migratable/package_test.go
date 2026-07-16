@@ -53,7 +53,7 @@ func (noopAdapter) VersionExists(context.Context, types.Package, string, string,
 func (noopAdapter) FileExists(context.Context, string, string, string, *types.File, types.ArtifactType) (bool, error) {
 	return false, nil
 }
-func (noopAdapter) GetAllFilesForVersion(context.Context, string, string, string) ([]string, error) {
+func (noopAdapter) BuildExistingIndex(context.Context, string, int) (*types.ExistingIndex, error) {
 	return nil, nil
 }
 func (noopAdapter) CreateVersion(string, string, string, types.ArtifactType, []*types.PackageFiles, map[string]interface{}) error {

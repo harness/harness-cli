@@ -92,18 +92,24 @@ func (a *adapter) GetConfig() types.RegistryConfig {
 }
 func (a *adapter) ValidateCredentials() (bool, error) { return false, nil }
 func (a *adapter) GetRegistry(ctx context.Context, registry string) (types.RegistryInfo, error) {
-	info, err := a.client.getRegistry(ctx, registry)
+	reg, err := a.client.resolveRegistry(ctx, registry)
 	if err != nil {
-		return info, err
+		return types.RegistryInfo{}, fmt.Errorf("failed to get registry %q: %w", registry, err)
 	}
-	// Cache the URL so GetOCIImagePath can derive the correct prefix without
-	// an extra API call.
-	if info.URL != "" {
+	if reg.Url != "" {
 		a.registryURLMu.Lock()
-		a.registryURLCache[registry] = info.URL
+		a.registryURLCache[registry] = reg.Url
 		a.registryURLMu.Unlock()
 	}
-	return info, nil
+	path := ""
+	if reg.Path != nil {
+		path = *reg.Path
+	}
+	return types.RegistryInfo{
+		Type: string(reg.Type),
+		URL:  reg.Url,
+		Path: path,
+	}, nil
 }
 func (a *adapter) CreateRegistryIfDoesntExist(registryRef string) (bool, error) {
 	return false, nil
@@ -257,11 +263,10 @@ func (a *adapter) FileExists(
 	return a.client.artifactFileExists(ctx, registryRef, pkg, version, file, artifactType)
 }
 
-func (a *adapter) GetAllFilesForVersion(
-	ctx context.Context,
-	registryRef, pkg, version string,
-) ([]string, error) {
-	return a.client.artifactGetFilesForVersion(ctx, registryRef, pkg, version)
+func (a *adapter) BuildExistingIndex(
+	ctx context.Context, registryName string, concurrency int,
+) (*types.ExistingIndex, error) {
+	return a.client.buildExistingIndex(ctx, registryName, concurrency)
 }
 
 func (a *adapter) CreateVersion(
