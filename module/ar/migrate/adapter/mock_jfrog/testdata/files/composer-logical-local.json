@@ -1,6 +1,6 @@
 [
   {
-    "Registry": "composer-local",
+    "Registry": "composer-logical-local",
     "Name": "vendor-package-1.0.0.zip",
     "Uri": "/vendor-package-1.0.0.zip",
     "Folder": false,
@@ -9,12 +9,21 @@
     "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80790"
   },
   {
-    "Registry": "composer-local",
+    "Registry": "composer-logical-local",
     "Name": "vendor-package-2.0.0.zip",
     "Uri": "/vendor-package-2.0.0.zip",
     "Folder": false,
     "Size": 640,
     "LastModified": "2023-01-02T00:00:00.000Z",
     "SHA1": "bb0e98fc1d17c07be138f06f7df5933dc8c3c0d6"
+  },
+  {
+    "Registry": "composer-logical-local",
+    "Name": "vendor-package-3.0.0.zip",
+    "Uri": "/vendor-package-3.0.0.zip",
+    "Folder": false,
+    "Size": 768,
+    "LastModified": "2023-01-03T00:00:00.000Z",
+    "SHA1": "356a192b7913b04c54574d18c28d46e6395428ab"
   }
 ]

@@ -207,11 +207,11 @@ func (c *mockClient) seedDefaultFileContent() {
   "description": "A sample NPM package for testing migration",
   "dist-tags": { "latest": "2.0.0", "beta": "2.0.0" },
   "versions": {
-    "1.0.0": { "name": "@har/sample-package", "version": "1.0.0", "dist": { "tarball": "http://localhost:8081/artifactory/npm-local/sample-package/-/sample-package-1.0.0.tgz", "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80707" } },
-    "1.1.0": { "name": "@har/sample-package", "version": "1.1.0", "dist": { "tarball": "http://localhost:8081/artifactory/npm-local/sample-package/-/sample-package-1.1.0.tgz", "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80711" } },
-    "2.0.0": { "name": "@har/sample-package", "version": "2.0.0", "dist": { "tarball": "http://localhost:8081/artifactory/npm-local/sample-package/-/sample-package-2.0.0.tgz", "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80712" } },
-    "2.0.0-beta.1": { "name": "@har/sample-package", "version": "2.0.0-beta.1", "dist": { "tarball": "http://localhost:8081/artifactory/npm-local/sample-package/-/sample-package-2.0.0-beta.1.tgz", "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80713" } },
-    "3.0.0-rc.1": { "name": "@har/sample-package", "version": "3.0.0-rc.1", "dist": { "tarball": "http://localhost:8081/artifactory/npm-local/sample-package/-/sample-package-3.0.0-rc.1.tgz", "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80714" } }
+    "1.0.0": { "name": "@har/sample-package", "version": "1.0.0", "dist": { "tarball": "http://localhost:8081/artifactory/npm-local/@har/sample-package/-/@har/sample-package-1.0.0.tgz", "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80707" } },
+    "1.1.0": { "name": "@har/sample-package", "version": "1.1.0", "dist": { "tarball": "http://localhost:8081/artifactory/npm-local/@har/sample-package/-/@har/sample-package-1.1.0.tgz", "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80711" } },
+    "2.0.0": { "name": "@har/sample-package", "version": "2.0.0", "dist": { "tarball": "http://localhost:8081/artifactory/npm-local/@har/sample-package/-/@har/sample-package-2.0.0.tgz", "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80712" } },
+    "2.0.0-beta.1": { "name": "@har/sample-package", "version": "2.0.0-beta.1", "dist": { "tarball": "http://localhost:8081/artifactory/npm-local/@har/sample-package/-/@har/sample-package-2.0.0-beta.1.tgz", "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80713" } },
+    "3.0.0-rc.1": { "name": "@har/sample-package", "version": "3.0.0-rc.1", "dist": { "tarball": "http://localhost:8081/artifactory/npm-local/@har/sample-package/-/@har/sample-package-3.0.0-rc.1.tgz", "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80714" } }
   },
   "time": { "created": "2023-01-01T00:00:00.000Z", "modified": "2023-05-01T00:00:00.000Z" }
 }`))

@@ -13,8 +13,8 @@ import (
 	"time"
 )
 
-const defaultE2EOrg = "default"
-const defaultE2EProject = "hc_e2e_migrate"
+const defaultE2EOrg = "har_auto_org_migration"
+const defaultE2EProject = "har_auto_project_migration"
 
 // EnsureProject guarantees the configured org/project exist before any registry
 // is created. Registries are always provisioned at project scope (parentRef =
@@ -26,6 +26,8 @@ func EnsureProject(t *testing.T, creds Creds) {
 	if creds.OrgID == "" || creds.ProjectID == "" {
 		t.Fatalf("EnsureProject: org and project must be set (org=%q project=%q)", creds.OrgID, creds.ProjectID)
 	}
+
+	EnsureOrg(t, creds)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -56,6 +58,123 @@ func EnsureProject(t *testing.T, creds Creds) {
 		return
 	}
 	t.Logf("created project %s/%s", creds.OrgID, creds.ProjectID)
+}
+
+// EnsureOrg guarantees the configured org exists before project/registry setup.
+func EnsureOrg(t *testing.T, creds Creds) {
+	t.Helper()
+
+	if creds.OrgID == "" {
+		t.Fatalf("EnsureOrg: org must be set")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	switch err := getOrg(ctx, creds); {
+	case err == nil:
+		t.Logf("using existing org %s", creds.OrgID)
+		return
+	case isForbidden(err):
+		t.Logf("warning: cannot verify org %s via NG API (403); proceeding — create it in the Harness UI if project create fails", creds.OrgID)
+		return
+	case !isNotFound(err):
+		t.Fatalf("failed to look up org %s: %v", creds.OrgID, err)
+	}
+
+	t.Logf("creating org %s for e2e migrations", creds.OrgID)
+	if err := createOrg(ctx, creds); err != nil {
+		switch {
+		case isAlreadyExists(err):
+			t.Logf("org %s already exists (race), reusing", creds.OrgID)
+		case isForbidden(err):
+			t.Fatalf("org %s does not exist and this token cannot create orgs (403). Create the org in Harness UI (id=%s) and re-run", creds.OrgID, creds.OrgID)
+		default:
+			t.Fatalf("failed to create org %s: %v", creds.OrgID, err)
+		}
+		return
+	}
+	t.Logf("created org %s", creds.OrgID)
+}
+
+func getOrg(ctx context.Context, creds Creds) error {
+	u, err := url.Parse(creds.APIURL + "/ng/api/organizations/" + url.PathEscape(creds.OrgID))
+	if err != nil {
+		return err
+	}
+	q := u.Query()
+	q.Set("accountIdentifier", creds.AccountID)
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("x-api-key", creds.APIKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return nil
+	case http.StatusNotFound:
+		return errNotFound{msg: strings.TrimSpace(string(body))}
+	case http.StatusForbidden:
+		return errForbidden{msg: strings.TrimSpace(string(body))}
+	default:
+		return fmt.Errorf("GET organization: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+}
+
+func createOrg(ctx context.Context, creds Creds) error {
+	u, err := url.Parse(creds.APIURL + "/ng/api/organizations")
+	if err != nil {
+		return err
+	}
+	q := u.Query()
+	q.Set("accountIdentifier", creds.AccountID)
+	u.RawQuery = q.Encode()
+
+	payload := map[string]any{
+		"organization": map[string]any{
+			"identifier":  creds.OrgID,
+			"name":        "Harness CLI E2E Migrations",
+			"description": "Dedicated org for harness-cli MOCK_JFROG -> HAR migration e2e tests",
+			"tags":        map[string]string{},
+		},
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("x-api-key", creds.APIKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	switch resp.StatusCode {
+	case http.StatusOK, http.StatusCreated:
+		return nil
+	case http.StatusForbidden:
+		return errForbidden{msg: strings.TrimSpace(string(body))}
+	default:
+		return classifyAlreadyExists(resp.StatusCode, body)
+	}
 }
 
 func getProject(ctx context.Context, creds Creds) error {
@@ -139,12 +258,19 @@ func createProject(ctx context.Context, creds Creds) error {
 	case http.StatusForbidden:
 		return errForbidden{msg: strings.TrimSpace(string(body))}
 	default:
-		msg := strings.ToLower(string(body))
-		if resp.StatusCode == http.StatusConflict || strings.Contains(msg, "already exists") {
-			return errAlreadyExists{msg: strings.TrimSpace(string(body))}
-		}
-		return fmt.Errorf("POST project: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return classifyAlreadyExists(resp.StatusCode, body)
 	}
+}
+
+func classifyAlreadyExists(status int, body []byte) error {
+	msg := strings.ToLower(string(body))
+	if status == http.StatusConflict ||
+		strings.Contains(msg, "already exists") ||
+		strings.Contains(msg, "already present") ||
+		strings.Contains(msg, "duplicate_field") {
+		return errAlreadyExists{msg: strings.TrimSpace(string(body))}
+	}
+	return fmt.Errorf("request failed: status %d: %s", status, strings.TrimSpace(string(body)))
 }
 
 type errNotFound struct{ msg string }

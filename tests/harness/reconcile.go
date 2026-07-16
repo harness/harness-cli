@@ -77,6 +77,85 @@ func Reconcile(t *testing.T, creds Creds, spec Spec) {
 	}
 }
 
+// destReconcileAdapter builds the HAR destination adapter used for reconciliation.
+func destReconcileAdapter(t *testing.T, ctx context.Context, creds Creds) adapter.Adapter {
+	t.Helper()
+	destAdapter, err := adapter.GetAdapter(ctx, types.RegistryConfig{
+		Endpoint:    creds.PkgURL,
+		Type:        types.HAR,
+		Credentials: types.CredentialsConfig{Username: "harness", Password: creds.APIKey},
+	})
+	if err != nil {
+		t.Fatalf("reconcile: failed to build destination adapter: %v", err)
+	}
+	return destAdapter
+}
+
+// ReconcileAbsent asserts that everything named in the spec's NotExpected*
+// groups is ABSENT from the destination. It is the negative counterpart to
+// Reconcile: exclude-pattern, zero-file, and dest-mismatch scenarios use it so a
+// successful CLI exit is never mistaken for a successful migration.
+func ReconcileAbsent(t *testing.T, creds Creds, spec Spec) {
+	t.Helper()
+
+	ApplyGlobalConfig(creds)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	destAdapter := destReconcileAdapter(t, ctx, creds)
+	registryRef := creds.registryRef(spec.DestRegistry)
+	artifactType := types.ArtifactType(spec.ArtifactType)
+
+	// RAW / GENERIC file URIs expected absent.
+	for _, uri := range spec.NotExpectedRawURIs {
+		file := &types.File{Uri: uri, Name: path.Base(uri)}
+		exists, err := destAdapter.FileExists(ctx, registryRef, "", "", file, types.RAW)
+		if err != nil {
+			t.Logf("reconcile-absent: existence check errored for %q (treated as absent): %v", uri, err)
+			continue
+		}
+		if exists {
+			t.Errorf("reconcile-absent: file %q unexpectedly present in registry %q", uri, spec.DestRegistry)
+		}
+	}
+
+	// Versioned artifacts expected absent.
+	for _, ef := range spec.NotExpectedFiles {
+		exists, err := destAdapter.VersionExists(ctx, types.Package{}, registryRef, ef.Pkg, ef.Version, artifactType)
+		if err != nil {
+			t.Logf("reconcile-absent: version check errored for %s@%s (treated as absent): %v", ef.Pkg, ef.Version, err)
+			continue
+		}
+		if exists {
+			t.Errorf("reconcile-absent: version %s@%s unexpectedly present in registry %q", ef.Pkg, ef.Version, spec.DestRegistry)
+		}
+	}
+
+	// OCI tags expected absent.
+	if len(spec.NotExpectedTags) > 0 {
+		keychain, err := destAdapter.GetKeyChain("")
+		if err != nil {
+			t.Fatalf("reconcile-absent: failed to get destination keychain: %v", err)
+		}
+		for _, et := range spec.NotExpectedTags {
+			repoRef, err := destAdapter.GetOCIImagePath(spec.DestRegistry, "", et.Image)
+			if err != nil {
+				t.Logf("reconcile-absent: failed to build OCI path for %q (treated as absent): %v", et.Image, err)
+				continue
+			}
+			tags, err := crane.ListTags(repoRef, crane.WithContext(ctx), crane.WithAuthFromKeychain(keychain))
+			if err != nil {
+				t.Logf("reconcile-absent: list tags errored for %q (treated as absent): %v", repoRef, err)
+				continue
+			}
+			if contains(tags, et.Tag) {
+				t.Errorf("reconcile-absent: tag %s:%s unexpectedly present in registry %q", et.Image, et.Tag, spec.DestRegistry)
+			}
+		}
+	}
+}
+
 // requestedFiles reproduces the migration's file-level enumeration: list source
 // files and apply include/exclude patterns, dropping folders.
 func requestedFiles(srcAdapter adapter.Adapter, spec Spec) []types.File {

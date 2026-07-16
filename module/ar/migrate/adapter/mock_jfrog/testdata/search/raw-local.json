@@ -1,0 +1,52 @@
+{
+  "results": [
+    {
+      "repo": "raw-local",
+      "path": "configs/v1",
+      "name": "config.yaml",
+      "created": "2024-02-20T14:00:00.000Z",
+      "modified": "2024-02-20T14:00:00.000Z",
+      "stats": [
+        {
+          "downloaded": "2026-06-01T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "repo": "raw-local",
+      "path": "assets/images",
+      "name": "logo.png",
+      "created": "2024-01-10T12:00:00.000Z",
+      "modified": "2024-01-10T12:00:00.000Z",
+      "stats": [
+        {
+          "downloaded": "2026-06-01T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "repo": "raw-local",
+      "path": "docs",
+      "name": "readme.txt",
+      "created": "2024-01-15T10:30:00.000Z",
+      "modified": "2024-01-15T10:30:00.000Z",
+      "stats": [
+        {
+          "downloaded": "2020-01-01T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "repo": "raw-local",
+      "path": "releases",
+      "name": "app-1.0.tar.gz",
+      "created": "2024-03-01T08:00:00.000Z",
+      "modified": "2024-03-01T08:00:00.000Z",
+      "stats": [
+        {
+          "downloaded": "2020-01-01T00:00:00.000Z"
+        }
+      ]
+    }
+  ]
+}

@@ -125,11 +125,32 @@
     "description": "Mock Composer Local Repository",
     "packageType": "composer"
   },
+  "composer-logical-local": {
+    "key": "composer-logical-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/composer-logical-local",
+    "description": "Mock Composer repo with multiple version zips enumerated as one logical package (ticket #18 repro)",
+    "packageType": "composer"
+  },
   "conan-local": {
     "key": "conan-local",
     "type": "LOCAL",
     "url": "http://localhost:8081/artifactory/conan-local",
     "description": "Mock Conan Local Repository",
     "packageType": "conan"
+  },
+  "raw-broken-local": {
+    "key": "raw-broken-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/raw-broken-local",
+    "description": "Mock Raw Local Repository with a listed file that has no content (download 404)",
+    "packageType": "raw"
+  },
+  "empty-local": {
+    "key": "empty-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/empty-local",
+    "description": "Mock empty Local Repository (no files) for enumeration edge cases",
+    "packageType": "raw"
   }
 }

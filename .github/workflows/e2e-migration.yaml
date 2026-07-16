@@ -1,0 +1,66 @@
+name: E2E Migration (MOCK_JFROG -> HAR)
+
+# Live end-to-end migration suite. It provisions real HAR registries in a QA
+# account, runs `hc registry migrate`, reconciles the result, and cleans up.
+# It therefore needs QA credentials, which are supplied via repository secrets.
+# When the secrets are absent (e.g. on forks) every test skips, so the workflow
+# stays green without mutating anything.
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Single tests/<package> to run (blank = all)'
+        required: false
+        default: ''
+  schedule:
+    # Nightly at 02:00 UTC.
+    - cron: '0 2 * * *'
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: '1.24'
+
+jobs:
+  vet:
+    name: Type-check e2e suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Vet (build tag e2e)
+        run: make e2e-vet
+
+  e2e:
+    name: Run e2e migration
+    needs: vet
+    runs-on: ubuntu-latest
+    # Give the live suite room; individual packages have their own timeouts.
+    timeout-minutes: 60
+    env:
+      HARNESS_API_KEY: ${{ secrets.E2E_HARNESS_API_KEY }}
+      HARNESS_ACCOUNT_ID: ${{ secrets.E2E_HARNESS_ACCOUNT_ID }}
+      HARNESS_API_URL: ${{ secrets.E2E_HARNESS_API_URL }}
+      HARNESS_PKG_URL: ${{ secrets.E2E_HARNESS_PKG_URL }}
+      HARNESS_ORG_ID: ${{ secrets.E2E_HARNESS_ORG_ID }}
+      HARNESS_PROJECT_ID: ${{ secrets.E2E_HARNESS_PROJECT_ID }}
+      # Stable per-run identifier so parallel branch runs never collide.
+      E2E_RUN_ID: gha-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run full suite
+        if: ${{ github.event.inputs.package == '' }}
+        run: make e2e-migration
+
+      - name: Run single package
+        if: ${{ github.event.inputs.package != '' }}
+        run: make e2e-migration-pkg PKG=${{ github.event.inputs.package }}

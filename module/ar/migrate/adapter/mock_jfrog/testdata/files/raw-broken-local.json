@@ -1,0 +1,11 @@
+[
+  {
+    "Registry": "raw-broken-local",
+    "Name": "broken.yaml",
+    "Uri": "/data/configs/broken.yaml",
+    "Folder": false,
+    "Size": 128,
+    "LastModified": "2024-01-01T00:00:00.000Z",
+    "SHA1": "0000000000000000000000000000000000000000"
+  }
+]

@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/harness/harness-cli/config"
+	"github.com/harness/harness-cli/module/ar/migrate/types"
 )
 
 // Creds holds the live (QA) credentials and endpoints the suite needs. They are
@@ -62,11 +63,47 @@ type Spec struct {
 	Insecure              bool
 	Overwrite             bool
 
+	// Source registry type and credentials. Defaults preserve the mock source
+	// (MOCK_JFROG with dummy creds) used by the offline suite. DOCKER/HELM live
+	// tests set SourceType=JFROG and real credentials to migrate from an actual
+	// OCI source registry.
+	SourceType     types.RegistryType // defaults to MOCK_JFROG
+	SourceUsername string             // defaults to "dummy"
+	SourcePassword string             // defaults to "dummy"
+
+	// Optional migration behavior. Zero values preserve the historical
+	// single-mapping, concurrency=1, full-upload behavior so existing happy-path
+	// tests are unaffected.
+	Concurrency int               // config concurrency; defaults to 1 when <= 0
+	DryRun      bool              // config dryRun: enumerate only, no uploads
+	Summary     bool              // config summary: print stats table only
+	DateFilter  *types.DateFilter // optional time-based filter on the mapping
+
 	// Reconciliation expectations. Exactly one group is used depending on the
 	// artifact type.
 	ExpectedRawURIs []string       // RAW: file URIs expected present (HEAD)
 	ExpectedFiles   []ExpectedFile // versioned types: (pkg, version, file)
 	ExpectedTags    []ExpectedTag  // DOCKER/HELM: image tags
+
+	// Negative reconciliation: assert these are ABSENT in the destination after
+	// migration. Used by exclude-pattern, zero-file, and dest-mismatch
+	// scenarios where a successful CLI exit must not be mistaken for a
+	// successful migration.
+	NotExpectedRawURIs []string
+	NotExpectedFiles   []ExpectedFile
+	NotExpectedTags    []ExpectedTag
+
+	// ExpectZeroFiles asserts the migration selected zero files (e.g. filters
+	// excluded everything). Reconcile must then confirm nothing landed.
+	ExpectZeroFiles bool
+}
+
+// concurrency returns the configured concurrency, defaulting to 1.
+func (s Spec) concurrency() int {
+	if s.Concurrency > 0 {
+		return s.Concurrency
+	}
+	return 1
 }
 
 const defaultSourceEndpoint = "http://mock-jfrog.local"
@@ -106,6 +143,30 @@ func (c Creds) spaceRef() string {
 // account[/org[/project]]/identifier used as the registry_ref path param.
 func (c Creds) registryRef(identifier string) string {
 	return c.spaceRef() + "/" + identifier
+}
+
+// ScopeLevel selects the Harness scope at which a registry is provisioned.
+type ScopeLevel string
+
+const (
+	ScopeAccount ScopeLevel = "account" // account only (no org/project)
+	ScopeOrg     ScopeLevel = "org"     // account/org (no project)
+	ScopeProject ScopeLevel = "project" // account/org/project (default)
+)
+
+// AtScope returns a copy of the credentials narrowed to the requested scope.
+// Account scope clears both org and project; org scope clears only project.
+// The returned Creds drive spaceRef/registryRef so registries are created and
+// reconciled at the intended level.
+func (c Creds) AtScope(scope ScopeLevel) Creds {
+	switch scope {
+	case ScopeAccount:
+		c.OrgID = ""
+		c.ProjectID = ""
+	case ScopeOrg:
+		c.ProjectID = ""
+	}
+	return c
 }
 
 // UniqueRegistry builds a run-unique, sanitized registry identifier so parallel

@@ -27,11 +27,10 @@ func newARClient(t *testing.T, creds Creds) *ar.ClientWithResponses {
 	return c
 }
 
-// CreateRegistry provisions a VIRTUAL HAR registry of the given package type in
-// the configured scope and returns its fully qualified registry reference for
-// later deletion. An already-existing registry (from a retried run) is treated
-// as success.
-func CreateRegistry(t *testing.T, creds Creds, identifier, packageType string) string {
+// tryCreateRegistry issues the create-registry request and returns the HTTP
+// status code and trimmed body. Transport errors fatal the test; HTTP status
+// codes (including 4xx) are returned for the caller to interpret.
+func tryCreateRegistry(t *testing.T, creds Creds, identifier, packageType string) (int, string) {
 	t.Helper()
 
 	c := newARClient(t, creds)
@@ -61,18 +60,51 @@ func CreateRegistry(t *testing.T, creds Creds, identifier, packageType string) s
 	if err != nil {
 		t.Fatalf("failed to create registry %q: %v", identifier, err)
 	}
+	return resp.StatusCode(), strings.TrimSpace(string(resp.Body))
+}
+
+// CreateRegistry provisions a VIRTUAL HAR registry of the given package type in
+// the configured scope and returns its fully qualified registry reference for
+// later deletion. An already-existing registry (from a retried run) is treated
+// as success.
+func CreateRegistry(t *testing.T, creds Creds, identifier, packageType string) string {
+	t.Helper()
+
+	status, body := tryCreateRegistry(t, creds, identifier, packageType)
 
 	switch {
-	case resp.StatusCode() == http.StatusCreated:
+	case status == http.StatusCreated:
 		t.Logf("created registry %q (packageType=%s)", identifier, packageType)
-	case resp.StatusCode() == http.StatusConflict,
-		(resp.StatusCode() == http.StatusBadRequest && strings.Contains(strings.ToLower(string(resp.Body)), "already")):
+	case status == http.StatusConflict,
+		(status == http.StatusBadRequest && strings.Contains(strings.ToLower(body), "already")):
 		t.Logf("registry %q already exists, reusing", identifier)
 	default:
-		t.Fatalf("failed to create registry %q: status %d: %s", identifier, resp.StatusCode(), strings.TrimSpace(string(resp.Body)))
+		t.Fatalf("failed to create registry %q: status %d: %s", identifier, status, body)
 	}
 
 	return creds.registryRef(identifier)
+}
+
+// ExpectCreateRegistryFails asserts that provisioning a registry of the given
+// package type is rejected by the server (non-2xx, and not an "already exists"
+// conflict). It is used for dest-registry-type scenarios such as a package type
+// that is not enabled in the target environment. When the registry is instead
+// created (or already exists), it is cleaned up and the test fails.
+func ExpectCreateRegistryFails(t *testing.T, creds Creds, identifier, packageType string) {
+	t.Helper()
+
+	status, body := tryCreateRegistry(t, creds, identifier, packageType)
+
+	switch {
+	case status == http.StatusCreated:
+		t.Cleanup(func() { DeleteRegistry(t, creds, creds.registryRef(identifier)) })
+		t.Errorf("expected registry create to fail for packageType=%s, but it was created (status %d)", packageType, status)
+	case status == http.StatusConflict,
+		(status == http.StatusBadRequest && strings.Contains(strings.ToLower(body), "already")):
+		t.Skipf("registry %q already exists; cannot assert create failure for packageType=%s", identifier, packageType)
+	default:
+		t.Logf("registry create for packageType=%s failed as expected: status %d: %s", packageType, status, body)
+	}
 }
 
 // DeleteRegistry removes a registry created by CreateRegistry. Cleanup failures

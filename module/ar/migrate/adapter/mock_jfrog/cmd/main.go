@@ -223,6 +223,11 @@ Files:
 		{"python-local/requests/2.28.0/requests-2.28.0.tar.gz", pythonSdist("requests", "2.28.0")},
 		{"python-local/requests/2.29.0/requests-2.29.0.tar.gz", pythonSdist("requests", "2.29.0")},
 
+		// Python sdists in a repo WITHOUT a .pypi simple index, exercising the
+		// tree-enumeration fallback (name/version still come from PKG-INFO).
+		{"python-noindex-local/requests/2.28.0/requests-2.28.0.tar.gz", pythonSdist("requests", "2.28.0")},
+		{"python-noindex-local/requests/2.29.0/requests-2.29.0.tar.gz", pythonSdist("requests", "2.29.0")},
+
 		// Swift source archives (zip with Package.swift)
 		{"swift-local/myscope/harness/1.0.0/harness-1.0.0.zip", swiftZip("harness", "1.0.0")},
 		{"swift-local/myscope/harness/1.0.1/harness-1.0.1.zip", swiftZip("harness", "1.0.1")},
@@ -244,6 +249,13 @@ Files:
 
 		// Composer package (zip whose composer.json drives the dest name/version)
 		{"composer-local/vendor-package-1.0.0.zip", composerPackageZip("vendor/package", "1.0.0")},
+		{"composer-local/vendor-package-2.0.0.zip", composerPackageZip("vendor/package", "2.0.0")},
+
+		// composer-logical-local: multiple versions of vendor/package; GetPackages
+		// returns one logical row (ticket #18 repro fixture).
+		{"composer-logical-local/vendor-package-1.0.0.zip", composerPackageZip("vendor/package", "1.0.0")},
+		{"composer-logical-local/vendor-package-2.0.0.zip", composerPackageZip("vendor/package", "2.0.0")},
+		{"composer-logical-local/vendor-package-3.0.0.zip", composerPackageZip("vendor/package", "3.0.0")},
 	}
 
 	for _, e := range entries {
