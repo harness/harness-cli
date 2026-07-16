@@ -103,5 +103,19 @@
     "url": "http://localhost:8081/artifactory/conan-local",
     "description": "Mock Conan Local Repository",
     "packageType": "conan"
+  },
+  "rpm-single-local": {
+    "key": "rpm-single-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/rpm-single-local",
+    "description": "Mock RPM Local Repository (single repo)",
+    "packageType": "rpm"
+  },
+  "rpm-multi-local": {
+    "key": "rpm-multi-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/rpm-multi-local",
+    "description": "Mock RPM Local Repository (multiple repos)",
+    "packageType": "rpm"
   }
 }

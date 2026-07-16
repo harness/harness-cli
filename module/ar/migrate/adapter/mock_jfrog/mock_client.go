@@ -157,18 +157,65 @@ func (c *mockClient) loadContent() {
 		loaded++
 		return nil
 	})
-	if loaded > 0 {
-		return
+
+	// Generate fallback content when testdata/binary/ doesn't exist
+	if loaded == 0 {
+		c.fileContent["maven-local/.pypi/simple.html"] =
+			[]byte(`<html><body><a href="requests/">requests</a><br/><a href="flask/">flask</a><br/></body></html>`)
+		c.fileContent["maven-local/repodata/repomd.xml"] =
+			[]byte(`<?xml version="1.0" encoding="UTF-8"?><repomd><data type="primary"><location href="repodata/primary.xml.gz"/></data></repomd>`)
+		c.fileContent["maven-local/index.yaml"] =
+			[]byte("apiVersion: v1\nentries:\n  nginx:\n    - name: nginx\n      version: 1.0.0\n      urls:\n        - charts/nginx-1.0.0.tgz\n")
 	}
 
-	// Fallback: generate content programmatically when testdata/binary/
-	// doesn't exist (e.g. fresh clone without running `make mock-init`).
-	c.fileContent["maven-local/.pypi/simple.html"] =
-		[]byte(`<html><body><a href="requests/">requests</a><br/><a href="flask/">flask</a><br/></body></html>`)
-	c.fileContent["maven-local/repodata/repomd.xml"] =
-		[]byte(`<?xml version="1.0" encoding="UTF-8"?><repomd><data type="primary"><location href="repodata/primary.xml.gz"/></data></repomd>`)
-	c.fileContent["maven-local/index.yaml"] =
-		[]byte("apiVersion: v1\nentries:\n  nginx:\n    - name: nginx\n      version: 1.0.0\n      urls:\n        - charts/nginx-1.0.0.tgz\n")
+	// RPM content (always generated, since not yet in testdata/binary/content/)
+	c.fileContent["rpm-single-local/repodata/repomd.xml"] =
+		[]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<repomd xmlns="http://linux.duke.edu/metadata/repo">
+  <data type="primary">
+    <location href="repodata/primary.xml.gz"/>
+  </data>
+</repomd>`)
+	c.binaryContent["rpm-single-local/repodata/primary.xml.gz"] = createRPMPrimaryXML([]rpmPackage{
+		{name: "nginx", href: "Packages/n/nginx-1.20.1-1.el7.x86_64.rpm", size: 573000},
+		{name: "vim-enhanced", href: "Packages/v/vim-enhanced-8.0.1-1.el7.x86_64.rpm", size: 1432000},
+	})
+
+	// RPM multiple repositories content (centos7, centos8, fedora35)
+	c.fileContent["rpm-multi-local/centos7/repodata/repomd.xml"] =
+		[]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<repomd xmlns="http://linux.duke.edu/metadata/repo">
+  <data type="primary">
+    <location href="repodata/primary.xml.gz"/>
+  </data>
+</repomd>`)
+	c.binaryContent["rpm-multi-local/centos7/repodata/primary.xml.gz"] = createRPMPrimaryXML([]rpmPackage{
+		{name: "nginx", href: "Packages/n/nginx-1.20.1-1.el7.x86_64.rpm", size: 573000},
+		{name: "vim-enhanced", href: "Packages/v/vim-enhanced-8.0.1-1.el7.x86_64.rpm", size: 1432000},
+	})
+
+	c.fileContent["rpm-multi-local/centos8/repodata/repomd.xml"] =
+		[]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<repomd xmlns="http://linux.duke.edu/metadata/repo">
+  <data type="primary">
+    <location href="repodata/primary.xml.gz"/>
+  </data>
+</repomd>`)
+	c.binaryContent["rpm-multi-local/centos8/repodata/primary.xml.gz"] = createRPMPrimaryXML([]rpmPackage{
+		{name: "httpd", href: "Packages/h/httpd-2.4.37-1.el8.x86_64.rpm", size: 1258000},
+		{name: "curl", href: "Packages/c/curl-7.61.1-1.el8.x86_64.rpm", size: 354000},
+	})
+
+	c.fileContent["rpm-multi-local/fedora35/repodata/repomd.xml"] =
+		[]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<repomd xmlns="http://linux.duke.edu/metadata/repo">
+  <data type="primary">
+    <location href="repodata/primary.xml.gz"/>
+  </data>
+</repomd>`)
+	c.binaryContent["rpm-multi-local/fedora35/repodata/primary.xml.gz"] = createRPMPrimaryXML([]rpmPackage{
+		{name: "kernel", href: "Packages/k/kernel-5.14.10-1.fc35.x86_64.rpm", size: 64820000},
+	})
 	c.fileContent["helm-legacy-local/index.yaml"] =
 		[]byte("apiVersion: v1\nentries:\n  nginx:\n    - name: nginx\n      version: 8.2.0\n      urls:\n        - nginx-8.2.0.tgz\n")
 	// HELM_HTTP index lists only the flat nginx chart (with a relative URL, the
@@ -584,5 +631,56 @@ func createNpmPackageTgz(packageName, version, description string) []byte {
 	tarWriter.Close()
 	gzWriter.Close()
 
+	return buf.Bytes()
+}
+
+// rpmPackage represents a minimal RPM package entry for primary.xml
+type rpmPackage struct {
+	name string
+	href string
+	size int
+}
+
+// createRPMPrimaryXML creates a gzipped primary.xml file for RPM repositories
+func createRPMPrimaryXML(packages []rpmPackage) []byte {
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+
+	// Write XML header and root element
+	gzWriter.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<metadata xmlns="http://linux.duke.edu/metadata/common" packages="` + fmt.Sprintf("%d", len(packages)) + `">
+`))
+
+	// Write each package
+	for _, pkg := range packages {
+		packageXML := fmt.Sprintf(`  <package type="rpm">
+    <name>%s</name>
+    <arch>x86_64</arch>
+    <version epoch="0" ver="1.0" rel="1"/>
+    <checksum type="sha256">0000000000000000000000000000000000000000000000000000000000000000</checksum>
+    <summary>Mock RPM package for migration testing</summary>
+    <description>This is a mock RPM package for testing migration.</description>
+    <packager>Mock Packager</packager>
+    <url>http://example.com</url>
+    <time file="1609459200" build="1609459200"/>
+    <size package="%d" installed="1000000" archive="900000"/>
+    <location href="%s"/>
+    <format>
+      <rpm:license>MIT</rpm:license>
+      <rpm:vendor>Mock Vendor</rpm:vendor>
+      <rpm:group>Applications/Internet</rpm:group>
+      <rpm:buildhost>mockhost.example.com</rpm:buildhost>
+      <rpm:sourcerpm>%s-1.0-1.src.rpm</rpm:sourcerpm>
+      <rpm:header-range start="0" end="1000"/>
+    </format>
+  </package>
+`, pkg.name, pkg.size, pkg.href, pkg.name)
+		gzWriter.Write([]byte(packageXML))
+	}
+
+	// Close root element
+	gzWriter.Write([]byte("</metadata>\n"))
+
+	gzWriter.Close()
 	return buf.Bytes()
 }
