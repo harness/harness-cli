@@ -259,8 +259,6 @@ func (r *Package) Migrate(ctx context.Context) error {
 		r.migrateDebian(ctx)
 	} else if r.artifactType == types.CONDA {
 		r.migrateConda(ctx)
-	} else if r.artifactType == types.COMPOSER {
-		r.migrateComposer(ctx)
 	} else if r.artifactType == types.SWIFT {
 		r.migrateSwift(ctx)
 	} else if r.artifactType == types.CONAN {
@@ -1028,42 +1026,6 @@ func (r *Package) migrateDebian(ctx context.Context) error {
 		}
 	}
 
-	return nil
-}
-
-func (r *Package) migrateComposer(ctx context.Context) error {
-	if r.config.DryRun {
-		log.Info().Ctx(ctx).Msgf("Dry-run: would migrate Composer package %s", r.pkg.URL)
-		return nil
-	}
-	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.URL)
-	if err != nil {
-		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download Composer package %s", r.pkg.URL)
-		pterm.Error.Println(fmt.Sprintf("Failed to download Composer package %s", r.pkg.URL))
-		return err
-	}
-	defer file.Close()
-
-	title := fmt.Sprintf("%s (%s)", r.pkg.Name, common.GetSize(int64(r.pkg.Size)))
-	pterm.Info.Println(fmt.Sprintf("Copying file %s from %s to %s", r.pkg.Name, r.srcRegistry, r.destRegistry))
-	err = r.destAdapter.UploadFile(r.destRegistry, file, &types.File{Uri: r.pkg.URL}, header, r.pkg.Name, r.pkg.Version,
-		r.artifactType, nil)
-	stat := types.FileStat{
-		Name:     r.pkg.Name,
-		Registry: r.srcRegistry,
-		Uri:      r.pkg.URL,
-		Size:     int64(r.pkg.Size),
-		Status:   types.StatusSuccess,
-	}
-	if err != nil {
-		r.logger.Error().Err(err).Msg("Failed to upload file")
-		stat.Status = types.StatusFail
-		stat.Error = err.Error()
-		pterm.Error.Println(title)
-	} else {
-		pterm.Success.Println(title)
-	}
-	r.stats.Add(stat)
 	return nil
 }
 

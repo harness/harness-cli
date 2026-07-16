@@ -123,7 +123,8 @@ func (r *Version) Migrate(ctx context.Context) error {
 	var jobs []engine.Job
 
 	if r.artifactType == types.GENERIC || r.artifactType == types.RAW || r.artifactType == types.MAVEN || r.artifactType == types.PYTHON ||
-		r.artifactType == types.NUGET || r.artifactType == types.NPM || r.artifactType == types.DART || r.artifactType == types.PUPPET {
+		r.artifactType == types.NUGET || r.artifactType == types.NPM || r.artifactType == types.DART || r.artifactType == types.PUPPET ||
+		r.artifactType == types.COMPOSER {
 		files, err := tree.GetAllFiles(r.node)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to get files from tree")
@@ -148,6 +149,15 @@ func (r *Version) Migrate(ctx context.Context) error {
 			// For PUPPET, skip files that don't match current module and version
 			if r.artifactType == types.PUPPET {
 				pkgName, version, ok := util.ParsePuppetFileNameWithPath(file.Uri)
+				if !ok || pkgName != r.pkg.Name || version != r.version.Name {
+					logger.Debug().Msgf("Skipping file %s (pkg=%s, ver=%s) - doesn't match current package %s version %s",
+						file.Name, pkgName, version, r.pkg.Name, r.version.Name)
+					continue
+				}
+			}
+			// For COMPOSER, skip files that don't match current package and version
+			if r.artifactType == types.COMPOSER {
+				pkgName, version, ok := util.ParseComposerFileName(file.Uri)
 				if !ok || pkgName != r.pkg.Name || version != r.version.Name {
 					logger.Debug().Msgf("Skipping file %s (pkg=%s, ver=%s) - doesn't match current package %s version %s",
 						file.Name, pkgName, version, r.pkg.Name, r.version.Name)

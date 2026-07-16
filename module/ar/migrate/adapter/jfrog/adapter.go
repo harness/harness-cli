@@ -487,36 +487,27 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 		return packages, nil
 	} else if artifactType == types.COMPOSER {
 		leaves, _ := tree.GetAllFiles(root)
-		packageMap := make(map[string]bool)
+		pkgMap := make(map[string]bool)
 		for _, leaf := range leaves {
 			if leaf.Folder {
 				continue
 			}
-			if !strings.HasSuffix(leaf.Uri, ".zip") {
+			pkgName, _, ok := util.ParseComposerFileName(leaf.Uri)
+			if !ok {
 				continue
 			}
-			// Extract package name from ZIP filename
-			// Composer packages are typically named: vendor-package-version.zip
-			filename := leaf.Name
-			nameWithoutExt := strings.TrimSuffix(filename, ".zip")
-
-			// For Composer, we'll use the full filename as package name
-			// since Composer packages can have complex naming patterns
-			pkgName := nameWithoutExt
-
-			path := "/"
-			if _, ok := packageMap[pkgName]; ok {
+			if pkgMap[pkgName] {
 				continue
 			}
-			packageMap[pkgName] = true
+			pkgMap[pkgName] = true
 			packages = append(packages, types.Package{
 				Registry: registry,
-				Path:     path,
+				Path:     "/",
 				Name:     pkgName,
-				Size:     leaf.Size,
-				URL:      leaf.Uri,
+				Size:     -1,
 			})
 		}
+		log.Info().Msgf("Found %d COMPOSER packages", len(packages))
 		return packages, nil
 	} else if artifactType == types.SWIFT {
 		leaves, _ := tree.GetAllFiles(root)
@@ -1238,14 +1229,34 @@ func (a *adapter) GetVersions(
 		return versions, nil
 	}
 	if artifactType == types.COMPOSER {
+		files, err := tree.GetAllFiles(node)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+
+		versionMap := make(map[string]bool)
+		for _, file := range files {
+			if file.Folder {
+				continue
+			}
+			pkgName, version, ok := util.ParseComposerFileName(file.Uri)
+			if !ok || pkgName != pkg {
+				continue
+			}
+			versionMap[version] = true
+		}
+
 		var versions []types.Version
-		versions = append(versions, types.Version{
-			Registry: registry,
-			Pkg:      pkg,
-			Path:     p.URL,
-			Name:     p.Name,
-			Size:     p.Size,
-		})
+		for version := range versionMap {
+			versions = append(versions, types.Version{
+				Registry: registry,
+				Pkg:      pkg,
+				Path:     "/",
+				Name:     version,
+				Size:     -1,
+			})
+		}
+		log.Info().Msgf("Found %d versions for COMPOSER package %s", len(versions), pkg)
 		return versions, nil
 	}
 	if artifactType == types.SWIFT {
