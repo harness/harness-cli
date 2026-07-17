@@ -161,6 +161,28 @@ func CreateMapOfFilteredFile(searchedFiles []types.SearchedFile, mapping *types.
 
 	return result
 }
+
+// IsPackageIndexFile reports whether uri is a repository index/metadata file
+// that package enumeration depends on (rather than an actual artifact). Such
+// files must be exempt from the date filter: they are typically old (written
+// once, rarely re-downloaded) and would otherwise be dropped by a
+// createdAfter/downloadedAfter filter, breaking enumeration for the whole
+// registry even though the artifacts themselves are still in range.
+//
+// For PyPI this is everything under the `.pypi/` prefix — the simple index
+// (.pypi/simple.html) and the per-package indexes (.pypi/<pkg>/<pkg>.html) —
+// which jfrog.(*adapter).GetPackages/GetVersions read to list packages and
+// versions.
+func IsPackageIndexFile(artifactType types.ArtifactType, uri string) bool {
+	normalized := strings.TrimPrefix(uri, "/")
+	switch artifactType {
+	case types.PYTHON:
+		return strings.HasPrefix(normalized, ".pypi/")
+	default:
+		return false
+	}
+}
+
 func ValidateDateFilter(df *types.DateFilter) error {
 
 	if df.Match != types.DateFilterMatchAny && df.Match != types.DateFilterMatchAll {

@@ -159,6 +159,10 @@ func validateConfig(config *Config) error {
 		if mapping.DestinationRegistry == "" {
 			return fmt.Errorf("mapping %d: destination registry cannot be empty", i)
 		}
+		// Date filtering is not supported for MAVEN.
+		if mapping.ArtifactType == MAVEN && mapping.DateFilter != nil {
+			return fmt.Errorf("mapping %d: date filter is not supported for %s", i, MAVEN)
+		}
 	}
 
 	return nil

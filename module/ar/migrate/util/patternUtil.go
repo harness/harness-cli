@@ -162,6 +162,30 @@ func IsPackageLevelFilterableArtifact(artifactType types.ArtifactType) bool {
 	}
 }
 
+// IsAtomicVersionArtifact reports whether a single logical version of this
+// artifact type may span MULTIPLE distribution files that must be migrated
+// all-or-nothing. For such types, GetVersions returns several types.Version
+// entries sharing the same Name (one per distribution) — e.g. a PyPI release
+// is an sdist plus one or more wheels. Because the date/pattern filters run
+// per file, they can keep some distributions of a version and prune others;
+// migrating only the survivors would publish a PARTIAL version. Package.Migrate
+// therefore groups these entries by version.Name and migrates a version only
+// when EVERY one of its files survived the filter.
+//
+// Types NOT listed here have exactly one file per version entry (or a unique
+// Name per version), so grouping is a no-op for them and Package.Migrate keeps
+// the per-entry path. To onboard another multi-file-version ecosystem, add it
+// here AFTER confirming its GetVersions emits one entry per distribution file
+// (sharing Name) rather than one entry per version.
+func IsAtomicVersionArtifact(artifactType types.ArtifactType) bool {
+	switch artifactType {
+	case types.PYTHON:
+		return true
+	default:
+		return false
+	}
+}
+
 func IsTimeBasedFilterPresent(mapping *types.RegistryMapping) bool {
 	if mapping.DateFilter != nil {
 		return true

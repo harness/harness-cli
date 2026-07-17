@@ -261,7 +261,7 @@ func (c *mockClient) loadContent() {
 	c.fileContent["python-local/.pypi/simple.html"] =
 		[]byte(`<html><body><a href="requests/">requests</a><br/></body></html>`)
 	c.fileContent["python-local/.pypi/requests/requests.html"] =
-		[]byte(`<html><body><a href="../requests-2.28.0.tar.gz#sha256=abc123">requests-2.28.0.tar.gz</a><br/><a href="../requests-2.29.0.tar.gz#sha256=def456">requests-2.29.0.tar.gz</a><br/></body></html>`)
+		[]byte(`<html><body><a href="../../requests/2.28.0/requests-2.28.0.tar.gz#sha256=abc123">requests-2.28.0.tar.gz</a><br/><a href="../../requests/2.29.0/requests-2.29.0.tar.gz#sha256=def456">requests-2.29.0.tar.gz</a><br/></body></html>`)
 	fmt.Printf("DEBUG: Loaded %d file content entries\n", len(c.fileContent))
 }
 

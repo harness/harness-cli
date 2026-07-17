@@ -249,7 +249,13 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			packages = append(packages, pkg)
 		}
 	} else if artifactType == types.PYTHON {
-
+		// The .pypi/simple.html index drives package enumeration. It is
+		// typically old (created once, rarely re-downloaded), so a
+		// downloadedAfter/createdAfter date filter would otherwise drop it from
+		// `root` and break enumeration entirely. The date filter deliberately
+		// preserves repository index files (see util.IsPackageIndexFile and
+		// registry.go), so the index is still present in `root` here and can be
+		// looked up from the tree like any other file.
 		node, err := tree.GetNodeForPath(root, "/.pypi/simple.html")
 		if err != nil {
 			return nil, fmt.Errorf("get node for path: %w", err)

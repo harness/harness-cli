@@ -273,17 +273,7 @@ func (r *Package) Migrate(ctx context.Context) error {
 			return fmt.Errorf("get versions failed: %w", err)
 		}
 
-		var jobs []engine.Job
-		for _, version := range versions {
-			versionNode, err := tree.GetNodeForPath(r.node, version.Path)
-			if err != nil {
-				logger.Error().Msg("Failed to get node for version")
-				return fmt.Errorf("get version failed: %w", err)
-			}
-			job := NewVersionJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, r.pkg,
-				version, versionNode, r.stats, r.mapping, r.config, r.registry, r.dryRunStats, r.existingIndex)
-			jobs = append(jobs, job)
-		}
+		jobs := r.buildVersionJobs(versions, logger)
 
 		log.Info().Msgf("Jobs length: %d", len(jobs))
 
@@ -298,6 +288,88 @@ func (r *Package) Migrate(ctx context.Context) error {
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed package migration step")
 	return nil
+}
+
+// buildVersionJobs turns the source's version listing into Version jobs against
+// the (date/pattern-filtered) tree.
+//
+// For most artifact types each types.Version entry maps to exactly one file (or
+// carries a unique Name), so a version is migrated iff its node survived the
+// filter; a single out-of-window version must never drop the whole package
+// (AH-4518 Defect 2), and packages whose entire history is out of window simply
+// contribute zero jobs.
+//
+// For atomic-version types (util.IsAtomicVersionArtifact — e.g. PyPI) a single
+// logical version spans MULTIPLE entries sharing Name (sdist + wheels). Because
+// the filter runs per file it can keep some distributions of a version and
+// prune others; publishing only the survivors would be a PARTIAL version. Such
+// versions are grouped by Name and migrated all-or-nothing: if any file was
+// pruned, the whole version is discarded with a warning.
+func (r *Package) buildVersionJobs(versions []types.Version, logger zerolog.Logger) []engine.Job {
+	atomic := util.IsAtomicVersionArtifact(r.artifactType)
+
+	// Resolve each entry's node once and tally, per version Name, how many
+	// distribution files the source listed vs. how many survived the filter.
+	type resolved struct {
+		version types.Version
+		node    *types.TreeNode // nil when pruned by the filter
+	}
+	entries := make([]resolved, 0, len(versions))
+	total := make(map[string]int, len(versions))
+	kept := make(map[string]int, len(versions))
+	for _, version := range versions {
+		total[version.Name]++
+		node, err := tree.GetNodeForPath(r.node, version.Path)
+		if err != nil {
+			logger.Debug().Str("version", version.Name).Str("path", version.Path).
+				Msg("Version file not present in filtered tree")
+			entries = append(entries, resolved{version: version})
+			continue
+		}
+		kept[version.Name]++
+		entries = append(entries, resolved{version: version, node: node})
+	}
+
+	var jobs []engine.Job
+	outOfWindow, discardedPartial := 0, 0
+	warned := make(map[string]bool)
+	for _, e := range entries {
+		name := e.version.Name
+		switch {
+		case kept[name] == 0:
+			// Whole version out of window: every file was pruned. Counts once per
+			// entry; deduped in the summary below via total/kept, so just tally.
+			outOfWindow++
+		case atomic && kept[name] < total[name]:
+			// Partial version: some distributions survived, others were pruned.
+			// Refuse to publish an incomplete version — discard all of it.
+			discardedPartial++
+			if !warned[name] {
+				warned[name] = true
+				logger.Warn().Str("version", name).Int("kept", kept[name]).Int("total", total[name]).
+					Msgf("Discarding version %s of package %s: %d of %d distribution file(s) fell outside "+
+						"the filter window; a partial version will not be migrated",
+						name, r.pkg.Name, total[name]-kept[name], total[name])
+			}
+		case e.node == nil:
+			// Non-atomic type, this specific file pruned but the version has other
+			// surviving files (distinct Names collapse here); nothing to migrate for
+			// this entry. Already debug-logged above.
+		default:
+			jobs = append(jobs, NewVersionJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry,
+				r.artifactType, r.pkg, e.version, e.node, r.stats, r.mapping, r.config, r.registry,
+				r.dryRunStats, r.existingIndex))
+		}
+	}
+
+	if outOfWindow > 0 || discardedPartial > 0 {
+		logger.Info().Int("kept", len(jobs)).Int("out_of_window", outOfWindow).
+			Int("discarded_partial", discardedPartial).
+			Msgf("Package %s: %d version-file(s) out of filter window, %d discarded as partial, %d migrating",
+				r.pkg.Name, outOfWindow, discardedPartial, len(jobs))
+	}
+
+	return jobs
 }
 
 // migrateOCI copies a Docker/Helm-OCI image repository from source to

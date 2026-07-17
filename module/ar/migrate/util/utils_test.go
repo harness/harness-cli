@@ -459,6 +459,60 @@ func TestFilterFilesByTime_AllMatch_BothFilters(t *testing.T) {
 	}, uris)
 }
 
+// ── IsPackageIndexFile ─────────────────────────────────────────────────────────
+
+func TestIsPackageIndexFile(t *testing.T) {
+	tests := []struct {
+		name         string
+		artifactType types.ArtifactType
+		uri          string
+		want         bool
+	}{
+		{
+			name:         "PyPI simple index",
+			artifactType: types.PYTHON,
+			uri:          "/.pypi/simple.html",
+			want:         true,
+		},
+		{
+			name:         "PyPI per-package index",
+			artifactType: types.PYTHON,
+			uri:          "/.pypi/requests/requests.html",
+			want:         true,
+		},
+		{
+			name:         "PyPI index without leading slash",
+			artifactType: types.PYTHON,
+			uri:          ".pypi/simple.html",
+			want:         true,
+		},
+		{
+			name:         "PyPI artifact is not an index",
+			artifactType: types.PYTHON,
+			uri:          "/requests/2.28.0/requests-2.28.0.tar.gz",
+			want:         false,
+		},
+		{
+			name:         "path merely containing .pypi later is not an index",
+			artifactType: types.PYTHON,
+			uri:          "/pkg/.pypi/foo.html",
+			want:         false,
+		},
+		{
+			name:         "non-PyPI artifact type never matches",
+			artifactType: types.NUGET,
+			uri:          "/.pypi/simple.html",
+			want:         false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IsPackageIndexFile(tc.artifactType, tc.uri))
+		})
+	}
+}
+
 // ── ValidateDateFilter ────────────────────────────────────────────────────────
 
 func TestValidateDateFilter(t *testing.T) {

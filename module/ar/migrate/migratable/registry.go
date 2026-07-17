@@ -182,6 +182,24 @@ func (r *Registry) Migrate(ctx context.Context) error {
 		logger.Info().Msgf("Applying time based filter (match: %s)", df.Match)
 		filteredURIs := util.CreateMapOfFilteredFile(searchedFiles, r.mapping)
 		logger.Info().Msgf("Time-based filter include %d file(s): out of  %d", len(filteredURIs), len(searchedFiles))
+		// Always keep repository index/metadata files (e.g. PyPI's .pypi/*.html)
+		// regardless of the date filter: enumeration reads them to list packages
+		// and versions, and they are typically too old to survive a
+		// createdAfter/downloadedAfter cutoff. Dropping them would break
+		// enumeration for the whole registry.
+		indexCount := 0
+		for _, f := range files {
+			if util.IsPackageIndexFile(r.artifactType, f.Uri) {
+				if _, ok := filteredURIs[f.Uri]; !ok {
+					filteredURIs[f.Uri] = struct{}{}
+					indexCount++
+				}
+			}
+		}
+		if indexCount > 0 {
+			logger.Info().Msgf("Preserving %d index/metadata file(s) exempt from date filter", indexCount)
+		}
+
 		dateFilteredFiles = util.FilterFilesByDate(files, filteredURIs)
 		logger.Info().Msgf("Count of filtered files by date filter: %d -> %d", len(files), len(dateFilteredFiles))
 
