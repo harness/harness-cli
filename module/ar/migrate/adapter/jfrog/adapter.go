@@ -314,11 +314,10 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 				// Resolve relative primary location path against repomd.xml location
 				// The primary location in repomd.xml is relative to the RPM repo root
 				// (parent of repodata/), not to the repodata/ directory itself
+				repomdDir := path.Dir(file.Uri)    // e.g., "/repodata" or "/centos7/repodata"
+				rpmRepoRoot := path.Dir(repomdDir) // e.g., "/" or "/centos7"
 				primaryPath := primaryLocation
 				if !strings.HasPrefix(primaryLocation, "/") {
-					// Get the RPM repo root by going up from /repodata/repomd.xml to /repodata, then to /
-					repomdDir := path.Dir(file.Uri)    // e.g., "/repodata" or "/centos7/repodata"
-					rpmRepoRoot := path.Dir(repomdDir) // e.g., "/" or "/centos7"
 					primaryPath = path.Join(rpmRepoRoot, primaryLocation)
 				}
 
@@ -329,7 +328,7 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 				}
 
 				// Extract package URLs from primary.xml.gz
-				rpmPackages, err := extractRPMPackages(primaryFile, registry)
+				rpmPackages, err := extractRPMPackages(primaryFile, registry, rpmRepoRoot)
 				primaryFile.Close()
 				if err != nil {
 					log.Warn().Msgf("Failed to extract RPM packages from %s: %v", primaryPath, err)
@@ -782,7 +781,7 @@ func extractPrimaryLocation(file io.Reader) (string, error) {
 	return "", fmt.Errorf("primary.xml.gz location not found in repomd.xml")
 }
 
-func extractRPMPackages(file io.Reader, registry string) ([]types.Package, error) {
+func extractRPMPackages(file io.Reader, registry string, rpmRepoRoot string) ([]types.Package, error) {
 	gz, err := gzip.NewReader(file)
 	if err != nil {
 		return nil, fmt.Errorf("create gzip reader: %w", err)
@@ -817,6 +816,7 @@ func extractRPMPackages(file io.Reader, registry string) ([]types.Package, error
 				Path:     "/",
 				Name:     path.Base(pkg.Location.Href),
 				URL:      pkg.Location.Href,
+				URI:      strings.TrimPrefix(path.Join(rpmRepoRoot, pkg.Location.Href), "/"),
 				Size:     pkg.Size.Package,
 			})
 		}
@@ -901,6 +901,7 @@ func extractDebianPackages(file io.Reader, registry string, distribution string,
 				Path:     "/",
 				Name:     path.Base(filename),
 				URL:      filename,
+				URI:      strings.TrimPrefix(filename, "/"),
 				Size:     size,
 				Metadata: map[string]string{
 					"distribution": distribution,
@@ -1008,6 +1009,7 @@ func extractDebianSourcePackages(file io.Reader, registry string, distribution s
 							Path:     "/",
 							Name:     filename,
 							URL:      filePath,
+							URI:      strings.TrimPrefix(filePath, "/"),
 							Size:     size,
 							Metadata: map[string]string{
 								"distribution": distribution,

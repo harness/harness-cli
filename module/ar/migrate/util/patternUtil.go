@@ -170,6 +170,20 @@ func IsTimeBasedFilterPresent(mapping *types.RegistryMapping) bool {
 
 }
 
+// IsMetadataDrivenArtifact returns true for artifact types whose GetPackages
+// implementation reads a repository metadata file (e.g. RPM's primary.xml.gz,
+// Debian's Packages.gz) that enumerates ALL packages in the repo, regardless
+// of which files are present in the date-filtered tree.
+// For these types the date filter must be re-applied after GetPackages.
+func IsMetadataDrivenArtifact(artifactType types.ArtifactType) bool {
+	switch artifactType {
+	case types.RPM, types.DEBIAN:
+		return true
+	default:
+		return false
+	}
+}
+
 // support * and ?
 func MatchesWildCardPattern(packageName string, pattern string) bool {
 	g, err := glob.Compile(pattern)

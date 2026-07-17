@@ -79,6 +79,26 @@ func FilterFilesByDate(files []types.File, filteredURIs map[string]struct{}) []t
 	return result
 }
 
+// FilterPackagesByFileName filters packages by checking if each package's exists among the
+// date-filtered files. This is used for metadata-driven artifact types (RPM,
+// DEBIAN) where GetPackages reads a metadata file that lists every package in
+// the repository, ignoring the date-filtered tree.
+
+func FilterPackagesByFileName(pkgs []types.Package, dateFilteredFiles []types.File) []types.Package {
+	uriSet := make(map[string]struct{}, len(dateFilteredFiles))
+	for _, f := range dateFilteredFiles {
+		uriSet[strings.TrimPrefix(f.Uri, "/")] = struct{}{}
+	}
+
+	var result []types.Package
+	for _, pkg := range pkgs {
+		if _, ok := uriSet[pkg.URI]; ok {
+			result = append(result, pkg)
+		}
+	}
+	return result
+}
+
 func CreateMapOfFilteredFile(searchedFiles []types.SearchedFile, mapping *types.RegistryMapping) map[string]struct{} {
 	result := map[string]struct{}{}
 

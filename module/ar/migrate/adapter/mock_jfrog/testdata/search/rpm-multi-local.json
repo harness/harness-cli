@@ -1,0 +1,124 @@
+{
+  "results": [
+    {
+      "repo": "rpm-multi-local",
+      "path": "centos7/repodata",
+      "name": "repomd.xml",
+      "created": "2020-01-01T00:00:00.000Z",
+      "modified": "2023-01-01T00:00:00.000Z",
+      "stats": []
+    },
+    {
+      "repo": "rpm-multi-local",
+      "path": "centos7/repodata",
+      "name": "primary.xml.gz",
+      "created": "2020-02-01T00:00:00.000Z",
+      "modified": "2023-01-01T00:00:00.000Z",
+      "stats": [
+        {
+          "downloaded": "2026-03-01T18:00:10.000Z"
+        }
+      ]
+    },
+    {
+      "repo": "rpm-multi-local",
+      "path": "centos7/Packages/n",
+      "name": "nginx-1.20.1-1.el7.x86_64.rpm",
+      "created": "2020-03-01T00:00:00.000Z",
+      "modified": "2023-01-01T00:00:00.000Z",
+      "stats": [
+        {
+          "downloaded": "2025-05-01T18:00:11.000Z"
+        }
+      ]
+    },
+    {
+      "repo": "rpm-multi-local",
+      "path": "centos7/Packages/v",
+      "name": "vim-enhanced-8.0.1-1.el7.x86_64.rpm",
+      "created": "2020-04-01T00:00:00.000Z",
+      "modified": "2023-01-01T00:00:00.000Z",
+      "stats": [
+        {
+          "downloaded": "2025-06-01T18:00:12.000Z"
+        }
+      ]
+    },
+    {
+      "repo": "rpm-multi-local",
+      "path": "centos8/repodata",
+      "name": "repomd.xml",
+      "created": "2020-05-01T00:00:00.000Z",
+      "modified": "2023-01-01T00:00:00.000Z",
+      "stats": []
+    },
+    {
+      "repo": "rpm-multi-local",
+      "path": "centos8/repodata",
+      "name": "primary.xml.gz",
+      "created": "2020-06-01T00:00:00.000Z",
+      "modified": "2023-01-01T00:00:00.000Z",
+      "stats": [
+        {
+          "downloaded": "2026-08-01T18:00:14.000Z"
+        }
+      ]
+    },
+    {
+      "repo": "rpm-multi-local",
+      "path": "centos8/Packages/h",
+      "name": "httpd-2.4.37-1.el8.x86_64.rpm",
+      "created": "2020-07-01T00:00:00.000Z",
+      "modified": "2023-01-01T00:00:00.000Z",
+      "stats": [
+        {
+          "downloaded": "2026-01-01T18:00:15.000Z"
+        }
+      ]
+    },
+    {
+      "repo": "rpm-multi-local",
+      "path": "centos8/Packages/c",
+      "name": "curl-7.61.1-1.el8.x86_64.rpm",
+      "created": "2020-08-01T00:00:00.000Z",
+      "modified": "2023-01-01T00:00:00.000Z",
+      "stats": [
+        {
+          "downloaded": "2026-02-01T18:00:16.000Z"
+        }
+      ]
+    },
+    {
+      "repo": "rpm-multi-local",
+      "path": "fedora35/repodata",
+      "name": "repomd.xml",
+      "created": "2020-09-01T00:00:00.000Z",
+      "modified": "2023-01-01T00:00:00.000Z",
+      "stats": []
+    },
+    {
+      "repo": "rpm-multi-local",
+      "path": "fedora35/repodata",
+      "name": "primary.xml.gz",
+      "created": "2020-10-01T00:00:00.000Z",
+      "modified": "2023-01-01T00:00:00.000Z",
+      "stats": [
+        {
+          "downloaded": "2026-12-01T18:00:18.000Z"
+        }
+      ]
+    },
+    {
+      "repo": "rpm-multi-local",
+      "path": "fedora35/Packages/k",
+      "name": "kernel-5.14.10-1.fc35.x86_64.rpm",
+      "created": "2020-11-01T00:00:00.000Z",
+      "modified": "2023-01-01T00:00:00.000Z",
+      "stats": [
+        {
+          "downloaded": "2026-03-15T18:00:19.000Z"
+        }
+      ]
+    }
+  ]
+}

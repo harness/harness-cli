@@ -42,6 +42,7 @@ type Package struct {
 	Name     string
 	Size     int
 	URL      string
+	URI      string // Full registry-relative path without leading slash, matches strings.TrimPrefix(f.Uri, "/")
 	Version  string
 	Metadata map[string]string // Package-type specific metadata (e.g., Debian: distribution, component, etc.)
 }

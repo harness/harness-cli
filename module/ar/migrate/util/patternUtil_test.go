@@ -102,3 +102,30 @@ func TestIsTimeBasedFilterPresent(t *testing.T) {
 		})
 	}
 }
+
+func TestIsMetadataDrivenArtifact(t *testing.T) {
+	tests := []struct {
+		name         string
+		artifactType types.ArtifactType
+		want         bool
+	}{
+		{"RPM is metadata-driven", types.RPM, true},
+		{"DEBIAN is metadata-driven", types.DEBIAN, true},
+		{"DOCKER is not metadata-driven", types.DOCKER, false},
+		{"HELM is not metadata-driven", types.HELM, false},
+		{"GENERIC is not metadata-driven", types.GENERIC, false},
+		{"RAW is not metadata-driven", types.RAW, false},
+		{"MAVEN is not metadata-driven", types.MAVEN, false},
+		{"NPM is not metadata-driven", types.NPM, false},
+		{"CONAN is not metadata-driven", types.CONAN, false},
+		{"HELM_HTTP is not metadata-driven", types.HELM_HTTP, false},
+		{"HELM_LEGACY is not metadata-driven", types.HELM_LEGACY, false},
+		{"RPM (duplicate check)", types.RPM, true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IsMetadataDrivenArtifact(tc.artifactType))
+		})
+	}
+}

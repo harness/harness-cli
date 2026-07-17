@@ -157,7 +157,16 @@ func (r *Registry) Migrate(ctx context.Context) error {
 		r.dryRunStats.EnsureRegistry(r.srcRegistry)
 	}
 
+	currArtifactType := r.artifactType
+
+	// dateFilteredFiles holds the date-filtered file list (may be empty/nil when nothing matches).
+	// For file-level artifact types it is also applied to the tree.
+	// For metadata-driven types (RPM, DEBIAN) it is used after GetPackages.
+	var dateFilteredFiles []types.File
+	dateFilterActive := false
+
 	if util.IsTimeBasedFilterPresent(r.mapping) {
+		dateFilterActive = true
 
 		df := r.mapping.DateFilter
 		if err := util.ValidateDateFilter(df); err != nil {
@@ -173,13 +182,18 @@ func (r *Registry) Migrate(ctx context.Context) error {
 		logger.Info().Msgf("Applying time based filter (match: %s)", df.Match)
 		filteredURIs := util.CreateMapOfFilteredFile(searchedFiles, r.mapping)
 		logger.Info().Msgf("Time-based filter include %d file(s): out of  %d", len(filteredURIs), len(searchedFiles))
-		originalCount := len(files)
-		files = util.FilterFilesByDate(files, filteredURIs)
-		logger.Info().Msgf("Count of filtered files by date filter out of: %d -> %d", originalCount, len(files))
+		dateFilteredFiles = util.FilterFilesByDate(files, filteredURIs)
+		logger.Info().Msgf("Count of filtered files by date filter: %d -> %d", len(files), len(dateFilteredFiles))
+
+		// Narrow the tree for all types EXCEPT metadata-driven types (RPM, DEBIAN)
+		// which need full file trees to read metadata files (repomd.xml, Packages.gz, etc.).
+		// Date filtering for metadata-driven types is applied after GetPackages.
+		if !util.IsMetadataDrivenArtifact(currArtifactType) {
+			files = dateFilteredFiles
+		}
 	}
 
 	// Filter files based on include/exclude patterns
-	currArtifactType := r.artifactType
 	if util.IsFileLevelFilterableArtifact(currArtifactType) {
 		if len(r.mapping.IncludePatterns) > 0 || len(r.mapping.ExcludePatterns) > 0 {
 			originalCount := len(files)
@@ -196,6 +210,17 @@ func (r *Registry) Migrate(ctx context.Context) error {
 	if err != nil {
 		logger.Error().Msg("Failed to get packages")
 		return fmt.Errorf("get packages failed: %w", err)
+	}
+
+	// For metadata-driven artifact types (RPM, DEBIAN), GetPackages reads a
+	// repository metadata file that lists every package regardless of the
+	// filtered tree.  Re-apply the date filter at the package level by
+	// matching each package's bare filename against the date-filtered file list.
+	if dateFilterActive && util.IsMetadataDrivenArtifact(currArtifactType) {
+		originalPkgCount := len(pkgs)
+		pkgs = util.FilterPackagesByFileName(pkgs, dateFilteredFiles)
+		logger.Info().Msgf("Date filter (post-GetPackages): %d -> %d packages for %s",
+			originalPkgCount, len(pkgs), currArtifactType)
 	}
 
 	// applying package level filter

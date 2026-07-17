@@ -534,3 +534,77 @@ func TestValidateDateFilter(t *testing.T) {
 		})
 	}
 }
+
+// ── FilterPackagesByFileName ───────────────────────────────────────────────────
+
+func TestFilterPackagesByFileName(t *testing.T) {
+	packages := []types.Package{
+		{Name: "nginx-1.20.1-1.el7.x86_64.rpm", Registry: "reg1", Path: "/centos7/Packages/n", Size: 573000, URI: "centos7/Packages/n/nginx-1.20.1-1.el7.x86_64.rpm"},
+		{Name: "vim-enhanced-8.0.1-1.el7.x86_64.rpm", Registry: "reg1", Path: "/centos7/Packages/v", Size: 1432000, URI: "centos7/Packages/v/vim-enhanced-8.0.1-1.el7.x86_64.rpm"},
+		{Name: "httpd-2.4.37-1.el8.x86_64.rpm", Registry: "reg1", Path: "/centos8/Packages/h", Size: 1258000, URI: "centos8/Packages/h/httpd-2.4.37-1.el8.x86_64.rpm"},
+		{Name: "kernel-5.14.10-1.fc35.x86_64.rpm", Registry: "reg1", Path: "/fedora35/Packages/k", Size: 64820000, URI: "fedora35/Packages/k/kernel-5.14.10-1.fc35.x86_64.rpm"},
+	}
+
+	tests := []struct {
+		name              string
+		dateFilteredFiles []types.File
+		wantNames         []string
+	}{
+		{
+			name: "keep two of four packages",
+			dateFilteredFiles: []types.File{
+				{Name: "nginx-1.20.1-1.el7.x86_64.rpm", Uri: "/centos7/Packages/n/nginx-1.20.1-1.el7.x86_64.rpm"},
+				{Name: "kernel-5.14.10-1.fc35.x86_64.rpm", Uri: "/fedora35/Packages/k/kernel-5.14.10-1.fc35.x86_64.rpm"},
+			},
+			wantNames: []string{"nginx-1.20.1-1.el7.x86_64.rpm", "kernel-5.14.10-1.fc35.x86_64.rpm"},
+		},
+		{
+			name:              "empty file list returns empty packages",
+			dateFilteredFiles: []types.File{},
+			wantNames:         nil,
+		},
+		{
+			name:              "nil file list returns empty packages",
+			dateFilteredFiles: nil,
+			wantNames:         nil,
+		},
+		{
+			name: "all packages matched",
+			dateFilteredFiles: []types.File{
+				{Name: "nginx-1.20.1-1.el7.x86_64.rpm", Uri: "/centos7/Packages/n/nginx-1.20.1-1.el7.x86_64.rpm"},
+				{Name: "vim-enhanced-8.0.1-1.el7.x86_64.rpm", Uri: "/centos7/Packages/v/vim-enhanced-8.0.1-1.el7.x86_64.rpm"},
+				{Name: "httpd-2.4.37-1.el8.x86_64.rpm", Uri: "/centos8/Packages/h/httpd-2.4.37-1.el8.x86_64.rpm"},
+				{Name: "kernel-5.14.10-1.fc35.x86_64.rpm", Uri: "/fedora35/Packages/k/kernel-5.14.10-1.fc35.x86_64.rpm"},
+			},
+			wantNames: []string{"nginx-1.20.1-1.el7.x86_64.rpm", "vim-enhanced-8.0.1-1.el7.x86_64.rpm", "httpd-2.4.37-1.el8.x86_64.rpm", "kernel-5.14.10-1.fc35.x86_64.rpm"},
+		},
+		{
+			name: "file URIs not matching any package URL are ignored",
+			dateFilteredFiles: []types.File{
+				{Name: "nonexistent.rpm", Uri: "/x/nonexistent.rpm"},
+				{Name: "another-missing.rpm", Uri: "/y/another-missing.rpm"},
+			},
+			wantNames: nil,
+		},
+		{
+			name: "mixed matching and non-matching",
+			dateFilteredFiles: []types.File{
+				{Name: "nginx-1.20.1-1.el7.x86_64.rpm", Uri: "/centos7/Packages/n/nginx-1.20.1-1.el7.x86_64.rpm"},
+				{Name: "nonexistent.rpm", Uri: "/x/nonexistent.rpm"},
+				{Name: "httpd-2.4.37-1.el8.x86_64.rpm", Uri: "/centos8/Packages/h/httpd-2.4.37-1.el8.x86_64.rpm"},
+			},
+			wantNames: []string{"nginx-1.20.1-1.el7.x86_64.rpm", "httpd-2.4.37-1.el8.x86_64.rpm"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := FilterPackagesByFileName(packages, tc.dateFilteredFiles)
+			var names []string
+			for _, pkg := range got {
+				names = append(names, pkg.Name)
+			}
+			assert.ElementsMatch(t, tc.wantNames, names)
+		})
+	}
+}
