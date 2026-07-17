@@ -32,12 +32,12 @@ func GetXApiKeyOptionAR() func(client *ar.Client) error {
 func GetAuthOptionARPKG() func(client *ar_pkg.Client) error {
 	return func(client *ar_pkg.Client) error {
 		client.RequestEditors = append(client.RequestEditors, func(ctx context.Context, req *http.Request) error {
-			// pkg endpoints authenticate via x-api-key, so always send it.
-			req.Header.Set("x-api-key", config.Global.AuthToken)
-			// A JWT (e.g. from `hc login`) is additionally accepted via Authorization
-			// by some pkg endpoints, so keep sending it for backward compatibility.
 			if strings.HasPrefix(config.Global.AuthToken, JWTTokenPrefix) {
+				// JWT token - use Authorization header
 				req.Header.Set("Authorization", config.Global.AuthToken)
+			} else {
+				// API key - use x-api-key header
+				req.Header.Set("x-api-key", config.Global.AuthToken)
 			}
 			req.Header.Set("User-Agent", config.UserAgent())
 			return nil
