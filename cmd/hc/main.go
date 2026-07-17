@@ -31,6 +31,7 @@ var version = "dev"
 func main() {
 	var verbose bool
 	factory := cmdutils.NewFactory()
+	config.Version = version
 
 	rootCmd := &cobra.Command{
 		Use:           "hc",

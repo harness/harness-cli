@@ -18,6 +18,7 @@ import (
 	"github.com/harness/harness-cli/internal/api/ar_v3"
 	"github.com/harness/harness-cli/module/ar/migrate/http"
 	"github.com/harness/harness-cli/module/ar/migrate/http/auth/xApiKey"
+	"github.com/harness/harness-cli/module/ar/migrate/http/modifier/useragent"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/util/common/auth"
 
@@ -74,6 +75,7 @@ func (t *pkgAuthTransport) RoundTrip(req *http2.Request) (*http2.Response, error
 	if strings.HasPrefix(config.Global.AuthToken, auth.JWTTokenPrefix) {
 		r.Header.Set("Authorization", config.Global.AuthToken)
 	}
+	r.Header.Set("User-Agent", config.UserAgent())
 	return t.wrapped.RoundTrip(r)
 }
 
@@ -102,6 +104,7 @@ func newClient(reg *types.RegistryConfig) *client {
 				Transport: http.GetHTTPTransport(http.WithInsecure(true)),
 			},
 			xApiKey.NewAuthorizer(token),
+			useragent.NewModifier(),
 		),
 		pkgClient:        pkgClient,
 		rawPkgHTTPClient: rawPkgHTTPClient(),

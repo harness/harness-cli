@@ -22,6 +22,7 @@ func GetXApiKeyOptionAR() func(client *ar.Client) error {
 	return func(client *ar.Client) error {
 		client.RequestEditors = append(client.RequestEditors, func(ctx context.Context, req *http.Request) error {
 			req.Header.Set("x-api-key", config.Global.AuthToken)
+			req.Header.Set("User-Agent", config.UserAgent())
 			return nil
 		})
 		return nil
@@ -38,6 +39,7 @@ func GetAuthOptionARPKG() func(client *ar_pkg.Client) error {
 			if strings.HasPrefix(config.Global.AuthToken, JWTTokenPrefix) {
 				req.Header.Set("Authorization", config.Global.AuthToken)
 			}
+			req.Header.Set("User-Agent", config.UserAgent())
 			return nil
 		})
 		return nil
@@ -48,6 +50,7 @@ func GetXApiKeyOptionARV2() func(client *ar_v2.Client) error {
 	return func(client *ar_v2.Client) error {
 		client.RequestEditors = append(client.RequestEditors, func(ctx context.Context, req *http.Request) error {
 			req.Header.Set("x-api-key", config.Global.AuthToken)
+			req.Header.Set("User-Agent", config.UserAgent())
 			return nil
 		})
 		return nil
@@ -58,6 +61,7 @@ func GetXApiKeyOptionARV3() func(client *ar_v3.Client) error {
 	return func(client *ar_v3.Client) error {
 		client.RequestEditors = append(client.RequestEditors, func(ctx context.Context, req *http.Request) error {
 			req.Header.Set("x-api-key", config.Global.AuthToken)
+			req.Header.Set("User-Agent", config.UserAgent())
 			return nil
 		})
 		return nil

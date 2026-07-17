@@ -7,6 +7,8 @@ SERVICES := $(shell find $(API_DIR) -mindepth 2 -maxdepth 2 -type f -name "opena
 GOCMD := go
 GEN   := ./tools/cobra-gen
 
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+
 ifndef GOPATH
 	GOPATH := $(shell go env GOPATH)
 endif
@@ -30,10 +32,10 @@ generate-%:
 	$(GOCMD) run $(GEN) --service=$* --in=$(API_DIR)/$*/openapi.yaml --out=cmd/$* --cmd=$(API_DIR)/$*/command.yaml
 
 build-all: generate format
-	CGO_ENABLED=0 $(GOCMD) build -ldflags="-s -w" -o hc ./cmd/hc
+	CGO_ENABLED=0 $(GOCMD) build -ldflags="-s -w -X main.version=$(VERSION)" -o hc ./cmd/hc
 
 build: generate format
-	CGO_ENABLED=0 $(GOCMD) build -ldflags="-s -w" -o hc ./cmd/hc
+	CGO_ENABLED=0 $(GOCMD) build -ldflags="-s -w -X main.version=$(VERSION)" -o hc ./cmd/hc
 
 
 # Remove generated artifacts

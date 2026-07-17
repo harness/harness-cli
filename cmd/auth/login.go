@@ -122,6 +122,7 @@ func validateCredentials(apiURL, token, accountID string) error {
 
 	// Add headers
 	req.Header.Add("x-api-key", token)
+	req.Header.Set("User-Agent", config.UserAgent())
 
 	// Execute the request
 	resp, err := client.Do(req)

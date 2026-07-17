@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/lib"
@@ -349,7 +350,7 @@ func (r *Package) migrateOCI(ctx context.Context, logger zerolog.Logger) {
 	}
 
 	craneOpts := []crane.Option{
-		crane.WithUserAgent("harness-cli"),
+		crane.WithUserAgent(config.UserAgent()),
 		crane.WithContext(ctx),
 		crane.WithJobs(r.config.Concurrency),
 		crane.WithNoClobber(!r.config.Overwrite),
@@ -1307,7 +1308,7 @@ func (r *Package) pushChart(ctx context.Context, chartPath string, dstRef string
 
 	craneOpts := []remote.Option{
 		remote.WithContext(ctx),
-		remote.WithUserAgent("harness-cli"),
+		remote.WithUserAgent(config.UserAgent()),
 		remote.WithAuthFromKeychain(keyChain),
 	}
 
