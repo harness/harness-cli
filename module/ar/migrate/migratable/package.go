@@ -955,13 +955,13 @@ func (r *Package) migrateConda(ctx context.Context) error {
 
 func (r *Package) migrateRPM(ctx context.Context) error {
 	if r.config.DryRun {
-		log.Info().Ctx(ctx).Msgf("Dry-run: would migrate RPM package %s", r.pkg.URL)
+		log.Info().Ctx(ctx).Msgf("Dry-run: would migrate RPM package %s", r.pkg.URI)
 		return nil
 	}
-	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.URL)
+	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.URI)
 	if err != nil {
-		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download RPM package %s", r.pkg.URL)
-		pterm.Error.Println(fmt.Sprintf("Failed to download RPM package %s", r.pkg.URL))
+		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download RPM package %s", r.pkg.URI)
+		pterm.Error.Println(fmt.Sprintf("Failed to download RPM package %s", r.pkg.URI))
 		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
@@ -969,12 +969,12 @@ func (r *Package) migrateRPM(ctx context.Context) error {
 
 	title := fmt.Sprintf("%s (%s)", r.pkg.Name, common.GetSize(int64(r.pkg.Size)))
 	pterm.Info.Println(fmt.Sprintf("Copying file %s from %s to %s", r.pkg.Name, r.srcRegistry, r.destRegistry))
-	err = r.destAdapter.UploadFile(r.destRegistry, file, &types.File{Uri: r.pkg.URL}, header, r.pkg.Name, r.pkg.Name,
+	err = r.destAdapter.UploadFile(r.destRegistry, file, &types.File{Uri: r.pkg.URI}, header, r.pkg.Name, r.pkg.Name,
 		r.artifactType, nil)
 	stat := types.FileStat{
 		Name:     r.pkg.Name,
 		Registry: r.srcRegistry,
-		Uri:      r.pkg.URL,
+		Uri:      r.pkg.URI,
 		Size:     int64(r.pkg.Size),
 		Status:   types.StatusSuccess,
 	}
