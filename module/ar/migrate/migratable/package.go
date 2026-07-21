@@ -714,27 +714,32 @@ func (r *Package) migrateLegacyHelm(ctx context.Context) error {
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download helm chart %s", r.pkg.URL)
 		pterm.Error.Println(fmt.Sprintf("Failed to download helm chart %s", r.pkg.URL))
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 	defer file.Close()
 
 	tmp, err := os.CreateTemp("", "*.tgz")
 	if err != nil {
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 	defer os.Remove(tmp.Name())
 
 	_, err = io.Copy(tmp, file)
 	if err != nil {
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 
 	if err := tmp.Close(); err != nil {
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 
 	refStr, err := r.destAdapter.GetOCIImagePath(r.destRegistry, r.sourcePackageHostname, r.pkg.Name)
 	if err != nil {
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 	refStr += ":" + r.pkg.Version
@@ -908,6 +913,7 @@ func (r *Package) migrateConda(ctx context.Context) error {
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download conda package %s", r.pkg.Path)
 		pterm.Error.Println(fmt.Sprintf("Failed to download conda package %s", r.pkg.Path))
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 	defer file.Close()
@@ -956,6 +962,7 @@ func (r *Package) migrateRPM(ctx context.Context) error {
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download RPM package %s", r.pkg.URL)
 		pterm.Error.Println(fmt.Sprintf("Failed to download RPM package %s", r.pkg.URL))
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 	defer file.Close()
@@ -992,6 +999,7 @@ func (r *Package) migrateDebian(ctx context.Context) error {
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download Debian package %s", r.pkg.URL)
 		pterm.Error.Println(fmt.Sprintf("Failed to download Debian package %s", r.pkg.URL))
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 	defer file.Close()
@@ -1135,6 +1143,7 @@ func (r *Package) migrateComposer(ctx context.Context) error {
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download Composer package %s", r.pkg.URL)
 		pterm.Error.Println(fmt.Sprintf("Failed to download Composer package %s", r.pkg.URL))
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 	defer file.Close()
@@ -1171,6 +1180,7 @@ func (r *Package) migrateSwift(ctx context.Context) error {
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download Swift package %s", r.pkg.URL)
 		pterm.Error.Println(fmt.Sprintf("Failed to download Swift package %s", r.pkg.URL))
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 	defer file.Close()

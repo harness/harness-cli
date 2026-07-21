@@ -24,6 +24,7 @@ import (
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/module/ar/migrate/types/npm"
+	"github.com/harness/harness-cli/module/ar/migrate/util"
 	"github.com/harness/harness-cli/util/common"
 
 	"github.com/google/uuid"
@@ -178,6 +179,7 @@ func (r *File) Migrate(ctx context.Context) error {
 		defer downloadFile.Close()
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to download file")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("download file failed: %w", err)
 		}
 
@@ -211,9 +213,15 @@ func (r *File) Migrate(ctx context.Context) error {
 
 	if r.artifactType == types.PYTHON {
 		downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.file.Uri)
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to download Python package file")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
+			return fmt.Errorf("failed to download Python package file: %w", err)
+		}
 		tempFile, err := os.CreateTemp("", fmt.Sprintf("python-pkg-%s-*", r.file.Name))
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to create temporary file")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to create temporary file: %w", err)
 		}
 		defer os.Remove(tempFile.Name()) // Clean up the temp file when done
@@ -222,11 +230,13 @@ func (r *File) Migrate(ctx context.Context) error {
 		_, err = io.Copy(tempFile, downloadFile)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to write to temporary file")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to write to temporary file: %w", err)
 		}
 		err = tempFile.Close()
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to close temporary file")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to close temporary file: %w", err)
 		}
 
@@ -242,12 +252,14 @@ func (r *File) Migrate(ctx context.Context) error {
 			metadata, err = r.extractTarGzMetadataFile(tempFile.Name())
 			if err != nil {
 				logger.Error().Err(err).Msg("Failed to extract metadata from tar.gz file")
+				util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 				return fmt.Errorf("failed to extract metadata from tar.gz file: %w", err)
 			}
 		} else if strings.HasSuffix(fileName, ".whl") {
 			metadata, err = r.extractWheelMetadataFile(tempFile.Name())
 			if err != nil {
 				logger.Error().Err(err).Msg("Failed to extract metadata from wheel file")
+				util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 				return fmt.Errorf("failed to extract metadata from wheel file: %w", err)
 			}
 		} else {
@@ -257,12 +269,14 @@ func (r *File) Migrate(ctx context.Context) error {
 		metadataMap, err := generatePythonMetadataMap(metadata, tempFile.Name())
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to generate metadata map")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to generate metadata map: %w", err)
 		}
 
 		tempFileReader, err := os.Open(tempFile.Name())
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to open temporary file")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to open temporary file: %w", err)
 		}
 		defer tempFileReader.Close()
@@ -292,6 +306,7 @@ func (r *File) Migrate(ctx context.Context) error {
 		tarFileReader, _, err := r.srcAdapter.DownloadFile(r.srcRegistry, tarFileURL)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to fetch metadata")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to fetch metadata: %w", err)
 		}
 		pkgJSONBytes, readme, err := utils.ExtractPackageJSONAndReadmeFromTarball(tarFileReader)
@@ -300,12 +315,14 @@ func (r *File) Migrate(ctx context.Context) error {
 		}
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to extract package.json from tarball")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to extract package.json from tarball: %w", err)
 		}
 
 		tarFileReader, _, err = r.srcAdapter.DownloadFile(r.srcRegistry, tarFileURL)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to fetch metadata")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to fetch metadata: %w", err)
 		}
 		// Build NPM upload payload
@@ -313,12 +330,15 @@ func (r *File) Migrate(ctx context.Context) error {
 		payload, pkgName, version, err := utils.BuildNpmUploadFromPackageJSON(pkgJSONBytes, readme, tarFileReader)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to build NPM upload body")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to build NPM upload body: %w", err)
 		}
 
 		if pkgName == "" || version == "" {
 			logger.Error().Msg("Package.json must contain non-empty 'name' and 'version'")
-			return fmt.Errorf("package.json must contain non-empty 'name' and 'version'")
+			emptyFieldErr := fmt.Errorf("package.json must contain non-empty 'name' and 'version'")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, emptyFieldErr)
+			return emptyFieldErr
 		}
 
 		logger.Info().
@@ -366,11 +386,17 @@ func (r *File) Migrate(ctx context.Context) error {
 		r.stats.Add(stat)
 	} else if r.artifactType == types.DART {
 		if r.file == nil {
+			r.stats.Add(types.FileStat{
+				Registry: r.srcRegistry,
+				Status:   types.StatusFail,
+				Error:    "no file provided for Dart migration",
+			})
 			return fmt.Errorf("no file provided for Dart migration")
 		}
 		downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.file.Uri)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to download Dart package file")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to download Dart package file: %w", err)
 		}
 		defer downloadFile.Close()

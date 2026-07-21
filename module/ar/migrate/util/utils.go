@@ -197,3 +197,25 @@ func ValidateDateFilter(df *types.DateFilter) error {
 
 	return nil
 }
+func AddPackageErrorToStat(stats *types.TransferStats, pkg types.Package, srcRegistry string, err error) {
+	stat := types.FileStat{
+		Name:     pkg.Name,
+		Registry: srcRegistry,
+		Uri:      pkg.URL,
+		Size:     int64(pkg.Size),
+		Status:   types.StatusFail,
+		Error:    err.Error(),
+	}
+	stats.Add(stat)
+}
+func AddFileErrorToStat(stats *types.TransferStats, file *types.File, srcRegistry string, err error) {
+	stat := types.FileStat{
+		Name:     file.Name,
+		Registry: srcRegistry,
+		Uri:      file.Uri,
+		Size:     int64(file.Size),
+		Status:   types.StatusFail,
+		Error:    err.Error(),
+	}
+	stats.Add(stat)
+}

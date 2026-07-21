@@ -188,6 +188,13 @@ func (r *Version) Migrate(ctx context.Context) error {
 		files, err := tree.GetAllFiles(r.node)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to get files from tree")
+			r.stats.Add(types.FileStat{
+				Name:     r.pkg.Name + "@" + r.version.Name,
+				Registry: r.srcRegistry,
+				Uri:      r.version.Path,
+				Status:   types.StatusFail,
+				Error:    err.Error(),
+			})
 			return fmt.Errorf("get files from tree failed: %w", err)
 		}
 		versionFiles := []*types.File{}
@@ -209,6 +216,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 			downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, file.Uri)
 			if err != nil {
 				logger.Error().Err(err).Msgf("Failed to download file %s", file.Name)
+				util.AddFileErrorToStat(r.stats, file, r.srcRegistry, err)
 				return fmt.Errorf("download file %s failed: %w", file.Name, err)
 			}
 			downloadedFiles = append(downloadedFiles, &types.PackageFiles{
@@ -222,8 +230,21 @@ func (r *Version) Migrate(ctx context.Context) error {
 			nil)
 
 		if err != nil {
+			r.stats.Add(types.FileStat{
+				Name:     r.pkg.Name + "@" + r.version.Name,
+				Registry: r.srcRegistry,
+				Uri:      r.version.Path,
+				Status:   types.StatusFail,
+				Error:    err.Error(),
+			})
 			return err
 		}
+		r.stats.Add(types.FileStat{
+			Name:     r.pkg.Name + "@" + r.version.Name,
+			Registry: r.srcRegistry,
+			Uri:      r.version.Path,
+			Status:   types.StatusSuccess,
+		})
 	}
 
 	if r.artifactType == types.DOCKER || r.artifactType == types.HELM || r.artifactType == types.HELM_LEGACY {
