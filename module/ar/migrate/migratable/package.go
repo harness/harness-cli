@@ -60,6 +60,10 @@ type Package struct {
 	registry              types.RegistryInfo
 	dryRunStats           *types.DryRunStats
 	existingIndex         *types.ExistingIndex
+	// unfilteredNode is a pattern-filtered but NOT date-filtered tree, used to
+	// recover pruned distribution files of an in-scope atomic version. nil
+	// unless a date filter is active for an atomic-version type.
+	unfilteredNode *types.TreeNode
 }
 
 func NewPackageJob(
@@ -71,6 +75,7 @@ func NewPackageJob(
 	artifactType types.ArtifactType,
 	pkg types.Package,
 	node *types.TreeNode,
+	unfilteredNode *types.TreeNode,
 	stats *types.TransferStats,
 	mapping *types.RegistryMapping,
 	config *types.Config,
@@ -104,6 +109,7 @@ func NewPackageJob(
 		registry:              registry,
 		dryRunStats:           dryRunStats,
 		existingIndex:         existingIndex,
+		unfilteredNode:        unfilteredNode,
 	}
 }
 
@@ -295,30 +301,29 @@ func (r *Package) Migrate(ctx context.Context) error {
 //
 // For most artifact types each types.Version entry maps to exactly one file (or
 // carries a unique Name), so a version is migrated iff its node survived the
-// filter; a single out-of-window version must never drop the whole package
-// (AH-4518 Defect 2), and packages whose entire history is out of window simply
-// contribute zero jobs.
+// filter; a single out-of-window version must never drop the whole package, and
+// packages whose entire history is out of window simply contribute zero jobs.
 //
 // For atomic-version types (util.IsAtomicVersionArtifact — e.g. PyPI) a single
 // logical version spans MULTIPLE entries sharing Name (sdist + wheels). Because
 // the filter runs per file it can keep some distributions of a version and
-// prune others; publishing only the survivors would be a PARTIAL version. Such
-// versions are grouped by Name and migrated all-or-nothing: if any file was
-// pruned, the whole version is discarded with a warning.
+// prune others, migrating only the survivors would be a PARTIAL version. Such
+// versions are grouped by Name and migrated all-or-nothing: if ANY file is
+// in-scope (survived the filter), the WHOLE version is migrated, recovering
+// pruned distributions from the unfiltered tree (r.unfilteredNode). This ensures
+// partial versions are never published and never discarded.
 func (r *Package) buildVersionJobs(versions []types.Version, logger zerolog.Logger) []engine.Job {
 	atomic := util.IsAtomicVersionArtifact(r.artifactType)
 
 	// Resolve each entry's node once and tally, per version Name, how many
-	// distribution files the source listed vs. how many survived the filter.
+	// distribution files survived the filter. A version is in-scope iff kept > 0.
 	type resolved struct {
 		version types.Version
 		node    *types.TreeNode // nil when pruned by the filter
 	}
 	entries := make([]resolved, 0, len(versions))
-	total := make(map[string]int, len(versions))
 	kept := make(map[string]int, len(versions))
 	for _, version := range versions {
-		total[version.Name]++
 		node, err := tree.GetNodeForPath(r.node, version.Path)
 		if err != nil {
 			logger.Debug().Str("version", version.Name).Str("path", version.Path).
@@ -331,8 +336,8 @@ func (r *Package) buildVersionJobs(versions []types.Version, logger zerolog.Logg
 	}
 
 	var jobs []engine.Job
-	outOfWindow, discardedPartial := 0, 0
-	warned := make(map[string]bool)
+	outOfWindow := 0
+	recovered := 0
 	for _, e := range entries {
 		name := e.version.Name
 		switch {
@@ -340,17 +345,35 @@ func (r *Package) buildVersionJobs(versions []types.Version, logger zerolog.Logg
 			// Whole version out of window: every file was pruned. Counts once per
 			// entry; deduped in the summary below via total/kept, so just tally.
 			outOfWindow++
-		case atomic && kept[name] < total[name]:
-			// Partial version: some distributions survived, others were pruned.
-			// Refuse to publish an incomplete version — discard all of it.
-			discardedPartial++
-			if !warned[name] {
-				warned[name] = true
-				logger.Warn().Str("version", name).Int("kept", kept[name]).Int("total", total[name]).
-					Msgf("Discarding version %s of package %s: %d of %d distribution file(s) fell outside "+
-						"the filter window; a partial version will not be migrated",
-						name, r.pkg.Name, total[name]-kept[name], total[name])
+		case atomic && kept[name] > 0:
+			// Atomic-version type: this version is IN SCOPE (at least one file
+			// survived). Migrate this file whether or not it survived the filter.
+			var node *types.TreeNode
+			if e.node != nil {
+				node = e.node
+			} else {
+				// Pruned sibling: recover it from the unfiltered tree.
+				if r.unfilteredNode == nil {
+					logger.Warn().Str("version", name).Str("path", e.version.Path).
+						Msgf("Could not recover pruned distribution file for in-scope version %s of package %s; unfilteredNode is nil (migrating without it — partial)",
+							name, r.pkg.Name)
+					continue
+				}
+				var err error
+				node, err = tree.GetNodeForPath(r.unfilteredNode, e.version.Path)
+				if err != nil || node == nil {
+					logger.Warn().Str("version", name).Str("path", e.version.Path).
+						Msgf("Could not recover pruned distribution file for in-scope version %s of package %s; migrating without it (partial)",
+							name, r.pkg.Name)
+					continue
+				}
+				recovered++
+				logger.Debug().Str("version", name).Str("path", e.version.Path).
+					Msg("Recovered pruned distribution file for in-scope atomic version")
 			}
+			jobs = append(jobs, NewVersionJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry,
+				r.artifactType, r.pkg, e.version, node, r.stats, r.mapping, r.config, r.registry,
+				r.dryRunStats, r.existingIndex))
 		case e.node == nil:
 			// Non-atomic type, this specific file pruned but the version has other
 			// surviving files (distinct Names collapse here); nothing to migrate for
@@ -362,11 +385,10 @@ func (r *Package) buildVersionJobs(versions []types.Version, logger zerolog.Logg
 		}
 	}
 
-	if outOfWindow > 0 || discardedPartial > 0 {
-		logger.Info().Int("kept", len(jobs)).Int("out_of_window", outOfWindow).
-			Int("discarded_partial", discardedPartial).
-			Msgf("Package %s: %d version-file(s) out of filter window, %d discarded as partial, %d migrating",
-				r.pkg.Name, outOfWindow, discardedPartial, len(jobs))
+	if outOfWindow > 0 || recovered > 0 {
+		logger.Info().Int("migrating", len(jobs)).Int("out_of_window", outOfWindow).Int("recovered", recovered).
+			Msgf("Package %s: %d version-file(s) migrating, %d out of filter window, %d recovered from full history (in-scope atomic versions)",
+				r.pkg.Name, len(jobs), outOfWindow, recovered)
 	}
 
 	return jobs

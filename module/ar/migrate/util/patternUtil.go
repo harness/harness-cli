@@ -169,8 +169,9 @@ func IsPackageLevelFilterableArtifact(artifactType types.ArtifactType) bool {
 // is an sdist plus one or more wheels. Because the date/pattern filters run
 // per file, they can keep some distributions of a version and prune others;
 // migrating only the survivors would publish a PARTIAL version. Package.Migrate
-// therefore groups these entries by version.Name and migrates a version only
-// when EVERY one of its files survived the filter.
+// therefore groups these entries by version.Name and migrates a version when
+// ANY of its files survived the filter, recovering the pruned distributions
+// from the unfiltered tree so partial versions are never published.
 //
 // Types NOT listed here have exactly one file per version entry (or a unique
 // Name per version), so grouping is a no-op for them and Package.Migrate keeps

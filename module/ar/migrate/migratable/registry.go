@@ -13,6 +13,7 @@ import (
 	"github.com/harness/harness-cli/module/ar/migrate/util"
 
 	"github.com/google/uuid"
+	"github.com/pterm/pterm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -136,6 +137,12 @@ func (r *Registry) Migrate(ctx context.Context) error {
 		logger.Error().Msgf("Failed to get files from registry %s", r.srcRegistry)
 		return fmt.Errorf("get files from registry %s failed: %w", r.srcRegistry, err2)
 	}
+	pulledMsg := fmt.Sprintf("Pulled %d file(s) from registry %s", len(files), r.srcRegistry)
+	logger.Info().Msg(pulledMsg)
+	pterm.Info.Println(pulledMsg)
+	// originalFiles is the pristine GetFiles listing, before date/pattern
+	// narrowing. Used to build the recovery tree for atomic-version types below.
+	originalFiles := files
 
 	// In dry-run mode, collect all files and initialize directory entry for this registry
 	if r.config.DryRun && r.dryRunStats != nil {
@@ -222,6 +229,26 @@ func (r *Registry) Migrate(ctx context.Context) error {
 		}
 	}
 
+	skippedByFilter := len(originalFiles) - len(files)
+	skipMsg := fmt.Sprintf("Registry %s: %d file(s) pulled, %d under skip condition (date/pattern filters)",
+		r.srcRegistry, len(originalFiles), skippedByFilter)
+	logger.Info().Msg(skipMsg)
+	pterm.Info.Println(skipMsg)
+
+	// For atomic-version types (PyPI), a version is migrated in full if ANY of
+	// its files is in window. buildVersionJobs recovers a version's pruned
+	// distribution files from this unfiltered tree. It is pattern-filtered (never
+	// resurrect an explicitly excluded file) but NOT date-filtered.
+	var unfilteredRoot *types.TreeNode
+	if dateFilterActive && util.IsAtomicVersionArtifact(currArtifactType) {
+		recoveryFiles := originalFiles
+		if util.IsFileLevelFilterableArtifact(currArtifactType) &&
+			(len(r.mapping.IncludePatterns) > 0 || len(r.mapping.ExcludePatterns) > 0) {
+			recoveryFiles = util.FilterFilesByPatterns(originalFiles, r.mapping.IncludePatterns, r.mapping.ExcludePatterns)
+		}
+		unfilteredRoot = tree.TransformToTree(recoveryFiles)
+	}
+
 	root := tree.TransformToTree(files)
 
 	pkgs, err := r.srcAdapter.GetPackages(r.srcRegistry, r.artifactType, root)
@@ -272,7 +299,7 @@ func (r *Registry) Migrate(ctx context.Context) error {
 			logger.Error().Msgf("Failed to get node for path %s", pkg.Path)
 			return fmt.Errorf("get node for path %s failed: %w", pkg.Path, err2)
 		}
-		job := NewPackageJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.sourcePackageHostname, r.destRegistry, r.artifactType, pkg, treeNode,
+		job := NewPackageJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.sourcePackageHostname, r.destRegistry, r.artifactType, pkg, treeNode, unfilteredRoot,
 			r.stats, r.mapping, r.config, r.registry, r.dryRunStats, existingIndex)
 		jobs = append(jobs, job)
 	}

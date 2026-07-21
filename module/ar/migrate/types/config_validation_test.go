@@ -1,7 +1,6 @@
 package types
 
 import (
-	"strings"
 	"testing"
 	"time"
 )
@@ -24,7 +23,7 @@ func baseValidConfig() *Config {
 	}
 }
 
-func TestValidateConfig_MavenWithDateFilterFails(t *testing.T) {
+func TestValidateConfig_MavenWithDateFilterWarnsButPasses(t *testing.T) {
 	config := baseValidConfig()
 	after := time.Unix(0, 0)
 	config.Mappings[0].DateFilter = &DateFilter{
@@ -32,12 +31,8 @@ func TestValidateConfig_MavenWithDateFilterFails(t *testing.T) {
 		CreatedAfter: &after,
 	}
 
-	err := validateConfig(config)
-	if err == nil {
-		t.Fatal("expected error for MAVEN mapping with date filter, got nil")
-	}
-	if !strings.Contains(err.Error(), "date filter is not supported") {
-		t.Fatalf("expected 'date filter is not supported' error, got: %v", err)
+	if err := validateConfig(config); err != nil {
+		t.Fatalf("expected MAVEN mapping with date filter to pass with a warning, got: %v", err)
 	}
 }
 

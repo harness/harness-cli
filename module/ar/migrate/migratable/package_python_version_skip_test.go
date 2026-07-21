@@ -2,6 +2,7 @@ package migratable
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -100,9 +101,25 @@ func minimalPyPIPackageTarGz(name, version string) []byte {
 	return buf.Bytes()
 }
 
-// pypiFixtureFiles mirrors the mock_jfrog python-local fixture's shape (see
-// AH-4518 Defect 1/2): a per-package index plus real per-version artifact
-// paths under requests/<version>/requests-<version>.tar.gz.
+// minimalPyPIWheel builds a valid .whl (ZIP) containing a METADATA file in the
+// .dist-info directory, so File.Migrate's PYTHON wheel branch can extract
+// metadata and reach UploadFile.
+func minimalPyPIWheel(name, version string) []byte {
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+
+	content := fmt.Sprintf("Metadata-Version: 2.1\nName: %s\nVersion: %s\n\n", name, version)
+	distInfo := fmt.Sprintf("%s-%s.dist-info/METADATA", name, version)
+	w, _ := zw.Create(distInfo)
+	_, _ = w.Write([]byte(content))
+	_ = zw.Close()
+
+	return buf.Bytes()
+}
+
+// pypiFixtureFiles mirrors the mock_jfrog python-local fixture's shape: a
+// per-package index plus real per-version artifact paths under
+// requests/<version>/requests-<version>.tar.gz.
 func pypiFixtureFiles() []types.File {
 	return []types.File{
 		{Name: "simple.html", Uri: "/.pypi/simple.html", Size: 64},
@@ -126,29 +143,29 @@ func pypiFixtureVersions() []types.Version {
 
 // newPythonPackageJob builds a Package job directly (bypassing NewPackageJob)
 // with artifactType PYTHON, wired to the given adapters and node.
-func newPythonPackageJob(src, dest adp.Adapter, node *types.TreeNode, stats *types.TransferStats) *Package {
+func newPythonPackageJob(src, dest adp.Adapter, node, unfilteredNode *types.TreeNode, stats *types.TransferStats) *Package {
 	return &Package{
-		srcRegistry:  "src-reg",
-		destRegistry: "dst-reg",
-		srcAdapter:   src,
-		destAdapter:  dest,
-		artifactType: types.PYTHON,
-		logger:       zerolog.Nop(),
-		pkg:          types.Package{Name: "requests", Path: "/"},
-		node:         node,
-		stats:        stats,
-		config:       &types.Config{Concurrency: 2},
+		srcRegistry:    "src-reg",
+		destRegistry:   "dst-reg",
+		srcAdapter:     src,
+		destAdapter:    dest,
+		artifactType:   types.PYTHON,
+		logger:         zerolog.Nop(),
+		pkg:            types.Package{Name: "requests", Path: "/"},
+		node:           node,
+		unfilteredNode: unfilteredNode,
+		stats:          stats,
+		config:         &types.Config{Concurrency: 2},
 	}
 }
 
-// TestPackageMigratePythonMixedWindowSkipsOnlyOutOfWindowVersions is the core
-// AH-4518 Defect 2 regression test: GetVersions returns the PyPI package's
-// full unfiltered release history (oldest first, per the report's spf-pylib
-// trace), but the tree handed to the Package job is the DATE-FILTERED tree —
-// only 2.28.0 and 2.29.0 survived; 0.1.1 was pruned. A single out-of-window
-// version must be skipped, not abort the whole package: in-window versions
-// must still produce VersionJobs (and successful uploads), and Migrate must
-// return nil.
+// TestPackageMigratePythonMixedWindowSkipsOnlyOutOfWindowVersions covers a
+// mixed date-filter window: GetVersions returns the PyPI package's full
+// unfiltered release history (oldest first), but the tree handed to the
+// Package job is the DATE-FILTERED tree — only 2.28.0 and 2.29.0 survived;
+// 0.1.1 was pruned. A single out-of-window version must be skipped, not abort
+// the whole package: in-window versions must still produce VersionJobs (and
+// successful uploads), and Migrate must return nil.
 func TestPackageMigratePythonMixedWindowSkipsOnlyOutOfWindowVersions(t *testing.T) {
 	allFiles := pypiFixtureFiles()
 	// Simulate the date filter: drop the out-of-window artifact
@@ -175,7 +192,7 @@ func TestPackageMigratePythonMixedWindowSkipsOnlyOutOfWindowVersions(t *testing.
 	}
 	dest := &pypiFakeDest{}
 	stats := &types.TransferStats{}
-	job := newPythonPackageJob(src, dest, root, stats)
+	job := newPythonPackageJob(src, dest, root, root, stats)
 
 	if err := job.Migrate(context.Background()); err != nil {
 		t.Fatalf("Migrate returned err (a single out-of-window version must not abort the package): %v", err)
@@ -209,7 +226,7 @@ func TestPackageMigratePythonAllOutOfWindowContributesZeroJobs(t *testing.T) {
 	src := &pypiFakeSrc{versions: pypiFixtureVersions(), content: map[string][]byte{}}
 	dest := &pypiFakeDest{}
 	stats := &types.TransferStats{}
-	job := newPythonPackageJob(src, dest, root, stats)
+	job := newPythonPackageJob(src, dest, root, root, stats)
 
 	if err := job.Migrate(context.Background()); err != nil {
 		t.Fatalf("Migrate returned err (all-out-of-window package must contribute zero jobs, not fail): %v", err)
@@ -219,14 +236,15 @@ func TestPackageMigratePythonAllOutOfWindowContributesZeroJobs(t *testing.T) {
 	}
 }
 
-// TestPackageMigratePythonPartialVersionDiscarded is the multi-file-version
-// (all-or-nothing) regression: a single PyPI release spans several distribution
-// files (sdist + wheel), surfaced by GetVersions as separate version entries
-// sharing Name but with distinct Paths. The date filter runs per file, so it
-// can keep the wheel of 2.28.0 while pruning its sdist. Migrating only the
-// survivor would publish a PARTIAL version, so the whole 2.28.0 version must be
-// discarded — while a fully-in-window version (2.29.0) still migrates in full.
-func TestPackageMigratePythonPartialVersionDiscarded(t *testing.T) {
+// TestPackageMigratePythonMixedWindowMigratesWholeVersion covers a single PyPI
+// release spanning several distribution files (sdist + wheel), surfaced by
+// GetVersions as separate version entries sharing Name but with distinct
+// Paths. The date filter runs per file, so it can keep the wheel of 2.28.0
+// while pruning its sdist. If ANY file of a version is in-scope (survived the
+// filter), the WHOLE version is migrated, recovering the pruned sdist from the
+// unfiltered tree. This ensures partial versions are never published and
+// never discarded.
+func TestPackageMigratePythonMixedWindowMigratesWholeVersion(t *testing.T) {
 	// Full source history: 2.28.0 has two distributions (sdist + wheel), 2.29.0
 	// has one. GetVersions returns one entry per distribution file.
 	versions := []types.Version{
@@ -243,36 +261,62 @@ func TestPackageMigratePythonPartialVersionDiscarded(t *testing.T) {
 		{Name: "requests-2.28.0-py3-none-any.whl", Uri: "/requests/2.28.0/requests-2.28.0-py3-none-any.whl", Size: 4096},
 		{Name: "requests-2.29.0.tar.gz", Uri: "/requests/2.29.0/requests-2.29.0.tar.gz", Size: 4200},
 	}
-	root := tree.TransformToTree(filtered)
+	filteredRoot := tree.TransformToTree(filtered)
+
+	// Unfiltered tree: full history including the pruned sdist.
+	unfiltered := []types.File{
+		{Name: "simple.html", Uri: "/.pypi/simple.html", Size: 64},
+		{Name: "requests.html", Uri: "/.pypi/requests/requests.html", Size: 128},
+		{Name: "requests-2.28.0.tar.gz", Uri: "/requests/2.28.0/requests-2.28.0.tar.gz", Size: 4000},
+		{Name: "requests-2.28.0-py3-none-any.whl", Uri: "/requests/2.28.0/requests-2.28.0-py3-none-any.whl", Size: 4096},
+		{Name: "requests-2.29.0.tar.gz", Uri: "/requests/2.29.0/requests-2.29.0.tar.gz", Size: 4200},
+	}
+	unfilteredRoot := tree.TransformToTree(unfiltered)
 
 	src := &pypiFakeSrc{
 		versions: versions,
 		content: map[string][]byte{
-			"/requests/2.28.0/requests-2.28.0-py3-none-any.whl": minimalPyPIPackageTarGz("requests", "2.28.0"),
+			"/requests/2.28.0/requests-2.28.0.tar.gz":           minimalPyPIPackageTarGz("requests", "2.28.0"),
+			"/requests/2.28.0/requests-2.28.0-py3-none-any.whl": minimalPyPIWheel("requests", "2.28.0"),
 			"/requests/2.29.0/requests-2.29.0.tar.gz":           minimalPyPIPackageTarGz("requests", "2.29.0"),
 		},
 	}
 	dest := &pypiFakeDest{}
 	stats := &types.TransferStats{}
-	job := newPythonPackageJob(src, dest, root, stats)
+	job := newPythonPackageJob(src, dest, filteredRoot, unfilteredRoot, stats)
 
 	if err := job.Migrate(context.Background()); err != nil {
-		t.Fatalf("Migrate returned err (a partial version must be discarded, not fail the package): %v", err)
+		t.Fatalf("Migrate returned err: %v", err)
 	}
 
 	uploaded := dest.uploadedSnapshot()
-	// Only 2.29.0 (fully in window) should migrate; both 2.28.0 files must be
-	// absent — the surviving wheel must NOT be uploaded on its own.
-	if len(uploaded) != 1 {
-		t.Fatalf("expected exactly 1 upload (only the fully-in-window version), got %d: %+v", len(uploaded), uploaded)
+	// Version 2.28.0 is in-scope (wheel survived), so the WHOLE version
+	// migrates (both sdist + wheel). Plus 2.29.0 (fully in-window) = 3 uploads.
+	if len(uploaded) != 3 {
+		t.Fatalf("expected 3 uploads (both 2.28.0 files + 2.29.0), got %d: %+v", len(uploaded), uploaded)
 	}
+	has2280sdist := false
+	has2280whl := false
+	has2290 := false
 	for _, uri := range uploaded {
-		if strings.Contains(uri, "2.28.0") {
-			t.Errorf("partial version 2.28.0 must be discarded entirely, but a 2.28.0 file was uploaded: %+v", uploaded)
+		if uri == "/requests/2.28.0/requests-2.28.0.tar.gz" {
+			has2280sdist = true
+		}
+		if uri == "/requests/2.28.0/requests-2.28.0-py3-none-any.whl" {
+			has2280whl = true
+		}
+		if strings.Contains(uri, "2.29.0") {
+			has2290 = true
 		}
 	}
-	if !strings.Contains(uploaded[0], "2.29.0") {
-		t.Errorf("expected the fully-in-window 2.29.0 to migrate, got: %+v", uploaded)
+	if !has2280sdist {
+		t.Errorf("expected 2.28.0 sdist (recovered from unfiltered tree) to be uploaded, got: %+v", uploaded)
+	}
+	if !has2280whl {
+		t.Errorf("expected 2.28.0 wheel to be uploaded, got: %+v", uploaded)
+	}
+	if !has2290 {
+		t.Errorf("expected 2.29.0 to be uploaded, got: %+v", uploaded)
 	}
 }
 
@@ -293,7 +337,7 @@ func TestPackageMigratePythonAllInWindowUnchanged(t *testing.T) {
 	}
 	dest := &pypiFakeDest{}
 	stats := &types.TransferStats{}
-	job := newPythonPackageJob(src, dest, root, stats)
+	job := newPythonPackageJob(src, dest, root, root, stats)
 
 	if err := job.Migrate(context.Background()); err != nil {
 		t.Fatalf("Migrate returned err: %v", err)

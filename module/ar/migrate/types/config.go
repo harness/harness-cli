@@ -5,6 +5,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/pterm/pterm"
+	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 )
 
@@ -159,9 +161,14 @@ func validateConfig(config *Config) error {
 		if mapping.DestinationRegistry == "" {
 			return fmt.Errorf("mapping %d: destination registry cannot be empty", i)
 		}
-		// Date filtering is not supported for MAVEN.
+		// Date filtering for MAVEN relies on the source file listing rather than
+		// maven-metadata.xml, so the metadata file may end up out of sync with
+		// the filtered set of artifacts that actually get migrated.
 		if mapping.ArtifactType == MAVEN && mapping.DateFilter != nil {
-			return fmt.Errorf("mapping %d: date filter is not supported for %s", i, MAVEN)
+			msg := fmt.Sprintf("mapping %d: date filter is enabled for %s — "+
+				"maven-metadata.xml may not be in sync with the migrated artifacts", i, MAVEN)
+			log.Warn().Msg(msg)
+			pterm.Warning.Println(msg)
 		}
 	}
 

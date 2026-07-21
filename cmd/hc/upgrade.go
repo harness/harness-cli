@@ -211,11 +211,9 @@ func findAssetForPlatform(release *GitHubRelease, goos, goarch string) (*GitHubA
 		archName = "i386"
 	}
 
-	// Expected file extension
+	// Expected file extension - all platforms are released as .tar.gz
+	// (see .goreleaser/{stable,beta}.yaml archives config, no format_overrides for windows)
 	ext := ".tar.gz"
-	if goos == "windows" {
-		ext = ".zip"
-	}
 
 	// Look for matching asset (e.g., hc_v2.0.0_mac-os_arm64.tar.gz)
 	var targetAsset *GitHubAsset
