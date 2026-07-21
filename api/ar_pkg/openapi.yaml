@@ -109,6 +109,15 @@ paths:
     put:
       summary: Upload (or replace) a file at a specific path within a registry
       operationId: uploadGenericFileToPath
+      description: |
+        Uploads a file to an arbitrary path within a registry. This endpoint
+        serves both **generic** and **raw** artifact upload patterns:
+
+        **Generic upload** – path includes package name and version:
+        PUT /pkg/{accountId}/{registry}/files/<ARTIFACT_NAME>/<VERSION>/<NESTED_FILE_PATH>
+        
+        **Raw upload** – path is the file destination directly (no version segment):
+        PUT /pkg/{accountId}/{registry}/files/<FILE_PATH>
       parameters:
         - name: accountId
           in: path
@@ -124,9 +133,11 @@ paths:
           schema:
             type: string
           description: >
-            Full path of the file (e.g. "pkg/version/file.tar.gz" or "docs/readme.txt").
-            For generic artifacts, include package/version as path segments.
-            For raw artifacts, use the file path directly.
+            Full path of the file within the registry. For generic artifacts,
+            include package name and version as path segments
+            (e.g. "my-package/1.0.0/file.tar.gz"). For raw artifacts, use
+            the file path directly without a version segment
+            (e.g. "subdir/file.txt").
       security:
         - ApiKeyAuth: [ ]
       requestBody:

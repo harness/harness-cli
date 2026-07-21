@@ -33,13 +33,21 @@ func TestUploadStats_Accumulate(t *testing.T) {
 
 // ── Pusher interface compliance ───────────────────────────────────────────────
 
-// Compile-time check: GenericUploader must satisfy Pusher.
+// Compile-time checks: both uploaders must satisfy Pusher.
 var _ Pusher = (*GenericUploader)(nil)
+var _ Pusher = (*RawUploader)(nil)
 
 func TestPusher_GenericUploaderImplementsInterface(t *testing.T) {
 	var p Pusher = &GenericUploader{}
 	if p == nil {
 		t.Fatal("GenericUploader should satisfy Pusher")
+	}
+}
+
+func TestPusher_RawUploaderImplementsInterface(t *testing.T) {
+	var p Pusher = &RawUploader{}
+	if p == nil {
+		t.Fatal("RawUploader should satisfy Pusher")
 	}
 }
 

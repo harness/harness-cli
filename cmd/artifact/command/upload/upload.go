@@ -62,9 +62,14 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 				then they can be pushed to there resepectivr registry based on there interface implementtion logic
 				currently it is default for generic registry
 			*/
-			var uploader Pusher = &GenericUploader{
+			/*var uploader Pusher = &GenericUploader{
 				SrcPattern: srcPattern,
 				Version:    packageVersion,
+				PkgClient:  c.PkgHttpClient(),
+			}
+			*/
+			var uploader Pusher = &RawUploader{
+				SrcPattern: srcPattern,
 				PkgClient:  c.PkgHttpClient(),
 			}
 
