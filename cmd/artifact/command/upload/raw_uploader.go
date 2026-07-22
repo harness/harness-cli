@@ -3,6 +3,7 @@ package upload
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,8 @@ import (
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	"github.com/harness/harness-cli/util/common/progress"
 	"github.com/harness/harness-cli/util/common/upload"
+
+	"github.com/bmatcuk/doublestar/v4"
 )
 
 // RawUploader implements Pusher for raw artifact uploads.
@@ -18,19 +21,22 @@ import (
 
 type RawUploader struct {
 	SrcPattern   string
-	DestTemplate string // path prefix within the registry; may contain {N} placeholders
+	DestTemplate string // path prefix within the registry
 	RegistryName string
 	PkgClient    *pkgclient.ClientWithResponses
 }
 
-// GetRegistryAndPath parses a raw target of the form "<registry>/<dest-path>".
+// GetRegistryAndPath parses the target, which may be either:
+//   - "<registry>/<dest-path>" – registry is the part before the first slash
 func (u *RawUploader) GetRegistryAndPath(target string) (string, error) {
 	idx := strings.IndexByte(target, '/')
 	if idx < 0 {
-		return "", fmt.Errorf("target must be in the form <registry>/<path>, got %q", target)
+		u.RegistryName = target
+		u.DestTemplate = ""
+	} else {
+		u.RegistryName = target[:idx]
+		u.DestTemplate = target[idx+1:]
 	}
-	u.RegistryName = target[:idx]
-	u.DestTemplate = target[idx+1:]
 	return u.RegistryName, nil
 }
 
@@ -54,7 +60,7 @@ func (u *RawUploader) GetFiles() ([]upload.FileUploadJob, UploadStats, error) {
 			return nil, stats, fmt.Errorf("%q is not a regular file", u.SrcPattern)
 		}
 		basename := filepath.Base(absRoot)
-		dest := resolveRawDestPath(u.DestTemplate, nil, basename)
+		dest := resolveRawDestPath(u.DestTemplate, basename)
 		checksums, err := utils.ComputeFileChecksums(absRoot)
 		if err != nil {
 			return nil, stats, fmt.Errorf("checksum %s: %w", absRoot, err)
@@ -65,61 +71,39 @@ func (u *RawUploader) GetFiles() ([]upload.FileUploadJob, UploadStats, error) {
 		return []upload.FileUploadJob{job}, stats, nil
 	}
 
-	// Compile the relative pattern into a regexp with capture groups.
-	re, _, err := compileWildcardPattern(relPattern)
-	if err != nil {
-		return nil, stats, fmt.Errorf("invalid pattern %q: %w", u.SrcPattern, err)
-	}
-
+	// Use doublestar for glob matching: *, ?, [...], **.
+	fsys := os.DirFS(absRoot)
 	var jobs []upload.FileUploadJob
 
-	walkErr := filepath.WalkDir(absRoot, func(path string, d os.DirEntry, werr error) error {
-		if werr != nil {
-			return werr
-		}
-		if path == absRoot {
-			return nil
-		}
+	walkErr := doublestar.GlobWalk(fsys, relPattern, func(relPath string, d fs.DirEntry) error {
 		if d.IsDir() {
 			return nil
 		}
+		//TODO to ignore other hidden file and git ignore etc too.
+
 		info, err := d.Info()
 		if err != nil {
-			return fmt.Errorf("stat %s: %w", path, err)
+			return fmt.Errorf("stat %s: %w", relPath, err)
 		}
 		if !info.Mode().IsRegular() {
 			return nil
 		}
 
-		// Compute path relative to the walk root (forward slashes).
-		relPath, err := filepath.Rel(absRoot, path)
+		absPath := filepath.Join(absRoot, filepath.FromSlash(relPath))
+		dest := resolveRawDestPath(u.DestTemplate, relPath)
+
+		checksums, err := utils.ComputeFileChecksums(absPath)
 		if err != nil {
-			return fmt.Errorf("rel %s: %w", path, err)
-		}
-		relPath = filepath.ToSlash(relPath)
-
-		// Test the relative path against the compiled pattern.
-		matches := re.FindStringSubmatch(relPath)
-		if matches == nil {
-			return nil
+			return fmt.Errorf("checksum %s: %w", absPath, err)
 		}
 
-		// Extract capture groups (matches[0] is the full match).
-		captures := matches[1:]
-		dest := resolveRawDestPath(u.DestTemplate, captures, relPath)
-
-		checksums, err := utils.ComputeFileChecksums(path)
-		if err != nil {
-			return fmt.Errorf("checksum %s: %w", path, err)
-		}
-
-		jobs = append(jobs, upload.NewRawUploadJob(relPath, path, dest, u.RegistryName, info.Size(), checksums, u.PkgClient))
+		jobs = append(jobs, upload.NewRawUploadJob(relPath, absPath, dest, u.RegistryName, info.Size(), checksums, u.PkgClient))
 		stats.FileCount++
 		stats.TotalBytes += info.Size()
 		return nil
 	})
 	if walkErr != nil {
-		return nil, stats, fmt.Errorf("failed to walk %s: %w", absRoot, walkErr)
+		return nil, stats, fmt.Errorf("invalid pattern or walk error for %q: %w", u.SrcPattern, walkErr)
 	}
 
 	return jobs, stats, nil
@@ -143,19 +127,14 @@ func (u *RawUploader) PushFiles(ctx context.Context, jobs []upload.FileUploadJob
 	return nil
 }
 
-func resolveRawDestPath(template string, captures []string, relPath string) string {
-	dest := template
-	for i, cap := range captures {
-		dest = strings.ReplaceAll(dest, fmt.Sprintf("{%d}", i+1), cap)
+// resolveRawDestPath computes the final destination path for a raw file upload.
+// No version segment is inserted; the full relative path is always preserved
+// so that source directory structure is mirrored in the registry.
+// When template is empty the file lands at the registry root: /files/<relPath>.
+func resolveRawDestPath(template, relPath string) string {
+	prefix := strings.TrimSuffix(template, "/")
+	if prefix == "" {
+		return relPath
 	}
-	dest = strings.TrimSuffix(dest, "/")
-
-	// Preserve subdirectory structure when no captures are used.
-	// When captures are present the user has explicit path control via {N},
-	// so only the basename is appended to avoid duplication.
-	filePathInDest := relPath
-	if len(captures) > 0 {
-		filePathInDest = filepath.Base(relPath)
-	}
-	return dest + "/" + filePathInDest
+	return prefix + "/" + relPath
 }

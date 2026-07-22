@@ -31,57 +31,38 @@ func TestResolveRawDestPath(t *testing.T) {
 	tests := []struct {
 		name     string
 		template string
-		captures []string
 		relPath  string
 		want     string
 	}{
 		{
-			name:     "no captures, flat file",
+			name:     "flat file",
 			template: "uploads",
-			captures: nil,
 			relPath:  "file.txt",
 			want:     "uploads/file.txt",
 		},
 		{
-			name:     "no captures, trailing slash in template",
+			name:     "trailing slash stripped from template",
 			template: "uploads/",
-			captures: nil,
 			relPath:  "file.txt",
 			want:     "uploads/file.txt",
 		},
 		{
-			name:     "no captures, preserves subdirectory structure",
+			name:     "preserves nested subdirectory structure",
 			template: "data",
-			captures: nil,
 			relPath:  "subdir/nested/file.bin",
 			want:     "data/subdir/nested/file.bin",
 		},
 		{
-			name:     "single capture, only basename appended",
-			template: "builds/{1}",
-			captures: []string{"linux"},
-			relPath:  "linux/app.zip",
-			want:     "builds/linux/app.zip",
-		},
-		{
-			name:     "two captures, only basename appended",
-			template: "releases/{1}/{2}",
-			captures: []string{"linux", "amd64"},
-			relPath:  "linux/amd64/binary",
-			want:     "releases/linux/amd64/binary",
-		},
-		{
-			name:     "empty captures slice treated as no captures",
-			template: "files",
-			captures: []string{},
+			name:     "deep template with nested rel path",
+			template: "bucket/prefix",
 			relPath:  "sub/file.tar.gz",
-			want:     "files/sub/file.tar.gz",
+			want:     "bucket/prefix/sub/file.tar.gz",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := resolveRawDestPath(tc.template, tc.captures, tc.relPath)
+			got := resolveRawDestPath(tc.template, tc.relPath)
 			if got != tc.want {
 				t.Errorf("got %q, want %q", got, tc.want)
 			}
@@ -268,16 +249,45 @@ func TestRawGetFiles_DoubleStarPattern_PreservesStructure(t *testing.T) {
 	}
 }
 
-func TestRawGetFiles_CaptureGroups_UsesBasenameOnly(t *testing.T) {
+func TestRawGetFiles_QuestionMarkPattern(t *testing.T) {
 	root := makeUploadTree(t, map[string]string{
-		"linux/app.bin":   "data",
-		"darwin/app.bin":  "data",
-		"windows/app.txt": "data",
+		"file1.bin": "data",
+		"file2.bin": "data",
+		"fileX.bin": "data",
+		"files.bin": "data", // 5 chars in segment before .bin – should NOT match fil?.bin
 	})
 
 	u := &RawUploader{
-		SrcPattern:   filepath.Join(root, "(*)/app.bin"),
-		DestTemplate: "builds/{1}",
+		SrcPattern:   filepath.Join(root, "fil?.bin"),
+		DestTemplate: "out",
+		RegistryName: "raw-reg",
+	}
+	jobs, stats, err := u.GetFiles()
+	if err != nil {
+		t.Fatalf("GetFiles: %v", err)
+	}
+	if stats.FileCount != 3 {
+		t.Errorf("FileCount: got %d, want 3 (file1, file2, fileX)", stats.FileCount)
+	}
+
+	got := rawDestPaths(t, jobs)
+	want := []string{"out/file1.bin", "out/file2.bin", "out/fileX.bin"}
+	if !slicesEqual(got, want) {
+		t.Errorf("dest paths: got %v, want %v", got, want)
+	}
+}
+
+func TestRawGetFiles_BracketPattern(t *testing.T) {
+	root := makeUploadTree(t, map[string]string{
+		"a.bin": "data",
+		"b.bin": "data",
+		"c.bin": "data",
+		"d.bin": "data",
+	})
+
+	u := &RawUploader{
+		SrcPattern:   filepath.Join(root, "[ab].bin"),
+		DestTemplate: "out",
 		RegistryName: "raw-reg",
 	}
 	jobs, stats, err := u.GetFiles()
@@ -285,14 +295,39 @@ func TestRawGetFiles_CaptureGroups_UsesBasenameOnly(t *testing.T) {
 		t.Fatalf("GetFiles: %v", err)
 	}
 	if stats.FileCount != 2 {
-		t.Errorf("FileCount: got %d, want 2", stats.FileCount)
+		t.Errorf("FileCount: got %d, want 2 ([ab] matches only a and b)", stats.FileCount)
 	}
 
 	got := rawDestPaths(t, jobs)
-	want := []string{
-		"builds/darwin/app.bin",
-		"builds/linux/app.bin",
+	want := []string{"out/a.bin", "out/b.bin"}
+	if !slicesEqual(got, want) {
+		t.Errorf("dest paths: got %v, want %v", got, want)
 	}
+}
+
+func TestRawGetFiles_BracketRangePattern(t *testing.T) {
+	root := makeUploadTree(t, map[string]string{
+		"file1.txt": "data",
+		"file2.txt": "data",
+		"file3.txt": "data",
+		"file9.txt": "data",
+	})
+
+	u := &RawUploader{
+		SrcPattern:   filepath.Join(root, "file[1-3].txt"),
+		DestTemplate: "docs",
+		RegistryName: "raw-reg",
+	}
+	jobs, stats, err := u.GetFiles()
+	if err != nil {
+		t.Fatalf("GetFiles: %v", err)
+	}
+	if stats.FileCount != 3 {
+		t.Errorf("FileCount: got %d, want 3 ([1-3] excludes file9)", stats.FileCount)
+	}
+
+	got := rawDestPaths(t, jobs)
+	want := []string{"docs/file1.txt", "docs/file2.txt", "docs/file3.txt"}
 	if !slicesEqual(got, want) {
 		t.Errorf("dest paths: got %v, want %v", got, want)
 	}
