@@ -148,16 +148,8 @@ func (u *GenericUploader) GetFiles() ([]upload.FileUploadJob, UploadStats, error
 	return jobs, stats, nil
 }
 
-// PreUpload writes a dry-run file list when --dry-run is set and signals the
-// caller to skip PushFiles by returning true.
 func (u *GenericUploader) PreUpload(jobs []upload.FileUploadJob) (bool, error) {
-	if !u.DryRun {
-		return false, nil
-	}
-	if err := writeDryRunOutput(jobs); err != nil {
-		return false, err
-	}
-	return true, nil
+	return runPreUpload(jobs, u.DryRun)
 }
 
 // PushFiles runs the shared upload engine on the provided jobs and reports

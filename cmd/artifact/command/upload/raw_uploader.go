@@ -24,6 +24,7 @@ type RawUploader struct {
 	DestTemplate string // path prefix within the registry
 	RegistryName string
 	DryRun       bool
+	Flatten      bool // when true, strip source sub-directories; only the file basename is used in the dest path
 	PkgClient    *pkgclient.ClientWithResponses
 }
 
@@ -91,7 +92,11 @@ func (u *RawUploader) GetFiles() ([]upload.FileUploadJob, UploadStats, error) {
 		}
 
 		absPath := filepath.Join(absRoot, filepath.FromSlash(relPath))
-		dest := resolveRawDestPath(u.DestTemplate, relPath)
+		destRelPath := relPath
+		if u.Flatten {
+			destRelPath = filepath.Base(relPath)
+		}
+		dest := resolveRawDestPath(u.DestTemplate, destRelPath)
 
 		checksums, err := utils.ComputeFileChecksums(absPath)
 		if err != nil {
@@ -110,16 +115,8 @@ func (u *RawUploader) GetFiles() ([]upload.FileUploadJob, UploadStats, error) {
 	return jobs, stats, nil
 }
 
-// PreUpload writes a dry-run file list when --dry-run is set and signals the
-// caller to skip PushFiles by returning true.
 func (u *RawUploader) PreUpload(jobs []upload.FileUploadJob) (bool, error) {
-	if !u.DryRun {
-		return false, nil
-	}
-	if err := writeDryRunOutput(jobs); err != nil {
-		return false, err
-	}
-	return true, nil
+	return runPreUpload(jobs, u.DryRun)
 }
 
 // PushFiles runs the shared upload engine on the provided jobs.

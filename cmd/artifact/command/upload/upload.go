@@ -32,6 +32,7 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 	const expectedArgumentCount = 2
 	var packageVersion string
 	var dryRun bool
+	var flatten bool
 
 	cmd := &cobra.Command{
 		Use:   "upload <SRC_PATH_PATTERN> <REGISTRY/DEST_PATH>",
@@ -72,6 +73,7 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 			var uploader Pusher = &RawUploader{
 				SrcPattern: srcPattern,
 				DryRun:     dryRun,
+				Flatten:    flatten,
 				PkgClient:  c.PkgHttpClient(),
 			}
 
@@ -119,6 +121,7 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 
 	cmd.Flags().StringVar(&packageVersion, "version", "1.0.0", "version for the artifact")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "list files that would be uploaded without actually uploading them")
+	cmd.Flags().BoolVar(&flatten, "flatten", false, "strip source sub-directories; upload all files directly into the destination path")
 
 	return cmd
 }

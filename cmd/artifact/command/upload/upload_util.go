@@ -28,6 +28,102 @@ type dryRunEntry struct {
 	SizeBytes int64  `json:"size_bytes"`
 }
 
+// conflictJobRef identifies one job that maps to a conflicting dest path.
+type conflictJobRef struct {
+	JobID     string `json:"job_id"`
+	LocalPath string `json:"local_path"`
+}
+
+// conflictEntry groups all jobs that share the same dest_path.
+type conflictEntry struct {
+	DestPath string           `json:"dest_path"`
+	Jobs     []conflictJobRef `json:"jobs"`
+}
+
+// findDestPathConflicts returns one conflictEntry per dest_path that is
+// targeted by more than one job.
+func findDestPathConflicts(jobs []upload.FileUploadJob) []conflictEntry {
+	buckets := make(map[string][]conflictJobRef)
+	order := make([]string, 0)
+
+	for _, j := range jobs {
+		destPath := ""
+		if dp, ok := j.(destPather); ok {
+			destPath = dp.GetDestPath()
+		}
+		if destPath == "" {
+			continue
+		}
+		if _, exists := buckets[destPath]; !exists {
+			order = append(order, destPath)
+		}
+		buckets[destPath] = append(buckets[destPath], conflictJobRef{
+			JobID:     j.GetID(),
+			LocalPath: j.GetFilePath(),
+		})
+	}
+
+	var conflicts []conflictEntry
+	for _, destPath := range order {
+		if len(buckets[destPath]) > 1 {
+			conflicts = append(conflicts, conflictEntry{
+				DestPath: destPath,
+				Jobs:     buckets[destPath],
+			})
+		}
+	}
+	return conflicts
+}
+
+// writeConflictReport writes the conflict list to a timestamped JSON file and
+// returns the path it was written to.
+func writeConflictReport(conflicts []conflictEntry) (string, error) {
+	if err := os.MkdirAll(dryRunOutputDir, 0o755); err != nil {
+		return "", fmt.Errorf("failed to create dry-run output directory: %w", err)
+	}
+
+	timestamp := time.Now().Format("20060102_150405")
+	outPath := filepath.Join(dryRunOutputDir, fmt.Sprintf("conflict-upload-%s.json", timestamp))
+
+	data, err := json.MarshalIndent(conflicts, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal conflict report: %w", err)
+	}
+	if err := os.WriteFile(outPath, data, 0o644); err != nil {
+		return "", fmt.Errorf("failed to write conflict report: %w", err)
+	}
+	return outPath, nil
+}
+
+// runPreUpload is the shared pre-upload logic used by all Pusher implementations.
+// It checks for dest_path conflicts, handles dry-run output, and signals whether
+// PushFiles should be skipped.
+func runPreUpload(jobs []upload.FileUploadJob, dryRun bool) (bool, error) {
+	conflicts := findDestPathConflicts(jobs)
+
+	if len(conflicts) > 0 {
+		if dryRun {
+			_ = writeDryRunOutput(jobs)
+			reportPath, err := writeConflictReport(conflicts)
+			if err != nil {
+				return false, fmt.Errorf("conflict found at %d destination(s); also failed to write conflict report: %w", len(conflicts), err)
+			}
+			fmt.Printf("\nConflict report written to: %s\n", reportPath)
+			return false, fmt.Errorf("conflict found at %d destination(s), see conflict report at %s", len(conflicts), reportPath)
+		}
+		return false, fmt.Errorf("conflict found at %d destination(s), run with --dry-run to see details", len(conflicts))
+	}
+
+	if dryRun {
+		if err := writeDryRunOutput(jobs); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	return false, nil
+}
+
 // writeDryRunOutput serialises the planned upload list to a timestamped JSON
 // file under dry-run-output/, mirroring the pattern used by migration.go.
 func writeDryRunOutput(jobs []upload.FileUploadJob) error {
