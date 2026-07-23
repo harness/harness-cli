@@ -20,6 +20,9 @@ type Pusher interface {
 	// GetFiles collects all files that match the configured source pattern
 	GetFiles() ([]upload.FileUploadJob, UploadStats, error)
 
+	// PreUpload runs before PushFiles. can be used for dry-run or applying any other filter
+	PreUpload(jobs []upload.FileUploadJob) (bool, error)
+
 	// PushFiles executes the upload for each job in jobs.
 	PushFiles(ctx context.Context, jobs []upload.FileUploadJob) error
 }

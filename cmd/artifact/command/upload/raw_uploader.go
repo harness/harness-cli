@@ -23,6 +23,7 @@ type RawUploader struct {
 	SrcPattern   string
 	DestTemplate string // path prefix within the registry
 	RegistryName string
+	DryRun       bool
 	PkgClient    *pkgclient.ClientWithResponses
 }
 
@@ -107,6 +108,18 @@ func (u *RawUploader) GetFiles() ([]upload.FileUploadJob, UploadStats, error) {
 	}
 
 	return jobs, stats, nil
+}
+
+// PreUpload writes a dry-run file list when --dry-run is set and signals the
+// caller to skip PushFiles by returning true.
+func (u *RawUploader) PreUpload(jobs []upload.FileUploadJob) (bool, error) {
+	if !u.DryRun {
+		return false, nil
+	}
+	if err := writeDryRunOutput(jobs); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // PushFiles runs the shared upload engine on the provided jobs.

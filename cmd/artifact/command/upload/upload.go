@@ -31,6 +31,7 @@ import (
 func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 	const expectedArgumentCount = 2
 	var packageVersion string
+	var dryRun bool
 
 	cmd := &cobra.Command{
 		Use:   "upload <SRC_PATH_PATTERN> <REGISTRY/DEST_PATH>",
@@ -70,6 +71,7 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 			*/
 			var uploader Pusher = &RawUploader{
 				SrcPattern: srcPattern,
+				DryRun:     dryRun,
 				PkgClient:  c.PkgHttpClient(),
 			}
 
@@ -94,6 +96,15 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 			progress.Step(fmt.Sprintf("Found %d file(s) (%s) to upload to registry %q\n",
 				stats.FileCount, bytesize.New(float64(stats.TotalBytes)), registryName))
 
+			skipped, err := uploader.PreUpload(jobs)
+			if err != nil {
+				progress.Error("pre-upload step failed")
+				return err
+			}
+			if skipped {
+				return nil
+			}
+
 			progress.Step("Executing upload step")
 			err = uploader.PushFiles(ctx, jobs)
 			if err != nil {
@@ -107,6 +118,7 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&packageVersion, "version", "1.0.0", "version for the artifact")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "list files that would be uploaded without actually uploading them")
 
 	return cmd
 }

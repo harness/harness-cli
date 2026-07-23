@@ -36,6 +36,8 @@ func NewRawUploadJob(id, filePath, destPath, registry string, fileSize int64, ch
 	}
 }
 
+func (j *RawUploadJob) GetDestPath() string { return j.DestPath }
+
 // Upload performs the PUT upload of the raw file to its destination path.
 func (j *RawUploadJob) Upload(ctx context.Context) error {
 	file, err := os.Open(j.FilePath)

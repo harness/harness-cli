@@ -26,7 +26,20 @@ type GenericUploader struct {
 	DestTemplate string // package path within the registry; may contain {N} placeholders
 	RegistryName string
 	Version      string
+	DryRun       bool
 	PkgClient    *pkgclient.ClientWithResponses
+}
+
+// GetRegistryAndPath parses a generic target of the form "<registry>/<dest-path>"
+
+func (u *GenericUploader) GetRegistryAndPath(target string) (string, error) {
+	idx := strings.IndexByte(target, '/')
+	if idx < 0 {
+		return "", fmt.Errorf("target must be in the form <registry>/<path>, got %q", target)
+	}
+	u.RegistryName = target[:idx]
+	u.DestTemplate = target[idx+1:]
+	return u.RegistryName, nil
 }
 
 // GetFiles expands SrcPattern and returns one GenericUploadJob per matched file.
@@ -135,6 +148,18 @@ func (u *GenericUploader) GetFiles() ([]upload.FileUploadJob, UploadStats, error
 	return jobs, stats, nil
 }
 
+// PreUpload writes a dry-run file list when --dry-run is set and signals the
+// caller to skip PushFiles by returning true.
+func (u *GenericUploader) PreUpload(jobs []upload.FileUploadJob) (bool, error) {
+	if !u.DryRun {
+		return false, nil
+	}
+	if err := writeDryRunOutput(jobs); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // PushFiles runs the shared upload engine on the provided jobs and reports
 func (u *GenericUploader) PushFiles(ctx context.Context, jobs []upload.FileUploadJob) error {
 	engine := upload.NewFileUploadEngine(upload.DefaultUploadWorker, progress.NewConsoleReporter())
@@ -151,48 +176,6 @@ func (u *GenericUploader) PushFiles(ctx context.Context, jobs []upload.FileUploa
 		return fmt.Errorf("%d of %d file(s) failed to upload", failed, len(results))
 	}
 	return nil
-}
-
-// GetRegistryAndPath parses a generic target of the form "<registry>/<dest-path>"
-
-func (u *GenericUploader) GetRegistryAndPath(target string) (string, error) {
-	idx := strings.IndexByte(target, '/')
-	if idx < 0 {
-		return "", fmt.Errorf("target must be in the form <registry>/<path>, got %q", target)
-	}
-	u.RegistryName = target[:idx]
-	u.DestTemplate = target[idx+1:]
-	return u.RegistryName, nil
-}
-
-// ── Pattern helpers
-// Examples:
-//
-//	"dist/(*)/*.zip"   →  "dist",  "(*)/*.zip"
-//	"*.jar"            →  ".",     "*.jar"
-//	"**/*.jar"         →  ".",     "**/*.jar"
-//	"target/(**)"      →  "target","(**)"
-//	"/abs/path/f.txt"  →  "/abs/path/f.txt", ""
-func splitPatternRoot(pattern string) (root, relPattern string) {
-	// Normalise to forward slashes for consistent splitting.
-	norm := filepath.ToSlash(pattern)
-	parts := strings.Split(norm, "/")
-
-	var rootParts []string
-	for i, p := range parts {
-		if containsWildcard(p) {
-			relPattern = strings.Join(parts[i:], "/")
-			break
-		}
-		rootParts = append(rootParts, p)
-	}
-
-	if len(rootParts) == 0 {
-		root = "."
-	} else {
-		root = strings.Join(rootParts, string(filepath.Separator))
-	}
-	return root, relPattern
 }
 
 // containsWildcard reports whether s contains any wildcard metacharacter.

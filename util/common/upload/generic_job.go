@@ -41,6 +41,8 @@ func NewGenericUploadJob(id, filePath, destPath, registry, packageName, version 
 	}
 }
 
+func (j *GenericUploadJob) GetDestPath() string { return j.DestPath }
+
 // Upload performs the PUT once. Any transient-failure handling is the
 // HTTP client layer's responsibility (see comment on GenericUploadJob).
 func (j *GenericUploadJob) Upload(ctx context.Context) error {
