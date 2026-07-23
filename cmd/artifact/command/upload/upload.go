@@ -4,8 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"strings"
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
+	"github.com/harness/harness-cli/config"
+	ar "github.com/harness/harness-cli/internal/api/ar"
+	client "github.com/harness/harness-cli/util/client"
 	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/inhies/go-bytesize"
@@ -60,25 +65,31 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 				ctx = context.Background()
 			}
 
-			/*
-				We can create uploader here using some factory logic ,
-				For any other pkg type whose artifact type is clearly identified by extension
-				then they can be pushed to there resepectivr registry based on there interface implementtion logic
-				currently it is default for generic registry
-			*/
-			/*var uploader Pusher = &GenericUploader{
-				SrcPattern: srcPattern,
-				Version:    packageVersion,
-				PkgClient:  c.PkgHttpClient(),
+			progress.Step("Validating registry")
+			targetRegistry, err := getRegistryName(target)
+			if err != nil {
+				progress.Error("Failed to parse registry name")
+				return err
 			}
-			*/
-			var uploader Pusher = &RawUploader{
-				SrcPattern: srcPattern,
-				DryRun:     dryRun,
-				Flatten:    flatten,
-				Include:    includes,
-				Exclude:    excludes,
-				PkgClient:  c.PkgHttpClient(),
+			pkgType, err := validateRegistry(ctx, targetRegistry, c)
+			if err != nil {
+				progress.Error("Registry validation failed")
+				return err
+			}
+			progress.Step(fmt.Sprintf("Registry %q exists (package type: %s)", targetRegistry, pkgType))
+			progress.Step(fmt.Sprintf("Initiating pushing of files for package type: %s", pkgType))
+			uploader, err := getPusherInstance(pkgType, UploaderConfig{
+				SrcPattern:     srcPattern,
+				PackageVersion: packageVersion,
+				DryRun:         dryRun,
+				Flatten:        flatten,
+				Include:        includes,
+				Exclude:        excludes,
+				PkgClient:      c.PkgHttpClient(),
+			})
+			if err != nil {
+				progress.Error("Unsupported registry type")
+				return err
 			}
 
 			progress.Start("Validating input parameters")
@@ -87,8 +98,6 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 				progress.Error("Failed to validate input parameter")
 				return err
 			}
-
-			//TODO validate registry and initialized Pusher based on Artifact type
 
 			fmt.Printf("Scanning pattern %q ...\n", srcPattern)
 			progress.Step("Collecting files to be uploaded")
@@ -132,4 +141,32 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 	cmd.Flags().StringArrayVar(&excludes, "exclude", nil, "glob pattern to exclude (may be repeated); matching files are skipped")
 
 	return cmd
+}
+
+// validateRegistry calls the GetRegistry API to confirm the registry exists
+// and returns its PackageType so the caller can select the right uploader.
+func validateRegistry(ctx context.Context, registryName string, c *cmdutils.Factory) (ar.PackageType, error) {
+	registryRef := client.GetRef(config.Global.AccountID, config.Global.OrgID, config.Global.ProjectID, registryName)
+	resp, err := c.RegistryHttpClient().GetRegistryWithResponse(ctx, registryRef)
+	if err != nil {
+		return "", fmt.Errorf("failed to reach registry %q: %w", registryName, err)
+	}
+	if resp.StatusCode() != http.StatusOK || resp.JSON200 == nil {
+		return "", fmt.Errorf("registry %q not found or inaccessible (HTTP %d)", registryName, resp.StatusCode())
+	}
+	return resp.JSON200.Data.PackageType, nil
+}
+
+func getRegistryName(target string) (string, error) {
+	idx := strings.IndexByte(target, '/')
+	var name string
+	if idx < 0 {
+		name = target
+	} else {
+		name = target[:idx]
+	}
+	if name == "" {
+		return "", fmt.Errorf("registry name must not be empty (got %q)", target)
+	}
+	return name, nil
 }
