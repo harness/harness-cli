@@ -97,8 +97,24 @@ func writeConflictReport(conflicts []conflictEntry) (string, error) {
 	return outPath, nil
 }
 
+// validatePatterns checks that every include/exclude glob is syntactically valid
+func validatePatterns(includes, excludes []string) error {
+	for _, p := range includes {
+		if _, err := doublestar.Match(p, ""); err != nil {
+			return fmt.Errorf("include pattern %q is not a valid glob: %w", p, err)
+		}
+	}
+	for _, p := range excludes {
+		if _, err := doublestar.Match(p, ""); err != nil {
+			return fmt.Errorf("exclude pattern %q is not a valid glob: %w", p, err)
+		}
+	}
+	return nil
+}
+
 // applyIncludeExcludeFilter filters jobs according to include/exclude glob patterns.
-func applyIncludeExcludeFilter(jobs []upload.FileUploadJob, includes, excludes []string) ([]upload.FileUploadJob, error) {
+// Patterns are guaranteed valid already verified before
+func applyIncludeExcludeFilter(jobs []upload.FileUploadJob, includes, excludes []string) []upload.FileUploadJob {
 	fmt.Printf("  Total Files found ::     %d\n", len(jobs))
 
 	if len(includes) > 0 {
@@ -106,11 +122,7 @@ func applyIncludeExcludeFilter(jobs []upload.FileUploadJob, includes, excludes [
 		for _, j := range jobs {
 			p := filepath.ToSlash(j.GetID())
 			for _, pattern := range includes {
-				matched, err := doublestar.Match(pattern, p)
-				if err != nil {
-					return nil, fmt.Errorf("invalid --include pattern %q: %w", pattern, err)
-				}
-				if matched {
+				if matched, _ := doublestar.Match(pattern, p); matched {
 					kept = append(kept, j)
 					break
 				}
@@ -126,11 +138,7 @@ func applyIncludeExcludeFilter(jobs []upload.FileUploadJob, includes, excludes [
 			p := filepath.ToSlash(j.GetID())
 			excluded := false
 			for _, pattern := range excludes {
-				matched, err := doublestar.Match(pattern, p)
-				if err != nil {
-					return nil, fmt.Errorf("invalid --exclude pattern %q: %w", pattern, err)
-				}
-				if matched {
+				if matched, _ := doublestar.Match(pattern, p); matched {
 					excluded = true
 					break
 				}
@@ -143,7 +151,7 @@ func applyIncludeExcludeFilter(jobs []upload.FileUploadJob, includes, excludes [
 		fmt.Printf("  Files After Applying exclude filter(s):  %d\n", len(jobs))
 	}
 
-	return jobs, nil
+	return jobs
 }
 
 func runPreUpload(jobs []upload.FileUploadJob, dryRun bool) (bool, error) {

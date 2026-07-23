@@ -47,6 +47,10 @@ func (u *RawUploader) GetRegistryAndPath(target string) (string, error) {
 func (u *RawUploader) GetFiles() ([]upload.FileUploadJob, UploadStats, error) {
 	var stats UploadStats
 
+	if err := validatePatterns(u.Include, u.Exclude); err != nil {
+		return nil, stats, err
+	}
+
 	root, relPattern := splitPatternRoot(u.SrcPattern)
 
 	absRoot, err := filepath.Abs(root)
@@ -113,10 +117,7 @@ func (u *RawUploader) GetFiles() ([]upload.FileUploadJob, UploadStats, error) {
 		return nil, stats, fmt.Errorf("invalid pattern or walk error for %q: %w", u.SrcPattern, walkErr)
 	}
 
-	jobs, err = applyIncludeExcludeFilter(jobs, u.Include, u.Exclude)
-	if err != nil {
-		return nil, stats, err
-	}
+	jobs = applyIncludeExcludeFilter(jobs, u.Include, u.Exclude)
 	stats.FileCount = len(jobs)
 	return jobs, stats, nil
 }
