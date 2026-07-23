@@ -21,7 +21,7 @@ type Pusher interface {
 	GetFiles() ([]upload.FileUploadJob, UploadStats, error)
 
 	// PreUpload runs before PushFiles. can be used for dry-run or applying any other filter or validation
-	PreUpload(jobs []upload.FileUploadJob) (bool, error)
+	PreUpload(jobs []upload.FileUploadJob) (skip bool, err error)
 
 	// PushFiles executes the upload for each job in jobs.
 	PushFiles(ctx context.Context, jobs []upload.FileUploadJob) error

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/harness/harness-cli/util/common/upload"
+
+	"github.com/bmatcuk/doublestar/v4"
 )
 
 const dryRunOutputDir = "dry-run-output"
@@ -95,9 +97,55 @@ func writeConflictReport(conflicts []conflictEntry) (string, error) {
 	return outPath, nil
 }
 
-// runPreUpload is the shared pre-upload logic used by all Pusher implementations.
-// It checks for dest_path conflicts, handles dry-run output, and signals whether
-// PushFiles should be skipped.
+// applyIncludeExcludeFilter filters jobs according to include/exclude glob patterns.
+func applyIncludeExcludeFilter(jobs []upload.FileUploadJob, includes, excludes []string) ([]upload.FileUploadJob, error) {
+	fmt.Printf("  Total Files found ::     %d\n", len(jobs))
+
+	if len(includes) > 0 {
+		var kept []upload.FileUploadJob
+		for _, j := range jobs {
+			p := filepath.ToSlash(j.GetID())
+			for _, pattern := range includes {
+				matched, err := doublestar.Match(pattern, p)
+				if err != nil {
+					return nil, fmt.Errorf("invalid --include pattern %q: %w", pattern, err)
+				}
+				if matched {
+					kept = append(kept, j)
+					break
+				}
+			}
+		}
+		jobs = kept
+		fmt.Printf("  Files After Applying include filter(s):  %d\n", len(jobs))
+	}
+
+	if len(excludes) > 0 {
+		var kept []upload.FileUploadJob
+		for _, j := range jobs {
+			p := filepath.ToSlash(j.GetID())
+			excluded := false
+			for _, pattern := range excludes {
+				matched, err := doublestar.Match(pattern, p)
+				if err != nil {
+					return nil, fmt.Errorf("invalid --exclude pattern %q: %w", pattern, err)
+				}
+				if matched {
+					excluded = true
+					break
+				}
+			}
+			if !excluded {
+				kept = append(kept, j)
+			}
+		}
+		jobs = kept
+		fmt.Printf("  Files After Applying exclude filter(s):  %d\n", len(jobs))
+	}
+
+	return jobs, nil
+}
+
 func runPreUpload(jobs []upload.FileUploadJob, dryRun bool) (bool, error) {
 	conflicts := findDestPathConflicts(jobs)
 
@@ -124,7 +172,7 @@ func runPreUpload(jobs []upload.FileUploadJob, dryRun bool) (bool, error) {
 	return false, nil
 }
 
-// writeDryRunOutput serialises the planned upload list to a timestamped JSON
+// writeDryRunOutput write  planned upload list to a timestamped JSON
 // file under dry-run-output/, mirroring the pattern used by migration.go.
 func writeDryRunOutput(jobs []upload.FileUploadJob) error {
 	if err := os.MkdirAll(dryRunOutputDir, 0o755); err != nil {
@@ -163,14 +211,6 @@ func writeDryRunOutput(jobs []upload.FileUploadJob) error {
 	return nil
 }
 
-// ── Pattern helpers
-// Examples:
-//
-//	"dist/(*)/*.zip"   →  "dist",  "(*)/*.zip"
-//	"*.jar"            →  ".",     "*.jar"
-//	"**/*.jar"         →  ".",     "**/*.jar"
-//	"target/(**)"      →  "target","(**)"
-//	"/abs/path/f.txt"  →  "/abs/path/f.txt", ""
 func splitPatternRoot(pattern string) (root, relPattern string) {
 	// Normalise to forward slashes for consistent splitting.
 	norm := filepath.ToSlash(pattern)

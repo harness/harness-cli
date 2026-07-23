@@ -25,6 +25,8 @@ type RawUploader struct {
 	RegistryName string
 	DryRun       bool
 	Flatten      bool // when true, strip source sub-directories; only the file basename is used in the dest path
+	Include      []string
+	Exclude      []string
 	PkgClient    *pkgclient.ClientWithResponses
 }
 
@@ -81,7 +83,6 @@ func (u *RawUploader) GetFiles() ([]upload.FileUploadJob, UploadStats, error) {
 		if d.IsDir() {
 			return nil
 		}
-		//TODO to ignore other hidden file and git ignore etc too.
 
 		info, err := d.Info()
 		if err != nil {
@@ -112,6 +113,11 @@ func (u *RawUploader) GetFiles() ([]upload.FileUploadJob, UploadStats, error) {
 		return nil, stats, fmt.Errorf("invalid pattern or walk error for %q: %w", u.SrcPattern, walkErr)
 	}
 
+	jobs, err = applyIncludeExcludeFilter(jobs, u.Include, u.Exclude)
+	if err != nil {
+		return nil, stats, err
+	}
+	stats.FileCount = len(jobs)
 	return jobs, stats, nil
 }
 
@@ -138,7 +144,7 @@ func (u *RawUploader) PushFiles(ctx context.Context, jobs []upload.FileUploadJob
 }
 
 // resolveRawDestPath computes the final destination path for a raw file upload.
-// No version segment is inserted; the full relative path is always preserved
+// the full relative path is always preserved
 // so that source directory structure is mirrored in the registry.
 // When template is empty the file lands at the registry root: /files/<relPath>.
 func resolveRawDestPath(template, relPath string) string {

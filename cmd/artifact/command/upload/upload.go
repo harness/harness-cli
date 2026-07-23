@@ -33,6 +33,8 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 	var packageVersion string
 	var dryRun bool
 	var flatten bool
+	var includes []string
+	var excludes []string
 
 	cmd := &cobra.Command{
 		Use:   "upload <SRC_PATH_PATTERN> <REGISTRY/DEST_PATH>",
@@ -74,6 +76,8 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 				SrcPattern: srcPattern,
 				DryRun:     dryRun,
 				Flatten:    flatten,
+				Include:    includes,
+				Exclude:    excludes,
 				PkgClient:  c.PkgHttpClient(),
 			}
 
@@ -83,6 +87,8 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 				progress.Error("Failed to validate input parameter")
 				return err
 			}
+
+			//TODO validate registry and initialized Pusher based on Artifact type
 
 			fmt.Printf("Scanning pattern %q ...\n", srcPattern)
 			progress.Step("Collecting files to be uploaded")
@@ -122,6 +128,8 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 	cmd.Flags().StringVar(&packageVersion, "version", "1.0.0", "version for the artifact")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "list files that would be uploaded without actually uploading them")
 	cmd.Flags().BoolVar(&flatten, "flatten", false, "strip source sub-directories; upload all files directly into the destination path")
+	cmd.Flags().StringArrayVar(&includes, "include", nil, "glob pattern to include (may be repeated); only matching files are uploaded")
+	cmd.Flags().StringArrayVar(&excludes, "exclude", nil, "glob pattern to exclude (may be repeated); matching files are skipped")
 
 	return cmd
 }
