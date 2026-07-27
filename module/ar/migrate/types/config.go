@@ -93,6 +93,11 @@ type RegistryMapping struct {
 	//Optional
 	SourcePackageHostname string      `yaml:"sourcePackageHostname"`
 	DateFilter            *DateFilter `yaml:"dateFilter"`
+	// PackageFilters is an opt-in allow-list restricting the migration to specific
+	// packages, and optionally specific versions/files within them. When empty, all
+	// packages migrate (behavior-preserving). Supported granularity varies by artifact
+	// type — see ValidatePackageFilters.
+	PackageFilters []PackageSelector `yaml:"packageFilters,omitempty"`
 }
 
 // CredentialsConfig defines the credential configuration
@@ -170,6 +175,9 @@ func validateConfig(config *Config) error {
 				"maven-metadata.xml may not be in sync with the migrated artifacts", i, MAVEN)
 			log.Warn().Msg(msg)
 			pterm.Warning.Println(msg)
+		}
+		if err := ValidatePackageFilters(mapping.PackageFilters, mapping.ArtifactType); err != nil {
+			return fmt.Errorf("mapping %d: %w", i, err)
 		}
 	}
 

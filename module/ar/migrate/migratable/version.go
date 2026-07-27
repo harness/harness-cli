@@ -129,7 +129,15 @@ func (r *Version) Migrate(ctx context.Context) error {
 			logger.Error().Err(err).Msg("Failed to get files from tree")
 			return fmt.Errorf("get files from tree failed: %w", err)
 		}
+		// Resolve the opt-in file selector (packageFilters[].files) for this package once.
+		fileSel, fileHasFilters, fileMatched := util.SelectorForPackage(r.mapping, r.pkg.Name)
 		for _, file := range files {
+			// Skip files not named by the package file selector. No-op when there is
+			// no matching selector or the selector's files list is empty (all files).
+			if fileHasFilters && fileMatched && !util.FileSelectedBySelector(fileSel, file.Name) {
+				logger.Debug().Msgf("Skipping file %s: not selected by package filter", file.Name)
+				continue
+			}
 			// For NPM, skip files that don't have .tgz extension
 			if r.artifactType == types.NPM && !strings.HasSuffix(file.Name, ".tgz") {
 				logger.Debug().Msgf("Skipping non-tgz file %s for NPM migration", file.Name)

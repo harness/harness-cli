@@ -279,6 +279,15 @@ func (r *Registry) Migrate(ctx context.Context) error {
 		}
 	}
 
+	// Apply the opt-in package selector allow-list (packageFilters). When set,
+	// only the named packages are migrated; runs before the destination index is
+	// built so the index only covers selected work. No-op when unset.
+	if len(r.mapping.PackageFilters) > 0 {
+		originalCount := len(pkgs)
+		pkgs = util.FilterPackagesBySelectors(pkgs, r.mapping.PackageFilters)
+		logger.Info().Msgf("Package selector filter: %d -> %d packages", originalCount, len(pkgs))
+	}
+
 	// Build destination index once per registry when overwrite=false
 	var existingIndex *types.ExistingIndex
 	if !r.config.Overwrite && !r.config.DryRun && indexApplicable(r.artifactType) {

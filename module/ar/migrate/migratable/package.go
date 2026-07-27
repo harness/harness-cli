@@ -315,6 +315,23 @@ func (r *Package) Migrate(ctx context.Context) error {
 func (r *Package) buildVersionJobs(versions []types.Version, logger zerolog.Logger) []engine.Job {
 	atomic := util.IsAtomicVersionArtifact(r.artifactType)
 
+	// Apply the opt-in version selector (packageFilters[].versions). When the
+	// current package is named in packageFilters with a non-empty versions list,
+	// keep only those versions; everything else is pruned. Filtering the slice up
+	// front keeps both the atomic and non-atomic grouping below correct. No-op when
+	// unset or when this package has no version-level selector.
+	if sel, hasFilters, matched := util.SelectorForPackage(r.mapping, r.pkg.Name); hasFilters && matched && len(sel.Versions) > 0 {
+		originalCount := len(versions)
+		filtered := versions[:0:0]
+		for _, v := range versions {
+			if util.VersionSelectedBySelector(sel, v.Name) {
+				filtered = append(filtered, v)
+			}
+		}
+		versions = filtered
+		logger.Info().Msgf("Version selector filter for package %s: %d -> %d versions", r.pkg.Name, originalCount, len(versions))
+	}
+
 	// Resolve each entry's node once and tally, per version Name, how many
 	// distribution files survived the filter. A version is in-scope iff kept > 0.
 	type resolved struct {
