@@ -303,6 +303,12 @@ type ClientInterface interface {
 
 	// UploadSwiftPackageWithBody request with any body
 	UploadSwiftPackageWithBody(ctx context.Context, accountId string, registry string, scope string, name string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadTerraformModuleWithBody request with any body
+	UploadTerraformModuleWithBody(ctx context.Context, accountId string, registry string, namespace string, name string, provider string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadTerraformProviderWithBody request with any body
+	UploadTerraformProviderWithBody(ctx context.Context, accountId string, registry string, namespace string, pType string, version string, filename string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) UploadCargoPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -619,6 +625,30 @@ func (c *Client) UploadRpmPackageWithBody(ctx context.Context, accountId string,
 
 func (c *Client) UploadSwiftPackageWithBody(ctx context.Context, accountId string, registry string, scope string, name string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadSwiftPackageRequestWithBody(c.Server, accountId, registry, scope, name, version, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadTerraformModuleWithBody(ctx context.Context, accountId string, registry string, namespace string, name string, provider string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadTerraformModuleRequestWithBody(c.Server, accountId, registry, namespace, name, provider, version, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadTerraformProviderWithBody(ctx context.Context, accountId string, registry string, namespace string, pType string, version string, filename string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadTerraformProviderRequestWithBody(c.Server, accountId, registry, namespace, pType, version, filename, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2190,6 +2220,148 @@ func NewUploadSwiftPackageRequestWithBody(server string, accountId string, regis
 	return req, nil
 }
 
+// NewUploadTerraformModuleRequestWithBody generates requests for UploadTerraformModule with any type of body
+func NewUploadTerraformModuleRequestWithBody(server string, accountId string, registry string, namespace string, name string, provider string, version string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "registry", runtime.ParamLocationPath, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "namespace", runtime.ParamLocationPath, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "name", runtime.ParamLocationPath, name)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam4 string
+
+	pathParam4, err = runtime.StyleParamWithLocation("simple", false, "provider", runtime.ParamLocationPath, provider)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam5 string
+
+	pathParam5, err = runtime.StyleParamWithLocation("simple", false, "version", runtime.ParamLocationPath, version)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pkg/%s/%s/terraform/v1/modules/%s/%s/%s/%s", pathParam0, pathParam1, pathParam2, pathParam3, pathParam4, pathParam5)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUploadTerraformProviderRequestWithBody generates requests for UploadTerraformProvider with any type of body
+func NewUploadTerraformProviderRequestWithBody(server string, accountId string, registry string, namespace string, pType string, version string, filename string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "registry", runtime.ParamLocationPath, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "namespace", runtime.ParamLocationPath, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithLocation("simple", false, "type", runtime.ParamLocationPath, pType)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam4 string
+
+	pathParam4, err = runtime.StyleParamWithLocation("simple", false, "version", runtime.ParamLocationPath, version)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam5 string
+
+	pathParam5, err = runtime.StyleParamWithLocation("simple", false, "filename", runtime.ParamLocationPath, filename)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pkg/%s/%s/terraform/v1/providers/%s/%s/%s/%s", pathParam0, pathParam1, pathParam2, pathParam3, pathParam4, pathParam5)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -2313,6 +2485,12 @@ type ClientWithResponsesInterface interface {
 
 	// UploadSwiftPackageWithBodyWithResponse request with any body
 	UploadSwiftPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, scope string, name string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSwiftPackageResp, error)
+
+	// UploadTerraformModuleWithBodyWithResponse request with any body
+	UploadTerraformModuleWithBodyWithResponse(ctx context.Context, accountId string, registry string, namespace string, name string, provider string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadTerraformModuleResp, error)
+
+	// UploadTerraformProviderWithBodyWithResponse request with any body
+	UploadTerraformProviderWithBodyWithResponse(ctx context.Context, accountId string, registry string, namespace string, pType string, version string, filename string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadTerraformProviderResp, error)
 }
 
 type UploadCargoPackageResp struct {
@@ -2882,6 +3060,48 @@ func (r UploadSwiftPackageResp) StatusCode() int {
 	return 0
 }
 
+type UploadTerraformModuleResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadTerraformModuleResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadTerraformModuleResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UploadTerraformProviderResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadTerraformProviderResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadTerraformProviderResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // UploadCargoPackageWithBodyWithResponse request with arbitrary body returning *UploadCargoPackageResp
 func (c *ClientWithResponses) UploadCargoPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadCargoPackageResp, error) {
 	rsp, err := c.UploadCargoPackageWithBody(ctx, accountId, registry, contentType, body, reqEditors...)
@@ -3123,6 +3343,24 @@ func (c *ClientWithResponses) UploadSwiftPackageWithBodyWithResponse(ctx context
 		return nil, err
 	}
 	return ParseUploadSwiftPackageResp(rsp)
+}
+
+// UploadTerraformModuleWithBodyWithResponse request with arbitrary body returning *UploadTerraformModuleResp
+func (c *ClientWithResponses) UploadTerraformModuleWithBodyWithResponse(ctx context.Context, accountId string, registry string, namespace string, name string, provider string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadTerraformModuleResp, error) {
+	rsp, err := c.UploadTerraformModuleWithBody(ctx, accountId, registry, namespace, name, provider, version, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadTerraformModuleResp(rsp)
+}
+
+// UploadTerraformProviderWithBodyWithResponse request with arbitrary body returning *UploadTerraformProviderResp
+func (c *ClientWithResponses) UploadTerraformProviderWithBodyWithResponse(ctx context.Context, accountId string, registry string, namespace string, pType string, version string, filename string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadTerraformProviderResp, error) {
+	rsp, err := c.UploadTerraformProviderWithBody(ctx, accountId, registry, namespace, pType, version, filename, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadTerraformProviderResp(rsp)
 }
 
 // ParseUploadCargoPackageResp parses an HTTP response from a UploadCargoPackageWithResponse call
@@ -3550,6 +3788,38 @@ func ParseUploadSwiftPackageResp(rsp *http.Response) (*UploadSwiftPackageResp, e
 	}
 
 	response := &UploadSwiftPackageResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseUploadTerraformModuleResp parses an HTTP response from a UploadTerraformModuleWithResponse call
+func ParseUploadTerraformModuleResp(rsp *http.Response) (*UploadTerraformModuleResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadTerraformModuleResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseUploadTerraformProviderResp parses an HTTP response from a UploadTerraformProviderWithResponse call
+func ParseUploadTerraformProviderResp(rsp *http.Response) (*UploadTerraformProviderResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadTerraformProviderResp{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
