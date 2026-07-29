@@ -298,7 +298,7 @@ func (wc *writeCounter) printProgress() {
 	}
 }
 
-func verifyChecksum(filepath, checksumURL string) error {
+func verifyChecksum(archivePath, checksumURL string) error {
 	// Download checksums.txt
 	client := &http.Client{Timeout: 30 * time.Second}
 	req, err := http.NewRequest("GET", checksumURL, nil)
@@ -323,7 +323,7 @@ func verifyChecksum(filepath, checksumURL string) error {
 	}
 
 	// Find the checksum for our file
-	filename := filepath[strings.LastIndex(filepath, "/")+1:]
+	filename := filepath.Base(archivePath)
 	lines := strings.Split(string(body), "\n")
 	var expectedChecksum string
 
@@ -342,7 +342,7 @@ func verifyChecksum(filepath, checksumURL string) error {
 	}
 
 	// Calculate actual checksum
-	actualChecksum, err := calculateSHA256(filepath)
+	actualChecksum, err := calculateSHA256(archivePath)
 	if err != nil {
 		return err
 	}
