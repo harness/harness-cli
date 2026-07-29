@@ -147,5 +147,6 @@ per type. See the full table in
 - `go build ./...` — build everything.
 - `go test ./module/ar/migrate/...` — migration engine tests.
 - `mock_jfrog` is the integration harness for end-to-end migration behavior.
-- Commits reference JIRA (e.g. `[AH-4458]`); PRs target the `develop` branch.
+- Commits reference JIRA (e.g. `[AH-4458]`); PRs target the `main` branch.
+- **Never commit or push directly to `main`.** Always work on a feature branch and open a PR.
 </content>
