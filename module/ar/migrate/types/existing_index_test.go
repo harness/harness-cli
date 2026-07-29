@@ -91,6 +91,8 @@ func TestExistingIndex_HasFile_NuGet(t *testing.T) {
 	idx := NewExistingIndex()
 	idx.AddFile("company.grpc.pkg", "1.0.0",
 		"/packageID/versionID/foo/company.grpc.pkg.1.0.0.nupkg")
+	idx.AddFile("hello.foo.bar.xxx.yyy", "3.203.0-pr-280.a52f7f9.1",
+		"/hello.foo.bar.xxx.yyy/3.203.0-INTEGRATION/hello/hello.foo.bar.xxx.yyy/3.203.0-INTEGRATION/hello.foo.bar.xxx.yyy.3.203.0-pr-280.a52f7f9.1.nupkg")
 
 	if !idx.HasFile("company.grpc.pkg", "1.0.0", "/foo/company.grpc.pkg.1.0.0.nupkg", NUGET) {
 		t.Error("Expected NuGet lookup to match after stripping the packageID/versionID prefix")
@@ -101,6 +103,10 @@ func TestExistingIndex_HasFile_NuGet(t *testing.T) {
 	// Wrong package/version buckets must not match.
 	if idx.HasFile("other.pkg", "1.0.0", "/foo/company.grpc.pkg.1.0.0.nupkg", NUGET) {
 		t.Error("Expected false for a mismatched package")
+	}
+
+	if !idx.HasFile("hello.foo.bar.xxx.yyy", "3.203.0-pr-280.a52f7f9.1", "/hello/hello.foo.bar.xxx.yyy/3.203.0-INTEGRATION/hello.foo.bar.xxx.yyy.3.203.0-pr-280.a52f7f9.1.nupkg", NUGET) {
+		t.Error("Expected true for a mismatched package")
 	}
 }
 
