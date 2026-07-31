@@ -235,7 +235,37 @@ The following flags are available for all commands:
 --project string          Project ID (overrides saved config)
 --format string           Output format: table (default) or json
 --log-file string         Path to store logs
+--no-progress             Suppress interactive progress output (start/step messages and upload bar)
 ```
+
+## CI Environments / Suppressing Output
+
+When running `hc` in CI pipelines (GitHub Actions, GitLab CI, CircleCI, Jenkins, etc.), interactive progress output such as step-by-step plan messages and upload progress bars can clutter logs.
+
+There are two ways to suppress this output:
+
+**1. Export the `CI` environment variable** (recommended for pipelines — most CI systems set this automatically):
+
+```bash
+export CI=true
+hc artifact push rpm my-registry ./mypackage.rpm
+```
+
+Accepted values: `true`, `1`, `yes`.
+
+**2. Pass the `--no-progress` flag** explicitly:
+
+```bash
+hc --no-progress artifact push rpm my-registry ./mypackage.rpm
+```
+
+Both methods produce the same result:
+- `Start` / `Step` progress messages are suppressed
+- Upload progress bar is hidden
+- **Errors are still printed to `stderr`**
+- **Final success message is still printed to `stdout`**
+
+This makes it safe to pipe or capture CLI output in scripts without losing actionable signal.
 
 ## Output Formatting 
 
