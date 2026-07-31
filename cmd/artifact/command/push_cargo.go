@@ -47,8 +47,8 @@ func NewPushCargoCmd(f *cmdutils.Factory) *cobra.Command {
 			registryName := args[0]
 			filePath := args[1]
 
-			// Create progress reporter
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporterAuto(config.Global.NoProgress)
+			showBar := !config.Global.NoProgress && !p.IsCI()
 
 			// Validate Registry Name and file_path
 			progress.Start("Validating input parameters")
@@ -133,7 +133,7 @@ func NewPushCargoCmd(f *cmdutils.Factory) *cobra.Command {
 			progress.Success("Input parameters validated")
 
 			bufferSize := int64(len(payload))
-			pkgClient := f.PkgHttpClientWithProgress(progress, bufferSize, "cargo")
+			pkgClient := f.PkgHttpClientWithProgress(progress, bufferSize, "cargo", showBar)
 
 			// Initialize progress reader
 			progress.Step("Uploading package to registry")

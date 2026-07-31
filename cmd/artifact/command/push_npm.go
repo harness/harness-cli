@@ -39,8 +39,8 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 			registryName := args[0]
 			packageFilePath := args[1]
 
-			// Create progress reporter
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporterAuto(config.Global.NoProgress)
+			showBar := !config.Global.NoProgress && !p.IsCI()
 
 			// Validate input parameters
 			progress.Start("Validating input parameters")
@@ -191,7 +191,7 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 			bufferSize := fileInfo.Size()
 
 			//Re-initializing pkgClient with progress reader for upload tracking
-			pkgClient = f.PkgHttpClientWithProgress(progress, bufferSize, fileInfo.Name())
+			pkgClient = f.PkgHttpClientWithProgress(progress, bufferSize, fileInfo.Name(), showBar)
 
 			// Check if this is a scoped package (e.g., @scope/package)
 			var statusCode int

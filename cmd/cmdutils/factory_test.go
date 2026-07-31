@@ -192,7 +192,7 @@ func TestFactory_PkgHttpClientWithProgress(t *testing.T) {
 	fileSize := int64(1024)
 	filename := "test.zip"
 
-	client := factory.PkgHttpClientWithProgress(reporter, fileSize, filename)
+	client := factory.PkgHttpClientWithProgress(reporter, fileSize, filename, true)
 
 	if client == nil {
 		t.Fatal("PkgHttpClientWithProgress() returned nil client")
@@ -208,7 +208,7 @@ func TestFactory_PkgHttpClientWithProgress_ZeroFileSize(t *testing.T) {
 	fileSize := int64(0)
 	filename := "empty.txt"
 
-	client := factory.PkgHttpClientWithProgress(reporter, fileSize, filename)
+	client := factory.PkgHttpClientWithProgress(reporter, fileSize, filename, true)
 
 	if client == nil {
 		t.Fatal("PkgHttpClientWithProgress() returned nil client for zero file size")
@@ -298,7 +298,7 @@ func TestFactory_PkgHttpClientWithProgress_LargeFile(t *testing.T) {
 	fileSize := int64(1024 * 1024 * 100) // 100MB
 	filename := "large-file.tar.gz"
 
-	client := factory.PkgHttpClientWithProgress(reporter, fileSize, filename)
+	client := factory.PkgHttpClientWithProgress(reporter, fileSize, filename, true)
 
 	if client == nil {
 		t.Fatal("PkgHttpClientWithProgress() returned nil client for large file")
@@ -326,7 +326,7 @@ func TestFactory_PkgHttpClientWithProgress_DifferentExtensions(t *testing.T) {
 
 	for _, filename := range testCases {
 		t.Run(filename, func(t *testing.T) {
-			client := factory.PkgHttpClientWithProgress(reporter, fileSize, filename)
+			client := factory.PkgHttpClientWithProgress(reporter, fileSize, filename, true)
 			if client == nil {
 				t.Errorf("PkgHttpClientWithProgress() returned nil for %s", filename)
 			}
@@ -462,7 +462,7 @@ func TestFactory_PkgHttpClientWithProgress_NilReporter(t *testing.T) {
 	filename := "test.zip"
 
 	// Test with nil reporter (should still work)
-	client := factory.PkgHttpClientWithProgress(nil, fileSize, filename)
+	client := factory.PkgHttpClientWithProgress(nil, fileSize, filename, true)
 
 	if client == nil {
 		t.Fatal("PkgHttpClientWithProgress() returned nil client with nil reporter")
@@ -478,7 +478,7 @@ func TestFactory_PkgHttpClientWithProgress_EmptyFilename(t *testing.T) {
 	fileSize := int64(1024)
 	filename := ""
 
-	client := factory.PkgHttpClientWithProgress(reporter, fileSize, filename)
+	client := factory.PkgHttpClientWithProgress(reporter, fileSize, filename, true)
 
 	if client == nil {
 		t.Fatal("PkgHttpClientWithProgress() returned nil client with empty filename")
@@ -494,7 +494,7 @@ func TestFactory_PkgHttpClientWithProgress_NegativeFileSize(t *testing.T) {
 	fileSize := int64(-1)
 	filename := "test.zip"
 
-	client := factory.PkgHttpClientWithProgress(reporter, fileSize, filename)
+	client := factory.PkgHttpClientWithProgress(reporter, fileSize, filename, true)
 
 	if client == nil {
 		t.Fatal("PkgHttpClientWithProgress() returned nil client with negative file size")

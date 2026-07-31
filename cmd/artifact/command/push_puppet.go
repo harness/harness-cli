@@ -59,7 +59,8 @@ func NewPushPuppetCmd(c *cmdutils.Factory) *cobra.Command {
 			registryName := args[0]
 			packageFilePath := args[1]
 
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporterAuto(config.Global.NoProgress)
+			showBar := !config.Global.NoProgress && !p.IsCI()
 
 			progress.Start("Validating input parameters")
 
@@ -130,7 +131,7 @@ func NewPushPuppetCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Step("Uploading module to registry")
 
-			pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), fileInfo.Name())
+			pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), fileInfo.Name(), showBar)
 			resp, err := pkgClient.UploadPuppetPackageWithBodyWithResponse(
 				context.Background(),
 				config.Global.AccountID,

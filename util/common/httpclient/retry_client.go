@@ -22,7 +22,7 @@ func NewRetryClientWithoutProgress() *http.Client {
 	p := progress.NewConsoleReporter()
 
 	retryClient.RequestLogHook =
-		requestLogHook(p, retryClient.RetryMax, 0, "")
+		requestLogHook(p, retryClient.RetryMax, 0, "", false)
 
 	retryClient.ResponseLogHook =
 		responseLogHookWithoutProgress(p)
@@ -30,14 +30,14 @@ func NewRetryClientWithoutProgress() *http.Client {
 	return retryClient.StandardClient()
 }
 
-// creates a retryable HTTP client with progress reporting
-func NewRetryClientWithProgress(prog progress.Reporter, fileSize int64, saveFilename string) *http.Client {
+// creates a retryable HTTP client with progress reporting.
+func NewRetryClientWithProgress(prog progress.Reporter, fileSize int64, saveFilename string, showBar bool) *http.Client {
 	retryClient := retryablehttp.NewClient()
 	retryClient.RetryMax = 3
 	retryClient.Logger = nil
 
 	retryClient.RequestLogHook =
-		requestLogHook(prog, retryClient.RetryMax, fileSize, saveFilename)
+		requestLogHook(prog, retryClient.RetryMax, fileSize, saveFilename, showBar)
 
 	retryClient.ResponseLogHook =
 		responseLogHook(prog)
@@ -50,6 +50,7 @@ func requestLogHook(
 	retryMax int,
 	fileSize int64,
 	saveFilename string,
+	showBar bool,
 ) func(retryablehttp.Logger, *http.Request, int) {
 	return func(
 		_ retryablehttp.Logger,
@@ -64,7 +65,7 @@ func requestLogHook(
 			))
 		}
 
-		if req.Body != nil && fileSize > 0 {
+		if req.Body != nil && fileSize > 0 && showBar {
 			title := fmt.Sprintf("%s (%s)", saveFilename, common.GetSize(fileSize))
 			bar := pterm.DefaultProgressbar.
 				WithTitle(title).

@@ -48,8 +48,8 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 			filePath := args[1]
 			targetPackagePath := args[2]
 
-			// Create progress reporter
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporterAuto(config.Global.NoProgress)
+			showBar := !config.Global.NoProgress && !p.IsCI()
 
 			// Validate Registry Name and file_path
 			progress.Start("Validating input parameters")
@@ -134,7 +134,7 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 			progress.Step("Uploading package to registry")
 			bufferSize := int64(formData.Len())
 
-			pkgClient := c.PkgHttpClientWithProgress(progress, bufferSize, "swift")
+			pkgClient := c.PkgHttpClientWithProgress(progress, bufferSize, "swift", showBar)
 
 			resp, err := pkgClient.UploadSwiftPackageWithBodyWithResponse(
 				context.Background(),

@@ -38,8 +38,8 @@ func NewPushGoCmd(c *cmdutils.Factory) *cobra.Command {
 			registryName := args[0]
 			dir := args[1]
 
-			// Create progress reporter
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporterAuto(config.Global.NoProgress)
+			showBar := !config.Global.NoProgress && !p.IsCI()
 
 			// Validate Registry Name and Version
 			progress.Start("Validating input parameters")
@@ -118,7 +118,7 @@ func NewPushGoCmd(c *cmdutils.Factory) *cobra.Command {
 			bufferSize := int64(formData.Len())
 
 			// Initialize the package client
-			pkgClient := c.PkgHttpClientWithProgress(progress, bufferSize, "go")
+			pkgClient := c.PkgHttpClientWithProgress(progress, bufferSize, "go", showBar)
 
 			resp, err := pkgClient.UploadGoPackageWithBodyWithResponse(
 				context.Background(),

@@ -41,8 +41,8 @@ func NewPushRpmCmd(c *cmdutils.Factory) *cobra.Command {
 			registryName := args[0]
 			filePath := args[1]
 
-			// Create progress reporter
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporterAuto(config.Global.NoProgress)
+			showBar := !config.Global.NoProgress && !p.IsCI()
 
 			// Validate Registry Name and file_path
 			progress.Start("Validating input parameters")
@@ -117,7 +117,7 @@ func NewPushRpmCmd(c *cmdutils.Factory) *cobra.Command {
 
 			fileWriter.Close()
 			bufferSize := int64(formData.Len())
-			pkgClient := c.PkgHttpClientWithProgress(progress, bufferSize, "rpm")
+			pkgClient := c.PkgHttpClientWithProgress(progress, bufferSize, "rpm", showBar)
 
 			// Upload package
 			progress.Step("Uploading package to registry")

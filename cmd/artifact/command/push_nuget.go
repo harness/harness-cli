@@ -52,8 +52,8 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 			registryName := args[0]
 			filePath := args[1]
 
-			// Create progress reporter
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporterAuto(config.Global.NoProgress)
+			showBar := !config.Global.NoProgress && !p.IsCI()
 
 			// Validate Registry Name and file_path
 			progress.Start("Validating input parameters")
@@ -140,7 +140,7 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 				}
 
 			} else {
-				pkgClient := c.PkgHttpClientWithProgress(progress, bufferSize, "nupkg")
+				pkgClient := c.PkgHttpClientWithProgress(progress, bufferSize, "nupkg", showBar)
 				resp, err := pkgClient.UploadNugetPackageWithBodyWithResponse(
 					context.Background(),
 					config.Global.AccountID,
@@ -189,7 +189,7 @@ func uploadNugetPackageDirect(ctx context.Context, url string, contentType strin
 	utils.SetChecksumHeaders(req.Header, checksums)
 
 	//creating retry client
-	client := httpclient.NewRetryClientWithProgress(progress, bufferSize, "nupkg")
+	client := httpclient.NewRetryClientWithProgress(progress, bufferSize, "nupkg", true) //nolint // always show bar for direct HTTP uploads
 
 	resp, err := client.Do(req)
 	if err != nil {

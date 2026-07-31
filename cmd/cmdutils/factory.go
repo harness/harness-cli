@@ -27,10 +27,11 @@ func (f *Factory) NewRegistryV3HttpClientWithURL(url string) (*ar_v3.ClientWithR
 		auth.GetXApiKeyOptionARV3())
 }
 
-// PkgHttpClientWithProgress creates a package client with retry and progress reporting support
-func (f *Factory) PkgHttpClientWithProgress(p progress.Reporter, fileSize int64, saveFilename string) *ar_pkg.ClientWithResponses {
+// PkgHttpClientWithProgress creates a package client with retry and progress reporting support.
+// Set showBar to false to suppress the interactive pterm upload bar (e.g. CI or --no-progress).
+func (f *Factory) PkgHttpClientWithProgress(p progress.Reporter, fileSize int64, saveFilename string, showBar bool) *ar_pkg.ClientWithResponses {
 	client, err := ar_pkg.NewClientWithResponses(config.Global.Registry.PkgURL,
-		ar_pkg.WithHTTPClient(httpclient.NewRetryClientWithProgress(p, fileSize, saveFilename)),
+		ar_pkg.WithHTTPClient(httpclient.NewRetryClientWithProgress(p, fileSize, saveFilename, showBar)),
 		auth.GetAuthOptionARPKG())
 	if err != nil {
 		log.Fatal().Msgf("Error creating pkg client: %v", err)

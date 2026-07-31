@@ -39,8 +39,8 @@ func NewPushComposerCmd(c *cmdutils.Factory) *cobra.Command {
 			filePath := args[1]
 			fileName := filepath.Base(filePath)
 
-			// Create progress reporter
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporterAuto(config.Global.NoProgress)
+			showBar := !config.Global.NoProgress && !p.IsCI()
 
 			// Validate Registry Name and file_path
 			progress.Start("Validating input parameters")
@@ -88,7 +88,7 @@ func NewPushComposerCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 			defer file.Close()
 
-			pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), "composer")
+			pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), "composer", showBar)
 
 			resp, err := pkgClient.UploadComposerPackageWithBodyWithResponse(
 				context.Background(),

@@ -60,8 +60,7 @@ func NewPushDebianCmd(c *cmdutils.Factory) *cobra.Command {
 			registryName := args[0]
 			filePath := args[1]
 
-			// Create progress reporter
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporterAuto(config.Global.NoProgress)
 
 			// Determine file type based on extension
 			fileExt := filepath.Ext(filePath)
@@ -91,7 +90,7 @@ func NewPushDebianCmd(c *cmdutils.Factory) *cobra.Command {
 }
 
 // handleDebPackage handles uploading .deb packages
-func handleDebPackage(registryName, filePath, distribution, component string, progress *p.ConsoleReporter) error {
+func handleDebPackage(registryName, filePath, distribution, component string, progress p.Reporter) error {
 	// Resolve file path (supports glob patterns like *.deb)
 	files, err := utils.ResolveFilePath(filePath, DebFileExtension)
 	if err != nil {
@@ -199,7 +198,7 @@ func handleDebPackage(registryName, filePath, distribution, component string, pr
 }
 
 // handleDebSourcePackage handles uploading .dsc source packages
-func handleDebSourcePackage(registryName, dscFilePath, distribution, component, sourceFile, originSourceFile string, progress *p.ConsoleReporter) error {
+func handleDebSourcePackage(registryName, dscFilePath, distribution, component, sourceFile, originSourceFile string, progress p.Reporter) error {
 	// Validate at least one source file is provided
 	if sourceFile == "" && originSourceFile == "" {
 		progress.Error("At least one source file is required")
@@ -308,7 +307,7 @@ func parseDscFile(filePath string) (*DscMetadata, error) {
 }
 
 // uploadDscFile uploads a .dsc file
-func uploadDscFile(client *pkgclient.ClientWithResponses, registryName, filePath, distribution, component string, progress *p.ConsoleReporter) error {
+func uploadDscFile(client *pkgclient.ClientWithResponses, registryName, filePath, distribution, component string, progress p.Reporter) error {
 	// Compute checksums
 	checksums, err := utils.ComputeFileChecksums(filePath)
 	if err != nil {
@@ -380,7 +379,7 @@ func uploadDscFile(client *pkgclient.ClientWithResponses, registryName, filePath
 }
 
 // uploadSourceFile uploads a source file
-func uploadSourceFile(client *pkgclient.ClientWithResponses, registryName, filePath, packageName, version, distribution, component string, progress *p.ConsoleReporter, isOrig bool) error {
+func uploadSourceFile(client *pkgclient.ClientWithResponses, registryName, filePath, packageName, version, distribution, component string, progress p.Reporter, isOrig bool) error {
 	// Validate file exists
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {

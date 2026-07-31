@@ -63,7 +63,7 @@ func NewPushConanCmd(c *cmdutils.Factory) *cobra.Command {
 			reference := args[1]
 			recipeDir := args[2]
 
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporterAuto(config.Global.NoProgress)
 
 			progress.Start("Validating input parameters")
 
@@ -277,7 +277,7 @@ func uploadConanRecipeFile(
 	ref conanutil.ConanRef,
 	rrev string,
 	filePath string,
-	progress *p.ConsoleReporter,
+	progress p.Reporter,
 ) error {
 	fileName := filepath.Base(filePath)
 	file, checksums, size, err := openConanFile(filePath, progress)
@@ -287,7 +287,8 @@ func uploadConanRecipeFile(
 	defer file.Close()
 
 	progress.Step(fmt.Sprintf("Uploading %s", fileName))
-	client := c.PkgHttpClientWithProgress(progress, size, "conan")
+	showBar := !config.Global.NoProgress && !p.IsCI()
+	client := c.PkgHttpClientWithProgress(progress, size, "conan", showBar)
 	resp, err := client.UploadConanRecipeFileWithBodyWithResponse(
 		context.Background(),
 		config.Global.AccountID,
@@ -325,7 +326,7 @@ func uploadConanPackageFile(
 	pkgID string,
 	prev string,
 	filePath string,
-	progress *p.ConsoleReporter,
+	progress p.Reporter,
 ) error {
 	fileName := filepath.Base(filePath)
 	file, checksums, size, err := openConanFile(filePath, progress)
@@ -335,7 +336,8 @@ func uploadConanPackageFile(
 	defer file.Close()
 
 	progress.Step(fmt.Sprintf("Uploading %s", fileName))
-	client := c.PkgHttpClientWithProgress(progress, size, "conan")
+	showBar := !config.Global.NoProgress && !p.IsCI()
+	client := c.PkgHttpClientWithProgress(progress, size, "conan", showBar)
 	resp, err := client.UploadConanPackageFileWithBodyWithResponse(
 		context.Background(),
 		config.Global.AccountID,
@@ -367,7 +369,7 @@ func uploadConanPackageFile(
 }
 
 // openConanFile validates the file, computes its checksums, and returns an open handle and its size.
-func openConanFile(filePath string, progress *p.ConsoleReporter) (*os.File, utils.FileChecksums, int64, error) {
+func openConanFile(filePath string, progress p.Reporter) (*os.File, utils.FileChecksums, int64, error) {
 	info, err := os.Stat(filePath)
 	if err != nil {
 		return nil, utils.FileChecksums{}, 0, errors.NewValidationError("file_path", fmt.Sprintf("failed to access file: %v", err))

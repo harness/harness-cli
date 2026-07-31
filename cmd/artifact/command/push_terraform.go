@@ -68,7 +68,7 @@ func NewPushTerraformCmd(c *cmdutils.Factory) *cobra.Command {
 			registryName := args[0]
 			inputPath := args[1]
 
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporterAuto(config.Global.NoProgress)
 			progress.Start("Validating input parameters")
 
 			ctx := cmd.Context()
@@ -347,8 +347,8 @@ func pushTerraformModule(
 		return fmt.Errorf("failed to open package file: %w", err)
 	}
 	defer file.Close()
-
-	pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), fileInfo.Name())
+	showBar := !config.Global.NoProgress && !p.IsCI()
+	pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), fileInfo.Name(), showBar)
 	progress.Step(fmt.Sprintf("Uploading module %s/%s/%s@%s", namespace, name, moduleProvider, version))
 	resp, err := pkgClient.UploadTerraformModuleWithBodyWithResponse(
 		ctx,
@@ -414,8 +414,8 @@ func pushTerraformProvider(
 		return fmt.Errorf("failed to open package file: %w", err)
 	}
 	defer file.Close()
-
-	pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), fileInfo.Name())
+	showBar := !config.Global.NoProgress && !p.IsCI()
+	pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), fileInfo.Name(), showBar)
 	progress.Step(fmt.Sprintf("Uploading provider %s/%s@%s (%s_%s)", namespace, typeName, version, osName, arch))
 	resp, err := pkgClient.UploadTerraformProviderWithBodyWithResponse(
 		ctx,

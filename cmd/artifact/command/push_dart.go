@@ -43,8 +43,8 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 			registryName := args[0]
 			packageFilePath := args[1]
 
-			// Create progress reporter
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporterAuto(config.Global.NoProgress)
+			showBar := !config.Global.NoProgress && !p.IsCI()
 
 			// Validate input parameters
 			progress.Start("Validating input parameters")
@@ -160,7 +160,7 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 
 			// Initialize the package client
 			progress.Step("Initializing package client")
-			pkgClient := f.PkgHttpClientWithProgress(progress, bufferSize, fileInfo.Name())
+			pkgClient := f.PkgHttpClientWithProgress(progress, bufferSize, fileInfo.Name(), showBar)
 
 			resp, err := pkgClient.UploadDartPackageWithBodyWithResponse(
 				context.Background(),

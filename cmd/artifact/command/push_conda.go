@@ -46,8 +46,8 @@ func NewPushCondaCmd(c *cmdutils.Factory) *cobra.Command {
 			filePath := args[1]
 			fileName := filepath.Base(filePath)
 
-			// Create progress reporter
-			progress := p.NewConsoleReporter()
+			progress := p.NewReporterAuto(config.Global.NoProgress)
+			showBar := !config.Global.NoProgress && !p.IsCI()
 
 			// Validate Registry Name and file_path
 			progress.Start("Validating input parameters")
@@ -116,7 +116,7 @@ func NewPushCondaCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 
 			// Initialize the package client with retry and progress support
-			pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), "conda")
+			pkgClient := c.PkgHttpClientWithProgress(progress, fileInfo.Size(), "conda", showBar)
 
 			resp, err := pkgClient.UploadCondaPackageWithBodyWithResponse(
 				context.Background(),

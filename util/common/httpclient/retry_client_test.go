@@ -64,6 +64,7 @@ func TestNewRetryClientWithProgress(t *testing.T) {
 		reporter,
 		1024,
 		"test.txt",
+		true,
 	)
 
 	require.NotNil(t, client)
@@ -78,6 +79,7 @@ func TestRequestLogHookRetryMessage(t *testing.T) {
 		3,
 		0,
 		"",
+		false,
 	)
 
 	req, err := http.NewRequest(
@@ -101,6 +103,7 @@ func TestRequestLogHookFirstAttemptNoMessage(t *testing.T) {
 		3,
 		0,
 		"",
+		false,
 	)
 
 	req, err := http.NewRequest(
@@ -134,6 +137,7 @@ func TestRequestLogHookWrapsBody(t *testing.T) {
 		3,
 		10,
 		"file.txt",
+		true,
 	)
 
 	hook(nil, req, 0)
@@ -163,6 +167,7 @@ func TestRequestLogHookDoesNotWrapWhenFileSizeZero(t *testing.T) {
 		3,
 		0,
 		"file.txt",
+		false,
 	)
 
 	hook(nil, req, 0)
@@ -278,6 +283,7 @@ func TestRequestLogHookNilBody(t *testing.T) {
 		3,
 		100,
 		"file.txt",
+		false,
 	)
 
 	hook(nil, req, 0)
