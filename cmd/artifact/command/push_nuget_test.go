@@ -356,6 +356,7 @@ func TestUploadNugetPackageDirect(t *testing.T) {
 		progress,
 		int64(body.Len()),
 		checksums,
+		false,
 	)
 
 	if err != nil {
