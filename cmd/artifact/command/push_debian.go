@@ -61,6 +61,7 @@ func NewPushDebianCmd(c *cmdutils.Factory) *cobra.Command {
 			filePath := args[1]
 
 			progress := p.NewReporterAuto(config.Global.NoProgress)
+			showBar := !config.Global.NoProgress && !p.IsCI()
 
 			// Determine file type based on extension
 			fileExt := filepath.Ext(filePath)
@@ -68,10 +69,10 @@ func NewPushDebianCmd(c *cmdutils.Factory) *cobra.Command {
 			switch fileExt {
 			case DebFileExtension:
 				// Handle .deb package
-				return handleDebPackage(registryName, filePath, distribution, component, progress)
+				return handleDebPackage(registryName, filePath, distribution, component, progress, showBar)
 			case DscFileExtension:
 				// Handle .dsc source package
-				return handleDebSourcePackage(registryName, filePath, distribution, component, sourceFile, originSourceFile, progress)
+				return handleDebSourcePackage(registryName, filePath, distribution, component, sourceFile, originSourceFile, progress, showBar)
 			default:
 				progress.Error("Unsupported file type")
 				return errors.NewValidationError("file_path", fmt.Sprintf("file must be either .deb or .dsc, got: %s", fileExt))
@@ -90,7 +91,7 @@ func NewPushDebianCmd(c *cmdutils.Factory) *cobra.Command {
 }
 
 // handleDebPackage handles uploading .deb packages
-func handleDebPackage(registryName, filePath, distribution, component string, progress p.Reporter) error {
+func handleDebPackage(registryName, filePath, distribution, component string, progress p.Reporter, showBar bool) error {
 	// Resolve file path (supports glob patterns like *.deb)
 	files, err := utils.ResolveFilePath(filePath, DebFileExtension)
 	if err != nil {
@@ -161,8 +162,14 @@ func handleDebPackage(registryName, filePath, distribution, component string, pr
 	// Initialize progress reader
 	progress.Step("Uploading package to registry")
 	bufferSize := int64(formData.Len())
-	reader, closer := p.Reader(bufferSize, &formData, "debian")
-	defer closer()
+	var reader io.Reader
+	if showBar {
+		var closer func()
+		reader, closer = p.Reader(bufferSize, &formData, "debian")
+		defer closer()
+	} else {
+		reader = &formData
+	}
 
 	// Build query parameters
 	params := &pkgclient.UploadDebianDebFileParams{
@@ -198,7 +205,7 @@ func handleDebPackage(registryName, filePath, distribution, component string, pr
 }
 
 // handleDebSourcePackage handles uploading .dsc source packages
-func handleDebSourcePackage(registryName, dscFilePath, distribution, component, sourceFile, originSourceFile string, progress p.Reporter) error {
+func handleDebSourcePackage(registryName, dscFilePath, distribution, component, sourceFile, originSourceFile string, progress p.Reporter, showBar bool) error {
 	// Validate at least one source file is provided
 	if sourceFile == "" && originSourceFile == "" {
 		progress.Error("At least one source file is required")
@@ -242,14 +249,14 @@ func handleDebSourcePackage(registryName, dscFilePath, distribution, component, 
 
 	// Upload DSC file first
 	progress.Step(fmt.Sprintf("Uploading: %s", dscFilePath))
-	if err := uploadDscFile(pkgClient, registryName, dscFilePath, distribution, component, progress); err != nil {
+	if err := uploadDscFile(pkgClient, registryName, dscFilePath, distribution, component, progress, showBar); err != nil {
 		return err
 	}
 
 	// Upload tar.xz file if provided
 	if sourceFile != "" {
 		progress.Step(fmt.Sprintf("Uploading: %s", sourceFile))
-		if err := uploadSourceFile(pkgClient, registryName, sourceFile, dscMetadata.Source, dscMetadata.Version, distribution, component, progress, false); err != nil {
+		if err := uploadSourceFile(pkgClient, registryName, sourceFile, dscMetadata.Source, dscMetadata.Version, distribution, component, progress, false, showBar); err != nil {
 			return err
 		}
 	}
@@ -258,7 +265,7 @@ func handleDebSourcePackage(registryName, dscFilePath, distribution, component, 
 	if originSourceFile != "" {
 		progress.Step(fmt.Sprintf("Uploading: %s", originSourceFile))
 		upstreamVersion := artifact.ExtractUpstreamVersion(dscMetadata.Version)
-		if err := uploadSourceFile(pkgClient, registryName, originSourceFile, dscMetadata.Source, upstreamVersion, distribution, component, progress, true); err != nil {
+		if err := uploadSourceFile(pkgClient, registryName, originSourceFile, dscMetadata.Source, upstreamVersion, distribution, component, progress, true, showBar); err != nil {
 			return err
 		}
 	}
@@ -307,7 +314,7 @@ func parseDscFile(filePath string) (*DscMetadata, error) {
 }
 
 // uploadDscFile uploads a .dsc file
-func uploadDscFile(client *pkgclient.ClientWithResponses, registryName, filePath, distribution, component string, progress p.Reporter) error {
+func uploadDscFile(client *pkgclient.ClientWithResponses, registryName, filePath, distribution, component string, progress p.Reporter, showBar bool) error {
 	// Compute checksums
 	checksums, err := utils.ComputeFileChecksums(filePath)
 	if err != nil {
@@ -342,8 +349,14 @@ func uploadDscFile(client *pkgclient.ClientWithResponses, registryName, filePath
 
 	// Initialize progress reader
 	bufferSize := int64(formData.Len())
-	reader, closer := p.Reader(bufferSize, &formData, "dsc")
-	defer closer()
+	var reader io.Reader
+	if showBar {
+		var closer func()
+		reader, closer = p.Reader(bufferSize, &formData, "dsc")
+		defer closer()
+	} else {
+		reader = &formData
+	}
 
 	// Build query parameters
 	params := &pkgclient.UploadDebianDscFileParams{
@@ -379,7 +392,7 @@ func uploadDscFile(client *pkgclient.ClientWithResponses, registryName, filePath
 }
 
 // uploadSourceFile uploads a source file
-func uploadSourceFile(client *pkgclient.ClientWithResponses, registryName, filePath, packageName, version, distribution, component string, progress p.Reporter, isOrig bool) error {
+func uploadSourceFile(client *pkgclient.ClientWithResponses, registryName, filePath, packageName, version, distribution, component string, progress p.Reporter, isOrig bool, showBar bool) error {
 	// Validate file exists
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
@@ -423,8 +436,14 @@ func uploadSourceFile(client *pkgclient.ClientWithResponses, registryName, fileP
 
 	// Initialize progress reader
 	bufferSize := int64(formData.Len())
-	reader, closer := p.Reader(bufferSize, &formData, "source file")
-	defer closer()
+	var reader io.Reader
+	if showBar {
+		var closer func()
+		reader, closer = p.Reader(bufferSize, &formData, "source file")
+		defer closer()
+	} else {
+		reader = &formData
+	}
 
 	// Build query parameters
 	params := &pkgclient.UploadDebianSrcFileParams{
