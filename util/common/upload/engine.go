@@ -19,16 +19,18 @@ const (
 type FileUploadEngine struct {
 	maxWorkers int
 	progress   p.Reporter
+	showBar    bool
 }
 
 // createing a new upload engine , to perform upload concurrently
-func NewFileUploadEngine(maxWorkers int, progress p.Reporter) *FileUploadEngine {
+func NewFileUploadEngine(maxWorkers int, progress p.Reporter, showBar bool) *FileUploadEngine {
 	if maxWorkers <= 0 {
 		maxWorkers = DefaultUploadWorker
 	}
 	return &FileUploadEngine{
 		maxWorkers: maxWorkers,
 		progress:   progress,
+		showBar:    showBar,
 	}
 }
 
@@ -45,9 +47,12 @@ func (e *FileUploadEngine) Execute(ctx context.Context, jobs []FileUploadJob) []
 
 	e.progress.Step(fmt.Sprintf("Starting upload: %d files with %d workers. Please wait ....", len(jobs), numWorkers))
 
-	// Create progress bar
-	progressBar, _ := pterm.DefaultProgressbar.WithTotal(len(jobs)).WithTitle("Uploading files").Start()
-	defer progressBar.Stop()
+	// Create progress bar (only when running interactively)
+	var progressBar *pterm.ProgressbarPrinter
+	if e.showBar {
+		progressBar, _ = pterm.DefaultProgressbar.WithTotal(len(jobs)).WithTitle("Uploading files").Start()
+		defer progressBar.Stop()
+	}
 
 	startTime := time.Now()
 	jobChan := make(chan FileUploadJob, len(jobs))
@@ -79,13 +84,17 @@ func (e *FileUploadEngine) Execute(ctx context.Context, jobs []FileUploadJob) []
 		for result := range resultChan {
 			resultMu.Lock()
 			results = append(results, result)
-			if result.Success {
+			if progressBar != nil {
+				if result.Success {
+					successCount++
+					progressBar.UpdateTitle(fmt.Sprintf("Uploading files (%d/%d completed)", len(results), len(jobs)))
+				} else {
+					progressBar.UpdateTitle(fmt.Sprintf("Uploading files (%d/%d completed, %d failed)", successCount, len(jobs), len(results)-successCount))
+				}
+				progressBar.Increment()
+			} else if result.Success {
 				successCount++
-				progressBar.UpdateTitle(fmt.Sprintf("Uploading files (%d/%d completed)", len(results), len(jobs)))
-			} else {
-				progressBar.UpdateTitle(fmt.Sprintf("Uploading files (%d/%d completed, %d failed)", successCount, len(jobs), len(results)-successCount))
 			}
-			progressBar.Increment()
 			resultMu.Unlock()
 		}
 	}()

@@ -60,6 +60,7 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 			filePath := args[1]
 
 			progress := p.NewReporterAuto(config.Global.NoProgress)
+			showBar := !config.Global.NoProgress && !p.IsCI()
 
 			// Validate file exists
 			fileInfo, err := os.Stat(filePath)
@@ -124,7 +125,7 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 			progress.Success(fmt.Sprintf("Prepared %d upload jobs", len(jobs)))
 
 			// uploading concurrently
-			engine := upload.NewFileUploadEngine(maxConcurrentUploads, progress)
+			engine := upload.NewFileUploadEngine(maxConcurrentUploads, progress, showBar)
 			results := engine.Execute(context.Background(), jobs)
 
 			//error fail check

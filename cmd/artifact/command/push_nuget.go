@@ -134,6 +134,7 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 					progress,
 					bufferSize,
 					checksums,
+					showBar,
 				)
 				if err != nil {
 					return err
@@ -175,7 +176,7 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 	return cmd
 }
 
-func uploadNugetPackageDirect(ctx context.Context, url string, contentType string, body io.Reader, apiKey string, progress p.Reporter, bufferSize int64, checksums utils.FileChecksums) error {
+func uploadNugetPackageDirect(ctx context.Context, url string, contentType string, body io.Reader, apiKey string, progress p.Reporter, bufferSize int64, checksums utils.FileChecksums, showbar bool) error {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, body)
 	if err != nil {
@@ -189,7 +190,7 @@ func uploadNugetPackageDirect(ctx context.Context, url string, contentType strin
 	utils.SetChecksumHeaders(req.Header, checksums)
 
 	//creating retry client
-	client := httpclient.NewRetryClientWithProgress(progress, bufferSize, "nupkg", true) //nolint // always show bar for direct HTTP uploads
+	client := httpclient.NewRetryClientWithProgress(progress, bufferSize, "nupkg", showbar)
 
 	resp, err := client.Do(req)
 	if err != nil {

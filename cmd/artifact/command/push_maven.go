@@ -62,6 +62,7 @@ func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 			pkgFilePath := args[1]
 
 			progress := p.NewReporterAuto(config.Global.NoProgress)
+			showBar := !config.Global.NoProgress && !p.IsCI()
 			var mavenFilesToUpload []string
 
 			packageFileName := filepath.Base(pkgFilePath)
@@ -187,7 +188,7 @@ func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 			progress.Success(fmt.Sprintf("Prepared %d upload jobs", len(jobs)))
 
 			// uploads using the engine
-			engine := upload.NewFileUploadEngine(maxConcurrentUploads, progress)
+			engine := upload.NewFileUploadEngine(maxConcurrentUploads, progress, showBar)
 			results := engine.Execute(context.Background(), jobs)
 
 			if upload.HasUploadErrors(results) {
@@ -216,7 +217,7 @@ func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 			mavenMetadataXML.addNewVersion(coordsFromPom.Version)
 			//uploading maven-metadata.xml
 
-			err = uploadMavenMetadataXML(pkgClient, registryName, progress, coordsFromPom, mavenMetadataXML)
+			err = uploadMavenMetadataXML(pkgClient, registryName, progress, coordsFromPom, mavenMetadataXML, showBar)
 			if err != nil {
 				return errors.NewValidationError("UPLOAD_ERROR", fmt.Sprintf("Failed in uploading : %v", err))
 			}
@@ -779,6 +780,7 @@ func uploadMavenMetadataXML(
 	progress p.Reporter,
 	coords *mavenPackageMetadata,
 	metadata *MavenMetadataXMLStruct,
+	showBar bool,
 ) error {
 
 	// Convert metadata to XML with header
@@ -796,12 +798,14 @@ func uploadMavenMetadataXML(
 	// Initialize progress reader
 
 	bufferSize := int64(len(xmlBytes))
-	reader, closer := p.Reader(
-		bufferSize,
-		bytes.NewReader(xmlBytes),
-		currentFileExt,
-	)
-	defer closer()
+	var reader io.Reader
+	var closer func()
+	if showBar {
+		reader, closer = p.Reader(bufferSize, bytes.NewReader(xmlBytes), currentFileExt)
+		defer closer()
+	} else {
+		reader = bytes.NewReader(xmlBytes)
+	}
 
 	resp, err := pkgClient.UploadMavenMetadataXmlWithBodyWithResponse(
 		context.Background(),

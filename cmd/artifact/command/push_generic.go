@@ -88,7 +88,8 @@ func NewPushGenericCmd(c *cmdutils.Factory) *cobra.Command {
 			// This avoids re-uploading unchanged files and matches the semantics of
 			// the future server-side dedup API.
 
-			engine := upload.NewFileUploadEngine(upload.DefaultUploadWorker, progress.NewReporterAuto(config.Global.NoProgress))
+			showBar := !config.Global.NoProgress && !progress.IsCI()
+			engine := upload.NewFileUploadEngine(upload.DefaultUploadWorker, progress.NewReporterAuto(config.Global.NoProgress), showBar)
 			results := engine.Execute(ctx, jobs)
 
 			if upload.HasUploadErrors(results) {
