@@ -257,6 +257,25 @@ func (r *Registry) Migrate(ctx context.Context) error {
 		return fmt.Errorf("get packages failed: %w", err)
 	}
 
+	// Guard: if the source registry had files but zero packages were resolved,
+	// the artifact type is likely misconfigured or unsupported for this source.
+	// Treat this as an error so the caller exits non-zero instead of silently
+	// reporting "Migration completed successfully" with 0 artifacts transferred.
+	// Only fire when no user-controlled filters are active: date filters, pattern
+	// filters, and packageFilters can legitimately reduce packages to zero, and we
+	// don't want to error on valid filtered runs.
+	noFiltersActive := !dateFilterActive &&
+		len(r.mapping.IncludePatterns) == 0 &&
+		len(r.mapping.ExcludePatterns) == 0 &&
+		len(r.mapping.PackageFilters) == 0
+	if len(pkgs) == 0 && len(originalFiles) > 0 && noFiltersActive {
+		return fmt.Errorf(
+			"registry %s: pulled %d file(s) from source but resolved 0 packages for artifactType %s — "+
+				"verify the registry contains %s artifacts and the artifactType is correct",
+			r.srcRegistry, len(originalFiles), r.artifactType, r.artifactType,
+		)
+	}
+
 	// For metadata-driven artifact types (RPM, DEBIAN), GetPackages reads a
 	// repository metadata file that lists every package regardless of the
 	// filtered tree.  Re-apply the date filter at the package level by

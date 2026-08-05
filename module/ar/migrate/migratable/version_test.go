@@ -188,3 +188,118 @@ func TestVersionMigrateNilIndexUploadsAll(t *testing.T) {
 		t.Errorf("dest uploads = %v, want both files uploaded", dest.uploaded)
 	}
 }
+
+// terraformFileTree builds a tree containing the given URI-keyed files, where
+// each node's Name is the basename of the URI.
+func terraformFileTree(uris ...string) *types.TreeNode {
+	root := &types.TreeNode{Name: "root", Key: "/", IsLeaf: false}
+	for _, uri := range uris {
+		parts := strings.Split(strings.TrimPrefix(uri, "/"), "/")
+		name := parts[len(parts)-1]
+		f := &types.File{Name: name, Uri: uri, Size: len(name)}
+		root.Children = append(root.Children, types.TreeNode{
+			Name:   name,
+			Key:    uri,
+			IsLeaf: true,
+			File:   f,
+		})
+	}
+	return root
+}
+
+func newTerraformVersionJob(src, dest adp.Adapter, node *types.TreeNode, pkg, version string, stats *types.TransferStats) *Version {
+	return &Version{
+		srcRegistry:  "src-reg",
+		destRegistry: "dst-reg",
+		srcAdapter:   src,
+		destAdapter:  dest,
+		artifactType: types.TERRAFORM,
+		logger:       zerolog.Nop(),
+		pkg:          types.Package{Name: pkg},
+		version:      types.Version{Name: version},
+		node:         node,
+		stats:        stats,
+		config:       &types.Config{Concurrency: 1, DryRun: false},
+		mapping:      &types.RegistryMapping{},
+	}
+}
+
+// TestVersionMigrateTerraformModuleFilter verifies that the TERRAFORM branch in
+// Version.Migrate only enqueues files whose path matches the current pkg+version.
+func TestVersionMigrateTerraformModuleFilter(t *testing.T) {
+	// tree contains two versions of the same module; only 1.0.0 should be uploaded.
+	node := terraformFileTree(
+		"/hashicorp/vpc/aws/1.0.0/vpc-1.0.0.tar.gz",
+		"/hashicorp/vpc/aws/1.1.0/vpc-1.1.0.tar.gz",
+	)
+	src := &indexFakeSrc{content: map[string][]byte{
+		"/hashicorp/vpc/aws/1.0.0/vpc-1.0.0.tar.gz": []byte("module-bytes"),
+		"/hashicorp/vpc/aws/1.1.0/vpc-1.1.0.tar.gz": []byte("module-bytes-v2"),
+	}}
+	dest := &indexFakeDest{}
+	stats := &types.TransferStats{}
+
+	job := newTerraformVersionJob(src, dest, node, "hashicorp/vpc/aws", "1.0.0", stats)
+	if err := job.Migrate(context.Background()); err != nil {
+		t.Fatalf("Migrate() failed: %v", err)
+	}
+
+	if len(dest.uploaded) != 1 || dest.uploaded[0] != "vpc-1.0.0.tar.gz" {
+		t.Errorf("uploaded = %v, want [vpc-1.0.0.tar.gz]", dest.uploaded)
+	}
+}
+
+// TestVersionMigrateTerraformProviderFilter verifies provider files are filtered
+// by pkg (ns/type) and version, and files for other versions are skipped.
+func TestVersionMigrateTerraformProviderFilter(t *testing.T) {
+	node := terraformFileTree(
+		"/hashicorp/aws/2.0.0/terraform-provider-aws_2.0.0_linux_amd64.zip",
+		"/hashicorp/aws/2.0.0/terraform-provider-aws_2.0.0_darwin_arm64.zip",
+		"/hashicorp/aws/1.0.0/terraform-provider-aws_1.0.0_linux_amd64.zip",
+	)
+	src := &indexFakeSrc{content: map[string][]byte{
+		"/hashicorp/aws/2.0.0/terraform-provider-aws_2.0.0_linux_amd64.zip":  []byte("p1"),
+		"/hashicorp/aws/2.0.0/terraform-provider-aws_2.0.0_darwin_arm64.zip": []byte("p2"),
+		"/hashicorp/aws/1.0.0/terraform-provider-aws_1.0.0_linux_amd64.zip":  []byte("p3"),
+	}}
+	dest := &indexFakeDest{}
+	stats := &types.TransferStats{}
+
+	job := newTerraformVersionJob(src, dest, node, "hashicorp/aws", "2.0.0", stats)
+	if err := job.Migrate(context.Background()); err != nil {
+		t.Fatalf("Migrate() failed: %v", err)
+	}
+
+	if len(dest.uploaded) != 2 {
+		t.Errorf("uploaded = %v, want 2 files for version 2.0.0", dest.uploaded)
+	}
+	for _, name := range dest.uploaded {
+		if !strings.Contains(name, "2.0.0") {
+			t.Errorf("uploaded unexpected file %q (not version 2.0.0)", name)
+		}
+	}
+}
+
+// TestVersionMigrateTerraformUnrecognisedPathSkipped verifies that files with
+// an unrecognised path shape (neither module nor provider) are silently skipped.
+func TestVersionMigrateTerraformUnrecognisedPathSkipped(t *testing.T) {
+	node := terraformFileTree(
+		"/hashicorp/aws/2.0.0/something-unexpected.zip",
+		"/hashicorp/aws/2.0.0/terraform-provider-aws_2.0.0_linux_amd64.zip",
+	)
+	src := &indexFakeSrc{content: map[string][]byte{
+		"/hashicorp/aws/2.0.0/terraform-provider-aws_2.0.0_linux_amd64.zip": []byte("p1"),
+	}}
+	dest := &indexFakeDest{}
+	stats := &types.TransferStats{}
+
+	job := newTerraformVersionJob(src, dest, node, "hashicorp/aws", "2.0.0", stats)
+	if err := job.Migrate(context.Background()); err != nil {
+		t.Fatalf("Migrate() failed: %v", err)
+	}
+
+	// Only the valid provider file should be uploaded; the unrecognised .zip is dropped.
+	if len(dest.uploaded) != 1 || dest.uploaded[0] != "terraform-provider-aws_2.0.0_linux_amd64.zip" {
+		t.Errorf("uploaded = %v, want only the valid provider file", dest.uploaded)
+	}
+}

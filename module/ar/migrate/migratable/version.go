@@ -123,7 +123,8 @@ func (r *Version) Migrate(ctx context.Context) error {
 	var jobs []engine.Job
 
 	if r.artifactType == types.GENERIC || r.artifactType == types.RAW || r.artifactType == types.MAVEN || r.artifactType == types.PYTHON ||
-		r.artifactType == types.NUGET || r.artifactType == types.NPM || r.artifactType == types.DART || r.artifactType == types.PUPPET {
+		r.artifactType == types.NUGET || r.artifactType == types.NPM || r.artifactType == types.DART || r.artifactType == types.PUPPET ||
+		r.artifactType == types.TERRAFORM {
 		files, err := tree.GetAllFiles(r.node)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to get files from tree")
@@ -159,6 +160,27 @@ func (r *Version) Migrate(ctx context.Context) error {
 				if !ok || pkgName != r.pkg.Name || version != r.version.Name {
 					logger.Debug().Msgf("Skipping file %s (pkg=%s, ver=%s) - doesn't match current package %s version %s",
 						file.Name, pkgName, version, r.pkg.Name, r.version.Name)
+					continue
+				}
+			}
+			// For TERRAFORM, skip files that don't belong to this package+version.
+			if r.artifactType == types.TERRAFORM {
+				if util.IsTerraformModule(file.Uri) {
+					ns, name, provider, version, ok := util.ParseTerraformModulePath(file.Uri)
+					if !ok || ns+"/"+name+"/"+provider != r.pkg.Name || version != r.version.Name {
+						logger.Debug().Msgf("Skipping terraform module file %s - doesn't match package %s version %s",
+							file.Uri, r.pkg.Name, r.version.Name)
+						continue
+					}
+				} else if util.IsTerraformProvider(file.Uri) {
+					ns, typeName, version, _, _, _, ok := util.ParseTerraformProviderPath(file.Uri)
+					if !ok || ns+"/"+typeName != r.pkg.Name || version != r.version.Name {
+						logger.Debug().Msgf("Skipping terraform provider file %s - doesn't match package %s version %s",
+							file.Uri, r.pkg.Name, r.version.Name)
+						continue
+					}
+				} else {
+					logger.Debug().Msgf("Skipping terraform file %s - unrecognised path shape", file.Uri)
 					continue
 				}
 			}

@@ -117,5 +117,12 @@
     "url": "http://localhost:8081/artifactory/rpm-multi-local",
     "description": "Mock RPM Local Repository (multiple repos)",
     "packageType": "rpm"
+  },
+  "terraform-local": {
+    "key": "terraform-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/terraform-local",
+    "description": "Mock Terraform Local Repository",
+    "packageType": "terraform"
   }
 }

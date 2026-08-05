@@ -328,6 +328,28 @@ func (c *mockClient) loadBinaryContent() {
 		c.binaryContent[key] = createPuppetPackageTarGz(p.author, p.module, p.version)
 	}
 
+	// Terraform modules: <registry>/<ns>/<name>/<provider>/<ver>/<name>-<ver>.tar.gz
+	tfModules := []struct{ ns, name, provider, version string }{
+		{"hashicorp", "vpc", "aws", "1.0.0"},
+		{"hashicorp", "vpc", "aws", "1.1.0"},
+	}
+	for _, m := range tfModules {
+		key := fmt.Sprintf("terraform-local/%s/%s/%s/%s/%s-%s.tar.gz",
+			m.ns, m.name, m.provider, m.version, m.name, m.version)
+		c.binaryContent[key] = createTerraformModuleTarGz(m.ns, m.name, m.provider, m.version)
+	}
+
+	// Terraform providers: <registry>/<ns>/<type>/<ver>/terraform-provider-<type>_<ver>_<os>_<arch>.zip
+	tfProviders := []struct{ ns, typeName, version, osName, arch string }{
+		{"hashicorp", "aws", "2.0.0", "linux", "amd64"},
+		{"hashicorp", "aws", "2.0.0", "darwin", "arm64"},
+	}
+	for _, p := range tfProviders {
+		key := fmt.Sprintf("terraform-local/%s/%s/%s/terraform-provider-%s_%s_%s_%s.zip",
+			p.ns, p.typeName, p.version, p.typeName, p.version, p.osName, p.arch)
+		c.binaryContent[key] = createTerraformProviderZip(p.typeName, p.version, p.osName, p.arch)
+	}
+
 	// RPM packages - generate mock RPM files for testing
 	rpmPkgs := []struct{ registry, path string }{
 		{"rpm-single-local", "Packages/n/nginx-1.20.1-1.el7.x86_64.rpm"},
@@ -901,4 +923,34 @@ func buildCPIOPayload(name string) []byte {
 	gzWriter.Close()
 
 	return gzBuf.Bytes()
+}
+
+// createTerraformModuleTarGz creates a minimal .tar.gz archive containing a
+// main.tf file, satisfying HAR's "at least one .tf at root" validation.
+func createTerraformModuleTarGz(ns, name, provider, version string) []byte {
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	tarWriter := tar.NewWriter(gzWriter)
+
+	content := fmt.Sprintf("# Terraform module %s/%s/%s v%s\n", ns, name, provider, version)
+	_ = tarWriter.WriteHeader(&tar.Header{
+		Name: "main.tf",
+		Mode: 0644,
+		Size: int64(len(content)),
+	})
+	tarWriter.Write([]byte(content))
+	tarWriter.Close()
+	gzWriter.Close()
+	return buf.Bytes()
+}
+
+// createTerraformProviderZip creates a minimal .zip archive for a provider binary.
+func createTerraformProviderZip(typeName, version, osName, arch string) []byte {
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	content := fmt.Sprintf("mock provider binary: %s %s %s_%s\n", typeName, version, osName, arch)
+	f, _ := w.Create(fmt.Sprintf("terraform-provider-%s_%s_%s_%s", typeName, version, osName, arch))
+	f.Write([]byte(content))
+	w.Close()
+	return buf.Bytes()
 }

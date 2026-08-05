@@ -628,6 +628,42 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 		}
 		packages = append(packages, util.GetConanPackages(files, registry)...)
 		log.Info().Msgf("Found %d CONAN packages", len(packages))
+	} else if artifactType == types.TERRAFORM {
+		// Terraform modules: /<ns>/<name>/<provider>/<ver>/<name>-<ver>.tar.gz
+		// Terraform providers: /<ns>/<type>/<ver>/terraform-provider-<type>_<os>_<arch>.zip
+		// One logical package per (ns/name/provider) for modules and (ns/type) for providers.
+		files, err := tree.GetAllFiles(root)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+
+		pkgMap := make(map[string]bool)
+		for _, file := range files {
+			if file.Folder {
+				continue
+			}
+			if util.IsTerraformModule(file.Uri) {
+				ns, name, provider, _, ok := util.ParseTerraformModulePath(file.Uri)
+				if ok {
+					pkgMap[ns+"/"+name+"/"+provider] = true
+				}
+			} else if util.IsTerraformProvider(file.Uri) {
+				ns, typeName, _, _, _, _, ok := util.ParseTerraformProviderPath(file.Uri)
+				if ok {
+					pkgMap[ns+"/"+typeName] = true
+				}
+			}
+		}
+
+		for pkgName := range pkgMap {
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     "/",
+				Name:     pkgName,
+				Size:     -1,
+			})
+		}
+		log.Info().Msgf("Found %d TERRAFORM packages", len(packages))
 	} else {
 		return []types.Package{}, errors.New("unknown artifact type")
 	}
@@ -1296,6 +1332,43 @@ func (a *adapter) GetVersions(
 			})
 		}
 		log.Info().Msgf("Found %d versions for PUPPET package %s", len(versions), pkg)
+		return versions, nil
+	}
+	if artifactType == types.TERRAFORM {
+		files, err := tree.GetAllFiles(node)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+
+		versionMap := make(map[string]bool)
+		for _, file := range files {
+			if file.Folder {
+				continue
+			}
+			if util.IsTerraformModule(file.Uri) {
+				ns, name, provider, version, ok := util.ParseTerraformModulePath(file.Uri)
+				if ok && ns+"/"+name+"/"+provider == pkg {
+					versionMap[version] = true
+				}
+			} else if util.IsTerraformProvider(file.Uri) {
+				ns, typeName, version, _, _, _, ok := util.ParseTerraformProviderPath(file.Uri)
+				if ok && ns+"/"+typeName == pkg {
+					versionMap[version] = true
+				}
+			}
+		}
+
+		var versions []types.Version
+		for version := range versionMap {
+			versions = append(versions, types.Version{
+				Registry: registry,
+				Pkg:      pkg,
+				Path:     "/",
+				Name:     version,
+				Size:     -1,
+			})
+		}
+		log.Info().Msgf("Found %d versions for TERRAFORM package %s", len(versions), pkg)
 		return versions, nil
 	}
 	return []types.Version{}, errors.New("unknown artifact type")

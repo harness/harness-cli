@@ -42,7 +42,25 @@ var (
 	SWIFT       ArtifactType = "SWIFT"
 	PUPPET      ArtifactType = "PUPPET"
 	CONAN       ArtifactType = "CONAN"
+	TERRAFORM   ArtifactType = "TERRAFORM"
 )
+
+// knownArtifactTypes is the exhaustive set of valid ArtifactType values.
+// MUST be kept in sync with the var block above — add here whenever you add a new ArtifactType var.
+// TestValidateConfig_AllKnownArtifactTypesAccepted acts as a compile-time-like guard: update that test too.
+var knownArtifactTypes = map[ArtifactType]struct{}{
+	DOCKER: {}, HELM: {}, HELM_LEGACY: {}, HELM_HTTP: {},
+	GENERIC: {}, PYTHON: {}, MAVEN: {}, NPM: {}, NUGET: {},
+	RPM: {}, DEBIAN: {}, GO: {}, CONDA: {}, COMPOSER: {},
+	DART: {}, RAW: {}, SWIFT: {}, PUPPET: {}, CONAN: {},
+	TERRAFORM: {},
+}
+
+// IsKnownArtifactType reports whether t is a recognised ArtifactType value.
+func IsKnownArtifactType(t ArtifactType) bool {
+	_, ok := knownArtifactTypes[t]
+	return ok
+}
 
 // Config represents the top-level configuration structure
 type Config struct {
@@ -166,6 +184,9 @@ func validateConfig(config *Config) error {
 		}
 		if mapping.DestinationRegistry == "" {
 			return fmt.Errorf("mapping %d: destination registry cannot be empty", i)
+		}
+		if !IsKnownArtifactType(mapping.ArtifactType) {
+			return fmt.Errorf("mapping %d: unknown artifactType %q — valid values are: DOCKER, HELM, HELM_LEGACY, HELM_HTTP, GENERIC, PYTHON, MAVEN, NPM, NUGET, RPM, DEBIAN, GO, CONDA, COMPOSER, DART, RAW, SWIFT, PUPPET, CONAN, TERRAFORM", i, mapping.ArtifactType)
 		}
 		// Date filtering for MAVEN relies on the source file listing rather than
 		// maven-metadata.xml, so the metadata file may end up out of sync with

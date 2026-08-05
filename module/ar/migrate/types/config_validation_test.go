@@ -57,3 +57,38 @@ func TestValidateConfig_NonMavenWithDateFilterOK(t *testing.T) {
 		t.Fatalf("expected PYTHON mapping with date filter to pass, got: %v", err)
 	}
 }
+
+func TestValidateConfig_UnknownArtifactTypeRejected(t *testing.T) {
+	config := baseValidConfig()
+	config.Mappings[0].ArtifactType = ArtifactType("NOTAREALTYPE")
+
+	err := validateConfig(config)
+	if err == nil {
+		t.Fatal("expected error for unknown artifactType, got nil")
+	}
+}
+
+func TestValidateConfig_AllKnownArtifactTypesAccepted(t *testing.T) {
+	known := []ArtifactType{
+		DOCKER, HELM, HELM_LEGACY, HELM_HTTP, GENERIC, PYTHON, MAVEN,
+		NPM, NUGET, RPM, DEBIAN, GO, CONDA, COMPOSER, DART, RAW,
+		SWIFT, PUPPET, CONAN, TERRAFORM,
+	}
+	for _, at := range known {
+		config := baseValidConfig()
+		config.Mappings[0].ArtifactType = at
+		if err := validateConfig(config); err != nil {
+			t.Errorf("expected known artifactType %q to pass, got: %v", at, err)
+		}
+	}
+}
+
+func TestValidateConfig_EmptyArtifactTypeRejected(t *testing.T) {
+	config := baseValidConfig()
+	config.Mappings[0].ArtifactType = ArtifactType("")
+
+	err := validateConfig(config)
+	if err == nil {
+		t.Fatal("expected error for empty artifactType, got nil")
+	}
+}
