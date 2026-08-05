@@ -128,6 +128,64 @@ func TestGenericUpload_FailsOnMissingFile(t *testing.T) {
 	}
 }
 
+// TestGenericUpload_JWTToken_SendsOnlyAuthorization asserts that a
+// CIManager JWT lands in `Authorization` and that `x-api-key` is NOT sent.
+// Regression guard for AH-4575: sending both headers caused gateways to
+// reject the request as "Invalid API Token: Token length not matching".
+func TestGenericUpload_JWTToken_SendsOnlyAuthorization(t *testing.T) {
+	var gotAuth, gotXApiKey string
+	srv, _ := withFakePkgServer(t, func(hit int, w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		gotXApiKey = r.Header.Get("x-api-key")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Override the token set by withFakePkgServer.
+	orig := config.Global.AuthToken
+	config.Global.AuthToken = "CIManager eyJhbGciOiJIUzI1NiJ9.payload.sig"
+	t.Cleanup(func() { config.Global.AuthToken = orig })
+
+	path, size := writeTempFile(t, "hello")
+	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size, utils.FileChecksums{}, config.Global.Registry.PkgURL, srv.Client())
+
+	if err := job.Upload(context.Background()); err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+
+	if gotAuth != "CIManager eyJhbGciOiJIUzI1NiJ9.payload.sig" {
+		t.Errorf("Authorization header = %q, want the JWT token", gotAuth)
+	}
+	if gotXApiKey != "" {
+		t.Errorf("x-api-key must be empty for JWT tokens, got %q", gotXApiKey)
+	}
+}
+
+// TestGenericUpload_PATToken_SendsOnlyXApiKey asserts the mirror case:
+// a non-JWT token stays on `x-api-key` and no `Authorization` is sent.
+func TestGenericUpload_PATToken_SendsOnlyXApiKey(t *testing.T) {
+	var gotAuth, gotXApiKey string
+	srv, _ := withFakePkgServer(t, func(hit int, w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		gotXApiKey = r.Header.Get("x-api-key")
+		w.WriteHeader(http.StatusOK)
+	})
+	// withFakePkgServer already sets a PAT-shaped token.
+
+	path, size := writeTempFile(t, "hello")
+	job := NewGenericUploadJob("blob.bin", path, "pkg/v1/blob.bin", "myreg", "pkg", "v1", size, utils.FileChecksums{}, config.Global.Registry.PkgURL, srv.Client())
+
+	if err := job.Upload(context.Background()); err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+
+	if gotXApiKey != config.Global.AuthToken {
+		t.Errorf("x-api-key header = %q, want %q", gotXApiKey, config.Global.AuthToken)
+	}
+	if gotAuth != "" {
+		t.Errorf("Authorization must be empty for PAT tokens, got %q", gotAuth)
+	}
+}
+
 func TestGenericUpload_RespectsContextCancel(t *testing.T) {
 	stop := make(chan struct{})
 	srv, _ := withFakePkgServer(t, func(hit int, w http.ResponseWriter, r *http.Request) {
