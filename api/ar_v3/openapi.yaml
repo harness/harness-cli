@@ -135,6 +135,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/V3Error"
           description: Error response.
+  /scans/bulk-evaluate-sync:
+    post:
+      x-internal: false
+      summary: Synchronous bulk evaluation
+      description: Evaluates artifacts in-process against firewall policies and returns results immediately (no DB writes, max 50 artifacts).
+      operationId: BulkScanEvaluateSync
+      tags:
+        - Registry V3
+      parameters:
+        - $ref: "#/components/parameters/AccountIdentifier"
+        - $ref: "#/components/parameters/OrgIdentifier"
+        - $ref: "#/components/parameters/ProjectIdentifier"
+      requestBody:
+        $ref: "#/components/requestBodies/BulkScanEvaluateSyncRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/BulkScanEvaluateSyncResponse"
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V3Error"
+          description: Error response.
   /build-info:
     post:
       x-internal: false
@@ -350,6 +373,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/BulkScanEvaluationRequest"
+    BulkScanEvaluateSyncRequest:
+      description: Request to synchronously evaluate a batch of artifacts
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/BulkScanEvaluateSyncRequest"
     BulkDeleteRequest:
       description: Request to bulk delete artifacts
       content:
@@ -491,6 +520,17 @@ components:
             properties:
               data:
                 $ref: "#/components/schemas/BulkScanEvaluationStatusData"
+    BulkScanEvaluateSyncResponse:
+      description: Synchronous bulk evaluation results
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ArtifactScanDetailsV3"
   schemas:
     BuildInfoRequestInput:
       type: object
@@ -913,6 +953,90 @@ components:
         version:
           type: string
           description: Version of the package
+    BulkScanEvaluateSyncRequest:
+      type: object
+      description: Request body for synchronous bulk evaluation
+      required:
+        - registryId
+        - artifacts
+      properties:
+        registryId:
+          type: string
+          format: uuid
+          description: Registry identifier (must be an upstream registry with firewall enabled)
+        artifacts:
+          type: array
+          description: List of artifacts to evaluate (max 50)
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/ArtifactScanInput"
+        skipCache:
+          type: boolean
+          description: If true, skip cached scan results and force fresh OPA evaluation
+          default: false
+    ArtifactScanDetailsV3:
+      type: object
+      description: |
+        Per-artifact synchronous bulk-evaluate result. Same shape as
+        ArtifactScanDetails but scanStatus additionally allows ALLOWED and UNKNOWN,
+        and id is always the zero UUID (no DB record is written).
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Always the zero UUID for sync evaluations (no DB record)
+        packageType:
+          $ref: "#/components/schemas/PackageType"
+        packageName:
+          type: string
+          description: Package name
+        version:
+          type: string
+          description: Version
+        versionId:
+          type: string
+          format: uuid
+          description: Version UUID (populated only if the artifact already exists in the DB)
+        purl:
+          type: string
+          description: Package URL
+        registryName:
+          type: string
+          description: Registry name
+        registryId:
+          type: string
+          format: uuid
+          description: Registry ID
+        parentRegistryName:
+          type: string
+          description: Parent registry name (upstream chain)
+        parentRegistryId:
+          type: string
+          format: uuid
+          description: Parent registry ID (upstream chain)
+        policySetFailureDetails:
+          type: array
+          items:
+            $ref: "#/components/schemas/PolicySetFailureDetail"
+        fixVersionDetails:
+          $ref: "#/components/schemas/FixVersionDetails"
+        scanStatus:
+          type: string
+          description: Scan status
+          enum:
+            - ALLOWED
+            - BLOCKED
+            - WARN
+            - UNKNOWN
+        lastEvaluatedAt:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - packageName
+        - version
+        - scanStatus
     BulkScanEvaluationAcceptedData:
       type: object
       description: Response data for bulk evaluation request
