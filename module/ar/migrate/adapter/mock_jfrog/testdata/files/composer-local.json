@@ -1,0 +1,65 @@
+[
+  {
+    "Registry": "composer-local",
+    "Name": "packages.json",
+    "Uri": "/.composer/packages.json",
+    "Folder": false,
+    "Size": 304,
+    "LastModified": "2026-01-01T00:00:00.000Z",
+    "SHA1": "8e7e1d183df61874cca552ef6c84c121d4d7515c"
+  },
+  {
+    "Registry": "composer-local",
+    "Name": "migtest.json",
+    "Uri": "/.composer/p2/harness/migtest.json",
+    "Folder": false,
+    "Size": 852,
+    "LastModified": "2026-01-01T00:00:00.000Z",
+    "SHA1": "765fbeee60395f00a409918d9f677698c9bd00c8"
+  },
+  {
+    "Registry": "composer-local",
+    "Name": "readme.txt",
+    "Uri": "/harness-migtest/readme.txt",
+    "Folder": false,
+    "Size": 128,
+    "LastModified": "2026-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80a01"
+  },
+  {
+    "Registry": "composer-local",
+    "Name": "archive.tar.gz",
+    "Uri": "/harness-migtest/archive.tar.gz",
+    "Folder": false,
+    "Size": 512,
+    "LastModified": "2026-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80a02"
+  },
+  {
+    "Registry": "composer-local",
+    "Name": "harness-migtest-1.0.0.zip",
+    "Uri": "/harness-migtest/harness-migtest-1.0.0.zip",
+    "Folder": false,
+    "Size": 509,
+    "LastModified": "2026-01-01T00:00:00.000Z",
+    "SHA1": "dfc77b095de730be74309bdbcee5db03571c68a4"
+  },
+  {
+    "Registry": "composer-local",
+    "Name": "harness-migtest-2.0.0.zip",
+    "Uri": "/harness-migtest/harness-migtest-2.0.0.zip",
+    "Folder": false,
+    "Size": 510,
+    "LastModified": "2026-01-01T00:00:00.000Z",
+    "SHA1": "89bc849c7d797ff992a9b0b4307801856ca8cd4b"
+  },
+  {
+    "Registry": "composer-local",
+    "Name": "acme-demo-1.0.0.zip",
+    "Uri": "/acme-demo/acme-demo-1.0.0.zip",
+    "Folder": false,
+    "Size": 290,
+    "LastModified": "2026-01-01T00:00:00.000Z",
+    "SHA1": "ea29e36ed0e5df58f4f84e0459a22d866a2aef59"
+  }
+]

@@ -682,13 +682,16 @@ func (c *client) uploadComposerFile(
 	}
 	defer resp.Body.Close()
 
-	// Check for successful response
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+	switch {
+	case resp.StatusCode == http2.StatusConflict:
+		return types.ErrArtifactAlreadyExists
+	case resp.StatusCode >= 200 && resp.StatusCode <= 299:
+		return nil
+	default:
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to upload file '%s', status code: %d, response: %s",
 			filename, resp.StatusCode, string(body))
 	}
-	return nil
 }
 
 func (c *client) uploadSwiftFile(

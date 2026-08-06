@@ -61,6 +61,23 @@ func TestMatchesWildCardPattern(t *testing.T) {
 	}
 }
 
+func TestFilterFilesByPatternsPackageName_Composer(t *testing.T) {
+	pkgs := []types.Package{
+		{Name: "harness/migtest"},
+		{Name: "acme/demo"},
+	}
+
+	included := FilterFilesByPatternsPackageName(pkgs, []string{"acme/*"}, nil)
+	if len(included) != 1 || included[0].Name != "acme/demo" {
+		t.Fatalf("include acme/*: got %+v", included)
+	}
+
+	excluded := FilterFilesByPatternsPackageName(pkgs, nil, []string{"acme/*"})
+	if len(excluded) != 1 || excluded[0].Name != "harness/migtest" {
+		t.Fatalf("exclude acme/*: got %+v", excluded)
+	}
+}
+
 func TestIsTimeBasedFilterPresent(t *testing.T) {
 	someTime := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
 

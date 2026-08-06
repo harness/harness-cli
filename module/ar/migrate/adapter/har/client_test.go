@@ -10,6 +10,7 @@ import (
 
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
+	migratehttp "github.com/harness/harness-cli/module/ar/migrate/http"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 )
 
@@ -194,6 +195,74 @@ func TestUploadRawFile(t *testing.T) {
 			}
 			if !strings.HasSuffix(gotPath, tt.wantPathHas) {
 				t.Errorf("path = %q, want suffix %q", gotPath, tt.wantPathHas)
+			}
+			if !tt.wantErr && gotCT != "application/octet-stream" {
+				t.Errorf("content-type = %q, want application/octet-stream", gotCT)
+			}
+		})
+	}
+}
+
+// TestUploadComposerFile verifies composer uploads and maps HTTP 409 to
+// ErrArtifactAlreadyExists so re-runs are recorded as skips, not failures.
+func TestUploadComposerFile(t *testing.T) {
+	config.Global.AccountID = "acct1"
+
+	tests := []struct {
+		name         string
+		status       int
+		wantErr      bool
+		wantConflict bool
+	}{
+		{"success 201", http.StatusCreated, false, false},
+		{"success 200", http.StatusOK, false, false},
+		{"conflict surfaces ErrArtifactAlreadyExists", http.StatusConflict, false, true},
+		{"bad request surfaces error", http.StatusBadRequest, true, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotMethod, gotPath, gotCT string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotMethod = r.Method
+				gotPath = r.URL.Path
+				gotCT = r.Header.Get("Content-Type")
+				if tt.status >= 400 {
+					w.WriteHeader(tt.status)
+					_, _ = w.Write([]byte(`{"message":"version already exists"}`))
+					return
+				}
+				w.WriteHeader(tt.status)
+			}))
+			defer srv.Close()
+
+			c := &client{
+				url:    srv.URL,
+				client: migratehttp.NewClient(srv.Client()),
+			}
+			body := io.NopCloser(strings.NewReader("zip-bytes"))
+			err := c.uploadComposerFile("composer_mig", "harness-migtest-1.0.0.zip", body)
+
+			switch {
+			case tt.wantConflict:
+				if !errors.Is(err, types.ErrArtifactAlreadyExists) {
+					t.Fatalf("expected ErrArtifactAlreadyExists, got %v", err)
+				}
+			case tt.wantErr:
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+			default:
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			}
+			if gotMethod != http.MethodPost {
+				t.Errorf("method = %q, want POST", gotMethod)
+			}
+			wantPath := "/pkg/acct1/composer_mig/composer/upload"
+			if gotPath != wantPath {
+				t.Errorf("path = %q, want %q", gotPath, wantPath)
 			}
 			if !tt.wantErr && gotCT != "application/octet-stream" {
 				t.Errorf("content-type = %q, want application/octet-stream", gotCT)

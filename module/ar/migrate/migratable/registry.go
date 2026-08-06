@@ -288,6 +288,10 @@ func (r *Registry) Migrate(ctx context.Context) error {
 	}
 
 	// applying package level filter
+	composerPkgsBeforeFilters := 0
+	if r.artifactType == types.COMPOSER {
+		composerPkgsBeforeFilters = len(pkgs)
+	}
 	if util.IsPackageLevelFilterableArtifact(currArtifactType) {
 		if len(r.mapping.IncludePatterns) > 0 || len(r.mapping.ExcludePatterns) > 0 {
 			originalCount := len(pkgs)
@@ -305,6 +309,19 @@ func (r *Registry) Migrate(ctx context.Context) error {
 		originalCount := len(pkgs)
 		pkgs = util.FilterPackagesBySelectors(pkgs, r.mapping.PackageFilters)
 		logger.Info().Msgf("Package selector filter: %d -> %d packages", originalCount, len(pkgs))
+	}
+
+	if r.artifactType == types.COMPOSER &&
+		composerPkgsBeforeFilters > 0 &&
+		len(pkgs) == 0 &&
+		(len(r.mapping.IncludePatterns) > 0 || len(r.mapping.ExcludePatterns) > 0 || len(r.mapping.PackageFilters) > 0) {
+		warnMsg := fmt.Sprintf(
+			"Registry %s: Composer package filters reduced %d package(s) to 0; nothing will be migrated — "+
+				"use vendor/package names (e.g. harness/migtest, acme/*), not zip basenames, in includePatterns, excludePatterns, and packageFilters",
+			r.srcRegistry, composerPkgsBeforeFilters,
+		)
+		logger.Warn().Msg(warnMsg)
+		pterm.Warning.Println(warnMsg)
 	}
 
 	// Build destination index once per registry when overwrite=false

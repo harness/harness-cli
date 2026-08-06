@@ -124,5 +124,12 @@
     "url": "http://localhost:8081/artifactory/terraform-local",
     "description": "Mock Terraform Local Repository",
     "packageType": "terraform"
+  },
+  "composer-local": {
+    "key": "composer-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/composer-local",
+    "description": "Mock Composer Local Repository",
+    "packageType": "composer"
   }
 }

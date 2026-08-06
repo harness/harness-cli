@@ -1,6 +1,7 @@
 package migratable
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"testing"
@@ -62,6 +63,32 @@ func TestRegistryMigrateZeroPackagesGuardSilentWhenEmpty(t *testing.T) {
 
 	if err := job.Migrate(context.Background()); err != nil {
 		t.Fatalf("unexpected error for empty registry: %v", err)
+	}
+}
+
+// TestRegistryMigrateComposerFiltersReducedToZero warns when legacy-style
+// includePatterns (zip basename globs) no longer match vendor/package names.
+func TestRegistryMigrateComposerFiltersReducedToZero(t *testing.T) {
+	var logBuf bytes.Buffer
+	src := &registryFakeSrc{
+		files: []types.File{{Name: "harness-migtest-1.0.0.zip", Uri: "/harness-migtest/harness-migtest-1.0.0.zip"}},
+		pkgs:  []types.Package{{Name: "harness/migtest", Path: "/"}},
+	}
+	job := newRegistryJob(src, types.COMPOSER)
+	job.logger = zerolog.New(&logBuf)
+	job.mapping = &types.RegistryMapping{
+		IncludePatterns: []string{"harness-migtest*"},
+	}
+
+	if err := job.Migrate(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := logBuf.String()
+	if !strings.Contains(out, "Composer package filters reduced 1 package(s) to 0") {
+		t.Fatalf("expected filter-to-zero warning in logs, got: %s", out)
+	}
+	if !strings.Contains(out, "vendor/package") {
+		t.Fatalf("expected Composer naming hint in logs, got: %s", out)
 	}
 }
 
