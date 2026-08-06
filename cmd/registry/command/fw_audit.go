@@ -401,9 +401,14 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 			}
 
 			if len(dependencies) == 0 {
-				p.Success("No dependencies found in the file")
-				log.Info().Msg("No dependencies found in the file")
-				return nil
+				// A supported lock file that yields zero dependencies almost
+				// always means a parse gap (e.g. an unrecognized lock-file
+				// format/version), not a genuinely empty project. Fail loudly so
+				// the result is never mistaken for "everything passed the firewall".
+				msg := fmt.Sprintf("no dependencies parsed from %s; the file may be empty or in an unsupported format", fileName)
+				p.Error(msg)
+				log.Error().Str("file", fileName).Msg(msg)
+				return fmt.Errorf("%s", msg)
 			}
 
 			sort.Slice(dependencies, func(i, j int) bool {
@@ -749,49 +754,152 @@ func parsePnpmLock(data []byte) ([]Dependency, error) {
 	return deps, nil
 }
 
+// parseYarnLock parses both Yarn Classic (v1) and Yarn Berry (v2+) lock files.
+//
+// Classic entries use   version "1.2.3"   ; Berry entries use   version: 1.2.3
+// and carry a   resolution: "name@npm:1.2.3"   field. A single parser handles
+// both: entry headers are detected by lack of indentation (raw, pre-trim), so
+// nested keys like a "@scope/pkg:" under peerDependenciesMeta are never mistaken
+// for package headers. The Berry resolution field, when present, is preferred
+// for the name since it is unambiguous. Non-package top-level blocks such as
+// __metadata: are skipped because their key contains no "@".
 func parseYarnLock(data []byte) ([]Dependency, error) {
 	lines := strings.Split(string(data), "\n")
 	deps := make([]Dependency, 0)
 	seen := make(map[string]bool)
 
-	var currentPkg string
-	var currentVersion string
+	var headerName, resolutionName, resolutionProtocol, version string
 
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
+	flush := func() {
+		reset := func() {
+			headerName = ""
+			resolutionName = ""
+			resolutionProtocol = ""
+			version = ""
+		}
+
+		// Only npm-registry packages are real, auditable dependencies. Berry
+		// also emits entries for other protocols — workspace: (the project's
+		// own workspaces, resolving to 0.0.0-use.local), patch:, link:, portal:
+		// and file:. These are not registry packages; a patch entry merely wraps
+		// a base npm package that appears as its own entry, so skipping them
+		// loses no firewall coverage while avoiding malformed names and
+		// unactionable "Unknown" rows in the audit table. An empty protocol
+		// means Yarn Classic (no protocol marker), which is kept.
+		if resolutionProtocol != "" && resolutionProtocol != "npm" {
+			reset()
+			return
+		}
+
+		name := resolutionName
+		if name == "" {
+			name = headerName
+		}
+		if name != "" && version != "" && !seen[name] {
+			seen[name] = true
+			deps = append(deps, Dependency{
+				Name:    name,
+				Version: version,
+				Source:  "yarn.lock",
+			})
+		}
+		reset()
+	}
+
+	for _, raw := range lines {
+		// Indentation is decided on the raw line: an entry header sits at column
+		// zero, everything belonging to it is indented.
+		indented := len(raw) > 0 && (raw[0] == ' ' || raw[0] == '\t')
+		line := strings.TrimSpace(raw)
 
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 
-		if !strings.HasPrefix(line, " ") && strings.Contains(line, "@") && strings.HasSuffix(line, ":") {
-			pkgLine := strings.TrimSuffix(line, ":")
-			parts := strings.Split(pkgLine, ",")
-			if len(parts) > 0 {
-				firstPart := strings.TrimSpace(parts[0])
-				lastAt := strings.LastIndex(firstPart, "@")
-				if lastAt > 0 {
-					currentPkg = strings.Trim(firstPart[:lastAt], "\"")
-				} else {
-					currentPkg = strings.Trim(firstPart, "\"")
+		if !indented {
+			// A new top-level key ends the previous entry.
+			flush()
+			if strings.HasSuffix(line, ":") {
+				key := strings.TrimSuffix(line, ":")
+				// Only "@"-bearing keys are package headers; __metadata: and
+				// friends are skipped.
+				if strings.Contains(key, "@") {
+					headerName = yarnSelectorName(key)
 				}
 			}
-			currentVersion = ""
-		} else if strings.HasPrefix(line, "version ") && currentPkg != "" {
-			currentVersion = strings.Trim(strings.TrimPrefix(line, "version "), "\"")
-			if !seen[currentPkg] {
-				seen[currentPkg] = true
-				deps = append(deps, Dependency{
-					Name:    currentPkg,
-					Version: currentVersion,
-					Source:  "yarn.lock",
-				})
-			}
-			currentPkg = ""
+			continue
+		}
+
+		// Indented content belongs to the current entry.
+		switch {
+		case strings.HasPrefix(line, "version:"):
+			version = strings.Trim(strings.TrimSpace(strings.TrimPrefix(line, "version:")), "\"")
+		case strings.HasPrefix(line, "version "):
+			version = strings.Trim(strings.TrimPrefix(line, "version "), "\"")
+		case strings.HasPrefix(line, "resolution:"):
+			resolutionName = yarnSelectorName(strings.TrimPrefix(line, "resolution:"))
+			resolutionProtocol = yarnSelectorProtocol(strings.TrimPrefix(line, "resolution:"))
 		}
 	}
+	flush()
 
 	return deps, nil
+}
+
+// yarnSelectorName extracts the package name from a yarn selector list or a
+// Berry resolution string. It handles multi-selector headers ("pkg@a, pkg@b"),
+// surrounding quotes, scoped names ("@scope/pkg") and Berry protocols
+// ("pkg@npm:1.2.3"). The name is everything up to the FIRST "@" after index 0,
+// which begins the version range or protocol; a leading "@" on scoped packages
+// is preserved. Splitting on the first (not last) "@" keeps npm aliases such as
+// "foo@npm:bar@^1" resolving to "foo" rather than "foo@npm:bar".
+func yarnSelectorName(s string) string {
+	s = firstSelector(s)
+	if s == "" {
+		return ""
+	}
+	if at := strings.Index(s[1:], "@"); at != -1 {
+		s = s[:at+1]
+	}
+	return strings.TrimSpace(s)
+}
+
+// yarnSelectorProtocol returns the Berry protocol of a selector — the token
+// immediately after the name-terminating "@" and before the next ":" (e.g.
+// "npm", "workspace", "patch"). It returns "" when there is no protocol marker,
+// which is the Yarn Classic case ("pkg@^1.2.3", where the range is not a
+// protocol).
+func yarnSelectorProtocol(s string) string {
+	s = firstSelector(s)
+	if s == "" {
+		return ""
+	}
+	at := strings.Index(s[1:], "@")
+	if at == -1 {
+		return ""
+	}
+	rest := s[at+2:] // everything after the name-terminating "@"
+	colon := strings.Index(rest, ":")
+	if colon == -1 {
+		return ""
+	}
+	proto := rest[:colon]
+	// A version range like "^1.2.3" has no ":"; guard against a stray ":" inside
+	// a range by rejecting protocols that aren't a bare identifier.
+	if proto == "" || strings.ContainsAny(proto, "^~<>= .") {
+		return ""
+	}
+	return proto
+}
+
+// firstSelector normalizes a raw selector/resolution string: it takes the first
+// entry of a comma-separated header, trims whitespace and surrounding quotes.
+func firstSelector(s string) string {
+	s = strings.TrimSpace(s)
+	if idx := strings.Index(s, ","); idx != -1 {
+		s = s[:idx]
+	}
+	return strings.Trim(strings.TrimSpace(s), "\"")
 }
 
 func parseRequirementsTxt(data []byte) ([]Dependency, error) {
