@@ -93,9 +93,9 @@ func (m *MigrationService) Run(ctx context.Context) error {
 	}
 
 	eng := engine.NewEngine(m.config.Concurrency, jobs)
-	err := eng.Execute(ctx)
-	if err != nil {
-		logger.Error().Err(err).Msgf("Engine execution saw following errors: %v", err)
+	engErr := eng.Execute(ctx)
+	if engErr != nil {
+		logger.Error().Err(engErr).Msgf("Engine execution saw following errors: %v", engErr)
 	}
 	logger.Info().Msg("Migration process completed")
 
@@ -118,16 +118,22 @@ func (m *MigrationService) Run(ctx context.Context) error {
 		})
 
 		// Log the same data as JSON
-		if jsonData, err := json.MarshalIndent(fileStats, "", "  "); err == nil {
+		if jsonData, jsonErr := json.MarshalIndent(fileStats, "", "  "); jsonErr == nil {
 			logger.Info().
 				RawJSON("file_stats", jsonData).
 				Int("total_files", len(fileStats)).
 				Msg("Migration file statistics")
 		} else {
-			logger.Error().Err(err).Msg("Failed to marshal file stats to JSON")
+			logger.Error().Err(jsonErr).Msg("Failed to marshal file stats to JSON")
 		}
 	}
 
+	if engErr != nil {
+		return engErr
+	}
+	if len(fileStats) == 0 {
+		return fmt.Errorf("migration completed with 0 files transferred — source registry may be empty, or the artifactType does not match any files in the source")
+	}
 	return nil
 }
 
@@ -225,5 +231,8 @@ func (m *MigrationService) writeDryRunOutput(logger zerolog.Logger) error {
 	fmt.Printf("  %-30s %d\n", "Packages   :", totalPackages)
 	fmt.Printf("  %-30s %d\n", "Versions   :", totalVersions)
 
+	if totalSourceFiles > 0 && totalPackages == 0 {
+		return fmt.Errorf("dry-run: source registry contained %d file(s) but 0 packages were resolved — verify the artifactType matches the source registry contents", totalSourceFiles)
+	}
 	return nil
 }

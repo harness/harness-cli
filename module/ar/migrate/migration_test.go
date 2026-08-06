@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"os"
@@ -125,8 +126,15 @@ func TestWriteDryRunOutput_FileListContent(t *testing.T) {
 	}
 
 	svc := newTestMigrationService(&types.DryRunStats{
-		Files:       inputFiles,
-		Directories: make(map[string]*types.DryRunDirectoryEntry),
+		Files: inputFiles,
+		Directories: map[string]*types.DryRunDirectoryEntry{
+			"reg1": {
+				Registry: "reg1",
+				Packages: map[string]*types.DryRunPackageEntry{
+					"pkg1": {Name: "pkg1", Versions: map[string]*types.DryRunVersionEntry{}},
+				},
+			},
+		},
 	})
 
 	if err := svc.writeDryRunOutput(zerolog.Nop()); err != nil {
@@ -411,5 +419,60 @@ func TestWriteDryRunOutput_SummaryCountsAreCorrect(t *testing.T) {
 		if !strings.Contains(stdout, c.value) {
 			t.Errorf("expected count %s for %q in output:\n%s", c.value, c.label, stdout)
 		}
+	}
+}
+
+// TestWriteDryRunOutput_ZeroPackagesWithSourceFiles verifies that writeDryRunOutput
+// returns an error when the source had files but 0 packages were resolved.
+func TestWriteDryRunOutput_ZeroPackagesWithSourceFiles(t *testing.T) {
+	defer setupTempDir(t)()
+
+	svc := newTestMigrationService(&types.DryRunStats{
+		Files: []types.DryRunFileEntry{
+			{Registry: "reg1", Name: "foo.jar", Uri: "/reg1/foo.jar"},
+		},
+		Directories: make(map[string]*types.DryRunDirectoryEntry),
+	})
+
+	err := svc.writeDryRunOutput(zerolog.Nop())
+	if err == nil {
+		t.Fatal("expected error when source has files but 0 packages resolved, got nil")
+	}
+	if !strings.Contains(err.Error(), "0 packages were resolved") {
+		t.Errorf("error %q does not mention '0 packages were resolved'", err.Error())
+	}
+}
+
+// TestWriteDryRunOutput_ZeroPackagesEmptySource verifies that writeDryRunOutput
+// does NOT error when the source itself is empty (no files, no packages).
+func TestWriteDryRunOutput_ZeroPackagesEmptySource(t *testing.T) {
+	defer setupTempDir(t)()
+
+	svc := newTestMigrationService(&types.DryRunStats{
+		Files:       []types.DryRunFileEntry{},
+		Directories: make(map[string]*types.DryRunDirectoryEntry),
+	})
+
+	if err := svc.writeDryRunOutput(zerolog.Nop()); err != nil {
+		t.Fatalf("unexpected error for empty source: %v", err)
+	}
+}
+
+// TestRun_ZeroFilesTransferredReturnsError verifies that Run returns an error
+// when 0 files were transferred (0 mappings → engine runs 0 jobs → empty fileStats).
+func TestRun_ZeroFilesTransferredReturnsError(t *testing.T) {
+	svc := &MigrationService{
+		config: &types.Config{
+			Concurrency: 1,
+			Mappings:    []types.RegistryMapping{}, // no jobs → 0 files transferred
+		},
+	}
+
+	err := svc.Run(context.Background())
+	if err == nil {
+		t.Fatal("expected error when 0 files transferred, got nil")
+	}
+	if !strings.Contains(err.Error(), "0 files transferred") {
+		t.Errorf("error %q does not mention '0 files transferred'", err.Error())
 	}
 }
