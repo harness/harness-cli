@@ -31,15 +31,35 @@ func NewExistingIndex() *ExistingIndex {
 // AddFile records a destination (HAR) file path under (pkg, version); the path
 // is lowercased for case-insensitive matching.
 func (i *ExistingIndex) AddFile(pkg, version, harPath string) {
+	lowerPkg := strings.ToLower(pkg)
+	lowerVersion := strings.ToLower(version)
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	if i.files[pkg] == nil {
-		i.files[pkg] = map[string]map[string]struct{}{}
+	if i.files[lowerPkg] == nil {
+		i.files[lowerPkg] = map[string]map[string]struct{}{}
 	}
-	if i.files[pkg][version] == nil {
-		i.files[pkg][version] = map[string]struct{}{}
+	if i.files[lowerPkg][lowerVersion] == nil {
+		i.files[lowerPkg][lowerVersion] = map[string]struct{}{}
 	}
-	i.files[pkg][version][strings.ToLower(harPath)] = struct{}{}
+	i.files[lowerPkg][lowerVersion][strings.ToLower(harPath)] = struct{}{}
+}
+
+// Stats reports how much the index holds: distinct packages, versions across
+// all packages, and files across all versions. A nil index reports zeros.
+func (i *ExistingIndex) Stats() (packages, versions, files int) {
+	if i == nil {
+		return 0, 0, 0
+	}
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	packages = len(i.files)
+	for _, versionFiles := range i.files {
+		versions += len(versionFiles)
+		for _, fileSet := range versionFiles {
+			files += len(fileSet)
+		}
+	}
+	return packages, versions, files
 }
 
 // HasFile reports whether the source-relative filePath already exists at the
@@ -48,6 +68,8 @@ func (i *ExistingIndex) AddFile(pkg, version, harPath string) {
 // query is lowercased to match the lowercased stored paths.
 func (i *ExistingIndex) HasFile(pkg, version, filePath string, artifactType ArtifactType) bool {
 	lower := strings.ToLower(filePath)
+	lowerPkg := strings.ToLower(pkg)
+	lowerVersion := strings.ToLower(version)
 
 	// NPM's source tree (jfrog/nexus adapters) flattens all packages and
 	// versions under one pseudo-package/pseudo-version (see GetVersions'
@@ -67,24 +89,40 @@ func (i *ExistingIndex) HasFile(pkg, version, filePath string, artifactType Arti
 		return false
 	}
 
-	fs := i.files[pkg][version]
-	if fs == nil {
-		return false
+	fs := i.files[lowerPkg][lowerVersion]
+	if fs != nil {
+		// Types whose HAR path equals the source path (GENERIC/RAW/PYTHON/DART/PUPPET)
+		// match via a direct O(1) lookup — the common miss on a fresh migration must
+		// not pay for a bucket scan.
+		if _, ok := fs[lower]; ok {
+			return true
+		}
+
+		// Types with a prefix rewrite (NuGet's /<packageID>/<versionID>/ prefix)
+		// require converting each stored HAR path back to source form.
+		if needsPathRewrite(artifactType) {
+			for harPath := range fs {
+				if harToSourcePath(artifactType, harPath, lowerPkg, lowerVersion) == lower {
+					return true
+				}
+			}
+		}
 	}
 
-	// Types whose HAR path equals the source path (GENERIC/RAW/PYTHON/DART/PUPPET)
-	// match via a direct O(1) lookup — the common miss on a fresh migration must
-	// not pay for a bucket scan.
-	if _, ok := fs[lower]; ok {
-		return true
-	}
-
-	// Types with a prefix rewrite (NuGet's /<packageID>/<versionID>/ prefix)
-	// require converting each stored HAR path back to source form.
-	if needsPathRewrite(artifactType) {
-		for harPath := range fs {
-			if harToSourcePath(artifactType, harPath, pkg, version) == lower {
-				return true
+	// Some NuGet artifacts have malformed or ambiguous names that cause the
+	// source and HAR sides to derive different package/version buckets. If the
+	// normal lookup misses, scan the complete index and compare the full
+	// source-relative path after stripping HAR's package/version prefix. Keep
+	// the parent path in the identity check: the same NuGet filename can exist
+	// in multiple JFrog folders.
+	if artifactType == NUGET {
+		for _, versions := range i.files {
+			for _, files := range versions {
+				for harPath := range files {
+					if harToSourcePath(NUGET, harPath, "", "") == lower {
+						return true
+					}
+				}
 			}
 		}
 	}
@@ -111,10 +149,9 @@ func harToSourcePath(artifactType ArtifactType, harPath, pkg, version string) st
 	case NUGET:
 		return stripLeadingSegments(harPath, 2)
 	case NPM:
-		p := strings.ToLower(pkg)
-		prefix := "/" + p + "/" + strings.ToLower(version) + "/"
+		prefix := "/" + pkg + "/" + version + "/"
 		if rest, ok := strings.CutPrefix(harPath, prefix); ok {
-			return "/" + p + "/-/" + rest
+			return "/" + pkg + "/-/" + rest
 		}
 		return harPath
 	default:
@@ -138,13 +175,4 @@ func stripLeadingSegments(p string, n int) string {
 		return p
 	}
 	return "/" + strings.Join(parts[n:], "/")
-}
-
-// FilesFor returns the lowercased HAR file-path set for (pkg, version), or nil.
-// Returned map must be treated as read-only.
-func (i *ExistingIndex) FilesFor(pkg, version string) map[string]struct{} {
-	if fv, ok := i.files[pkg]; ok {
-		return fv[version]
-	}
-	return nil
 }

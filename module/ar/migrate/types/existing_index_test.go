@@ -19,15 +19,6 @@ func TestExistingIndex_AddFile(t *testing.T) {
 	if !idx.HasFile("mypackage", "1.0.0", "MyFile.TXT", "") {
 		t.Error("Expected mixed-case query to find file")
 	}
-
-	// Verify FilesFor returns the lowercased name
-	files := idx.FilesFor("mypackage", "1.0.0")
-	if files == nil {
-		t.Fatal("Expected non-nil file set")
-	}
-	if _, ok := files["myfile.txt"]; !ok {
-		t.Error("Expected lowercased filename in FilesFor result")
-	}
 }
 
 func TestExistingIndex_MissingEntries(t *testing.T) {
@@ -38,10 +29,6 @@ func TestExistingIndex_MissingEntries(t *testing.T) {
 	if idx.HasFile("pkg2", "1.0", "file.txt", "") {
 		t.Error("Expected false for missing package file")
 	}
-	if idx.FilesFor("pkg2", "1.0") != nil {
-		t.Error("Expected nil for missing package")
-	}
-
 	// Missing version
 	if idx.HasFile("pkg1", "2.0", "file.txt", "") {
 		t.Error("Expected false for missing version file")
@@ -100,13 +87,50 @@ func TestExistingIndex_HasFile_NuGet(t *testing.T) {
 	if idx.HasFile("company.grpc.pkg", "1.0.0", "/foo/other.nupkg", NUGET) {
 		t.Error("Expected false for a file absent from the version")
 	}
-	// Wrong package/version buckets must not match.
-	if idx.HasFile("other.pkg", "1.0.0", "/foo/company.grpc.pkg.1.0.0.nupkg", NUGET) {
-		t.Error("Expected false for a mismatched package")
+	// A wrong package/version bucket still matches via the NuGet filename
+	// fallback after the normal bucket lookup misses.
+	if !idx.HasFile("other.pkg", "1.0.0", "/foo/company.grpc.pkg.1.0.0.nupkg", NUGET) {
+		t.Error("Expected filename fallback to match across package/version buckets")
 	}
 
 	if !idx.HasFile("hello.foo.bar.xxx.yyy", "3.203.0-pr-280.a52f7f9.1", "/hello/hello.foo.bar.xxx.yyy/3.203.0-INTEGRATION/hello.foo.bar.xxx.yyy.3.203.0-pr-280.a52f7f9.1.nupkg", NUGET) {
 		t.Error("Expected true for a mismatched package")
+	}
+}
+
+func TestExistingIndex_HasFile_NuGetFallsBackToPathAcrossIndex(t *testing.T) {
+	idx := NewExistingIndex()
+	idx.AddFile(
+		"har-derived-package",
+		"har-derived-version",
+		"/packageID/versionID/uwm/Some Path/My.Package.1.2.3-RC.1.nupkg",
+	)
+
+	if !idx.HasFile(
+		"source-derived-package",
+		"source-derived-version",
+		"/uwm/some path/my.package.1.2.3-rc.1.nupkg",
+		NUGET,
+	) {
+		t.Error("expected NuGet path fallback to match across package/version buckets")
+	}
+
+	if idx.HasFile(
+		"source-derived-package",
+		"source-derived-version",
+		"/different/source/path/my.package.1.2.3-rc.1.nupkg",
+		NUGET,
+	) {
+		t.Error("path fallback must not match the same filename in another folder")
+	}
+
+	if idx.HasFile(
+		"source-derived-package",
+		"source-derived-version",
+		"/uwm/some path/my.package.1.2.3-rc.1.nupkg",
+		GENERIC,
+	) {
+		t.Error("global path fallback must only apply to NuGet")
 	}
 }
 
@@ -179,39 +203,5 @@ func TestHarToSourcePath(t *testing.T) {
 					tt.artifactType, tt.harPath, tt.pkg, tt.version, got, tt.want)
 			}
 		})
-	}
-}
-
-func TestExistingIndex_CaseNormalization(t *testing.T) {
-	idx := NewExistingIndex()
-
-	// Add files with various cases
-	idx.AddFile("Package", "Version", "FILE1.jar")
-	idx.AddFile("Package", "Version", "file2.JAR")
-	idx.AddFile("Package", "Version", "File3.Jar")
-
-	// File names are lowercased in storage and query
-	files := idx.FilesFor("Package", "Version")
-	if files == nil {
-		t.Fatal("Expected files")
-	}
-	expectedFiles := []string{"file1.jar", "file2.jar", "file3.jar"}
-	for _, f := range expectedFiles {
-		if _, ok := files[f]; !ok {
-			t.Errorf("Expected file %s in index", f)
-		}
-	}
-
-	// Package/version names are matched verbatim (not case-normalized).
-	if idx.HasFile("package", "version", "file1.jar", "") {
-		t.Error("Package/version should NOT be case-normalized")
-	}
-
-	// All file-name queries should hit (lowercased before lookup)
-	if !idx.HasFile("Package", "Version", "FILE1.jar", "") {
-		t.Error("Expected uppercase query to match")
-	}
-	if !idx.HasFile("Package", "Version", "file1.jar", "") {
-		t.Error("Expected lowercase query to match")
 	}
 }
