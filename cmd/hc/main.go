@@ -113,7 +113,7 @@ func main() {
 	rootCmd.PersistentFlags().IntVar(&config.Global.TimeoutSeconds, "timeout", config.DefaultTimeoutSeconds,
 		"Request timeout in seconds (default: no timeout)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging to console")
-
+	rootCmd.PersistentFlags().BoolVar(&config.Global.NoProgress, "no-progress", false, "Suppress interactive progress output (auto-enabled when CI env var is set)")
 	// Load auth config
 	authConfig, err := loadAuthConfig()
 	if err == nil {

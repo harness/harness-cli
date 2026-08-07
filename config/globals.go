@@ -19,6 +19,9 @@ type GlobalFlags struct {
 	// Request timeout in seconds (0 means no timeout)
 	TimeoutSeconds int
 
+	// NoProgress suppresses interactive plan/step output (auto-enabled when CI env var is set)
+	NoProgress bool
+
 	// Command-specific configurations
 	Registry RegistryConfig
 }

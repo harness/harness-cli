@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harness/harness-cli/config"
 	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/pterm/pterm"
@@ -45,9 +46,15 @@ func (e *FileUploadEngine) Execute(ctx context.Context, jobs []FileUploadJob) []
 
 	e.progress.Step(fmt.Sprintf("Starting upload: %d files with %d workers. Please wait ....", len(jobs), numWorkers))
 
-	// Create progress bar
-	progressBar, _ := pterm.DefaultProgressbar.WithTotal(len(jobs)).WithTitle("Uploading files").Start()
-	defer progressBar.Stop()
+	showBar := !config.Global.NoProgress && !p.SuppressLog()
+
+	// Create progress bar (only when running interactively)
+	var progressBar *pterm.ProgressbarPrinter
+
+	if showBar {
+		progressBar, _ = pterm.DefaultProgressbar.WithTotal(len(jobs)).WithTitle("Uploading files").Start()
+		defer progressBar.Stop()
+	}
 
 	startTime := time.Now()
 	jobChan := make(chan FileUploadJob, len(jobs))
@@ -79,13 +86,17 @@ func (e *FileUploadEngine) Execute(ctx context.Context, jobs []FileUploadJob) []
 		for result := range resultChan {
 			resultMu.Lock()
 			results = append(results, result)
-			if result.Success {
+			if progressBar != nil {
+				if result.Success {
+					successCount++
+					progressBar.UpdateTitle(fmt.Sprintf("Uploading files (%d/%d completed)", len(results), len(jobs)))
+				} else {
+					progressBar.UpdateTitle(fmt.Sprintf("Uploading files (%d/%d completed, %d failed)", successCount, len(jobs), len(results)-successCount))
+				}
+				progressBar.Increment()
+			} else if result.Success {
 				successCount++
-				progressBar.UpdateTitle(fmt.Sprintf("Uploading files (%d/%d completed)", len(results), len(jobs)))
-			} else {
-				progressBar.UpdateTitle(fmt.Sprintf("Uploading files (%d/%d completed, %d failed)", successCount, len(jobs), len(results)-successCount))
 			}
-			progressBar.Increment()
 			resultMu.Unlock()
 		}
 	}()
