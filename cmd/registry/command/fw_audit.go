@@ -47,8 +47,14 @@ type auditContext struct {
 	p            *progress.ConsoleReporter
 	evaluator    Evaluator
 	batchSize    int
-	workers      int
 }
+
+// syncWorkers is the fixed number of concurrent batches for the sync path.
+// It is deliberately not user-tunable: higher concurrency intermittently
+// overwhelmed the firewall eval service (batches failing with "Evaluation
+// execution failed" -> fail-open UNKNOWN rows), and lower concurrency only
+// slows the client. 3 is the balance point. Async mode is always serial.
+const syncWorkers = 3
 
 type batchInfo struct {
 	batchIdx     int
@@ -186,10 +192,7 @@ func processBatches(ctx *auditContext, dependencies []Dependency, registryName s
 	batches := chunkDependencies(dependencies, effectiveBatchSize)
 	totalBatches := len(batches)
 
-	workers := ctx.workers
-	if workers < 1 {
-		workers = 1
-	}
+	workers := syncWorkers
 	// Async mode is inherently serial per-batch (each batch initiates + polls);
 	// running it in parallel would just multiply polling load without speedup.
 	if ctx.evaluator.Mode() == "async" {
@@ -341,7 +344,6 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 	var projectID string
 	var useAsync bool
 	var batchSize int
-	var workers int
 
 	cmd := &cobra.Command{
 		Use:   "audit",
@@ -424,7 +426,6 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 				p:            p,
 				evaluator:    evaluator,
 				batchSize:    batchSize,
-				workers:      workers,
 			}
 
 			results, batchErr := processBatches(ctx, dependencies, registryName)
@@ -445,7 +446,6 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 	cmd.Flags().StringVar(&projectID, "project", "", "Project identifier (defaults to global config)")
 	cmd.Flags().BoolVar(&useAsync, "async", false, "Use the legacy async bulk-evaluate + poll flow instead of the default sync API")
 	cmd.Flags().IntVar(&batchSize, "batch-size", 20, "Artifacts per batch (max 50; sync mode)")
-	cmd.Flags().IntVar(&workers, "workers", 10, "Concurrent batches (sync mode only; async is always serial)")
 	cmd.MarkFlagRequired("file")
 	cmd.MarkFlagRequired("registry")
 

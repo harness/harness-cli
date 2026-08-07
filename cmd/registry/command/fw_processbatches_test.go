@@ -53,7 +53,6 @@ func TestProcessBatches_AllSuccess(t *testing.T) {
 		p:            progress.NewConsoleReporter(),
 		evaluator:    stub,
 		batchSize:    5,
-		workers:      3,
 		registryUUID: uuid.New(),
 	}
 	results, err := processBatches(ctx, makeDeps(13), "r")
@@ -81,7 +80,6 @@ func TestProcessBatches_MixedFailure(t *testing.T) {
 		p:         progress.NewConsoleReporter(),
 		evaluator: stub,
 		batchSize: 5,
-		workers:   3,
 	}
 	results, err := processBatches(ctx, makeDeps(15), "r")
 	assert.Error(t, err)
@@ -102,8 +100,8 @@ func TestProcessBatches_MixedFailure(t *testing.T) {
 }
 
 func TestProcessBatches_AsyncForcesSerial(t *testing.T) {
-	// Async mode should ignore --workers=10 and run one at a time.
-	// We assert only 1 concurrent invocation ever by tracking an atomic counter.
+	// Async mode must run one batch at a time regardless of the sync worker
+	// count. We assert only 1 concurrent invocation ever by tracking an atomic counter.
 	var inflight, maxInflight int32
 	stub := &stubEvaluator{
 		mode: "async",
@@ -125,7 +123,6 @@ func TestProcessBatches_AsyncForcesSerial(t *testing.T) {
 		p:         progress.NewConsoleReporter(),
 		evaluator: stub,
 		batchSize: 1,
-		workers:   10,
 	}
 	_, err := processBatches(ctx, makeDeps(5), "r")
 	assert.NoError(t, err)
@@ -147,7 +144,6 @@ func TestProcessBatches_BatchSizeCapAtMax(t *testing.T) {
 		p:         progress.NewConsoleReporter(),
 		evaluator: stub,
 		batchSize: 100, // over the max
-		workers:   1,
 	}
 	_, err := processBatches(ctx, makeDeps(120), "r")
 	assert.NoError(t, err)
