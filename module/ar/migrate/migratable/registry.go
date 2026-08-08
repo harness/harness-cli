@@ -137,6 +137,7 @@ func (r *Registry) Migrate(ctx context.Context) error {
 	if err2 != nil {
 		fetchProgress.fail(fmt.Sprintf("Failed to fetch file metadata from source registry %s", r.srcRegistry))
 		logger.Error().Msgf("Failed to get files from registry %s", r.srcRegistry)
+		util.AddRegistryErrorToStat(r.stats, r.srcRegistry, err2)
 		return fmt.Errorf("get files from registry %s failed: %w", r.srcRegistry, err2)
 	}
 	pulledMsg := fmt.Sprintf("Pulled %d file(s) from registry %s", len(files), r.srcRegistry)
@@ -186,6 +187,7 @@ func (r *Registry) Migrate(ctx context.Context) error {
 		searchedFiles, err2 := r.srcAdapter.SearchFiles(r.srcRegistry)
 		if err2 != nil {
 			logger.Error().Msgf("Failed to search files from registry %s", r.srcRegistry)
+			util.AddRegistryErrorToStat(r.stats, r.srcRegistry, err2)
 			return fmt.Errorf("search files from registry %s failed: %w", r.srcRegistry, err2)
 		}
 		logger.Info().Msgf("Applying time based filter (match: %s)", df.Match)
@@ -241,8 +243,11 @@ func (r *Registry) Migrate(ctx context.Context) error {
 	// its files is in window. buildVersionJobs recovers a version's pruned
 	// distribution files from this unfiltered tree. It is pattern-filtered (never
 	// resurrect an explicitly excluded file) but NOT date-filtered.
+	// TERRAFORM also gets the unfiltered tree: its provider versions are atomic
+	// multi-file versions too (all platform zips per version), but discovery
+	// happens inside Version.Migrate, which swaps to this tree — see version.go.
 	var unfilteredRoot *types.TreeNode
-	if dateFilterActive && util.IsAtomicVersionArtifact(currArtifactType) {
+	if dateFilterActive && (util.IsAtomicVersionArtifact(currArtifactType) || currArtifactType == types.TERRAFORM) {
 		recoveryFiles := originalFiles
 		if util.IsFileLevelFilterableArtifact(currArtifactType) &&
 			(len(r.mapping.IncludePatterns) > 0 || len(r.mapping.ExcludePatterns) > 0) {
@@ -256,6 +261,7 @@ func (r *Registry) Migrate(ctx context.Context) error {
 	pkgs, err := r.srcAdapter.GetPackages(r.srcRegistry, r.artifactType, root)
 	if err != nil {
 		logger.Error().Msg("Failed to get packages")
+		util.AddRegistryErrorToStat(r.stats, r.srcRegistry, err)
 		return fmt.Errorf("get packages failed: %w", err)
 	}
 
@@ -263,19 +269,24 @@ func (r *Registry) Migrate(ctx context.Context) error {
 	// the artifact type is likely misconfigured or unsupported for this source.
 	// Treat this as an error so the caller exits non-zero instead of silently
 	// reporting "Migration completed successfully" with 0 artifacts transferred.
-	// Only fire when no user-controlled filters are active: date filters, pattern
-	// filters, and packageFilters can legitimately reduce packages to zero, and we
-	// don't want to error on valid filtered runs.
-	noFiltersActive := !dateFilterActive &&
-		len(r.mapping.IncludePatterns) == 0 &&
-		len(r.mapping.ExcludePatterns) == 0 &&
-		len(r.mapping.PackageFilters) == 0
-	if len(pkgs) == 0 && len(originalFiles) > 0 && noFiltersActive {
-		return fmt.Errorf(
-			"registry %s: pulled %d file(s) from source but resolved 0 packages for artifactType %s — "+
+	//
+	// The guard fires whenever the enumeration tree still had input: filters
+	// (date/pattern) can legitimately starve the tree to ZERO files — a valid
+	// empty result — but if files SURVIVED the filters and GetPackages still
+	// resolved nothing, the surviving content does not parse as this artifact
+	// type, which is a type mismatch no filter setting can explain away.
+	// (Package-level pattern filters and packageFilters are applied AFTER this
+	// point, so they can never be the cause of a zero here. For
+	// metadata-driven types the tree is intentionally not date-narrowed, so
+	// `files` still reflects the full listing for them.)
+	if len(pkgs) == 0 && len(files) > 0 {
+		err := fmt.Errorf(
+			"registry %s: pulled %d file(s) from source (%d after filters) but resolved 0 packages for artifactType %s — "+
 				"verify the registry contains %s artifacts and the artifactType is correct",
-			r.srcRegistry, len(originalFiles), r.artifactType, r.artifactType,
+			r.srcRegistry, len(originalFiles), len(files), r.artifactType, r.artifactType,
 		)
+		util.AddRegistryErrorToStat(r.stats, r.srcRegistry, err)
+		return err
 	}
 
 	// For metadata-driven artifact types (RPM, DEBIAN), GetPackages reads a
@@ -362,7 +373,10 @@ func (r *Registry) Migrate(ctx context.Context) error {
 	eng := engine.NewEngine(r.config.Concurrency, jobs)
 	err = eng.Execute(ctx)
 	if err != nil {
+		// Propagate so the failure reaches MigrationService.Run's exit-code
+		// contract; the per-coordinate stats already carry the detail.
 		logger.Error().Err(err).Msg("Engine execution saw following errors")
+		return fmt.Errorf("registry %s: package migration errors: %w", r.srcRegistry, err)
 	}
 
 	logger.Info().

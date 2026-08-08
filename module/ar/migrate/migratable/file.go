@@ -134,6 +134,7 @@ func (r *File) Pre(ctx context.Context) error {
 				Uri:      r.file.Uri,
 				Size:     int64(r.file.Size),
 				Status:   types.StatusSkip,
+				Reason:   types.SkipReasonAlreadyExists,
 			}
 			r.stats.Add(stat)
 		}
@@ -199,6 +200,7 @@ func (r *File) Migrate(ctx context.Context) error {
 		if err != nil {
 			if errors.Is(err, types.ErrArtifactAlreadyExists) {
 				stat.Status = types.StatusSkip
+				stat.Reason = types.SkipReasonAlreadyExists
 				pterm.Info.Println(fmt.Sprintf("%s already exists, skipping", title))
 			} else {
 				logger.Error().Err(err).Msg("Failed to upload Terraform file")
@@ -237,6 +239,7 @@ func (r *File) Migrate(ctx context.Context) error {
 		if err != nil {
 			if errors.Is(err, types.ErrArtifactAlreadyExists) {
 				stat.Status = types.StatusSkip
+				stat.Reason = types.SkipReasonAlreadyExists
 				pterm.Info.Println(fmt.Sprintf("%s already exists, skipping", title))
 			} else {
 				logger.Error().Err(err).Msg("Failed to upload file")

@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/pterm/pterm"
@@ -45,15 +46,42 @@ var (
 	TERRAFORM   ArtifactType = "TERRAFORM"
 )
 
-// knownArtifactTypes is the exhaustive set of valid ArtifactType values.
-// MUST be kept in sync with the var block above — add here whenever you add a new ArtifactType var.
-// TestValidateConfig_AllKnownArtifactTypesAccepted acts as a compile-time-like guard: update that test too.
-var knownArtifactTypes = map[ArtifactType]struct{}{
-	DOCKER: {}, HELM: {}, HELM_LEGACY: {}, HELM_HTTP: {},
-	GENERIC: {}, PYTHON: {}, MAVEN: {}, NPM: {}, NUGET: {},
-	RPM: {}, DEBIAN: {}, GO: {}, CONDA: {}, COMPOSER: {},
-	DART: {}, RAW: {}, SWIFT: {}, PUPPET: {}, CONAN: {},
-	TERRAFORM: {},
+// knownArtifactTypesList is the exhaustive, ordered list of valid ArtifactType
+// values and the SINGLE SOURCE OF TRUTH for "which types exist": config
+// validation, the validation error message, and the `migrate --help` text are
+// all derived from it. Add new types here (and to the var block above)
+// whenever a new ArtifactType is introduced.
+var knownArtifactTypesList = []ArtifactType{
+	DOCKER, HELM, HELM_LEGACY, HELM_HTTP, GENERIC, PYTHON, MAVEN, NPM, NUGET,
+	RPM, DEBIAN, GO, CONDA, COMPOSER, DART, RAW, SWIFT, PUPPET, CONAN,
+	TERRAFORM,
+}
+
+// knownArtifactTypes is the lookup set derived from knownArtifactTypesList.
+var knownArtifactTypes = func() map[ArtifactType]struct{} {
+	m := make(map[ArtifactType]struct{}, len(knownArtifactTypesList))
+	for _, t := range knownArtifactTypesList {
+		m[t] = struct{}{}
+	}
+	return m
+}()
+
+// KnownArtifactTypes returns the ordered list of all valid ArtifactType
+// values. Safe to mutate by the caller (a fresh copy is returned each time).
+func KnownArtifactTypes() []ArtifactType {
+	out := make([]ArtifactType, len(knownArtifactTypesList))
+	copy(out, knownArtifactTypesList)
+	return out
+}
+
+// KnownArtifactTypesString returns the valid types as a single
+// comma-separated string for error messages and help text.
+func KnownArtifactTypesString() string {
+	parts := make([]string, len(knownArtifactTypesList))
+	for i, t := range knownArtifactTypesList {
+		parts[i] = string(t)
+	}
+	return strings.Join(parts, ", ")
 }
 
 // IsKnownArtifactType reports whether t is a recognised ArtifactType value.
@@ -69,6 +97,10 @@ type Config struct {
 	Overwrite   bool              `yaml:"overwrite"`
 	DryRun      bool              `yaml:"dryRun"`
 	Summary     bool              `yaml:"summary"`
+	// ResultFile is an optional path to a JSON-lines file that receives one
+	// per-coordinate result record (mirroring FileStat) at the end of a
+	// non-dry-run migration, so automation never has to parse human tables.
+	ResultFile string            `yaml:"resultFile,omitempty"`
 	Source      RegistryConfig    `yaml:"source"`
 	Dest        RegistryConfig    `yaml:"destination"`
 	Mappings    []RegistryMapping `yaml:"mappings"`
@@ -105,7 +137,13 @@ type RegistryMapping struct {
 	ArtifactType        ArtifactType `yaml:"artifactType"`
 	SourceRegistry      string       `yaml:"sourceRegistry"`
 	DestinationRegistry string       `yaml:"destinationRegistry"`
-	// NOT IMPLEMENTED YET
+	// IncludePatterns/ExcludePatterns are glob patterns (* and **) applied at
+	// file level for file-level-filterable types (GENERIC, RAW, PYTHON, MAVEN,
+	// NUGET, NPM, DART, GO) and at package-name level for
+	// package-level-filterable types (DOCKER, HELM, HELM_LEGACY, HELM_HTTP,
+	// RPM, CONDA, COMPOSER, SWIFT, CONAN). Setting them for any other type
+	// (DEBIAN, TERRAFORM, PUPPET) is a config error — scope controls must
+	// never be silent no-ops. Only one of the two may be set per mapping.
 	IncludePatterns []string `yaml:"includePatterns"`
 	ExcludePatterns []string `yaml:"excludePatterns"`
 	//Optional
@@ -186,7 +224,18 @@ func validateConfig(config *Config) error {
 			return fmt.Errorf("mapping %d: destination registry cannot be empty", i)
 		}
 		if !IsKnownArtifactType(mapping.ArtifactType) {
-			return fmt.Errorf("mapping %d: unknown artifactType %q — valid values are: DOCKER, HELM, HELM_LEGACY, HELM_HTTP, GENERIC, PYTHON, MAVEN, NPM, NUGET, RPM, DEBIAN, GO, CONDA, COMPOSER, DART, RAW, SWIFT, PUPPET, CONAN, TERRAFORM", i, mapping.ArtifactType)
+			return fmt.Errorf("mapping %d: unknown artifactType %q — valid values are: %s", i, mapping.ArtifactType, KnownArtifactTypesString())
+		}
+		// Scope controls must never be silent no-ops: include/exclude patterns
+		// only take effect for pattern-filterable types (file-level or
+		// package-level); for every other type they would be ignored entirely.
+		if (len(mapping.IncludePatterns) > 0 || len(mapping.ExcludePatterns) > 0) &&
+			!IsPatternFilterable(mapping.ArtifactType) {
+			return fmt.Errorf("mapping %d: includePatterns/excludePatterns are not supported for artifact type %s — "+
+				"patterns are applied at file level for %s and at package level for %s; use packageFilters for scoping where supported",
+				i, mapping.ArtifactType,
+				"GENERIC, RAW, PYTHON, MAVEN, NUGET, NPM, DART, GO",
+				"DOCKER, HELM, HELM_LEGACY, HELM_HTTP, RPM, CONDA, COMPOSER, SWIFT, CONAN")
 		}
 		// Date filtering for MAVEN relies on the source file listing rather than
 		// maven-metadata.xml, so the metadata file may end up out of sync with
@@ -197,12 +246,40 @@ func validateConfig(config *Config) error {
 			log.Warn().Msg(msg)
 			pterm.Warning.Println(msg)
 		}
+		// Index-seeded / metadata-driven types seed enumeration from a
+		// repository index (PyPI's .pypi HTML, Conda's repodata, RPM's
+		// repomd/primary) rather than from the raw file listing, so a
+		// date-filtered run can silently omit in-scope content: the filter
+		// narrows which files migrate, but the index decides what exists.
+		// A full no-filter run with overwrite:false is the completeness path.
+		if mapping.DateFilter != nil && isIndexSeededArtifact(mapping.ArtifactType) {
+			msg := fmt.Sprintf("mapping %d: date filter is enabled for %s — "+
+				"date-filtered runs of index-seeded types can omit in-scope content; "+
+				"a full run with overwrite:false is the completeness path", i, mapping.ArtifactType)
+			log.Warn().Msg(msg)
+			pterm.Warning.Println(msg)
+		}
 		if err := ValidatePackageFilters(mapping.PackageFilters, mapping.ArtifactType); err != nil {
 			return fmt.Errorf("mapping %d: %w", i, err)
 		}
 	}
 
 	return nil
+}
+
+// isIndexSeededArtifact reports whether the type's package/version enumeration
+// is seeded from a repository index or metadata file (PyPI's .pypi HTML,
+// Conda's repodata.json, RPM's repomd/primary.xml) rather than purely from the
+// raw file listing — the set of types for which a date-filtered run can
+// under-migrate in-scope content (see the date-filter warning in
+// validateConfig).
+func isIndexSeededArtifact(t ArtifactType) bool {
+	switch t {
+	case PYTHON, CONDA, RPM:
+		return true
+	default:
+		return false
+	}
 }
 
 func validateCredentials(registry RegistryConfig) error {

@@ -15,16 +15,27 @@ import (
 
 // NewListArtifactCmd wires up:
 //
-//	hc artifact list
+//	hc artifact list [registry]
 func NewListArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 	var registry string
 	var pageSize int32
 	var pageIndex int32
 	cmd := &cobra.Command{
-		Use:   "list",
+		Use:   "list [registry]",
 		Short: "List all artifacts",
-		Long:  "Lists all artifacts in the Harness Artifact Registry",
+		Long: "Lists all artifacts in the Harness Artifact Registry. Pass a registry name " +
+			"(or --registry) to scope the listing to a single registry; with neither, artifacts " +
+			"across all registries in the account are listed.",
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 1 {
+				if len(registry) > 0 && registry != args[0] {
+					return fmt.Errorf("conflicting registry arguments: positional '%s' and --registry '%s'",
+						args[0], registry)
+				}
+				registry = args[0]
+			}
+
 			params := client.GetAllHarnessArtifactsParams{}
 			if len(registry) > 0 {
 				params.RegIdentifier = &[]string{registry}

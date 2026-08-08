@@ -7,7 +7,13 @@ Guidance for working in this repo (Harness CLI). Focused on the artifact-registr
 
 - `cmd/` — Cobra command trees (auth, registry, artifact, project, org, pkgmgr, …).
   `cmd/artifact/command/` holds per-ecosystem push commands (`push_maven.go`,
-  `push_npm.go`, `push_nuget.go`, …) and `utils/`.
+  `push_npm.go`, `push_nuget.go`, …) and `utils/`. Push/pull commands resolve the
+  package base URL in `PreRunE` via `cmdutils.ResolvePkgURL` (`--pkg-url` > saved
+  login config > derived from `--api-url` via `/system/info`; empty = fail fast).
+  `artifact delete` never mutates under `--dry-run=true` (no prompt); real deletes
+  require a TTY confirmation or `--yes`, and are verified post-delete per
+  coordinate (SOFT_DELETED/HARD_DELETED/UNCHANGED/UNSUPPORTED, non-zero exit on
+  UNCHANGED/UNSUPPORTED).
 - `internal/api/ar/client_gen.go` + `internal/api/ar_pkg/client_gen.go` —
   **generated** OpenAPI clients (do not hand-edit). `ar` = HAR control-plane API
   (registries/artifacts/versions/files); `ar_pkg` = package upload/content API.
@@ -109,6 +115,35 @@ factory map (`adapter/adapter.go:72-101`); blank-imported in `migration.go:21-24
 - **Idempotency:** duplicate uploads return `types.ErrArtifactAlreadyExists`
   (mapped from HTTP 409); callers treat it as a Skip, not a failure. A cache/lookup
   miss therefore only causes a safe re-upload attempt, never data loss.
+- **Exit-code contract (2026-08-07):** `MigrationService.Run` returns a non-nil
+  aggregate error — and `runMigration` exits 1 — when (a) the engine collected
+  any job error (every nested engine now propagates: File→Version→Package→
+  Registry→Run) **or** (b) any `StatusFail` stat exists. No opt-out flag; dry-run
+  is exempt. Enumeration aborts (GetFiles/SearchFiles/GetPackages/GetVersions)
+  also record `StatusFail` stats (`util.AddRegistryErrorToStat` /
+  `AddPackageErrorToStat`) so Failed reconciles with the process result.
+- **Skip classes:** `types.FileStat.Reason` classifies `StatusSkip` rows
+  (`types.SkipReasonAlreadyExists` for index/HEAD/409 skips,
+  `types.SkipReasonNoContent` for e.g. tag-less OCI repos). `FileStat` now has
+  lowercase JSON tags; the `--summary=false` table maps the lowercase keys.
+- **Result file:** `--result-file <path>` (or `resultFile:` in the config) writes
+  one JSON-lines `FileStat` record per coordinate at the end of a non-dry-run
+  run — written even on failure; automation must consume this instead of
+  parsing tables.
+- **Config validation is the loud failure point:** unknown `artifactType`
+  (validated against `types.KnownArtifactTypes()` — the single source of truth
+  that also renders `--help`), and include/exclude patterns on non-filterable
+  types (DEBIAN/TERRAFORM/PUPPET — classification lives in `types/patterns.go`,
+  `util/patternUtil.go` delegates) are rejected at load, before any source call.
+  Date filters on index-seeded types (PYTHON/CONDA/RPM) warn at load.
+- **Zero-package guard:** `Registry.Migrate` errors when the enumeration tree
+  has surviving files but `GetPackages` resolves zero packages (type mismatch),
+  regardless of filter settings; filters that starve the tree to zero files are
+  a valid empty result.
+- **Atomic versions:** PYTHON (entry-level recovery in `buildVersionJobs`) and
+  TERRAFORM (tree-swap in `Version.Migrate`: an in-scope provider version
+  migrates ALL platform zips from the unfiltered tree) never publish partial
+  versions under date filters.
 - **Dry-run:** `--dry-run` skips all destination calls and emits
   `dry-run-output/{file_list,directory_structure}_*.json` (`migration.go:147`).
   Use a before/after diff of these as a **regression gate** for refactors.

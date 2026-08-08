@@ -34,6 +34,12 @@ type Version struct {
 	registry      types.RegistryInfo
 	dryRunStats   *types.DryRunStats
 	existingIndex *types.ExistingIndex
+	// unfilteredNode is a pattern-filtered but NOT date-filtered tree, used by
+	// multi-file atomic version types discovered at Migrate time (TERRAFORM):
+	// once a version is in scope, ALL of its distribution files migrate so a
+	// partial provider version is never published. nil when no date filter is
+	// active or the type does not need version-level atomic recovery.
+	unfilteredNode *types.TreeNode
 }
 
 func NewVersionJob(
@@ -51,6 +57,7 @@ func NewVersionJob(
 	registry types.RegistryInfo,
 	dryRunStats *types.DryRunStats,
 	existingIndex *types.ExistingIndex,
+	unfilteredNode *types.TreeNode,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -64,21 +71,22 @@ func NewVersionJob(
 		Logger()
 
 	return &Version{
-		srcRegistry:   srcRegistry,
-		destRegistry:  destRegistry,
-		srcAdapter:    src,
-		destAdapter:   dest,
-		artifactType:  artifactType,
-		logger:        jobLogger,
-		pkg:           pkg,
-		version:       version,
-		node:          node,
-		stats:         stats,
-		mapping:       mapping,
-		config:        config,
-		registry:      registry,
-		dryRunStats:   dryRunStats,
-		existingIndex: existingIndex,
+		srcRegistry:    srcRegistry,
+		destRegistry:   destRegistry,
+		srcAdapter:     src,
+		destAdapter:    dest,
+		artifactType:   artifactType,
+		logger:         jobLogger,
+		pkg:            pkg,
+		version:        version,
+		node:           node,
+		stats:          stats,
+		mapping:        mapping,
+		config:         config,
+		registry:       registry,
+		dryRunStats:    dryRunStats,
+		existingIndex:  existingIndex,
+		unfilteredNode: unfilteredNode,
 	}
 }
 
@@ -125,7 +133,17 @@ func (r *Version) Migrate(ctx context.Context) error {
 	if r.artifactType == types.GENERIC || r.artifactType == types.RAW || r.artifactType == types.MAVEN || r.artifactType == types.PYTHON ||
 		r.artifactType == types.NUGET || r.artifactType == types.NPM || r.artifactType == types.DART || r.artifactType == types.PUPPET ||
 		r.artifactType == types.TERRAFORM {
-		files, err := tree.GetAllFiles(r.node)
+		// TERRAFORM versions are atomic multi-file versions (a provider version
+		// spans one zip per os/arch and a network mirror is only complete when
+		// ALL platform files are present). This version job only exists because
+		// at least one of its files survived the date filter, so iterate the
+		// unfiltered (pattern-filtered, never date-filtered) tree when available
+		// to migrate the version in full — never publish a partial version.
+		fileTree := r.node
+		if r.artifactType == types.TERRAFORM && r.unfilteredNode != nil {
+			fileTree = r.unfilteredNode
+		}
+		files, err := tree.GetAllFiles(fileTree)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to get files from tree")
 			return fmt.Errorf("get files from tree failed: %w", err)
@@ -201,6 +219,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 					Uri:      file.Uri,
 					Size:     int64(file.Size),
 					Status:   types.StatusSkip,
+					Reason:   types.SkipReasonAlreadyExists,
 				}
 				r.stats.Add(stat)
 				continue
@@ -287,7 +306,10 @@ func (r *Version) Migrate(ctx context.Context) error {
 	eng := engine.NewEngine(r.config.Concurrency, jobs)
 	err := eng.Execute(ctx)
 	if err != nil {
+		// Propagate so the failure reaches MigrationService.Run's exit-code
+		// contract; per-file stats already carry the detail.
 		logger.Error().Err(err).Msg("Engine execution saw following errors")
+		return fmt.Errorf("version %s/%s: file migration errors: %w", r.pkg.Name, r.version.Name, err)
 	}
 
 	logger.Info().

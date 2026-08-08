@@ -26,11 +26,12 @@ func getMigrateCmd(*cmdutils.Factory) *cobra.Command {
 	var overwrite bool
 	var dryRun bool
 	var summary bool
+	var resultFile string
 
 	migrateCmd := &cobra.Command{
 		Use:   "migrate",
 		Short: "Start a migration based on configuration",
-		Long: `Migrate artifacts from a source registry to a Harness Artifact Registry.
+		Long: fmt.Sprintf(`Migrate artifacts from a source registry to a Harness Artifact Registry.
 
 This command reads a YAML configuration file that defines the source and destination
 registries, credentials, and artifact mappings.
@@ -86,7 +87,7 @@ Example configuration file (config.yaml):
       destinationRegistry: harness-helm
 
 Supported artifact types:
-  DOCKER, HELM, HELM_LEGACY, HELM_HTTP, MAVEN, NPM, NUGET, PYTHON, GO, GENERIC, CONDA, COMPOSER, SWIFT, DEBIAN, PUPPET, DART, RPM, RAW, CONAN
+  %s
 
 Note: HARBOR source supports OCI artifact types only (DOCKER, HELM).
 
@@ -102,10 +103,26 @@ Package Filtering (opt-in):
   For synthetic-identity types (MAVEN, NPM, GENERIC, RAW), filter via the files field
   rather than package names, as package/version names are derived from file paths.
 
+Include/Exclude Patterns (includePatterns / excludePatterns, mutually exclusive):
+  Glob patterns (* and ** wildcards) applied at a type-dependent granularity:
+    - File level:   GENERIC, RAW, PYTHON, MAVEN, NUGET, NPM, DART, GO
+    - Package level: DOCKER, HELM, HELM_LEGACY, HELM_HTTP, RPM, CONDA, COMPOSER, SWIFT, CONAN
+  Setting them for any other type (DEBIAN, TERRAFORM, PUPPET) is rejected at
+  config load — scope controls are never silently ignored.
+
+Date filter caveat (createdAfter / downloadedAfter):
+  For index-seeded types (PYTHON, CONDA, RPM) a date-filtered run can omit
+  in-scope content, because enumeration is seeded from the repository index,
+  not the raw file listing. The completeness path is a full run with no date
+  filter and overwrite:false; for RPM repeat runs, ensure every nested
+  repodata/repomd.xml seed falls inside the window first (see the operational
+  rule in the hc open-issues register; scripts/art-touch-rpm-seeds.sh can help
+  poll seed freshness).
+
 Environment variables can be used in the config file using ${VAR_NAME} syntax.
 
 Usage example:
-  hc registry migrate -c config.yaml`,
+  hc registry migrate -c config.yaml`, types.KnownArtifactTypesString()),
 		Run: runMigration,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			// Sync local flags to global config
@@ -117,6 +134,7 @@ Usage example:
 			config.Global.Registry.Migrate.Overwrite = overwrite
 			config.Global.Registry.Migrate.DryRun = dryRun
 			config.Global.Registry.Migrate.Summary = summary
+			config.Global.Registry.Migrate.ResultFile = resultFile
 		},
 	}
 	migrateCmd.Flags().StringVarP(&localConfigPath, "config", "c", "config.yaml", "Path to configuration file")
@@ -125,6 +143,7 @@ Usage example:
 	migrateCmd.Flags().BoolVar(&overwrite, "overwrite", false, "Allow overwriting artifacts")
 	migrateCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Run migration in dry-run mode (no uploads, generates file list and directory structure)")
 	migrateCmd.Flags().BoolVar(&summary, "summary", false, "Print a status summary instead of the full per-file table")
+	migrateCmd.Flags().StringVar(&resultFile, "result-file", "", "Write per-coordinate results as JSON-lines to this file (non-dry-run only)")
 
 	migrateCmd.MarkFlagRequired("config")
 
@@ -152,6 +171,10 @@ func runMigration(cmd *cobra.Command, args []string) {
 
 	if config.Global.Registry.Migrate.Summary {
 		cfg.Summary = true
+	}
+
+	if config.Global.Registry.Migrate.ResultFile != "" {
+		cfg.ResultFile = config.Global.Registry.Migrate.ResultFile
 	}
 
 	// Create an API client for orchestration purpose. The registry clients will be initiated separately

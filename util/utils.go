@@ -112,10 +112,13 @@ func ProgressBar(current, total int, width int) string {
 	return fmt.Sprintf("%s %.1f%%", bar, percentage*100)
 }
 
-// GetPkgUrl returns the URL for the packages
-// Deprecated
+// GetPkgUrl normalizes the --pkg-url flag value, adding https:// when the
+// scheme is missing. --pkg-url remains supported for explicit-credential
+// flows; when it is omitted, hc derives the package endpoint from --api-url
+// or the saved login config (see cmdutils.ResolvePkgURL).
 func GetPkgUrl(url string) string {
-	fmt.Println("INFO :: usage of flag pkg-url is deprecated...")
+	fmt.Println("INFO :: --pkg-url remains supported for explicit-credential flows; " +
+		"when omitted, the package URL is derived from --api-url or the saved login config")
 	if !strings.Contains(url, "://") {
 		url = "https://" + url
 	}

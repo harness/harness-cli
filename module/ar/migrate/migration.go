@@ -3,6 +3,7 @@ package migrate
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/util/common/printer"
 
+	"github.com/pterm/pterm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -93,13 +95,15 @@ func (m *MigrationService) Run(ctx context.Context) error {
 	}
 
 	eng := engine.NewEngine(m.config.Concurrency, jobs)
-	err := eng.Execute(ctx)
-	if err != nil {
-		logger.Error().Err(err).Msgf("Engine execution saw following errors: %v", err)
+	engineErr := eng.Execute(ctx)
+	if engineErr != nil {
+		logger.Error().Err(engineErr).Msgf("Engine execution saw following errors: %v", engineErr)
 	}
 	logger.Info().Msg("Migration process completed")
 
-	// Handle dry-run output
+	// Handle dry-run output. Dry-run behavior is intentionally unchanged by the
+	// exit-code contract below: a dry-run never mutates anything, so engine
+	// errors there do not fail the process.
 	if m.config.DryRun {
 		return m.writeDryRunOutput(logger)
 	}
@@ -109,12 +113,13 @@ func (m *MigrationService) Run(ctx context.Context) error {
 		printSummary(fileStats)
 	} else {
 		printer.Print(fileStats, 0, 0, int64(len(fileStats)), false, [][]string{
-			{"Name", "Name"},
-			{"Registry", "Registry"},
-			{"Size", "Size"},
-			{"Status", "Status"},
-			{"Uri", "Uri"},
-			{"Error", "Error"},
+			{"name", "Name"},
+			{"registry", "Registry"},
+			{"size", "Size"},
+			{"status", "Status"},
+			{"uri", "Uri"},
+			{"error", "Error"},
+			{"reason", "Reason"},
 		})
 
 		// Log the same data as JSON
@@ -128,6 +133,61 @@ func (m *MigrationService) Run(ctx context.Context) error {
 		}
 	}
 
+	// Machine-readable per-coordinate result file (opt-in) — written BEFORE the
+	// exit-code decision so automation gets the full picture even on failure.
+	if m.config.ResultFile != "" {
+		if err := writeResultFile(m.config.ResultFile, fileStats); err != nil {
+			logger.Error().Err(err).Str("path", m.config.ResultFile).Msg("Failed to write result file")
+			engineErr = errors.Join(engineErr, fmt.Errorf("write result file: %w", err))
+		} else {
+			logger.Info().Str("path", m.config.ResultFile).Int("records", len(fileStats)).
+				Msg("Wrote per-coordinate result file")
+		}
+	}
+
+	// Exit-code contract: a migration with ANY failure fails the process — no
+	// opt-out. Failures are (a) engine-level errors (enumeration aborts, job
+	// panics) or (b) any per-coordinate StatusFail stat. Callers needing
+	// partial-failure detail must consume the result file / read APIs rather
+	// than rely on exit-0-with-failures.
+	failed := 0
+	for _, fs := range fileStats {
+		if fs.Status == types.StatusFail {
+			failed++
+		}
+	}
+	if failed > 0 {
+		engineErr = errors.Join(engineErr, fmt.Errorf("%d of %d artifact(s) failed to migrate", failed, len(fileStats)))
+	}
+	if engineErr != nil {
+		pterm.Error.Println(fmt.Sprintf("Migration failed: %v", engineErr))
+		return engineErr
+	}
+
+	return nil
+}
+
+// writeResultFile writes one JSON object per FileStat (JSON-lines) to path,
+// creating parent directories as needed. The format mirrors the dry-run
+// output convention: machine-first, one record per line, safe to stream-parse.
+func writeResultFile(path string, fileStats []types.FileStat) error {
+	if dir := filepath.Dir(path); dir != "." && dir != "" {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("create result file directory: %w", err)
+		}
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("create result file: %w", err)
+	}
+	defer f.Close()
+
+	enc := json.NewEncoder(f)
+	for _, fs := range fileStats {
+		if err := enc.Encode(fs); err != nil {
+			return fmt.Errorf("encode result record: %w", err)
+		}
+	}
 	return nil
 }
 

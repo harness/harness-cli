@@ -13,7 +13,6 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	"github.com/harness/harness-cli/util"
 	"github.com/harness/harness-cli/util/common/errors"
 	"github.com/harness/harness-cli/util/common/fileutil"
 	p "github.com/harness/harness-cli/util/common/progress"
@@ -32,10 +31,8 @@ func NewPushRpmCmd(c *cmdutils.Factory) *cobra.Command {
 		Short: "Push Rpm Artifacts",
 		Long:  "Push Rpm Artifacts to Harness Artifact Registry",
 		Args:  cobra.ExactArgs(2),
-		PreRun: func(cmd *cobra.Command, args []string) {
-			if pkgURL != "" {
-				config.Global.Registry.PkgURL = util.GetPkgUrl(pkgURL)
-			}
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return cmdutils.ResolvePkgURL(cmd, pkgURL)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]
