@@ -3,16 +3,71 @@ package migrate
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 
 	"github.com/rs/zerolog"
 )
+
+// errorJob is a minimal engine.Job whose Migrate step always returns an error.
+type errorJob struct{ label string }
+
+func (j *errorJob) Info() string                    { return j.label }
+func (j *errorJob) Pre(_ context.Context) error     { return nil }
+func (j *errorJob) Migrate(_ context.Context) error { return errors.New("injected migrate error") }
+func (j *errorJob) Post(_ context.Context) error    { return nil }
+
+var _ engine.Job = (*errorJob)(nil)
+
+// errAdapter is a minimal adapter.Adapter stub whose GetRegistry always fails.
+// All other methods are no-ops. Used to make Registry.Pre return an error,
+// which in turn makes the engine return a non-nil engErr in Run().
+type errAdapter struct{}
+
+func (errAdapter) GetKeyChain(string) (authn.Keychain, error)         { return nil, nil }
+func (errAdapter) GetConfig() types.RegistryConfig                    { return types.RegistryConfig{} }
+func (errAdapter) ValidateCredentials() (bool, error)                 { return true, nil }
+func (errAdapter) SearchFiles(string) ([]types.SearchedFile, error)   { return nil, nil }
+func (errAdapter) GetRegistry(context.Context, string) (types.RegistryInfo, error) {
+	return types.RegistryInfo{}, errors.New("injected GetRegistry error")
+}
+func (errAdapter) CreateRegistryIfDoesntExist(string) (bool, error) { return false, nil }
+func (errAdapter) GetPackages(string, types.ArtifactType, *types.TreeNode) ([]types.Package, error) {
+	return nil, nil
+}
+func (errAdapter) GetVersions(types.Package, *types.TreeNode, string, string, types.ArtifactType) ([]types.Version, error) {
+	return nil, nil
+}
+func (errAdapter) GetFiles(string) ([]types.File, error) { return nil, nil }
+func (errAdapter) DownloadFile(string, string) (io.ReadCloser, http.Header, error) {
+	return nil, nil, nil
+}
+func (errAdapter) UploadFile(string, io.ReadCloser, *types.File, http.Header, string, string, types.ArtifactType, map[string]interface{}) error {
+	return nil
+}
+func (errAdapter) GetOCIImagePath(string, string, string) (string, error) { return "", nil }
+func (errAdapter) AddNPMTag(string, string, string, string) error         { return nil }
+func (errAdapter) VersionExists(context.Context, types.Package, string, string, string, types.ArtifactType) (bool, error) {
+	return false, nil
+}
+func (errAdapter) FileExists(context.Context, string, string, string, *types.File, types.ArtifactType) (bool, error) {
+	return false, nil
+}
+func (errAdapter) BuildExistingIndex(context.Context, string, int) (*types.ExistingIndex, error) {
+	return nil, nil
+}
+func (errAdapter) CreateVersion(string, string, string, types.ArtifactType, []*types.PackageFiles, map[string]interface{}) error {
+	return nil
+}
 
 // setupTempDir changes the working directory to a temporary directory for the
 // duration of the test and returns a restore function that must be deferred.
@@ -474,5 +529,34 @@ func TestRun_ZeroFilesTransferredReturnsError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "0 files transferred") {
 		t.Errorf("error %q does not mention '0 files transferred'", err.Error())
+	}
+}
+
+// TestRun_EngineErrorIsReturned verifies that Run surfaces engine errors when
+// a registry job's Pre step fails (engErr != nil branch in Run).
+func TestRun_EngineErrorIsReturned(t *testing.T) {
+	svc := &MigrationService{
+		config: &types.Config{
+			Concurrency: 1,
+			// One mapping → one RegistryJob → Pre calls destAdapter.GetRegistry which errors.
+			Mappings: []types.RegistryMapping{
+				{
+					ArtifactType:        types.GENERIC,
+					SourceRegistry:      "src-reg",
+					DestinationRegistry: "dst-reg",
+				},
+			},
+		},
+		source:      errAdapter{},
+		destination: errAdapter{}, // GetRegistry returns error → Pre fails → engErr != nil
+	}
+
+	err := svc.Run(context.Background())
+	if err == nil {
+		t.Fatal("expected Run to return engine error, got nil")
+	}
+	// The error should originate from the engine (Pre step failure).
+	if !strings.Contains(err.Error(), "pre-step") && !strings.Contains(err.Error(), "registry") {
+		t.Errorf("unexpected error message: %q", err.Error())
 	}
 }
