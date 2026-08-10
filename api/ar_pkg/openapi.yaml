@@ -385,6 +385,41 @@ paths:
           description: Missing or invalid `x-api-key`
         '5XX':
           description: Server-side error
+  /pkg/{accountId}/{registry}/ruby/api/v1/gems:
+    post:
+      summary: Upload a Ruby gem
+      operationId: uploadRubyPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Gem uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '409':
+          description: Gem version already exists
+        '5XX':
+          description: Server-side error
   /pkg/{accountId}/{registry}/puppet/upload:
     put:
       summary: Upload a puppet module tarball

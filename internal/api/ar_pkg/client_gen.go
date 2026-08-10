@@ -301,6 +301,9 @@ type ClientInterface interface {
 	// UploadRpmPackageWithBody request with any body
 	UploadRpmPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// UploadRubyPackageWithBody request with any body
+	UploadRubyPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// UploadSwiftPackageWithBody request with any body
 	UploadSwiftPackageWithBody(ctx context.Context, accountId string, registry string, scope string, name string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -613,6 +616,18 @@ func (c *Client) UploadPythonPackageWithBody(ctx context.Context, accountId stri
 
 func (c *Client) UploadRpmPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadRpmPackageRequestWithBody(c.Server, accountId, registry, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadRubyPackageWithBody(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadRubyPackageRequestWithBody(c.Server, accountId, registry, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2156,6 +2171,49 @@ func NewUploadRpmPackageRequestWithBody(server string, accountId string, registr
 	return req, nil
 }
 
+// NewUploadRubyPackageRequestWithBody generates requests for UploadRubyPackage with any type of body
+func NewUploadRubyPackageRequestWithBody(server string, accountId string, registry string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "registry", runtime.ParamLocationPath, registry)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/pkg/%s/%s/ruby/api/v1/gems", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewUploadSwiftPackageRequestWithBody generates requests for UploadSwiftPackage with any type of body
 func NewUploadSwiftPackageRequestWithBody(server string, accountId string, registry string, scope string, name string, version string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -2482,6 +2540,9 @@ type ClientWithResponsesInterface interface {
 
 	// UploadRpmPackageWithBodyWithResponse request with any body
 	UploadRpmPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadRpmPackageResp, error)
+
+	// UploadRubyPackageWithBodyWithResponse request with any body
+	UploadRubyPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadRubyPackageResp, error)
 
 	// UploadSwiftPackageWithBodyWithResponse request with any body
 	UploadSwiftPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, scope string, name string, version string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSwiftPackageResp, error)
@@ -3039,6 +3100,27 @@ func (r UploadRpmPackageResp) StatusCode() int {
 	return 0
 }
 
+type UploadRubyPackageResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadRubyPackageResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadRubyPackageResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type UploadSwiftPackageResp struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3334,6 +3416,15 @@ func (c *ClientWithResponses) UploadRpmPackageWithBodyWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseUploadRpmPackageResp(rsp)
+}
+
+// UploadRubyPackageWithBodyWithResponse request with arbitrary body returning *UploadRubyPackageResp
+func (c *ClientWithResponses) UploadRubyPackageWithBodyWithResponse(ctx context.Context, accountId string, registry string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadRubyPackageResp, error) {
+	rsp, err := c.UploadRubyPackageWithBody(ctx, accountId, registry, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadRubyPackageResp(rsp)
 }
 
 // UploadSwiftPackageWithBodyWithResponse request with arbitrary body returning *UploadSwiftPackageResp
@@ -3772,6 +3863,22 @@ func ParseUploadRpmPackageResp(rsp *http.Response) (*UploadRpmPackageResp, error
 	}
 
 	response := &UploadRpmPackageResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseUploadRubyPackageResp parses an HTTP response from a UploadRubyPackageWithResponse call
+func ParseUploadRubyPackageResp(rsp *http.Response) (*UploadRubyPackageResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadRubyPackageResp{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
