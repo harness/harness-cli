@@ -291,6 +291,38 @@ paths:
               schema:
                 $ref: "#/components/schemas/V3Error"
           description: Error response.
+  /files/search:
+    post:
+      x-internal: false
+      summary: Search Registry Files by path regex
+      description: >
+        Search files across a registry using a POSIX regular expression
+        matched server-side against the full node path. Filter payload is
+        sent in the request body so that regex characters such as `?`, `&`,
+        `+`, `#` and `%` do not need URL-encoding and are not truncated by
+        proxies. Backs the CLI bulk-download flow: the server performs regex
+        filtering and the client parallelizes the individual file downloads.
+      operationId: SearchRegistryFilesV3
+      tags:
+        - Registry V3
+      parameters:
+        - $ref: "#/components/parameters/AccountIdentifier"
+        - $ref: "#/components/parameters/OrgIdentifier"
+        - $ref: "#/components/parameters/ProjectIdentifier"
+        - $ref: "#/components/parameters/PageNumber"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/SortParam"
+      requestBody:
+        $ref: "#/components/requestBodies/SearchRegistryFilesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ListFilesResponse"
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V3Error"
+          description: Error response.
   /files:
     get:
       x-internal: false
@@ -385,6 +417,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/BulkDeleteRequest"
+    SearchRegistryFilesRequest:
+      description: Request to search registry files by path regex
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SearchRegistryFilesRequest"
   responses:
     ListRegistryResponse:
       description: Response containing list of registries
@@ -912,6 +950,27 @@ components:
           maxItems: 50
           items:
             $ref: "#/components/schemas/ArtifactScanInput"
+    SearchRegistryFilesRequest:
+      type: object
+      description: >
+        Input for the search registry files operation. The regex is sent
+        in the body so characters like `?`, `&`, `+`, `#` and `%` don't
+        need URL-encoding and aren't mangled by proxies.
+      required:
+        - registry
+        - regex
+      properties:
+        registry:
+          type: string
+          description: Registry identifier (name).
+          example: "my-generic-registry"
+        regex:
+          type: string
+          description: >
+            POSIX regular expression matched server-side against file paths.
+            Evaluated by Postgres (`~` operator, case-sensitive). Max length 500.
+          maxLength: 500
+          example: ".*\\.txt"
     BulkDeleteRequest:
       type: object
       description: Request to bulk delete artifacts

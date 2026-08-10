@@ -672,6 +672,15 @@ type ScanMeta struct {
 	WarnCount *int64 `json:"warnCount,omitempty"`
 }
 
+// SearchRegistryFilesRequest Input for the search registry files operation. The regex is sent in the body so characters like `?`, `&`, `+`, `#` and `%` don't need URL-encoding and aren't mangled by proxies.
+type SearchRegistryFilesRequest struct {
+	// Regex POSIX regular expression matched server-side against file paths. Evaluated by Postgres (`~` operator, case-sensitive). Max length 500.
+	Regex string `json:"regex"`
+
+	// Registry Registry identifier (name).
+	Registry string `json:"registry"`
+}
+
 // SecurityPolicyFailureDetailConfig Security-specific failure detail payload.
 type SecurityPolicyFailureDetailConfig struct {
 	// Vulnerabilities List of security violations.
@@ -1074,6 +1083,44 @@ type ListFilesV3Params struct {
 	SearchTerm *SearchTerm `form:"search_term,omitempty" json:"search_term,omitempty"`
 }
 
+// SearchRegistryFilesV3Params defines parameters for SearchRegistryFilesV3.
+type SearchRegistryFilesV3Params struct {
+	// AccountIdentifier Unique identifier for the Harness account.
+	AccountIdentifier AccountIdentifier `form:"account_identifier" json:"account_identifier"`
+
+	// OrgIdentifier Unique identifier for the organization within the account.
+	//
+	// Example: `default` or `engineering_org`
+	OrgIdentifier *OrgIdentifier `form:"org_identifier,omitempty" json:"org_identifier,omitempty"`
+
+	// ProjectIdentifier Unique identifier for the project within the organization.
+	//
+	// Example: `my_project` or `frontend_services`
+	ProjectIdentifier *ProjectIdentifier `form:"project_identifier,omitempty" json:"project_identifier,omitempty"`
+
+	// Page The page number for pagination (0-indexed).
+	//
+	// Used to navigate through large result sets. Combined with `size` parameter
+	// to control which subset of results to return.
+	//
+	// Example: `page=0` returns the first page, `page=1` returns the second page
+	Page *PageNumber `form:"page,omitempty" json:"page,omitempty"`
+
+	// Size The number of items to return per page.
+	//
+	// Controls the page size for paginated results.
+	//
+	// Example: `size=50` returns up to 50 items per page
+	Size *PageSize `form:"size,omitempty" json:"size,omitempty"`
+
+	// Sort The sort for the results.
+	// Accepted pattern: `sort_field:sort_order` where sort_field is the field name
+	// and sort_order is either `asc` or `desc`.
+	//
+	// Examples: `name:asc`, `modifiedAt:desc`
+	Sort *SortParam `form:"sort,omitempty" json:"sort,omitempty"`
+}
+
 // ListPackagesV3Params defines parameters for ListPackagesV3.
 type ListPackagesV3Params struct {
 	// AccountIdentifier Unique identifier for the Harness account.
@@ -1432,6 +1479,9 @@ type AddBuildInfoJSONRequestBody = BuildInfoRequestInput
 // BulkDeleteArtifactsJSONRequestBody defines body for BulkDeleteArtifacts for application/json ContentType.
 type BulkDeleteArtifactsJSONRequestBody = BulkDeleteRequest
 
+// SearchRegistryFilesV3JSONRequestBody defines body for SearchRegistryFilesV3 for application/json ContentType.
+type SearchRegistryFilesV3JSONRequestBody = SearchRegistryFilesRequest
+
 // InitiateBulkScanEvaluationJSONRequestBody defines body for InitiateBulkScanEvaluation for application/json ContentType.
 type InitiateBulkScanEvaluationJSONRequestBody = BulkScanEvaluationRequest
 
@@ -1709,6 +1759,11 @@ type ClientInterface interface {
 	// ListFilesV3 request
 	ListFilesV3(ctx context.Context, params *ListFilesV3Params, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// SearchRegistryFilesV3WithBody request with any body
+	SearchRegistryFilesV3WithBody(ctx context.Context, params *SearchRegistryFilesV3Params, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	SearchRegistryFilesV3(ctx context.Context, params *SearchRegistryFilesV3Params, body SearchRegistryFilesV3JSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListPackagesV3 request
 	ListPackagesV3(ctx context.Context, params *ListPackagesV3Params, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -1796,6 +1851,30 @@ func (c *Client) BulkDeleteArtifacts(ctx context.Context, params *BulkDeleteArti
 
 func (c *Client) ListFilesV3(ctx context.Context, params *ListFilesV3Params, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListFilesV3Request(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SearchRegistryFilesV3WithBody(ctx context.Context, params *SearchRegistryFilesV3Params, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSearchRegistryFilesV3RequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SearchRegistryFilesV3(ctx context.Context, params *SearchRegistryFilesV3Params, body SearchRegistryFilesV3JSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSearchRegistryFilesV3Request(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2327,6 +2406,144 @@ func NewListFilesV3Request(server string, params *ListFilesV3Params) (*http.Requ
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewSearchRegistryFilesV3Request calls the generic SearchRegistryFilesV3 builder with application/json body
+func NewSearchRegistryFilesV3Request(server string, params *SearchRegistryFilesV3Params, body SearchRegistryFilesV3JSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSearchRegistryFilesV3RequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewSearchRegistryFilesV3RequestWithBody generates requests for SearchRegistryFilesV3 with any type of body
+func NewSearchRegistryFilesV3RequestWithBody(server string, params *SearchRegistryFilesV3Params, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/files/search")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "account_identifier", runtime.ParamLocationQuery, params.AccountIdentifier); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if params.OrgIdentifier != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "org_identifier", runtime.ParamLocationQuery, *params.OrgIdentifier); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ProjectIdentifier != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "project_identifier", runtime.ParamLocationQuery, *params.ProjectIdentifier); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Page != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page", runtime.ParamLocationQuery, *params.Page); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Size != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "size", runtime.ParamLocationQuery, *params.Size); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Sort != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sort", runtime.ParamLocationQuery, *params.Sort); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -3802,6 +4019,11 @@ type ClientWithResponsesInterface interface {
 	// ListFilesV3WithResponse request
 	ListFilesV3WithResponse(ctx context.Context, params *ListFilesV3Params, reqEditors ...RequestEditorFn) (*ListFilesV3Resp, error)
 
+	// SearchRegistryFilesV3WithBodyWithResponse request with any body
+	SearchRegistryFilesV3WithBodyWithResponse(ctx context.Context, params *SearchRegistryFilesV3Params, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SearchRegistryFilesV3Resp, error)
+
+	SearchRegistryFilesV3WithResponse(ctx context.Context, params *SearchRegistryFilesV3Params, body SearchRegistryFilesV3JSONRequestBody, reqEditors ...RequestEditorFn) (*SearchRegistryFilesV3Resp, error)
+
 	// ListPackagesV3WithResponse request
 	ListPackagesV3WithResponse(ctx context.Context, params *ListPackagesV3Params, reqEditors ...RequestEditorFn) (*ListPackagesV3Resp, error)
 
@@ -3901,6 +4123,29 @@ func (r ListFilesV3Resp) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r ListFilesV3Resp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type SearchRegistryFilesV3Resp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListFilesResponse
+	JSONDefault  *V3Error
+}
+
+// Status returns HTTPResponse.Status
+func (r SearchRegistryFilesV3Resp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SearchRegistryFilesV3Resp) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -4180,6 +4425,23 @@ func (c *ClientWithResponses) ListFilesV3WithResponse(ctx context.Context, param
 	return ParseListFilesV3Resp(rsp)
 }
 
+// SearchRegistryFilesV3WithBodyWithResponse request with arbitrary body returning *SearchRegistryFilesV3Resp
+func (c *ClientWithResponses) SearchRegistryFilesV3WithBodyWithResponse(ctx context.Context, params *SearchRegistryFilesV3Params, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SearchRegistryFilesV3Resp, error) {
+	rsp, err := c.SearchRegistryFilesV3WithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSearchRegistryFilesV3Resp(rsp)
+}
+
+func (c *ClientWithResponses) SearchRegistryFilesV3WithResponse(ctx context.Context, params *SearchRegistryFilesV3Params, body SearchRegistryFilesV3JSONRequestBody, reqEditors ...RequestEditorFn) (*SearchRegistryFilesV3Resp, error) {
+	rsp, err := c.SearchRegistryFilesV3(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSearchRegistryFilesV3Resp(rsp)
+}
+
 // ListPackagesV3WithResponse request returning *ListPackagesV3Resp
 func (c *ClientWithResponses) ListPackagesV3WithResponse(ctx context.Context, params *ListPackagesV3Params, reqEditors ...RequestEditorFn) (*ListPackagesV3Resp, error) {
 	rsp, err := c.ListPackagesV3(ctx, params, reqEditors...)
@@ -4362,6 +4624,39 @@ func ParseListFilesV3Resp(rsp *http.Response) (*ListFilesV3Resp, error) {
 	}
 
 	response := &ListFilesV3Resp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListFilesResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest V3Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSearchRegistryFilesV3Resp parses an HTTP response from a SearchRegistryFilesV3WithResponse call
+func ParseSearchRegistryFilesV3Resp(rsp *http.Response) (*SearchRegistryFilesV3Resp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SearchRegistryFilesV3Resp{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
