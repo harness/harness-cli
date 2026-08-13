@@ -899,6 +899,39 @@ func (c *client) uploadPuppetFile(
 	return nil
 }
 
+// uploadRubyFile streams a Ruby gem (.gem) to HAR via the Ruby push API.
+// Do not send checksum headers; the server generates sidecar metadata on push.
+func (c *client) uploadRubyFile(
+	registry string,
+	f *types.File,
+	file io.ReadCloser,
+) error {
+	if c.pkgClient == nil {
+		return fmt.Errorf("ruby upload: pkg client is not configured")
+	}
+
+	resp, err := c.pkgClient.UploadRubyPackageWithBodyWithResponse(
+		context.Background(),
+		config.Global.AccountID,
+		registry,
+		"application/octet-stream",
+		file,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to upload Ruby gem '%s': %w", f.Name, err)
+	}
+
+	switch resp.StatusCode() {
+	case http2.StatusOK, http2.StatusCreated:
+		return nil
+	case http2.StatusConflict:
+		return types.ErrArtifactAlreadyExists
+	default:
+		return fmt.Errorf("failed to upload Ruby gem '%s', status code: %d, response: %s",
+			f.Name, resp.StatusCode(), string(resp.Body))
+	}
+}
+
 // uploadTerraformFile routes a Terraform file to the correct HAR endpoint.
 // Modules (.tar.gz/.tgz) go to PUT /terraform/v1/modules/{ns}/{name}/{provider}/{ver}.
 // Providers (.zip) go to PUT /terraform/v1/providers/{ns}/{type}/{ver}/{filename}.
@@ -1246,7 +1279,6 @@ func (c *client) resolveRegistry(ctx context.Context, registryName string) (ar_v
 
 	return ar_v3.Registry{}, fmt.Errorf("registry %q not found", registryName)
 }
-
 
 func (c *client) listAllVersionsV3(ctx context.Context, regID openapi_types.UUID, orgID, projectID *string) ([]ar_v3.Version, error) {
 	page := int64(0)

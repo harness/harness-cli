@@ -615,6 +615,38 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			})
 		}
 		log.Info().Msgf("Found %d PUPPET packages", len(packages))
+	} else if artifactType == types.RUBY {
+		// Ruby gems in JFrog may live at any path depth; identity comes from the
+		// .gem filename ({name}-{version}.gem or {name}-{version}-{platform}.gem).
+		files, err := tree.GetAllFiles(root)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+
+		pkgMap := make(map[string]bool)
+		for _, file := range files {
+			if file.Folder {
+				continue
+			}
+			if !strings.HasSuffix(file.Name, ".gem") {
+				continue
+			}
+			meta, ok := util.ParseRubyGemFileNameWithPath(file.Uri)
+			if !ok {
+				continue
+			}
+			pkgMap[meta.Name] = true
+		}
+
+		for pkgName := range pkgMap {
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     "/",
+				Name:     pkgName,
+				Size:     -1,
+			})
+		}
+		log.Info().Msgf("Found %d RUBY packages", len(packages))
 	} else if artifactType == types.CONAN {
 		// One package per distinct Conan reference (name/version[@user/channel]).
 		// The reference subtree carries every RREV/PKGID/PREV file, migrated by
@@ -1346,6 +1378,40 @@ func (a *adapter) GetVersions(
 			})
 		}
 		log.Info().Msgf("Found %d versions for PUPPET package %s", len(versions), pkg)
+		return versions, nil
+	}
+	if artifactType == types.RUBY {
+		files, err := tree.GetAllFiles(node)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+
+		versionMap := make(map[string]bool)
+		for _, file := range files {
+			if file.Folder {
+				continue
+			}
+			if !strings.HasSuffix(file.Name, ".gem") {
+				continue
+			}
+			meta, ok := util.ParseRubyGemFileNameWithPath(file.Uri)
+			if !ok || meta.Name != pkg {
+				continue
+			}
+			versionMap[meta.Version] = true
+		}
+
+		var versions []types.Version
+		for version := range versionMap {
+			versions = append(versions, types.Version{
+				Registry: registry,
+				Pkg:      pkg,
+				Path:     "/",
+				Name:     version,
+				Size:     -1,
+			})
+		}
+		log.Info().Msgf("Found %d versions for RUBY package %s", len(versions), pkg)
 		return versions, nil
 	}
 	if artifactType == types.TERRAFORM {

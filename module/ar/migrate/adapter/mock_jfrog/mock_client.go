@@ -328,6 +328,15 @@ func (c *mockClient) loadBinaryContent() {
 		c.binaryContent[key] = createPuppetPackageTarGz(p.author, p.module, p.version)
 	}
 
+	rubyGems := []string{
+		"gems/rails-8.0.2.gem",
+		"gems/rails-8.0.2-x86_64-linux.gem",
+		"gems/nokogiri-1.15.0.gem",
+	}
+	for _, path := range rubyGems {
+		c.binaryContent["gems-local/"+path] = []byte("mock gem content: " + path)
+	}
+
 	// Terraform modules: <registry>/<ns>/<name>/<provider>/<ver>/<name>-<ver>.tar.gz
 	tfModules := []struct{ ns, name, provider, version string }{
 		{"hashicorp", "vpc", "aws", "1.0.0"},

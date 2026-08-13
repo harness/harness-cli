@@ -394,7 +394,7 @@ func (r *Registry) Post(ctx context.Context) error {
 // Must exactly equal the set Version.Pre checks today (version.go:109 exclusions).
 func indexApplicable(t types.ArtifactType) bool {
 	switch t {
-	case types.GENERIC, types.RAW, types.PYTHON, types.NUGET, types.DART, types.PUPPET, types.NPM, types.MAVEN:
+	case types.GENERIC, types.RAW, types.PYTHON, types.NUGET, types.DART, types.PUPPET, types.RUBY, types.NPM, types.MAVEN:
 		return true
 	default:
 		return false

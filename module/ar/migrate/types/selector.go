@@ -28,7 +28,7 @@ func SupportedSelectorGranularity(t ArtifactType) SelectorGranularity {
 	switch t {
 	case GO:
 		return GranularityVersion
-	case GENERIC, RAW, MAVEN, PYTHON, NUGET, NPM, DART, PUPPET:
+	case GENERIC, RAW, MAVEN, PYTHON, NUGET, NPM, DART, PUPPET, RUBY:
 		return GranularityFile
 	default:
 		// DOCKER, HELM, HELM_LEGACY, HELM_HTTP, RPM, DEBIAN, CONDA, COMPOSER, SWIFT, CONAN

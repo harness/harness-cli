@@ -213,7 +213,7 @@ func (r *File) Migrate(ctx context.Context) error {
 		return nil
 	}
 
-	if r.artifactType == types.GENERIC || r.artifactType == types.RAW || r.artifactType == types.MAVEN || r.artifactType == types.NUGET || r.artifactType == types.PUPPET {
+	if r.artifactType == types.GENERIC || r.artifactType == types.RAW || r.artifactType == types.MAVEN || r.artifactType == types.NUGET || r.artifactType == types.PUPPET || r.artifactType == types.RUBY {
 		downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.file.Uri)
 		defer downloadFile.Close()
 		if err != nil {

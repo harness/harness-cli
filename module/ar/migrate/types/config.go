@@ -41,6 +41,7 @@ var (
 	RAW         ArtifactType = "RAW"
 	SWIFT       ArtifactType = "SWIFT"
 	PUPPET      ArtifactType = "PUPPET"
+	RUBY        ArtifactType = "RUBY"
 	CONAN       ArtifactType = "CONAN"
 	TERRAFORM   ArtifactType = "TERRAFORM"
 )
@@ -52,7 +53,7 @@ var knownArtifactTypes = map[ArtifactType]struct{}{
 	DOCKER: {}, HELM: {}, HELM_LEGACY: {}, HELM_HTTP: {},
 	GENERIC: {}, PYTHON: {}, MAVEN: {}, NPM: {}, NUGET: {},
 	RPM: {}, DEBIAN: {}, GO: {}, CONDA: {}, COMPOSER: {},
-	DART: {}, RAW: {}, SWIFT: {}, PUPPET: {}, CONAN: {},
+	DART: {}, RAW: {}, SWIFT: {}, PUPPET: {}, RUBY: {}, CONAN: {},
 	TERRAFORM: {},
 }
 
@@ -186,7 +187,7 @@ func validateConfig(config *Config) error {
 			return fmt.Errorf("mapping %d: destination registry cannot be empty", i)
 		}
 		if !IsKnownArtifactType(mapping.ArtifactType) {
-			return fmt.Errorf("mapping %d: unknown artifactType %q — valid values are: DOCKER, HELM, HELM_LEGACY, HELM_HTTP, GENERIC, PYTHON, MAVEN, NPM, NUGET, RPM, DEBIAN, GO, CONDA, COMPOSER, DART, RAW, SWIFT, PUPPET, CONAN, TERRAFORM", i, mapping.ArtifactType)
+			return fmt.Errorf("mapping %d: unknown artifactType %q — valid values are: DOCKER, HELM, HELM_LEGACY, HELM_HTTP, GENERIC, PYTHON, MAVEN, NPM, NUGET, RPM, DEBIAN, GO, CONDA, COMPOSER, DART, RAW, SWIFT, PUPPET, RUBY, CONAN, TERRAFORM", i, mapping.ArtifactType)
 		}
 		// Date filtering for MAVEN relies on the source file listing rather than
 		// maven-metadata.xml, so the metadata file may end up out of sync with

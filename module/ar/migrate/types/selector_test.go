@@ -18,6 +18,7 @@ func TestSupportedSelectorGranularity(t *testing.T) {
 		{NPM, GranularityFile},
 		{DART, GranularityFile},
 		{PUPPET, GranularityFile},
+		{RUBY, GranularityFile},
 		// GranularityPackage
 		{DOCKER, GranularityPackage},
 		{HELM, GranularityPackage},

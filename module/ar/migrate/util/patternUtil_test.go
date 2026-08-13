@@ -120,6 +120,25 @@ func TestIsTimeBasedFilterPresent(t *testing.T) {
 	}
 }
 
+func TestIsFileLevelFilterableArtifact(t *testing.T) {
+	tests := []struct {
+		name         string
+		artifactType types.ArtifactType
+		want         bool
+	}{
+		{"RUBY is file-level filterable", types.RUBY, true},
+		{"DART is file-level filterable", types.DART, true},
+		{"DOCKER is not file-level filterable", types.DOCKER, false},
+		{"COMPOSER is not file-level filterable", types.COMPOSER, false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IsFileLevelFilterableArtifact(tc.artifactType))
+		})
+	}
+}
+
 func TestIsMetadataDrivenArtifact(t *testing.T) {
 	tests := []struct {
 		name         string

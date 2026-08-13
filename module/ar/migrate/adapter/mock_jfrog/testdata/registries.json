@@ -90,6 +90,13 @@
     "description": "Mock Puppet Local Repository",
     "packageType": "puppet"
   },
+  "gems-local": {
+    "key": "gems-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/gems-local",
+    "description": "Mock RubyGems Local Repository",
+    "packageType": "gems"
+  },
   "helm-http-local": {
     "key": "helm-http-local",
     "type": "LOCAL",
