@@ -5,6 +5,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/pterm/pterm"
+	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 )
 
@@ -15,6 +17,7 @@ var (
 	JFROG      RegistryType = "JFROG"
 	MOCK_JFROG RegistryType = "MOCK_JFROG"
 	NEXUS      RegistryType = "NEXUS"
+	HARBOR     RegistryType = "HARBOR"
 )
 
 type ArtifactType string
@@ -39,7 +42,25 @@ var (
 	SWIFT       ArtifactType = "SWIFT"
 	PUPPET      ArtifactType = "PUPPET"
 	CONAN       ArtifactType = "CONAN"
+	TERRAFORM   ArtifactType = "TERRAFORM"
 )
+
+// knownArtifactTypes is the exhaustive set of valid ArtifactType values.
+// MUST be kept in sync with the var block above — add here whenever you add a new ArtifactType var.
+// TestValidateConfig_AllKnownArtifactTypesAccepted acts as a compile-time-like guard: update that test too.
+var knownArtifactTypes = map[ArtifactType]struct{}{
+	DOCKER: {}, HELM: {}, HELM_LEGACY: {}, HELM_HTTP: {},
+	GENERIC: {}, PYTHON: {}, MAVEN: {}, NPM: {}, NUGET: {},
+	RPM: {}, DEBIAN: {}, GO: {}, CONDA: {}, COMPOSER: {},
+	DART: {}, RAW: {}, SWIFT: {}, PUPPET: {}, CONAN: {},
+	TERRAFORM: {},
+}
+
+// IsKnownArtifactType reports whether t is a recognised ArtifactType value.
+func IsKnownArtifactType(t ArtifactType) bool {
+	_, ok := knownArtifactTypes[t]
+	return ok
+}
 
 // Config represents the top-level configuration structure
 type Config struct {
@@ -90,6 +111,11 @@ type RegistryMapping struct {
 	//Optional
 	SourcePackageHostname string      `yaml:"sourcePackageHostname"`
 	DateFilter            *DateFilter `yaml:"dateFilter"`
+	// PackageFilters is an opt-in allow-list restricting the migration to specific
+	// packages, and optionally specific versions/files within them. When empty, all
+	// packages migrate (behavior-preserving). Supported granularity varies by artifact
+	// type — see ValidatePackageFilters.
+	PackageFilters []PackageSelector `yaml:"packageFilters,omitempty"`
 }
 
 // CredentialsConfig defines the credential configuration
@@ -159,6 +185,21 @@ func validateConfig(config *Config) error {
 		if mapping.DestinationRegistry == "" {
 			return fmt.Errorf("mapping %d: destination registry cannot be empty", i)
 		}
+		if !IsKnownArtifactType(mapping.ArtifactType) {
+			return fmt.Errorf("mapping %d: unknown artifactType %q — valid values are: DOCKER, HELM, HELM_LEGACY, HELM_HTTP, GENERIC, PYTHON, MAVEN, NPM, NUGET, RPM, DEBIAN, GO, CONDA, COMPOSER, DART, RAW, SWIFT, PUPPET, CONAN, TERRAFORM", i, mapping.ArtifactType)
+		}
+		// Date filtering for MAVEN relies on the source file listing rather than
+		// maven-metadata.xml, so the metadata file may end up out of sync with
+		// the filtered set of artifacts that actually get migrated.
+		if mapping.ArtifactType == MAVEN && mapping.DateFilter != nil {
+			msg := fmt.Sprintf("mapping %d: date filter is enabled for %s — "+
+				"maven-metadata.xml may not be in sync with the migrated artifacts", i, MAVEN)
+			log.Warn().Msg(msg)
+			pterm.Warning.Println(msg)
+		}
+		if err := ValidatePackageFilters(mapping.PackageFilters, mapping.ArtifactType); err != nil {
+			return fmt.Errorf("mapping %d: %w", i, err)
+		}
 	}
 
 	return nil
@@ -177,7 +218,7 @@ func validateCredentials(registry RegistryConfig) error {
 
 	// Check supported registry types
 	switch registry.Type {
-	case HAR, JFROG, NEXUS, MOCK_JFROG:
+	case HAR, JFROG, NEXUS, HARBOR, MOCK_JFROG:
 		// These are supported
 	default:
 		return fmt.Errorf("unsupported registry type: %s", registry.Type)

@@ -385,6 +385,41 @@ paths:
           description: Missing or invalid `x-api-key`
         '5XX':
           description: Server-side error
+  /pkg/{accountId}/{registry}/ruby/api/v1/gems:
+    post:
+      summary: Upload a Ruby gem
+      operationId: uploadRubyPackage
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Gem uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '409':
+          description: Gem version already exists
+        '5XX':
+          description: Server-side error
   /pkg/{accountId}/{registry}/puppet/upload:
     put:
       summary: Upload a puppet module tarball
@@ -1238,6 +1273,130 @@ paths:
           description: Missing or invalid `x-api-key`
         '409':
           description: A different file already exists at this revision path (immutable revision)
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/terraform/v1/modules/{namespace}/{name}/{provider}/{version}:
+    put:
+      summary: Upload a Terraform module archive
+      operationId: uploadTerraformModule
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Module namespace
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Module name
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Module provider (e.g. aws)
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Module version (SemVer 2.0.0)
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+              description: Module .tar.gz archive
+      responses:
+        '200':
+          description: Module uploaded successfully
+        '201':
+          description: Module uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '409':
+          description: Module version already exists
+        '5XX':
+          description: Server-side error
+  /pkg/{accountId}/{registry}/terraform/v1/providers/{namespace}/{type}/{version}/{filename}:
+    put:
+      summary: Upload a Terraform provider binary
+      operationId: uploadTerraformProvider
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: registry
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Provider namespace
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Provider type (e.g. aws)
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Provider version (SemVer 2.0.0)
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Provider zip filename (terraform-provider-{type}_{version}_{os}_{arch}.zip)
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+              description: Provider .zip binary
+      responses:
+        '200':
+          description: Provider uploaded successfully
+        '201':
+          description: Provider uploaded successfully
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Missing or invalid `x-api-key`
+        '409':
+          description: Provider version already exists
         '5XX':
           description: Server-side error
 components:

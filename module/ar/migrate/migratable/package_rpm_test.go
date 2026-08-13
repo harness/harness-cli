@@ -26,18 +26,19 @@ import (
 func TestMigrateRPMFileStatReflectsArtifactSize(t *testing.T) {
 	t.Helper()
 
-	const rpmURI = "/mockpkg-1.0.0-1.x86_64.rpm"
+	const rpmPath = "mockpkg-1.0.0-1.x86_64.rpm"
 	rpmBytes := []byte("rpm-artifact-bytes-for-size-test")
 
-	src := &rpmFakeSrc{content: map[string][]byte{rpmURI: rpmBytes}}
+	src := &rpmFakeSrc{content: map[string][]byte{rpmPath: rpmBytes}}
 	dest := &rpmFakeDest{}
 	stats := &types.TransferStats{}
 
 	job := newRPMJob(src, dest, types.Package{
 		Registry: "rpm-local",
-		Name:     "mockpkg-1.0.0-1.x86_64.rpm", // filename from location.href today
-		URL:      rpmURI,
-		Size:     0,                               // from <size package="0"/> in primary.xml
+		Name:     rpmPath,
+		URL:      rpmPath,
+		URI:      rpmPath,
+		Size:     0, // from <size package="0"/> in primary.xml
 	}, stats)
 
 	if err := job.migrateRPM(context.Background()); err != nil {

@@ -1,0 +1,155 @@
+[
+  {
+    "Registry": "rpm-multi-local",
+    "Name": "centos7",
+    "Uri": "/centos7",
+    "Folder": true,
+    "Size": 0,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": ""
+  },
+  {
+    "Registry": "rpm-multi-local",
+    "Name": "repodata",
+    "Uri": "/centos7/repodata",
+    "Folder": true,
+    "Size": 0,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": ""
+  },
+  {
+    "Registry": "rpm-multi-local",
+    "Name": "repomd.xml",
+    "Uri": "/centos7/repodata/repomd.xml",
+    "Folder": false,
+    "Size": 1024,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80750"
+  },
+  {
+    "Registry": "rpm-multi-local",
+    "Name": "primary.xml.gz",
+    "Uri": "/centos7/repodata/primary.xml.gz",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80751"
+  },
+  {
+    "Registry": "rpm-multi-local",
+    "Name": "nginx-1.20.1-1.el7.x86_64.rpm",
+    "Uri": "/centos7/Packages/n/nginx-1.20.1-1.el7.x86_64.rpm",
+    "Folder": false,
+    "Size": 573000,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80752"
+  },
+  {
+    "Registry": "rpm-multi-local",
+    "Name": "vim-enhanced-8.0.1-1.el7.x86_64.rpm",
+    "Uri": "/centos7/Packages/v/vim-enhanced-8.0.1-1.el7.x86_64.rpm",
+    "Folder": false,
+    "Size": 1432000,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80753"
+  },
+  {
+    "Registry": "rpm-multi-local",
+    "Name": "centos8",
+    "Uri": "/centos8",
+    "Folder": true,
+    "Size": 0,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": ""
+  },
+  {
+    "Registry": "rpm-multi-local",
+    "Name": "repodata",
+    "Uri": "/centos8/repodata",
+    "Folder": true,
+    "Size": 0,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": ""
+  },
+  {
+    "Registry": "rpm-multi-local",
+    "Name": "repomd.xml",
+    "Uri": "/centos8/repodata/repomd.xml",
+    "Folder": false,
+    "Size": 1024,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80760"
+  },
+  {
+    "Registry": "rpm-multi-local",
+    "Name": "primary.xml.gz",
+    "Uri": "/centos8/repodata/primary.xml.gz",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80761"
+  },
+  {
+    "Registry": "rpm-multi-local",
+    "Name": "httpd-2.4.37-1.el8.x86_64.rpm",
+    "Uri": "/centos8/Packages/h/httpd-2.4.37-1.el8.x86_64.rpm",
+    "Folder": false,
+    "Size": 1258000,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80762"
+  },
+  {
+    "Registry": "rpm-multi-local",
+    "Name": "curl-7.61.1-1.el8.x86_64.rpm",
+    "Uri": "/centos8/Packages/c/curl-7.61.1-1.el8.x86_64.rpm",
+    "Folder": false,
+    "Size": 354000,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80763"
+  },
+  {
+    "Registry": "rpm-multi-local",
+    "Name": "fedora35",
+    "Uri": "/fedora35",
+    "Folder": true,
+    "Size": 0,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": ""
+  },
+  {
+    "Registry": "rpm-multi-local",
+    "Name": "repodata",
+    "Uri": "/fedora35/repodata",
+    "Folder": true,
+    "Size": 0,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": ""
+  },
+  {
+    "Registry": "rpm-multi-local",
+    "Name": "repomd.xml",
+    "Uri": "/fedora35/repodata/repomd.xml",
+    "Folder": false,
+    "Size": 1024,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80770"
+  },
+  {
+    "Registry": "rpm-multi-local",
+    "Name": "primary.xml.gz",
+    "Uri": "/fedora35/repodata/primary.xml.gz",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80771"
+  },
+  {
+    "Registry": "rpm-multi-local",
+    "Name": "kernel-5.14.10-1.fc35.x86_64.rpm",
+    "Uri": "/fedora35/Packages/k/kernel-5.14.10-1.fc35.x86_64.rpm",
+    "Folder": false,
+    "Size": 64820000,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80772"
+  }
+]

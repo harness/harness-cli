@@ -6,8 +6,16 @@ import (
 )
 
 /*
-This will parse Nuget file with filePath  like /package.version.nupkg or file name package.version.nupkg
-and return package , version and success , traversing from right side fo file name
+This will parse a Nuget file with a filePath like /package.version.nupkg or a
+file name package.version.nupkg and return package, version and success.
+
+A nupkg file name is "<id>.<version>". Both the id and the version may contain
+dots — the version via prerelease/build metadata (e.g. 3.203.0-pr-280.a52f7f9.1)
+— so a fixed dot count cannot separate them. A NuGet version always begins with
+a purely-numeric segment (the SemVer major), so we split the id off at the first
+all-digit segment. Requiring the segment to be *all* digits (not merely
+digit-led) avoids mistaking a numeric-led name segment such as "7zip" for the
+start of the version.
 */
 func ParseNugetFileNameWithPath(filePath string) (string, string, bool) {
 	fileName := path.Base(filePath)
@@ -24,27 +32,24 @@ func ParseNugetFileNameWithPath(filePath string) (string, string, bool) {
 	name = strings.TrimSuffix(name, ".snupkg")
 	name = strings.TrimSuffix(name, ".nuspec")
 
-	// Traverse from right to find 3rd dot
-	dotCount := 0
-	splitIdx := -1
-
-	for i := len(name) - 1; i >= 0; i-- {
-		if name[i] == '.' {
-			dotCount++
-			if dotCount == 3 {
-				splitIdx = i
-				break
-			}
+	// Find the first all-digit segment (the SemVer major); everything before it
+	// is the package id, everything from it onward is the version. Start at
+	// index 1 so the package id is never empty.
+	parts := strings.Split(name, ".")
+	versionStart := -1
+	for i := 1; i < len(parts); i++ {
+		if isAllDigits(parts[i]) {
+			versionStart = i
+			break
 		}
 	}
 
-	// less than 3 dots implies invalid format,
-	if splitIdx == -1 {
+	if versionStart == -1 {
 		return "", "", false
 	}
 
-	packageName := name[:splitIdx]
-	version := name[splitIdx+1:]
+	packageName := strings.Join(parts[:versionStart], ".")
+	version := strings.Join(parts[versionStart:], ".")
 
 	// Normalize package name to lowercase
 	packageName = strings.ToLower(packageName)
@@ -54,6 +59,19 @@ func ParseNugetFileNameWithPath(filePath string) (string, string, bool) {
 	}
 
 	return packageName, version, true
+}
+
+// isAllDigits reports whether s is non-empty and consists solely of ASCII digits.
+func isAllDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 /*

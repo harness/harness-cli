@@ -19,21 +19,21 @@ import (
 )
 
 type Version struct {
-	srcRegistry     string
-	destRegistry    string
-	srcAdapter      adapter.Adapter
-	destAdapter     adapter.Adapter
-	artifactType    types.ArtifactType
-	logger          zerolog.Logger
-	pkg             types.Package
-	version         types.Version
-	node            *types.TreeNode
-	stats           *types.TransferStats
-	mapping         *types.RegistryMapping
-	config          *types.Config
-	registry        types.RegistryInfo
-	existingFileMap map[string]bool
-	dryRunStats     *types.DryRunStats
+	srcRegistry   string
+	destRegistry  string
+	srcAdapter    adapter.Adapter
+	destAdapter   adapter.Adapter
+	artifactType  types.ArtifactType
+	logger        zerolog.Logger
+	pkg           types.Package
+	version       types.Version
+	node          *types.TreeNode
+	stats         *types.TransferStats
+	mapping       *types.RegistryMapping
+	config        *types.Config
+	registry      types.RegistryInfo
+	dryRunStats   *types.DryRunStats
+	existingIndex *types.ExistingIndex
 }
 
 func NewVersionJob(
@@ -50,6 +50,7 @@ func NewVersionJob(
 	config *types.Config,
 	registry types.RegistryInfo,
 	dryRunStats *types.DryRunStats,
+	existingIndex *types.ExistingIndex,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -63,21 +64,21 @@ func NewVersionJob(
 		Logger()
 
 	return &Version{
-		srcRegistry:     srcRegistry,
-		destRegistry:    destRegistry,
-		srcAdapter:      src,
-		destAdapter:     dest,
-		artifactType:    artifactType,
-		logger:          jobLogger,
-		pkg:             pkg,
-		version:         version,
-		node:            node,
-		stats:           stats,
-		mapping:         mapping,
-		config:          config,
-		registry:        registry,
-		existingFileMap: make(map[string]bool),
-		dryRunStats:     dryRunStats,
+		srcRegistry:   srcRegistry,
+		destRegistry:  destRegistry,
+		srcAdapter:    src,
+		destAdapter:   dest,
+		artifactType:  artifactType,
+		logger:        jobLogger,
+		pkg:           pkg,
+		version:       version,
+		node:          node,
+		stats:         stats,
+		mapping:       mapping,
+		config:        config,
+		registry:      registry,
+		dryRunStats:   dryRunStats,
+		existingIndex: existingIndex,
 	}
 }
 
@@ -95,31 +96,9 @@ func (r *Version) Pre(ctx context.Context) error {
 	logger.Info().Msg("Starting version pre-migration step")
 	startTime := time.Now()
 
-	// Skip destination checks in dry-run mode
-	if r.config.DryRun {
-		logger.Info().Msg("Dry-run mode: skipping destination version checks")
-		logger.Info().
-			Dur("duration", time.Since(startTime)).
-			Msg("Completed version pre-migration step (dry-run)")
-		return nil
-	}
-
-	// reading all existing files for this version from destination
-
-	if !r.config.Overwrite && (r.artifactType != types.MAVEN && r.artifactType != types.NPM && r.pkg.Name != "" && r.version.Name != "") {
-
-		existingFiles, err := r.getAllExistingFilesForThisVersion(ctx)
-
-		if err != nil {
-			logger.Warn().Err(err).Msg("Failed to get existing files, will proceed with migration")
-		} else {
-			// Populate existingFileMap with file name
-			for _, fileName := range existingFiles {
-				r.existingFileMap[fileName] = true
-			}
-			logger.Info().Msgf("Found %d existing files for version %s", len(r.existingFileMap), r.version.Name)
-		}
-	}
+	// Existing-file skip decisions now read directly from the shared
+	// existingIndex in Migrate (see version.go file-loop), so there is no
+	// per-version destination lookup to perform here.
 	logger.Info().
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed version pre-migration step")
@@ -144,13 +123,22 @@ func (r *Version) Migrate(ctx context.Context) error {
 	var jobs []engine.Job
 
 	if r.artifactType == types.GENERIC || r.artifactType == types.RAW || r.artifactType == types.MAVEN || r.artifactType == types.PYTHON ||
-		r.artifactType == types.NUGET || r.artifactType == types.NPM || r.artifactType == types.DART || r.artifactType == types.PUPPET {
+		r.artifactType == types.NUGET || r.artifactType == types.NPM || r.artifactType == types.DART || r.artifactType == types.PUPPET ||
+		r.artifactType == types.TERRAFORM {
 		files, err := tree.GetAllFiles(r.node)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to get files from tree")
 			return fmt.Errorf("get files from tree failed: %w", err)
 		}
+		// Resolve the opt-in file selector (packageFilters[].files) for this package once.
+		fileSel, fileHasFilters, fileMatched := util.SelectorForPackage(r.mapping, r.pkg.Name)
 		for _, file := range files {
+			// Skip files not named by the package file selector. No-op when there is
+			// no matching selector or the selector's files list is empty (all files).
+			if fileHasFilters && fileMatched && !util.FileSelectedBySelector(fileSel, file.Name) {
+				logger.Debug().Msgf("Skipping file %s: not selected by package filter", file.Name)
+				continue
+			}
 			// For NPM, skip files that don't have .tgz extension
 			if r.artifactType == types.NPM && !strings.HasSuffix(file.Name, ".tgz") {
 				logger.Debug().Msgf("Skipping non-tgz file %s for NPM migration", file.Name)
@@ -175,10 +163,32 @@ func (r *Version) Migrate(ctx context.Context) error {
 					continue
 				}
 			}
-			// Check if file already exists in destination
-
-			lowerCaseNormalizeFileName := strings.ToLower(file.Name)
-			if r.existingFileMap[lowerCaseNormalizeFileName] {
+			// For TERRAFORM, skip files that don't belong to this package+version.
+			if r.artifactType == types.TERRAFORM {
+				if util.IsTerraformModule(file.Uri) {
+					ns, name, provider, version, ok := util.ParseTerraformModulePath(file.Uri)
+					if !ok || ns+"/"+name+"/"+provider != r.pkg.Name || version != r.version.Name {
+						logger.Debug().Msgf("Skipping terraform module file %s - doesn't match package %s version %s",
+							file.Uri, r.pkg.Name, r.version.Name)
+						continue
+					}
+				} else if util.IsTerraformProvider(file.Uri) {
+					ns, typeName, version, _, _, _, ok := util.ParseTerraformProviderPath(file.Uri)
+					if !ok || ns+"/"+typeName != r.pkg.Name || version != r.version.Name {
+						logger.Debug().Msgf("Skipping terraform provider file %s - doesn't match package %s version %s",
+							file.Uri, r.pkg.Name, r.version.Name)
+						continue
+					}
+				} else {
+					logger.Debug().Msgf("Skipping terraform file %s - unrecognised path shape", file.Uri)
+					continue
+				}
+			}
+			// Check if file already exists in destination. The index is built
+			// once per registry only when overwrite=false && !dry-run for the
+			// indexable types (registry.go), so a non-nil index already encodes
+			// that gating; HasFile lowercases the name for matching.
+			if r.existingIndex != nil && r.existingIndex.HasFile(r.pkg.Name, r.version.Name, file.Uri, r.artifactType) {
 				util.GetSkipPrinter().Println(fmt.Sprintf("Registry [%s], Package [%s/%s], File [%s] already exists",
 					r.destRegistry,
 					r.pkg.Name, r.version.Name, file.Name))
@@ -192,7 +202,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 					Size:     int64(file.Size),
 					Status:   types.StatusSkip,
 				}
-				r.stats.FileStats = append(r.stats.FileStats, stat)
+				r.stats.Add(stat)
 				continue
 			}
 
@@ -208,6 +218,13 @@ func (r *Version) Migrate(ctx context.Context) error {
 		files, err := tree.GetAllFiles(r.node)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to get files from tree")
+			r.stats.Add(types.FileStat{
+				Name:     r.pkg.Name + "@" + r.version.Name,
+				Registry: r.srcRegistry,
+				Uri:      r.version.Path,
+				Status:   types.StatusFail,
+				Error:    err.Error(),
+			})
 			return fmt.Errorf("get files from tree failed: %w", err)
 		}
 		versionFiles := []*types.File{}
@@ -229,6 +246,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 			downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, file.Uri)
 			if err != nil {
 				logger.Error().Err(err).Msgf("Failed to download file %s", file.Name)
+				util.AddFileErrorToStat(r.stats, file, r.srcRegistry, err)
 				return fmt.Errorf("download file %s failed: %w", file.Name, err)
 			}
 			downloadedFiles = append(downloadedFiles, &types.PackageFiles{
@@ -242,8 +260,21 @@ func (r *Version) Migrate(ctx context.Context) error {
 			nil)
 
 		if err != nil {
+			r.stats.Add(types.FileStat{
+				Name:     r.pkg.Name + "@" + r.version.Name,
+				Registry: r.srcRegistry,
+				Uri:      r.version.Path,
+				Status:   types.StatusFail,
+				Error:    err.Error(),
+			})
 			return err
 		}
+		r.stats.Add(types.FileStat{
+			Name:     r.pkg.Name + "@" + r.version.Name,
+			Registry: r.srcRegistry,
+			Uri:      r.version.Path,
+			Status:   types.StatusSuccess,
+		})
 	}
 
 	if r.artifactType == types.DOCKER || r.artifactType == types.HELM || r.artifactType == types.HELM_LEGACY {
@@ -287,23 +318,4 @@ func (r *Version) Post(ctx context.Context) error {
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed version post-migration step")
 	return nil
-}
-
-// getAllExistingFilesForThisVersion fetches existing files for this version from the destination API
-// Returns a slice of file paths that already exist
-func (r *Version) getAllExistingFilesForThisVersion(ctx context.Context) ([]string, error) {
-	// Call the destination adapter API to get all files for this version
-	allFileNames, err := r.destAdapter.GetAllFilesForVersion(
-		ctx,
-		r.registry.Path,
-		r.pkg.Name,
-		r.version.Name,
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get existing files from destination: %w", err)
-	}
-
-	r.logger.Info().Msgf("Retrieved %d existing files from destination API for version %s", len(allFileNames), r.version.Name)
-	return allFileNames, nil
 }

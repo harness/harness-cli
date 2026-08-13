@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
@@ -22,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 )
 
@@ -45,7 +45,16 @@ type auditContext struct {
 	org          string
 	project      string
 	p            *progress.ConsoleReporter
+	evaluator    Evaluator
+	batchSize    int
 }
+
+// syncWorkers is the fixed number of concurrent batches for the sync path.
+// It is deliberately not user-tunable: higher concurrency intermittently
+// overwhelmed the firewall eval service (batches failing with "Evaluation
+// execution failed" -> fail-open UNKNOWN rows), and lower concurrency only
+// slows the client. 3 is the balance point. Async mode is always serial.
+const syncWorkers = 3
 
 type batchInfo struct {
 	batchIdx     int
@@ -95,132 +104,6 @@ func fetchRegistryDetails(f *cmdutils.Factory, registryName, org, project string
 	return registryUUID, packageType, nil
 }
 
-func initiateBatchEvaluation(ctx *auditContext, batch []Dependency, info batchInfo) (string, error) {
-	ctx.p.Step(fmt.Sprintf("Processing batch %d/%d (%d packages) for registry: %s", info.batchIdx+1, info.totalBatches, len(batch), info.registryName))
-	log.Info().Str("registry", info.registryName).Int("batch", info.batchIdx+1).Int("totalBatches", info.totalBatches).Int("batchSize", len(batch)).Msg("Initiating bulk evaluation")
-
-	artifacts := make([]ar_v3.ArtifactScanInput, 0, len(batch))
-	for _, dep := range batch {
-		artifacts = append(artifacts, ar_v3.ArtifactScanInput{
-			PackageName: dep.Name,
-			Version:     dep.Version,
-		})
-	}
-
-	initParams := &ar_v3.InitiateBulkScanEvaluationParams{
-		AccountIdentifier: config.Global.AccountID,
-		OrgIdentifier:     &ctx.org,
-		ProjectIdentifier: &ctx.project,
-	}
-
-	initResp, err := ctx.f.RegistryV3HttpClient().InitiateBulkScanEvaluationWithResponse(
-		context.Background(),
-		initParams,
-		ar_v3.InitiateBulkScanEvaluationJSONRequestBody{
-			RegistryId: ctx.registryUUID,
-			Artifacts:  artifacts,
-		},
-	)
-	if err != nil {
-		ctx.p.Error(fmt.Sprintf("Failed to initiate bulk evaluation for batch %d/%d", info.batchIdx+1, info.totalBatches))
-		log.Error().Err(err).Int("batch", info.batchIdx+1).Msg("Failed to initiate bulk evaluation")
-		return "", fmt.Errorf("failed to initiate bulk evaluation for batch %d: %w", info.batchIdx+1, err)
-	}
-
-	if initResp.StatusCode() != 202 {
-		errMsg := fmt.Sprintf("Failed to initiate bulk evaluation for batch %d/%d", info.batchIdx+1, info.totalBatches)
-		if initResp.JSONDefault != nil && initResp.JSONDefault.Error.Message != nil {
-			errMsg = *initResp.JSONDefault.Error.Message
-		}
-		ctx.p.Error(errMsg)
-		log.Error().Int("statusCode", initResp.StatusCode()).Int("batch", info.batchIdx+1).Msg(errMsg)
-		return "", fmt.Errorf("%s", errMsg)
-	}
-
-	if initResp.JSON202 == nil || initResp.JSON202.Data == nil || initResp.JSON202.Data.EvaluationId == nil {
-		ctx.p.Error(fmt.Sprintf("Invalid response from bulk evaluation API for batch %d/%d", info.batchIdx+1, info.totalBatches))
-		log.Error().Int("batch", info.batchIdx+1).Msg("Invalid response from bulk evaluation API")
-		return "", fmt.Errorf("invalid response from bulk evaluation API for batch %d", info.batchIdx+1)
-	}
-
-	evaluationID := *initResp.JSON202.Data.EvaluationId
-	ctx.p.Success(fmt.Sprintf("Batch %d/%d evaluation initiated with ID: %s", info.batchIdx+1, info.totalBatches, evaluationID))
-	log.Info().Str("evaluationId", evaluationID).Int("batch", info.batchIdx+1).Msg("Bulk evaluation initiated")
-
-	return evaluationID, nil
-}
-
-func pollBatchEvaluation(ctx *auditContext, evaluationID string, info batchInfo) (*ar_v3.GetBulkScanEvaluationStatusResp, error) {
-	ctx.p.Step(fmt.Sprintf("Waiting for batch %d/%d evaluation to complete", info.batchIdx+1, info.totalBatches))
-	log.Info().Int("batch", info.batchIdx+1).Msg("Polling bulk evaluation status")
-
-	statusParams := &ar_v3.GetBulkScanEvaluationStatusParams{
-		AccountIdentifier: config.Global.AccountID,
-		OrgIdentifier:     &ctx.org,
-		ProjectIdentifier: &ctx.project,
-	}
-
-	pollCount := 0
-	maxPolls := 120
-
-	for {
-		pollCount++
-		if pollCount > maxPolls {
-			ctx.p.Error(fmt.Sprintf("Timeout waiting for batch %d/%d evaluation to complete", info.batchIdx+1, info.totalBatches))
-			log.Error().Int("maxPolls", maxPolls).Int("batch", info.batchIdx+1).Msg("Timeout waiting for bulk evaluation")
-			return nil, fmt.Errorf("timeout waiting for batch %d evaluation to complete", info.batchIdx+1)
-		}
-
-		statusResp, err := ctx.f.RegistryV3HttpClient().GetBulkScanEvaluationStatusWithResponse(
-			context.Background(),
-			evaluationID,
-			statusParams,
-		)
-		if err != nil {
-			ctx.p.Error(fmt.Sprintf("Failed to get bulk evaluation status for batch %d/%d", info.batchIdx+1, info.totalBatches))
-			log.Error().Err(err).Int("batch", info.batchIdx+1).Msg("Failed to get bulk evaluation status")
-			return nil, fmt.Errorf("failed to get bulk evaluation status for batch %d: %w", info.batchIdx+1, err)
-		}
-
-		if statusResp.StatusCode() != 200 {
-			errMsg := fmt.Sprintf("Failed to get bulk evaluation status for batch %d/%d", info.batchIdx+1, info.totalBatches)
-			if statusResp.JSONDefault != nil && statusResp.JSONDefault.Error.Message != nil {
-				errMsg = *statusResp.JSONDefault.Error.Message
-			}
-			ctx.p.Error(errMsg)
-			log.Error().Int("statusCode", statusResp.StatusCode()).Int("batch", info.batchIdx+1).Msg(errMsg)
-			return nil, fmt.Errorf("%s", errMsg)
-		}
-
-		if statusResp.JSON200 == nil || statusResp.JSON200.Data == nil || statusResp.JSON200.Data.Status == nil {
-			ctx.p.Error(fmt.Sprintf("Invalid response from bulk evaluation status API for batch %d/%d", info.batchIdx+1, info.totalBatches))
-			log.Error().Int("batch", info.batchIdx+1).Msg("Invalid response from bulk evaluation status API")
-			return nil, fmt.Errorf("invalid response from bulk evaluation status API for batch %d", info.batchIdx+1)
-		}
-
-		status := *statusResp.JSON200.Data.Status
-		log.Debug().Str("status", string(status)).Int("poll", pollCount).Int("batch", info.batchIdx+1).Msg("Bulk evaluation status")
-
-		if status == ar_v3.SUCCESS {
-			ctx.p.Success(fmt.Sprintf("Batch %d/%d evaluation completed successfully", info.batchIdx+1, info.totalBatches))
-			log.Info().Int("batch", info.batchIdx+1).Msg("Bulk evaluation completed successfully")
-			return statusResp, nil
-		}
-
-		if status == ar_v3.FAILURE {
-			errMsg := fmt.Sprintf("Batch %d/%d evaluation failed", info.batchIdx+1, info.totalBatches)
-			if statusResp.JSON200.Data.Error != nil {
-				errMsg = *statusResp.JSON200.Data.Error
-			}
-			ctx.p.Error(errMsg)
-			log.Error().Str("error", errMsg).Int("batch", info.batchIdx+1).Msg("Bulk evaluation failed")
-			return nil, fmt.Errorf("%s", errMsg)
-		}
-
-		time.Sleep(2 * time.Second)
-	}
-}
-
 func extractScanResults(statusResp *ar_v3.GetBulkScanEvaluationStatusResp, batchIdx int) []ScanResult {
 	if statusResp.JSON200.Data.Scans == nil {
 		return nil
@@ -251,40 +134,148 @@ func extractScanResults(statusResp *ar_v3.GetBulkScanEvaluationStatusResp, batch
 	return results
 }
 
-func processBatches(ctx *auditContext, dependencies []Dependency, registryName string) ([]ScanResult, error) {
-	const batchSize = 50
-	totalBatches := (len(dependencies) + batchSize - 1) / batchSize
-	allResults := make([]ScanResult, 0, len(dependencies))
-
-	for batchIdx := 0; batchIdx < totalBatches; batchIdx++ {
-		start := batchIdx * batchSize
+// chunkDependencies slices deps into batches of size <= batchSize.
+func chunkDependencies(deps []Dependency, batchSize int) [][]Dependency {
+	if batchSize <= 0 {
+		batchSize = 20
+	}
+	totalBatches := (len(deps) + batchSize - 1) / batchSize
+	batches := make([][]Dependency, 0, totalBatches)
+	for i := 0; i < totalBatches; i++ {
+		start := i * batchSize
 		end := start + batchSize
-		if end > len(dependencies) {
-			end = len(dependencies)
+		if end > len(deps) {
+			end = len(deps)
 		}
-		batch := dependencies[start:end]
+		batches = append(batches, deps[start:end])
+	}
+	return batches
+}
 
+// unknownResults marks every dependency in a batch as UNKNOWN so a failed
+// batch doesn't drop rows from the final table.
+func unknownResults(batch []Dependency) []ScanResult {
+	out := make([]ScanResult, 0, len(batch))
+	for _, dep := range batch {
+		out = append(out, ScanResult{
+			PackageName: dep.Name,
+			Version:     dep.Version,
+			ScanStatus:  "UNKNOWN",
+		})
+	}
+	return out
+}
+
+type batchOutcome struct {
+	idx     int
+	results []ScanResult
+	err     error
+}
+
+// processBatches slices the deps, dispatches through the evaluator with the
+// configured worker pool, streams per-batch progress, and returns the merged
+// result set. If any batch errored, the second return is the first such error;
+// results still contain UNKNOWN rows for the failed batch's deps so the caller
+// can render a complete table before exiting non-zero.
+func processBatches(ctx *auditContext, dependencies []Dependency, registryName string) ([]ScanResult, error) {
+	effectiveBatchSize := ctx.batchSize
+	maxBatch := ctx.evaluator.MaxBatchSize()
+	if effectiveBatchSize <= 0 {
+		effectiveBatchSize = maxBatch
+	} else if effectiveBatchSize > maxBatch {
+		log.Warn().Int("requested", ctx.batchSize).Int("max", maxBatch).
+			Msg("--batch-size exceeds server maximum; clamping")
+		ctx.p.Step(fmt.Sprintf("--batch-size=%d exceeds max (%d); clamping to %d",
+			ctx.batchSize, maxBatch, maxBatch))
+		effectiveBatchSize = maxBatch
+	}
+	batches := chunkDependencies(dependencies, effectiveBatchSize)
+	totalBatches := len(batches)
+
+	workers := syncWorkers
+	// Async mode is inherently serial per-batch (each batch initiates + polls);
+	// running it in parallel would just multiply polling load without speedup.
+	if ctx.evaluator.Mode() == "async" {
+		workers = 1
+	}
+
+	ctx.p.Step(fmt.Sprintf("Evaluating %d packages across %d batches (mode=%s, workers=%d, batch-size=%d)",
+		len(dependencies), totalBatches, ctx.evaluator.Mode(), workers, effectiveBatchSize))
+
+	outcomes := make(chan batchOutcome, totalBatches)
+	runCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	g, gctx := errgroup.WithContext(runCtx)
+	g.SetLimit(workers)
+
+	for i := range batches {
+		i := i
+		batch := batches[i]
 		info := batchInfo{
-			batchIdx:     batchIdx,
+			batchIdx:     i,
 			totalBatches: totalBatches,
 			registryName: registryName,
 		}
-
-		evaluationID, err := initiateBatchEvaluation(ctx, batch, info)
-		if err != nil {
-			return nil, err
-		}
-
-		statusResp, err := pollBatchEvaluation(ctx, evaluationID, info)
-		if err != nil {
-			return nil, err
-		}
-
-		batchResults := extractScanResults(statusResp, batchIdx)
-		allResults = append(allResults, batchResults...)
+		g.Go(func() error {
+			res, err := ctx.evaluator.Evaluate(gctx, batch, info)
+			if err != nil {
+				log.Error().Err(err).Int("batch", i+1).Msg("Batch evaluation failed; marking as UNKNOWN")
+				outcomes <- batchOutcome{idx: i, results: unknownResults(batch), err: err}
+				return nil // never cancel siblings; we're fail-open
+			}
+			outcomes <- batchOutcome{idx: i, results: res.Results}
+			return nil
+		})
 	}
 
-	return allResults, nil
+	// Close the channel once every worker has returned. Because each worker
+	// sends synchronously before returning nil, g.Wait() completing means all
+	// sends are committed, so close() cannot race with a live sender.
+	go func() {
+		_ = g.Wait()
+		close(outcomes)
+	}()
+
+	allResults := make([]ScanResult, 0, len(dependencies))
+	completed := 0
+	var blockedRunning int
+	var firstErr error
+
+	for out := range outcomes {
+		completed++
+		var bBlocked, bWarn, bAllowed, bUnknown int
+		for _, r := range out.results {
+			switch r.ScanStatus {
+			case "BLOCKED":
+				bBlocked++
+				blockedRunning++
+			case "WARN":
+				bWarn++
+			case "UNKNOWN":
+				bUnknown++
+			default:
+				bAllowed++
+			}
+		}
+		allResults = append(allResults, out.results...)
+		if out.err != nil {
+			if firstErr == nil {
+				firstErr = out.err
+			}
+			ctx.p.Error(fmt.Sprintf("Batch %d/%d failed: %s (marked %d UNKNOWN)",
+				out.idx+1, totalBatches, out.err.Error(), len(out.results)))
+		} else {
+			ctx.p.Success(fmt.Sprintf("Batch %d/%d done — %d pkgs (%d BLOCKED, %d WARN, %d ALLOWED, %d UNKNOWN)",
+				out.idx+1, totalBatches, len(out.results), bBlocked, bWarn, bAllowed, bUnknown))
+		}
+		if completed%5 == 0 || completed == totalBatches {
+			ctx.p.Step(fmt.Sprintf("progress: %d/%d batches, %d/%d pkgs, %d BLOCKED so far",
+				completed, totalBatches, len(allResults), len(dependencies), blockedRunning))
+		}
+	}
+
+	return allResults, firstErr
 }
 
 func displayResults(results []ScanResult, p *progress.ConsoleReporter) error {
@@ -351,6 +342,8 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 	var filePath string
 	var orgID string
 	var projectID string
+	var useAsync bool
+	var batchSize int
 
 	cmd := &cobra.Command{
 		Use:   "audit",
@@ -401,9 +394,14 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 			}
 
 			if len(dependencies) == 0 {
-				p.Success("No dependencies found in the file")
-				log.Info().Msg("No dependencies found in the file")
-				return nil
+				// A supported lock file that yields zero dependencies almost
+				// always means a parse gap (e.g. an unrecognized lock-file
+				// format/version), not a genuinely empty project. Fail loudly so
+				// the result is never mistaken for "everything passed the firewall".
+				msg := fmt.Sprintf("no dependencies parsed from %s; the file may be empty or in an unsupported format", fileName)
+				p.Error(msg)
+				log.Error().Str("file", fileName).Msg(msg)
+				return fmt.Errorf("%s", msg)
 			}
 
 			sort.Slice(dependencies, func(i, j int) bool {
@@ -412,20 +410,33 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 
 			p.Success(fmt.Sprintf("Found %d dependencies in %s", len(dependencies), fileName))
 
+			evaluator := newEvaluator(f, useAsync, evaluatorParams{
+				registryUUID:   registryUUID,
+				org:            org,
+				project:        project,
+				registryName:   registryName,
+				skipCacheParam: true, // per product decision: always skip cache
+			}, p)
+
 			ctx := &auditContext{
 				f:            f,
 				registryUUID: registryUUID,
 				org:          org,
 				project:      project,
 				p:            p,
+				evaluator:    evaluator,
+				batchSize:    batchSize,
 			}
 
-			results, err := processBatches(ctx, dependencies, registryName)
-			if err != nil {
+			results, batchErr := processBatches(ctx, dependencies, registryName)
+
+			if err := displayResults(results, p); err != nil {
 				return err
 			}
-
-			return displayResults(results, p)
+			if batchErr != nil {
+				return fmt.Errorf("one or more batches failed: %w", batchErr)
+			}
+			return nil
 		},
 	}
 
@@ -433,6 +444,8 @@ func NewFirewallAuditCmd(f *cmdutils.Factory) *cobra.Command {
 	cmd.Flags().StringVarP(&filePath, "file", "f", "", "Path to lock file (package-lock.json, pnpm-lock.yaml, or yarn.lock)")
 	cmd.Flags().StringVar(&orgID, "org", "", "Organization identifier (defaults to global config)")
 	cmd.Flags().StringVar(&projectID, "project", "", "Project identifier (defaults to global config)")
+	cmd.Flags().BoolVar(&useAsync, "async", false, "Use the legacy async bulk-evaluate + poll flow instead of the default sync API")
+	cmd.Flags().IntVar(&batchSize, "batch-size", 20, "Artifacts per batch (max 50; sync mode)")
 	cmd.MarkFlagRequired("file")
 	cmd.MarkFlagRequired("registry")
 
@@ -599,6 +612,7 @@ func parsePackageLock(data []byte) ([]Dependency, error) {
 		} `json:"dependencies"`
 		Packages map[string]struct {
 			Version string `json:"version"`
+			Link    bool   `json:"link"`
 		} `json:"packages"`
 	}
 
@@ -613,7 +627,7 @@ func parsePackageLock(data []byte) ([]Dependency, error) {
 		// Build a version map for parent key resolution
 		versionMap := make(map[string]string)
 		for pkgPath, pkg := range lockFile.Packages {
-			if pkgPath == "" {
+			if pkgPath == "" || pkg.Link {
 				continue
 			}
 			name := extractPackageName(pkgPath)
@@ -623,7 +637,8 @@ func parsePackageLock(data []byte) ([]Dependency, error) {
 		}
 
 		for pkgPath, pkg := range lockFile.Packages {
-			if pkgPath == "" {
+			if pkgPath == "" || pkg.Link {
+				// link:true entries are local workspace symlinks, not registry packages
 				continue
 			}
 			name := extractPackageName(pkgPath)
@@ -749,49 +764,152 @@ func parsePnpmLock(data []byte) ([]Dependency, error) {
 	return deps, nil
 }
 
+// parseYarnLock parses both Yarn Classic (v1) and Yarn Berry (v2+) lock files.
+//
+// Classic entries use   version "1.2.3"   ; Berry entries use   version: 1.2.3
+// and carry a   resolution: "name@npm:1.2.3"   field. A single parser handles
+// both: entry headers are detected by lack of indentation (raw, pre-trim), so
+// nested keys like a "@scope/pkg:" under peerDependenciesMeta are never mistaken
+// for package headers. The Berry resolution field, when present, is preferred
+// for the name since it is unambiguous. Non-package top-level blocks such as
+// __metadata: are skipped because their key contains no "@".
 func parseYarnLock(data []byte) ([]Dependency, error) {
 	lines := strings.Split(string(data), "\n")
 	deps := make([]Dependency, 0)
 	seen := make(map[string]bool)
 
-	var currentPkg string
-	var currentVersion string
+	var headerName, resolutionName, resolutionProtocol, version string
 
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
+	flush := func() {
+		reset := func() {
+			headerName = ""
+			resolutionName = ""
+			resolutionProtocol = ""
+			version = ""
+		}
+
+		// Only npm-registry packages are real, auditable dependencies. Berry
+		// also emits entries for other protocols — workspace: (the project's
+		// own workspaces, resolving to 0.0.0-use.local), patch:, link:, portal:
+		// and file:. These are not registry packages; a patch entry merely wraps
+		// a base npm package that appears as its own entry, so skipping them
+		// loses no firewall coverage while avoiding malformed names and
+		// unactionable "Unknown" rows in the audit table. An empty protocol
+		// means Yarn Classic (no protocol marker), which is kept.
+		if resolutionProtocol != "" && resolutionProtocol != "npm" {
+			reset()
+			return
+		}
+
+		name := resolutionName
+		if name == "" {
+			name = headerName
+		}
+		if name != "" && version != "" && !seen[name] {
+			seen[name] = true
+			deps = append(deps, Dependency{
+				Name:    name,
+				Version: version,
+				Source:  "yarn.lock",
+			})
+		}
+		reset()
+	}
+
+	for _, raw := range lines {
+		// Indentation is decided on the raw line: an entry header sits at column
+		// zero, everything belonging to it is indented.
+		indented := len(raw) > 0 && (raw[0] == ' ' || raw[0] == '\t')
+		line := strings.TrimSpace(raw)
 
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 
-		if !strings.HasPrefix(line, " ") && strings.Contains(line, "@") && strings.HasSuffix(line, ":") {
-			pkgLine := strings.TrimSuffix(line, ":")
-			parts := strings.Split(pkgLine, ",")
-			if len(parts) > 0 {
-				firstPart := strings.TrimSpace(parts[0])
-				lastAt := strings.LastIndex(firstPart, "@")
-				if lastAt > 0 {
-					currentPkg = strings.Trim(firstPart[:lastAt], "\"")
-				} else {
-					currentPkg = strings.Trim(firstPart, "\"")
+		if !indented {
+			// A new top-level key ends the previous entry.
+			flush()
+			if strings.HasSuffix(line, ":") {
+				key := strings.TrimSuffix(line, ":")
+				// Only "@"-bearing keys are package headers; __metadata: and
+				// friends are skipped.
+				if strings.Contains(key, "@") {
+					headerName = yarnSelectorName(key)
 				}
 			}
-			currentVersion = ""
-		} else if strings.HasPrefix(line, "version ") && currentPkg != "" {
-			currentVersion = strings.Trim(strings.TrimPrefix(line, "version "), "\"")
-			if !seen[currentPkg] {
-				seen[currentPkg] = true
-				deps = append(deps, Dependency{
-					Name:    currentPkg,
-					Version: currentVersion,
-					Source:  "yarn.lock",
-				})
-			}
-			currentPkg = ""
+			continue
+		}
+
+		// Indented content belongs to the current entry.
+		switch {
+		case strings.HasPrefix(line, "version:"):
+			version = strings.Trim(strings.TrimSpace(strings.TrimPrefix(line, "version:")), "\"")
+		case strings.HasPrefix(line, "version "):
+			version = strings.Trim(strings.TrimPrefix(line, "version "), "\"")
+		case strings.HasPrefix(line, "resolution:"):
+			resolutionName = yarnSelectorName(strings.TrimPrefix(line, "resolution:"))
+			resolutionProtocol = yarnSelectorProtocol(strings.TrimPrefix(line, "resolution:"))
 		}
 	}
+	flush()
 
 	return deps, nil
+}
+
+// yarnSelectorName extracts the package name from a yarn selector list or a
+// Berry resolution string. It handles multi-selector headers ("pkg@a, pkg@b"),
+// surrounding quotes, scoped names ("@scope/pkg") and Berry protocols
+// ("pkg@npm:1.2.3"). The name is everything up to the FIRST "@" after index 0,
+// which begins the version range or protocol; a leading "@" on scoped packages
+// is preserved. Splitting on the first (not last) "@" keeps npm aliases such as
+// "foo@npm:bar@^1" resolving to "foo" rather than "foo@npm:bar".
+func yarnSelectorName(s string) string {
+	s = firstSelector(s)
+	if s == "" {
+		return ""
+	}
+	if at := strings.Index(s[1:], "@"); at != -1 {
+		s = s[:at+1]
+	}
+	return strings.TrimSpace(s)
+}
+
+// yarnSelectorProtocol returns the Berry protocol of a selector — the token
+// immediately after the name-terminating "@" and before the next ":" (e.g.
+// "npm", "workspace", "patch"). It returns "" when there is no protocol marker,
+// which is the Yarn Classic case ("pkg@^1.2.3", where the range is not a
+// protocol).
+func yarnSelectorProtocol(s string) string {
+	s = firstSelector(s)
+	if s == "" {
+		return ""
+	}
+	at := strings.Index(s[1:], "@")
+	if at == -1 {
+		return ""
+	}
+	rest := s[at+2:] // everything after the name-terminating "@"
+	colon := strings.Index(rest, ":")
+	if colon == -1 {
+		return ""
+	}
+	proto := rest[:colon]
+	// A version range like "^1.2.3" has no ":"; guard against a stray ":" inside
+	// a range by rejecting protocols that aren't a bare identifier.
+	if proto == "" || strings.ContainsAny(proto, "^~<>= .") {
+		return ""
+	}
+	return proto
+}
+
+// firstSelector normalizes a raw selector/resolution string: it takes the first
+// entry of a comma-separated header, trims whitespace and surrounding quotes.
+func firstSelector(s string) string {
+	s = strings.TrimSpace(s)
+	if idx := strings.Index(s, ","); idx != -1 {
+		s = s[:idx]
+	}
+	return strings.Trim(strings.TrimSpace(s), "\"")
 }
 
 func parseRequirementsTxt(data []byte) ([]Dependency, error) {

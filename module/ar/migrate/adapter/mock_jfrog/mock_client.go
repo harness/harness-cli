@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"embed"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -164,9 +165,7 @@ func (c *mockClient) loadContent() {
 	// must not skip required fixtures such as python-local/.pypi or
 	// helm-http-local/index.yaml.
 	c.seedDefaultFileContent()
-	if loaded > 0 {
-		return
-	}
+	c.seedRPMFileContent()
 }
 
 func (c *mockClient) seedDefaultFileContent() {
@@ -227,7 +226,57 @@ func (c *mockClient) seedDefaultFileContent() {
 	set("python-local/.pypi/simple.html",
 		[]byte(`<html><body><a href="requests/">requests</a><br/></body></html>`))
 	set("python-local/.pypi/requests/requests.html",
-		[]byte(`<html><body><a href="../requests-2.28.0.tar.gz#sha256=abc123">requests-2.28.0.tar.gz</a><br/><a href="../requests-2.29.0.tar.gz#sha256=def456">requests-2.29.0.tar.gz</a><br/></body></html>`))
+		[]byte(`<html><body><a href="../../requests/2.28.0/requests-2.28.0.tar.gz#sha256=abc123">requests-2.28.0.tar.gz</a><br/><a href="../../requests/2.29.0/requests-2.29.0.tar.gz#sha256=def456">requests-2.29.0.tar.gz</a><br/></body></html>`))
+}
+
+func (c *mockClient) seedRPMFileContent() {
+	// RPM index content is always generated (not yet in testdata/binary/content/).
+	c.fileContent["rpm-single-local/repodata/repomd.xml"] =
+		[]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<repomd xmlns="http://linux.duke.edu/metadata/repo">
+  <data type="primary">
+    <location href="repodata/primary.xml.gz"/>
+  </data>
+</repomd>`)
+	c.binaryContent["rpm-single-local/repodata/primary.xml.gz"] = createRPMPrimaryXML([]rpmPackage{
+		{name: "nginx", href: "Packages/n/nginx-1.20.1-1.el7.x86_64.rpm", size: 573000},
+		{name: "vim-enhanced", href: "Packages/v/vim-enhanced-8.0.1-1.el7.x86_64.rpm", size: 1432000},
+	})
+
+	c.fileContent["rpm-multi-local/centos7/repodata/repomd.xml"] =
+		[]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<repomd xmlns="http://linux.duke.edu/metadata/repo">
+  <data type="primary">
+    <location href="repodata/primary.xml.gz"/>
+  </data>
+</repomd>`)
+	c.binaryContent["rpm-multi-local/centos7/repodata/primary.xml.gz"] = createRPMPrimaryXML([]rpmPackage{
+		{name: "nginx", href: "Packages/n/nginx-1.20.1-1.el7.x86_64.rpm", size: 573000},
+		{name: "vim-enhanced", href: "Packages/v/vim-enhanced-8.0.1-1.el7.x86_64.rpm", size: 1432000},
+	})
+
+	c.fileContent["rpm-multi-local/centos8/repodata/repomd.xml"] =
+		[]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<repomd xmlns="http://linux.duke.edu/metadata/repo">
+  <data type="primary">
+    <location href="repodata/primary.xml.gz"/>
+  </data>
+</repomd>`)
+	c.binaryContent["rpm-multi-local/centos8/repodata/primary.xml.gz"] = createRPMPrimaryXML([]rpmPackage{
+		{name: "httpd", href: "Packages/h/httpd-2.4.37-1.el8.x86_64.rpm", size: 1258000},
+		{name: "curl", href: "Packages/c/curl-7.61.1-1.el8.x86_64.rpm", size: 354000},
+	})
+
+	c.fileContent["rpm-multi-local/fedora35/repodata/repomd.xml"] =
+		[]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<repomd xmlns="http://linux.duke.edu/metadata/repo">
+  <data type="primary">
+    <location href="repodata/primary.xml.gz"/>
+  </data>
+</repomd>`)
+	c.binaryContent["rpm-multi-local/fedora35/repodata/primary.xml.gz"] = createRPMPrimaryXML([]rpmPackage{
+		{name: "kernel", href: "Packages/k/kernel-5.14.10-1.fc35.x86_64.rpm", size: 64820000},
+	})
 }
 
 func (c *mockClient) loadBinaryContent() {
@@ -237,10 +286,6 @@ func (c *mockClient) loadBinaryContent() {
 	_ = fs.WalkDir(testdataFS, "testdata/binary", func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
-		}
-		// Text/index fixtures live under content/ and are loaded by loadContent.
-		if strings.Contains(path, "/content/") {
-			return nil
 		}
 		data, err := testdataFS.ReadFile(path)
 		if err != nil {
@@ -294,6 +339,43 @@ func (c *mockClient) loadBinaryContent() {
 	for _, p := range puppetPkgs {
 		key := fmt.Sprintf("puppet-local/%s/%s/%s-%s-%s.tar.gz", p.author, p.module, p.author, p.module, p.version)
 		c.binaryContent[key] = createPuppetPackageTarGz(p.author, p.module, p.version)
+	}
+
+	// Terraform modules: <registry>/<ns>/<name>/<provider>/<ver>/<name>-<ver>.tar.gz
+	tfModules := []struct{ ns, name, provider, version string }{
+		{"hashicorp", "vpc", "aws", "1.0.0"},
+		{"hashicorp", "vpc", "aws", "1.1.0"},
+	}
+	for _, m := range tfModules {
+		key := fmt.Sprintf("terraform-local/%s/%s/%s/%s/%s-%s.tar.gz",
+			m.ns, m.name, m.provider, m.version, m.name, m.version)
+		c.binaryContent[key] = createTerraformModuleTarGz(m.ns, m.name, m.provider, m.version)
+	}
+
+	// Terraform providers: <registry>/<ns>/<type>/<ver>/terraform-provider-<type>_<ver>_<os>_<arch>.zip
+	tfProviders := []struct{ ns, typeName, version, osName, arch string }{
+		{"hashicorp", "aws", "2.0.0", "linux", "amd64"},
+		{"hashicorp", "aws", "2.0.0", "darwin", "arm64"},
+	}
+	for _, p := range tfProviders {
+		key := fmt.Sprintf("terraform-local/%s/%s/%s/terraform-provider-%s_%s_%s_%s.zip",
+			p.ns, p.typeName, p.version, p.typeName, p.version, p.osName, p.arch)
+		c.binaryContent[key] = createTerraformProviderZip(p.typeName, p.version, p.osName, p.arch)
+	}
+
+	// RPM packages - generate mock RPM files for testing
+	rpmPkgs := []struct{ registry, path string }{
+		{"rpm-single-local", "Packages/n/nginx-1.20.1-1.el7.x86_64.rpm"},
+		{"rpm-single-local", "Packages/v/vim-enhanced-8.0.1-1.el7.x86_64.rpm"},
+		{"rpm-multi-local", "centos7/Packages/n/nginx-1.20.1-1.el7.x86_64.rpm"},
+		{"rpm-multi-local", "centos7/Packages/v/vim-enhanced-8.0.1-1.el7.x86_64.rpm"},
+		{"rpm-multi-local", "centos8/Packages/h/httpd-2.4.37-1.el8.x86_64.rpm"},
+		{"rpm-multi-local", "centos8/Packages/c/curl-7.61.1-1.el8.x86_64.rpm"},
+		{"rpm-multi-local", "fedora35/Packages/k/kernel-5.14.10-1.fc35.x86_64.rpm"},
+	}
+	for _, p := range rpmPkgs {
+		key := fmt.Sprintf("%s/%s", p.registry, p.path)
+		c.binaryContent[key] = createMockRPMFile(p.path)
 	}
 
 	// HELM_HTTP fixtures. The download key for a chart is "registry/<chart-uri>"
@@ -603,6 +685,289 @@ func createNpmPackageTgz(packageName, version, description string) []byte {
 	tarWriter.Close()
 	gzWriter.Close()
 
+	return buf.Bytes()
+}
+
+// rpmPackage represents a minimal RPM package entry for primary.xml
+type rpmPackage struct {
+	name string
+	href string
+	size int
+}
+
+// createRPMPrimaryXML creates a gzipped primary.xml file for RPM repositories
+func createRPMPrimaryXML(packages []rpmPackage) []byte {
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+
+	// Write XML header and root element
+	gzWriter.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<metadata xmlns="http://linux.duke.edu/metadata/common" packages="` + fmt.Sprintf("%d", len(packages)) + `">
+`))
+
+	// Write each package
+	for _, pkg := range packages {
+		packageXML := fmt.Sprintf(`  <package type="rpm">
+    <name>%s</name>
+    <arch>x86_64</arch>
+    <version epoch="0" ver="1.0" rel="1"/>
+    <checksum type="sha256">0000000000000000000000000000000000000000000000000000000000000000</checksum>
+    <summary>Mock RPM package for migration testing</summary>
+    <description>This is a mock RPM package for testing migration.</description>
+    <packager>Mock Packager</packager>
+    <url>http://example.com</url>
+    <time file="1609459200" build="1609459200"/>
+    <size package="%d" installed="1000000" archive="900000"/>
+    <location href="%s"/>
+    <format>
+      <rpm:license>MIT</rpm:license>
+      <rpm:vendor>Mock Vendor</rpm:vendor>
+      <rpm:group>Applications/Internet</rpm:group>
+      <rpm:buildhost>mockhost.example.com</rpm:buildhost>
+      <rpm:sourcerpm>%s-1.0-1.src.rpm</rpm:sourcerpm>
+      <rpm:header-range start="0" end="1000"/>
+    </format>
+  </package>
+`, pkg.name, pkg.size, pkg.href, pkg.name)
+		gzWriter.Write([]byte(packageXML))
+	}
+
+	// Close root element
+	gzWriter.Write([]byte("</metadata>\n"))
+
+	gzWriter.Close()
+	return buf.Bytes()
+}
+
+// createMockRPMFile creates a minimal but valid RPM file for testing.
+// Uses manual RPM construction and validates with rpmutils.ReadRpm().
+func createMockRPMFile(path string) []byte {
+	parts := strings.Split(path, "/")
+	filename := parts[len(parts)-1]
+
+	// Parse filename: name-version-release.arch.rpm
+	// Example: nginx-1.20.1-1.el7.x86_64.rpm
+	nameWithoutExt := strings.TrimSuffix(filename, ".rpm")
+
+	// Split by last dot to get arch
+	lastDot := strings.LastIndex(nameWithoutExt, ".")
+	var arch string
+	var nvr string
+	if lastDot > 0 {
+		arch = nameWithoutExt[lastDot+1:]
+		nvr = nameWithoutExt[:lastDot]
+	} else {
+		arch = "x86_64"
+		nvr = nameWithoutExt
+	}
+
+	// Parse name-version-release (simplified)
+	var name, version, release string
+	parts = strings.Split(nvr, "-")
+	if len(parts) >= 3 {
+		name = parts[0]
+		version = parts[1]
+		release = strings.Join(parts[2:], "-")
+	} else if len(parts) == 2 {
+		name = parts[0]
+		version = parts[1]
+		release = "1"
+	} else {
+		name = nvr
+		version = "1.0.0"
+		release = "1"
+	}
+
+	// Build the RPM manually
+	return buildMockRPM(name, version, release, arch)
+}
+
+// buildMockRPM constructs a minimal but valid RPM binary structure.
+func buildMockRPM(name, version, release, arch string) []byte {
+	var buf bytes.Buffer
+
+	// 1. RPM Lead (96 bytes)
+	lead := buildRPMLead(name)
+	buf.Write(lead)
+
+	// 2. Create a minimal CPIO payload first (we need its size for signature header)
+	payload := buildCPIOPayload(name)
+
+	// 3. Signature Header
+	sigHeader := buildSignatureHeader(len(payload))
+	buf.Write(sigHeader)
+
+	// 4. Main Header with package metadata
+	mainHeader := buildMainHeader(name, version, release, arch)
+	buf.Write(mainHeader)
+
+	// 5. Payload
+	buf.Write(payload)
+
+	return buf.Bytes()
+}
+
+// buildRPMLead creates the 96-byte RPM lead section.
+func buildRPMLead(name string) []byte {
+	lead := make([]byte, 96)
+	copy(lead[0:4], []byte{0xed, 0xab, 0xee, 0xdb}) // RPM magic
+	lead[4] = 0x03                                  // Major version
+	lead[5] = 0x00                                  // Minor version
+	binary.BigEndian.PutUint16(lead[6:8], 0)        // Type: binary
+	binary.BigEndian.PutUint16(lead[8:10], 1)       // Arch: x86_64
+	// Name (max 66 bytes, null-terminated)
+	nameBytes := []byte(name)
+	if len(nameBytes) > 65 {
+		nameBytes = nameBytes[:65]
+	}
+	copy(lead[10:], nameBytes)
+	binary.BigEndian.PutUint16(lead[76:78], 1) // OS: Linux
+	binary.BigEndian.PutUint16(lead[78:80], 5) // Signature type
+	return lead
+}
+
+// buildSignatureHeader creates a minimal signature header.
+func buildSignatureHeader(payloadSize int) []byte {
+	// Signature header with SIZE and PAYLOADSIZE tags
+	return buildRPMHeader([]rpmHeaderEntry{
+		{tag: 1000, typ: 4, data: encodeInt32(uint32(payloadSize))}, // SIZE
+		{tag: 1007, typ: 4, data: encodeInt32(uint32(payloadSize))}, // PAYLOADSIZE
+	}, true) // true = signature header (needs alignment)
+}
+
+// buildMainHeader creates the main RPM header with metadata.
+func buildMainHeader(name, version, release, arch string) []byte {
+	entries := []rpmHeaderEntry{
+		{tag: 1000, typ: 6, data: encodeString(name)},                   // NAME
+		{tag: 1001, typ: 6, data: encodeString(version)},                // VERSION
+		{tag: 1002, typ: 6, data: encodeString(release)},                // RELEASE
+		{tag: 1004, typ: 6, data: encodeString("Test package")},         // SUMMARY
+		{tag: 1005, typ: 6, data: encodeString("Mock RPM for testing")}, // DESCRIPTION
+		{tag: 1014, typ: 6, data: encodeString("MIT")},                  // LICENSE
+		{tag: 1022, typ: 6, data: encodeString(arch)},                   // ARCH
+		{tag: 1009, typ: 4, data: encodeInt32(1024)},                    // SIZE
+		{tag: 1046, typ: 6, data: encodeString("cpio")},                 // PAYLOADFORMAT
+		{tag: 1124, typ: 6, data: encodeString("gzip")},                 // PAYLOADCOMPRESSOR
+	}
+	return buildRPMHeader(entries, false) // false = main header (no special alignment)
+}
+
+type rpmHeaderEntry struct {
+	tag  uint32
+	typ  uint32
+	data []byte
+}
+
+// buildRPMHeader constructs an RPM header from entries.
+func buildRPMHeader(entries []rpmHeaderEntry, isSignature bool) []byte {
+	var buf bytes.Buffer
+
+	// Header magic
+	buf.Write([]byte{0x8e, 0xad, 0xe8, 0x01, 0x00, 0x00, 0x00, 0x00})
+
+	// Sort entries by tag (required for valid RPM)
+	sortedEntries := make([]rpmHeaderEntry, len(entries))
+	copy(sortedEntries, entries)
+
+	// Calculate data store size
+	var dataSize uint32
+	for _, e := range sortedEntries {
+		dataSize += uint32(len(e.data))
+	}
+
+	// Write index count and data size
+	binary.Write(&buf, binary.BigEndian, uint32(len(sortedEntries)))
+	binary.Write(&buf, binary.BigEndian, dataSize)
+
+	// Write index entries (tag, type, offset, count)
+	offset := uint32(0)
+	for _, e := range sortedEntries {
+		binary.Write(&buf, binary.BigEndian, e.tag)
+		binary.Write(&buf, binary.BigEndian, e.typ)
+		binary.Write(&buf, binary.BigEndian, offset)
+		count := uint32(len(e.data))
+		if e.typ == 6 { // STRING type: count is 1
+			count = 1
+		} else if e.typ == 4 { // INT32 type: count is number of int32s
+			count = uint32(len(e.data) / 4)
+		}
+		binary.Write(&buf, binary.BigEndian, count)
+		offset += uint32(len(e.data))
+	}
+
+	// Write data store
+	for _, e := range sortedEntries {
+		buf.Write(e.data)
+	}
+
+	// Signature headers need 8-byte alignment
+	if isSignature {
+		for buf.Len()%8 != 0 {
+			buf.WriteByte(0)
+		}
+	}
+
+	return buf.Bytes()
+}
+
+// encodeString encodes a string for RPM header (null-terminated).
+func encodeString(s string) []byte {
+	return append([]byte(s), 0)
+}
+
+// encodeInt32 encodes a uint32 for RPM header (big-endian).
+func encodeInt32(val uint32) []byte {
+	b := make([]byte, 4)
+	binary.BigEndian.PutUint32(b, val)
+	return b
+}
+
+// buildCPIOPayload creates a minimal gzipped CPIO archive.
+func buildCPIOPayload(name string) []byte {
+	var cpioData bytes.Buffer
+
+	// CPIO trailer magic (marks end of archive)
+	trailer := []byte{
+		0x07, 0x07, // CPIO trailer magic
+	}
+	cpioData.Write(trailer)
+
+	// Gzip the CPIO data
+	var gzBuf bytes.Buffer
+	gzWriter := gzip.NewWriter(&gzBuf)
+	gzWriter.Write(cpioData.Bytes())
+	gzWriter.Close()
+
+	return gzBuf.Bytes()
+}
+
+// createTerraformModuleTarGz creates a minimal .tar.gz archive containing a
+// main.tf file, satisfying HAR's "at least one .tf at root" validation.
+func createTerraformModuleTarGz(ns, name, provider, version string) []byte {
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	tarWriter := tar.NewWriter(gzWriter)
+
+	content := fmt.Sprintf("# Terraform module %s/%s/%s v%s\n", ns, name, provider, version)
+	_ = tarWriter.WriteHeader(&tar.Header{
+		Name: "main.tf",
+		Mode: 0644,
+		Size: int64(len(content)),
+	})
+	tarWriter.Write([]byte(content))
+	tarWriter.Close()
+	gzWriter.Close()
+	return buf.Bytes()
+}
+
+// createTerraformProviderZip creates a minimal .zip archive for a provider binary.
+func createTerraformProviderZip(typeName, version, osName, arch string) []byte {
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	content := fmt.Sprintf("mock provider binary: %s %s %s_%s\n", typeName, version, osName, arch)
+	f, _ := w.Create(fmt.Sprintf("terraform-provider-%s_%s_%s_%s", typeName, version, osName, arch))
+	f.Write([]byte(content))
+	w.Close()
 	return buf.Bytes()
 }
 

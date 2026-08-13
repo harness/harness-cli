@@ -68,10 +68,7 @@ func (j *GenericUploadJob) Upload(ctx context.Context) error {
 		return fmt.Errorf("failed to create upload request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
-	req.Header.Set("x-api-key", config.Global.AuthToken)
-	if strings.HasPrefix(config.Global.AuthToken, auth.JWTTokenPrefix) {
-		req.Header.Set("Authorization", config.Global.AuthToken)
-	}
+	auth.SetAuthHeader(req)
 	utils.SetChecksumHeaders(req.Header, j.Checksums)
 
 	resp, err := j.HTTPClient.Do(req)

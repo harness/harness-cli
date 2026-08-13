@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -459,6 +460,60 @@ func TestFilterFilesByTime_AllMatch_BothFilters(t *testing.T) {
 	}, uris)
 }
 
+// ── IsPackageIndexFile ─────────────────────────────────────────────────────────
+
+func TestIsPackageIndexFile(t *testing.T) {
+	tests := []struct {
+		name         string
+		artifactType types.ArtifactType
+		uri          string
+		want         bool
+	}{
+		{
+			name:         "PyPI simple index",
+			artifactType: types.PYTHON,
+			uri:          "/.pypi/simple.html",
+			want:         true,
+		},
+		{
+			name:         "PyPI per-package index",
+			artifactType: types.PYTHON,
+			uri:          "/.pypi/requests/requests.html",
+			want:         true,
+		},
+		{
+			name:         "PyPI index without leading slash",
+			artifactType: types.PYTHON,
+			uri:          ".pypi/simple.html",
+			want:         true,
+		},
+		{
+			name:         "PyPI artifact is not an index",
+			artifactType: types.PYTHON,
+			uri:          "/requests/2.28.0/requests-2.28.0.tar.gz",
+			want:         false,
+		},
+		{
+			name:         "path merely containing .pypi later is not an index",
+			artifactType: types.PYTHON,
+			uri:          "/pkg/.pypi/foo.html",
+			want:         false,
+		},
+		{
+			name:         "non-PyPI artifact type never matches",
+			artifactType: types.NUGET,
+			uri:          "/.pypi/simple.html",
+			want:         false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IsPackageIndexFile(tc.artifactType, tc.uri))
+		})
+	}
+}
+
 // ── ValidateDateFilter ────────────────────────────────────────────────────────
 
 func TestValidateDateFilter(t *testing.T) {
@@ -533,4 +588,256 @@ func TestValidateDateFilter(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ── FilterPackagesByFileName ───────────────────────────────────────────────────
+
+func TestFilterPackagesByFileName(t *testing.T) {
+	packages := []types.Package{
+		{Name: "nginx-1.20.1-1.el7.x86_64.rpm", Registry: "reg1", Path: "/centos7/Packages/n", Size: 573000, URI: "centos7/Packages/n/nginx-1.20.1-1.el7.x86_64.rpm"},
+		{Name: "vim-enhanced-8.0.1-1.el7.x86_64.rpm", Registry: "reg1", Path: "/centos7/Packages/v", Size: 1432000, URI: "centos7/Packages/v/vim-enhanced-8.0.1-1.el7.x86_64.rpm"},
+		{Name: "httpd-2.4.37-1.el8.x86_64.rpm", Registry: "reg1", Path: "/centos8/Packages/h", Size: 1258000, URI: "centos8/Packages/h/httpd-2.4.37-1.el8.x86_64.rpm"},
+		{Name: "kernel-5.14.10-1.fc35.x86_64.rpm", Registry: "reg1", Path: "/fedora35/Packages/k", Size: 64820000, URI: "fedora35/Packages/k/kernel-5.14.10-1.fc35.x86_64.rpm"},
+	}
+
+	tests := []struct {
+		name              string
+		dateFilteredFiles []types.File
+		wantNames         []string
+	}{
+		{
+			name: "keep two of four packages",
+			dateFilteredFiles: []types.File{
+				{Name: "nginx-1.20.1-1.el7.x86_64.rpm", Uri: "/centos7/Packages/n/nginx-1.20.1-1.el7.x86_64.rpm"},
+				{Name: "kernel-5.14.10-1.fc35.x86_64.rpm", Uri: "/fedora35/Packages/k/kernel-5.14.10-1.fc35.x86_64.rpm"},
+			},
+			wantNames: []string{"nginx-1.20.1-1.el7.x86_64.rpm", "kernel-5.14.10-1.fc35.x86_64.rpm"},
+		},
+		{
+			name:              "empty file list returns empty packages",
+			dateFilteredFiles: []types.File{},
+			wantNames:         nil,
+		},
+		{
+			name:              "nil file list returns empty packages",
+			dateFilteredFiles: nil,
+			wantNames:         nil,
+		},
+		{
+			name: "all packages matched",
+			dateFilteredFiles: []types.File{
+				{Name: "nginx-1.20.1-1.el7.x86_64.rpm", Uri: "/centos7/Packages/n/nginx-1.20.1-1.el7.x86_64.rpm"},
+				{Name: "vim-enhanced-8.0.1-1.el7.x86_64.rpm", Uri: "/centos7/Packages/v/vim-enhanced-8.0.1-1.el7.x86_64.rpm"},
+				{Name: "httpd-2.4.37-1.el8.x86_64.rpm", Uri: "/centos8/Packages/h/httpd-2.4.37-1.el8.x86_64.rpm"},
+				{Name: "kernel-5.14.10-1.fc35.x86_64.rpm", Uri: "/fedora35/Packages/k/kernel-5.14.10-1.fc35.x86_64.rpm"},
+			},
+			wantNames: []string{"nginx-1.20.1-1.el7.x86_64.rpm", "vim-enhanced-8.0.1-1.el7.x86_64.rpm", "httpd-2.4.37-1.el8.x86_64.rpm", "kernel-5.14.10-1.fc35.x86_64.rpm"},
+		},
+		{
+			name: "file URIs not matching any package URL are ignored",
+			dateFilteredFiles: []types.File{
+				{Name: "nonexistent.rpm", Uri: "/x/nonexistent.rpm"},
+				{Name: "another-missing.rpm", Uri: "/y/another-missing.rpm"},
+			},
+			wantNames: nil,
+		},
+		{
+			name: "mixed matching and non-matching",
+			dateFilteredFiles: []types.File{
+				{Name: "nginx-1.20.1-1.el7.x86_64.rpm", Uri: "/centos7/Packages/n/nginx-1.20.1-1.el7.x86_64.rpm"},
+				{Name: "nonexistent.rpm", Uri: "/x/nonexistent.rpm"},
+				{Name: "httpd-2.4.37-1.el8.x86_64.rpm", Uri: "/centos8/Packages/h/httpd-2.4.37-1.el8.x86_64.rpm"},
+			},
+			wantNames: []string{"nginx-1.20.1-1.el7.x86_64.rpm", "httpd-2.4.37-1.el8.x86_64.rpm"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := FilterPackagesByFileName(packages, tc.dateFilteredFiles)
+			var names []string
+			for _, pkg := range got {
+				names = append(names, pkg.Name)
+			}
+			assert.ElementsMatch(t, tc.wantNames, names)
+		})
+	}
+}
+
+// ── AddPackageErrorToStat ─────────────────────────────────────────────────────
+
+func TestAddPackageErrorToStat(t *testing.T) {
+	tests := []struct {
+		name        string
+		pkg         types.Package
+		srcRegistry string
+		errMsg      string
+		wantStat    types.FileStat
+	}{
+		{
+			name: "basic package failure recorded correctly",
+			pkg: types.Package{
+				Name: "nginx-1.20.1-1.el7.x86_64.rpm",
+				URL:  "/centos7/Packages/n/nginx-1.20.1-1.el7.x86_64.rpm",
+				Size: 1024,
+			},
+			srcRegistry: "rpm-local",
+			errMsg:      "file not found",
+			wantStat: types.FileStat{
+				Name:     "nginx-1.20.1-1.el7.x86_64.rpm",
+				Registry: "rpm-local",
+				Uri:      "/centos7/Packages/n/nginx-1.20.1-1.el7.x86_64.rpm",
+				Size:     1024,
+				Status:   types.StatusFail,
+				Error:    "file not found",
+			},
+		},
+		{
+			name: "zero size package",
+			pkg: types.Package{
+				Name: "empty.rpm",
+				URL:  "/repo/empty.rpm",
+				Size: 0,
+			},
+			srcRegistry: "my-registry",
+			errMsg:      "download timeout",
+			wantStat: types.FileStat{
+				Name:     "empty.rpm",
+				Registry: "my-registry",
+				Uri:      "/repo/empty.rpm",
+				Size:     0,
+				Status:   types.StatusFail,
+				Error:    "download timeout",
+			},
+		},
+		{
+			name: "empty srcRegistry uses empty string",
+			pkg: types.Package{
+				Name: "pkg.deb",
+				URL:  "/pool/main/pkg.deb",
+				Size: 512,
+			},
+			srcRegistry: "",
+			errMsg:      "connection refused",
+			wantStat: types.FileStat{
+				Name:     "pkg.deb",
+				Registry: "",
+				Uri:      "/pool/main/pkg.deb",
+				Size:     512,
+				Status:   types.StatusFail,
+				Error:    "connection refused",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			stats := &types.TransferStats{}
+			AddPackageErrorToStat(stats, tc.pkg, tc.srcRegistry, fmt.Errorf("%s", tc.errMsg))
+			snapshot := stats.Snapshot()
+			assert.Len(t, snapshot, 1)
+			assert.Equal(t, tc.wantStat, snapshot[0])
+		})
+	}
+}
+
+func TestAddPackageErrorToStat_AppendsMultiple(t *testing.T) {
+	stats := &types.TransferStats{}
+	AddPackageErrorToStat(stats, types.Package{Name: "a.rpm", URL: "/a.rpm", Size: 10}, "reg", fmt.Errorf("err1"))
+	AddPackageErrorToStat(stats, types.Package{Name: "b.rpm", URL: "/b.rpm", Size: 20}, "reg", fmt.Errorf("err2"))
+	snapshot := stats.Snapshot()
+	assert.Len(t, snapshot, 2)
+	assert.Equal(t, "a.rpm", snapshot[0].Name)
+	assert.Equal(t, "b.rpm", snapshot[1].Name)
+	assert.Equal(t, types.StatusFail, snapshot[0].Status)
+	assert.Equal(t, types.StatusFail, snapshot[1].Status)
+}
+
+// ── AddFileErrorToStat ────────────────────────────────────────────────────────
+
+func TestAddFileErrorToStat(t *testing.T) {
+	tests := []struct {
+		name        string
+		file        *types.File
+		srcRegistry string
+		errMsg      string
+		wantStat    types.FileStat
+	}{
+		{
+			name: "basic file failure recorded correctly",
+			file: &types.File{
+				Name: "curl-7.61.1-1.el8.x86_64.rpm",
+				Uri:  "/Packages/c/curl-7.61.1-1.el8.x86_64.rpm",
+				Size: 2048,
+			},
+			srcRegistry: "rpm-multi-local",
+			errMsg:      "file not found",
+			wantStat: types.FileStat{
+				Name:     "curl-7.61.1-1.el8.x86_64.rpm",
+				Registry: "rpm-multi-local",
+				Uri:      "/Packages/c/curl-7.61.1-1.el8.x86_64.rpm",
+				Size:     2048,
+				Status:   types.StatusFail,
+				Error:    "file not found",
+			},
+		},
+		{
+			name: "zero size file",
+			file: &types.File{
+				Name: "requests-2.28.0.tar.gz",
+				Uri:  "/requests/2.28.0/requests-2.28.0.tar.gz",
+				Size: 0,
+			},
+			srcRegistry: "pypi-local",
+			errMsg:      "failed to create temporary file",
+			wantStat: types.FileStat{
+				Name:     "requests-2.28.0.tar.gz",
+				Registry: "pypi-local",
+				Uri:      "/requests/2.28.0/requests-2.28.0.tar.gz",
+				Size:     0,
+				Status:   types.StatusFail,
+				Error:    "failed to create temporary file",
+			},
+		},
+		{
+			name: "npm tarball failure",
+			file: &types.File{
+				Name: "lodash-4.17.21.tgz",
+				Uri:  "/lodash/-/lodash-4.17.21.tgz",
+				Size: 71168,
+			},
+			srcRegistry: "npm-local",
+			errMsg:      "failed to extract package.json from tarball",
+			wantStat: types.FileStat{
+				Name:     "lodash-4.17.21.tgz",
+				Registry: "npm-local",
+				Uri:      "/lodash/-/lodash-4.17.21.tgz",
+				Size:     71168,
+				Status:   types.StatusFail,
+				Error:    "failed to extract package.json from tarball",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			stats := &types.TransferStats{}
+			AddFileErrorToStat(stats, tc.file, tc.srcRegistry, fmt.Errorf("%s", tc.errMsg))
+			snapshot := stats.Snapshot()
+			assert.Len(t, snapshot, 1)
+			assert.Equal(t, tc.wantStat, snapshot[0])
+		})
+	}
+}
+
+func TestAddFileErrorToStat_AppendsMultiple(t *testing.T) {
+	stats := &types.TransferStats{}
+	AddFileErrorToStat(stats, &types.File{Name: "a.tgz", Uri: "/a.tgz", Size: 100}, "npm-local", fmt.Errorf("err1"))
+	AddFileErrorToStat(stats, &types.File{Name: "b.tgz", Uri: "/b.tgz", Size: 200}, "npm-local", fmt.Errorf("err2"))
+	snapshot := stats.Snapshot()
+	assert.Len(t, snapshot, 2)
+	assert.Equal(t, "a.tgz", snapshot[0].Name)
+	assert.Equal(t, "b.tgz", snapshot[1].Name)
+	assert.Equal(t, types.StatusFail, snapshot[0].Status)
+	assert.Equal(t, types.StatusFail, snapshot[1].Status)
 }

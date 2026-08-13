@@ -33,7 +33,7 @@ func TestExtractRPMPackagesUsesPrimaryXMLPackageSize(t *testing.T) {
 		t.Fatalf("close gzip writer: %v", err)
 	}
 
-	pkgs, err := extractRPMPackages(bytes.NewReader(buf.Bytes()), "rpm-local")
+	pkgs, err := extractRPMPackages(bytes.NewReader(buf.Bytes()), "rpm-local", "")
 	if err != nil {
 		t.Fatalf("extractRPMPackages: %v", err)
 	}

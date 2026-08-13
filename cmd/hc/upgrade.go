@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/harness/harness-cli/config"
 	"github.com/spf13/cobra"
 )
 
@@ -165,6 +166,7 @@ func getLatestRelease(includePreRelease bool) (*GitHubRelease, error) {
 	}
 
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", config.UserAgent())
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -209,11 +211,9 @@ func findAssetForPlatform(release *GitHubRelease, goos, goarch string) (*GitHubA
 		archName = "i386"
 	}
 
-	// Expected file extension
+	// Expected file extension - all platforms are released as .tar.gz
+	// (see .goreleaser/{stable,beta}.yaml archives config, no format_overrides for windows)
 	ext := ".tar.gz"
-	if goos == "windows" {
-		ext = ".zip"
-	}
 
 	// Look for matching asset (e.g., hc_v2.0.0_mac-os_arm64.tar.gz)
 	var targetAsset *GitHubAsset
@@ -246,7 +246,12 @@ func findAssetForPlatform(release *GitHubRelease, goos, goarch string) (*GitHubA
 func downloadFile(filepath, url string) error {
 	client := &http.Client{Timeout: 5 * time.Minute}
 
-	resp, err := client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", config.UserAgent())
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -293,10 +298,15 @@ func (wc *writeCounter) printProgress() {
 	}
 }
 
-func verifyChecksum(filepath, checksumURL string) error {
+func verifyChecksum(archivePath, checksumURL string) error {
 	// Download checksums.txt
 	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(checksumURL)
+	req, err := http.NewRequest("GET", checksumURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", config.UserAgent())
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -313,7 +323,7 @@ func verifyChecksum(filepath, checksumURL string) error {
 	}
 
 	// Find the checksum for our file
-	filename := filepath[strings.LastIndex(filepath, "/")+1:]
+	filename := filepath.Base(archivePath)
 	lines := strings.Split(string(body), "\n")
 	var expectedChecksum string
 
@@ -332,7 +342,7 @@ func verifyChecksum(filepath, checksumURL string) error {
 	}
 
 	// Calculate actual checksum
-	actualChecksum, err := calculateSHA256(filepath)
+	actualChecksum, err := calculateSHA256(archivePath)
 	if err != nil {
 		return err
 	}

@@ -1,0 +1,38 @@
+[
+  {
+    "Registry": "terraform-local",
+    "Name": "vpc-1.0.0.tar.gz",
+    "Uri": "/hashicorp/vpc/aws/1.0.0/vpc-1.0.0.tar.gz",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2024-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80740"
+  },
+  {
+    "Registry": "terraform-local",
+    "Name": "vpc-1.1.0.tar.gz",
+    "Uri": "/hashicorp/vpc/aws/1.1.0/vpc-1.1.0.tar.gz",
+    "Folder": false,
+    "Size": 2100,
+    "LastModified": "2024-02-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80741"
+  },
+  {
+    "Registry": "terraform-local",
+    "Name": "terraform-provider-aws_2.0.0_linux_amd64.zip",
+    "Uri": "/hashicorp/aws/2.0.0/terraform-provider-aws_2.0.0_linux_amd64.zip",
+    "Folder": false,
+    "Size": 50000,
+    "LastModified": "2024-01-15T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80742"
+  },
+  {
+    "Registry": "terraform-local",
+    "Name": "terraform-provider-aws_2.0.0_darwin_arm64.zip",
+    "Uri": "/hashicorp/aws/2.0.0/terraform-provider-aws_2.0.0_darwin_arm64.zip",
+    "Folder": false,
+    "Size": 48000,
+    "LastModified": "2024-01-15T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80743"
+  }
+]

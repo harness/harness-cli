@@ -9,6 +9,7 @@ import (
 
 	"github.com/harness/harness-cli/module/ar/migrate/http"
 	"github.com/harness/harness-cli/module/ar/migrate/http/auth/bearer"
+	"github.com/harness/harness-cli/module/ar/migrate/http/modifier/useragent"
 	"github.com/harness/harness-cli/module/ar/migrate/lib"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 )
@@ -37,6 +38,7 @@ func newClient(reg *types.RegistryConfig) *client {
 				Transport: http.GetHTTPTransport(http.WithInsecure(true)),
 			},
 			bearer.NewAuthorizer(password),
+			useragent.NewModifier(),
 		),
 		url:      reg.Endpoint,
 		insecure: true,

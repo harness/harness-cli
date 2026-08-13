@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/lib"
@@ -58,6 +59,11 @@ type Package struct {
 	config                *types.Config
 	registry              types.RegistryInfo
 	dryRunStats           *types.DryRunStats
+	existingIndex         *types.ExistingIndex
+	// unfilteredNode is a pattern-filtered but NOT date-filtered tree, used to
+	// recover pruned distribution files of an in-scope atomic version. nil
+	// unless a date filter is active for an atomic-version type.
+	unfilteredNode *types.TreeNode
 }
 
 func NewPackageJob(
@@ -69,11 +75,13 @@ func NewPackageJob(
 	artifactType types.ArtifactType,
 	pkg types.Package,
 	node *types.TreeNode,
+	unfilteredNode *types.TreeNode,
 	stats *types.TransferStats,
 	mapping *types.RegistryMapping,
 	config *types.Config,
 	registry types.RegistryInfo,
 	dryRunStats *types.DryRunStats,
+	existingIndex *types.ExistingIndex,
 ) engine.Job {
 	jobID := uuid.New().String()
 
@@ -100,6 +108,8 @@ func NewPackageJob(
 		config:                config,
 		registry:              registry,
 		dryRunStats:           dryRunStats,
+		existingIndex:         existingIndex,
+		unfilteredNode:        unfilteredNode,
 	}
 }
 
@@ -148,7 +158,7 @@ func (r *Package) Pre(ctx context.Context) error {
 				Size:     int64(r.pkg.Size),
 				Status:   types.StatusSkip,
 			}
-			r.stats.FileStats = append(r.stats.FileStats, stat)
+			r.stats.Add(stat)
 			return nil
 		}
 	}
@@ -202,7 +212,7 @@ func (r *Package) Pre(ctx context.Context) error {
 					Size:     0,
 					Status:   types.StatusSkip,
 				}
-				r.stats.FileStats = append(r.stats.FileStats, stat)
+				r.stats.Add(stat)
 			}
 		}
 
@@ -269,17 +279,7 @@ func (r *Package) Migrate(ctx context.Context) error {
 			return fmt.Errorf("get versions failed: %w", err)
 		}
 
-		var jobs []engine.Job
-		for _, version := range versions {
-			versionNode, err := tree.GetNodeForPath(r.node, version.Path)
-			if err != nil {
-				logger.Error().Msg("Failed to get node for version")
-				return fmt.Errorf("get version failed: %w", err)
-			}
-			job := NewVersionJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry, r.artifactType, r.pkg,
-				version, versionNode, r.stats, r.mapping, r.config, r.registry, r.dryRunStats)
-			jobs = append(jobs, job)
-		}
+		jobs := r.buildVersionJobs(versions, logger)
 
 		log.Info().Msgf("Jobs length: %d", len(jobs))
 
@@ -296,23 +296,145 @@ func (r *Package) Migrate(ctx context.Context) error {
 	return nil
 }
 
+// buildVersionJobs turns the source's version listing into Version jobs against
+// the (date/pattern-filtered) tree.
+//
+// For most artifact types each types.Version entry maps to exactly one file (or
+// carries a unique Name), so a version is migrated iff its node survived the
+// filter; a single out-of-window version must never drop the whole package, and
+// packages whose entire history is out of window simply contribute zero jobs.
+//
+// For atomic-version types (util.IsAtomicVersionArtifact — e.g. PyPI) a single
+// logical version spans MULTIPLE entries sharing Name (sdist + wheels). Because
+// the filter runs per file it can keep some distributions of a version and
+// prune others, migrating only the survivors would be a PARTIAL version. Such
+// versions are grouped by Name and migrated all-or-nothing: if ANY file is
+// in-scope (survived the filter), the WHOLE version is migrated, recovering
+// pruned distributions from the unfiltered tree (r.unfilteredNode). This ensures
+// partial versions are never published and never discarded.
+func (r *Package) buildVersionJobs(versions []types.Version, logger zerolog.Logger) []engine.Job {
+	atomic := util.IsAtomicVersionArtifact(r.artifactType)
+
+	// Apply the opt-in version selector (packageFilters[].versions). When the
+	// current package is named in packageFilters with a non-empty versions list,
+	// keep only those versions; everything else is pruned. Filtering the slice up
+	// front keeps both the atomic and non-atomic grouping below correct. No-op when
+	// unset or when this package has no version-level selector.
+	if sel, hasFilters, matched := util.SelectorForPackage(r.mapping, r.pkg.Name); hasFilters && matched && len(sel.Versions) > 0 {
+		originalCount := len(versions)
+		filtered := versions[:0:0]
+		for _, v := range versions {
+			if util.VersionSelectedBySelector(sel, v.Name) {
+				filtered = append(filtered, v)
+			}
+		}
+		versions = filtered
+		logger.Info().Msgf("Version selector filter for package %s: %d -> %d versions", r.pkg.Name, originalCount, len(versions))
+	}
+
+	// Resolve each entry's node once and tally, per version Name, how many
+	// distribution files survived the filter. A version is in-scope iff kept > 0.
+	type resolved struct {
+		version types.Version
+		node    *types.TreeNode // nil when pruned by the filter
+	}
+	entries := make([]resolved, 0, len(versions))
+	kept := make(map[string]int, len(versions))
+	for _, version := range versions {
+		node, err := tree.GetNodeForPath(r.node, version.Path)
+		if err != nil {
+			logger.Debug().Str("version", version.Name).Str("path", version.Path).
+				Msg("Version file not present in filtered tree")
+			entries = append(entries, resolved{version: version})
+			continue
+		}
+		kept[version.Name]++
+		entries = append(entries, resolved{version: version, node: node})
+	}
+
+	var jobs []engine.Job
+	outOfWindow := 0
+	recovered := 0
+	for _, e := range entries {
+		name := e.version.Name
+		switch {
+		case kept[name] == 0:
+			// Whole version out of window: every file was pruned. Counts once per
+			// entry; deduped in the summary below via total/kept, so just tally.
+			outOfWindow++
+		case atomic && kept[name] > 0:
+			// Atomic-version type: this version is IN SCOPE (at least one file
+			// survived). Migrate this file whether or not it survived the filter.
+			var node *types.TreeNode
+			if e.node != nil {
+				node = e.node
+			} else {
+				// Pruned sibling: recover it from the unfiltered tree.
+				if r.unfilteredNode == nil {
+					logger.Warn().Str("version", name).Str("path", e.version.Path).
+						Msgf("Could not recover pruned distribution file for in-scope version %s of package %s; unfilteredNode is nil (migrating without it — partial)",
+							name, r.pkg.Name)
+					continue
+				}
+				var err error
+				node, err = tree.GetNodeForPath(r.unfilteredNode, e.version.Path)
+				if err != nil || node == nil {
+					logger.Warn().Str("version", name).Str("path", e.version.Path).
+						Msgf("Could not recover pruned distribution file for in-scope version %s of package %s; migrating without it (partial)",
+							name, r.pkg.Name)
+					continue
+				}
+				recovered++
+				logger.Debug().Str("version", name).Str("path", e.version.Path).
+					Msg("Recovered pruned distribution file for in-scope atomic version")
+			}
+			jobs = append(jobs, NewVersionJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry,
+				r.artifactType, r.pkg, e.version, node, r.stats, r.mapping, r.config, r.registry,
+				r.dryRunStats, r.existingIndex))
+		case e.node == nil:
+			// Non-atomic type, this specific file pruned but the version has other
+			// surviving files (distinct Names collapse here); nothing to migrate for
+			// this entry. Already debug-logged above.
+		default:
+			jobs = append(jobs, NewVersionJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry,
+				r.artifactType, r.pkg, e.version, e.node, r.stats, r.mapping, r.config, r.registry,
+				r.dryRunStats, r.existingIndex))
+		}
+	}
+
+	if outOfWindow > 0 || recovered > 0 {
+		logger.Info().Int("migrating", len(jobs)).Int("out_of_window", outOfWindow).Int("recovered", recovered).
+			Msgf("Package %s: %d version-file(s) migrating, %d out of filter window, %d recovered from full history (in-scope atomic versions)",
+				r.pkg.Name, len(jobs), outOfWindow, recovered)
+	}
+
+	return jobs
+}
+
 // migrateOCI copies a Docker/Helm-OCI image repository from source to
 // destination.
 //
-// The fast path is crane.CopyRepository, which copies every tag in parallel and
-// is the well-tested common case. Its weakness is all-or-nothing: it runs every
-// tag inside a single errgroup, so the first tag whose manifest cannot be
-// fetched (e.g. an orphaned tag whose manifest was garbage-collected at the
-// source — the registry answers MANIFEST_UNKNOWN) cancels the shared context
-// and aborts every remaining tag, marking the whole image as failed.
+// When Overwrite is true, every tag is pushed unconditionally, so the fast
+// path is crane.CopyRepository, which copies every tag in parallel and is the
+// well-tested common case. Its weakness is all-or-nothing: it runs every tag
+// inside a single errgroup, so the first tag whose manifest cannot be fetched
+// (e.g. an orphaned tag whose manifest was garbage-collected at the source —
+// the registry answers MANIFEST_UNKNOWN) cancels the shared context and
+// aborts every remaining tag, marking the whole image as failed. If the bulk
+// copy fails, we fall back to copyTagsIndividually.
 //
-// So we only pay for isolation when we have to: if the bulk copy fails, we fall
-// back to copyTagsIndividually, which walks the tags in parallel, skips any
-// whose SOURCE manifest is missing/orphaned, and lets the rest through. The
-// image contributes exactly ONE stat — the same granularity as before, not one
-// per tag — but that stat is honest: it is only Success when at least one tag
-// actually migrated (or every tag was already present), Fail on a genuine
-// per-tag failure, and Skip when there was nothing to do.
+// When Overwrite is false, we skip the bulk fast path entirely: its no-clobber
+// check only tests whether a destination tag NAME exists, so it can never
+// detect a tag that was re-pointed to a different digest at the source (e.g.
+// a "latest" tag moved to a new image) — that tag would be skipped and go
+// stale at the destination forever. Instead we go straight to
+// copyTagsIndividually, which compares source/destination digests per tag and
+// pushes only when the tag is missing or its digest differs, so a moved tag
+// is corrected without needing Overwrite to be true.
+//
+// Either way, the image contributes exactly ONE stat: Success when at least
+// one tag migrated or every tag was already in sync/present, Fail on a
+// genuine per-tag failure, and Skip when there was nothing to do.
 func (r *Package) migrateOCI(ctx context.Context, logger zerolog.Logger) {
 	srcImage, _ := r.srcAdapter.GetOCIImagePath(r.srcRegistry, r.sourcePackageHostname, r.pkg.Name)
 	dstImage, _ := r.destAdapter.GetOCIImagePath(r.destRegistry, "", r.pkg.Name)
@@ -334,12 +456,12 @@ func (r *Package) migrateOCI(ctx context.Context, logger zerolog.Logger) {
 		pterm.Error.Println(fmt.Sprintf("Failed to create keyChain: %v", err))
 		stat.Error = err.Error()
 		stat.Status = types.StatusFail
-		r.stats.FileStats = append(r.stats.FileStats, stat)
+		r.stats.Add(stat)
 		return
 	}
 
 	craneOpts := []crane.Option{
-		crane.WithUserAgent("harness-cli"),
+		crane.WithUserAgent(config.UserAgent()),
 		crane.WithContext(ctx),
 		crane.WithJobs(r.config.Concurrency),
 		crane.WithNoClobber(!r.config.Overwrite),
@@ -349,10 +471,17 @@ func (r *Package) migrateOCI(ctx context.Context, logger zerolog.Logger) {
 		craneOpts = append(craneOpts, crane.Insecure)
 	}
 
+	if !r.config.Overwrite {
+		res, tagErr := r.copyTagsIndividually(ctx, logger, srcImage, dstImage, craneOpts)
+		r.finishOCICopy(ctx, &stat, res, tagErr, srcImage, dstImage)
+		r.stats.Add(stat)
+		return
+	}
+
 	// Fast path: bulk parallel copy of every tag.
 	if err := crane.CopyRepository(srcImage, dstImage, craneOpts...); err == nil {
 		pterm.Success.Println(fmt.Sprintf("Copy repository %s to %s completed", srcImage, dstImage))
-		r.stats.FileStats = append(r.stats.FileStats, stat)
+		r.stats.Add(stat)
 		return
 	}
 	log.Warn().Ctx(ctx).
@@ -361,8 +490,19 @@ func (r *Package) migrateOCI(ctx context.Context, logger zerolog.Logger) {
 
 	// Slow path: a bad tag took down the bulk copy. Retry per tag so orphaned
 	// source manifests are skipped and the rest of the image still migrates.
-	// Tags already pushed by the bulk attempt are skipped by no-clobber.
-	res, err := r.copyTagsIndividually(ctx, logger, srcImage, dstImage, craneOpts)
+	res, tagErr := r.copyTagsIndividually(ctx, logger, srcImage, dstImage, craneOpts)
+	r.finishOCICopy(ctx, &stat, res, tagErr, srcImage, dstImage)
+	r.stats.Add(stat)
+}
+
+// finishOCICopy sets stat's Status/Error from a copyTagsIndividually result,
+// preserving the single-stat-per-image contract described on migrateOCI:
+// Success when at least one tag migrated or all tags were already in
+// sync/skipped, Skip when there was nothing to do at all, Fail on a genuine
+// per-tag failure.
+func (r *Package) finishOCICopy(
+	ctx context.Context, stat *types.FileStat, res copyResult, err error, srcImage, dstImage string,
+) {
 	switch {
 	case err != nil:
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to copy repository %s to %s", srcImage, dstImage)
@@ -376,14 +516,13 @@ func (r *Package) migrateOCI(ctx context.Context, logger zerolog.Logger) {
 		stat.Status = types.StatusSkip
 		pterm.Warning.Println(fmt.Sprintf("Repository %s had no tags to copy", srcImage))
 	case res.migrated == 0:
-		// Every tag was already present (or an orphaned source we skipped); the
-		// image is effectively in sync, so this is a success.
+		// Every tag was already in sync (or an orphaned source we skipped); the
+		// image is effectively up to date, so this is a success.
 		pterm.Success.Println(fmt.Sprintf(
-			"Copy repository %s to %s completed (all %d tags already present/skipped)", srcImage, dstImage, res.skipped))
+			"Copy repository %s to %s completed (all %d tags already in sync/skipped)", srcImage, dstImage, res.skipped))
 	default:
 		pterm.Success.Println(fmt.Sprintf("Copy repository %s to %s completed", srcImage, dstImage))
 	}
-	r.stats.FileStats = append(r.stats.FileStats, stat)
 }
 
 // copyResult summarises the outcome of a per-tag copy pass so the caller can
@@ -396,13 +535,22 @@ type copyResult struct {
 }
 
 // copyTagsIndividually copies each tag of an image independently so one bad tag
-// cannot abort the rest. The tags are copied in parallel (bounded by the
-// configured concurrency), but — unlike the bulk path — a single tag's failure
-// never cancels its siblings. A tag whose SOURCE manifest is missing/orphaned is
-// skipped; a tag already present at the destination is skipped (no-clobber); any
-// other per-tag error is a genuine failure. It returns a summary plus a non-nil
-// error iff at least one tag genuinely failed, so the caller can set a single
-// image-level stat — this function does NOT touch r.stats.FileStats itself.
+// cannot abort the rest, and so a tag whose source digest has changed (e.g. a
+// tag re-pointed to a different image) is still corrected at the destination.
+//
+// The tags are copied in parallel (bounded by the configured concurrency), but
+// — unlike the bulk path — a single tag's failure never cancels its siblings.
+// For each tag, the source and destination digests are compared (via a cheap
+// HEAD, crane.Digest) rather than relying on crane's name-based no-clobber:
+//   - destination tag missing, or its digest differs from the source → push
+//     (this is what corrects a moved tag without needing Overwrite).
+//   - destination digest already matches the source → skip, no push needed.
+//   - a tag whose SOURCE manifest is missing/orphaned is skipped.
+//   - any other error is a genuine failure.
+//
+// It returns a summary plus a non-nil error iff at least one tag genuinely
+// failed, so the caller can set a single image-level stat — this function does
+// NOT touch r.stats.FileStats itself.
 func (r *Package) copyTagsIndividually(
 	ctx context.Context, logger zerolog.Logger, srcImage, dstImage string, craneOpts []crane.Option,
 ) (copyResult, error) {
@@ -426,10 +574,12 @@ func (r *Package) copyTagsIndividually(
 	}
 	res.total = len(tags)
 
-	// No-clobber is left to crane.Copy (craneOpts still carries WithNoClobber):
-	// an already-present destination tag comes back as a "refusing to clobber"
-	// error, which we count as skipped. This avoids a second, divergent
-	// destination tag-listing here.
+	// Push must be able to overwrite a destination tag whose digest differs
+	// from the source, so no-clobber is dropped here — the digest comparison
+	// below is what decides whether a push happens, replacing name-based
+	// no-clobber as the skip mechanism.
+	pushOpts := withoutNoClobber(craneOpts)
+
 	var (
 		mu         sync.Mutex
 		failedErrs []error
@@ -444,7 +594,36 @@ func (r *Package) copyTagsIndividually(
 			src := fmt.Sprintf("%s:%s", srcImage, tag)
 			dst := fmt.Sprintf("%s:%s", dstImage, tag)
 
-			copyErr := crane.Copy(src, dst, craneOpts...)
+			srcDigest, digestErr := crane.Digest(src, craneOpts...)
+			if digestErr != nil {
+				mu.Lock()
+				defer mu.Unlock()
+				if isStaleSourceManifestErr(digestErr, srcHost) {
+					res.skipped++
+					logger.Warn().Ctx(ctx).Err(digestErr).
+						Msgf("Skipping tag %s: source manifest missing/orphaned", src)
+					pterm.Warning.Println(fmt.Sprintf("Skipping %s: source manifest missing/orphaned (%v)", src, digestErr))
+				} else {
+					failedErrs = append(failedErrs, fmt.Errorf("%s: resolve source digest: %w", tag, digestErr))
+					logger.Error().Ctx(ctx).Err(digestErr).Msgf("Failed to resolve source digest for %s", src)
+					pterm.Error.Println(fmt.Sprintf("Failed to resolve source digest for %s", src))
+				}
+				return nil
+			}
+
+			dstDigest, dstErr := crane.Digest(dst, craneOpts...)
+			if dstErr == nil && dstDigest == srcDigest {
+				mu.Lock()
+				res.skipped++
+				logger.Info().Ctx(ctx).Msgf("Skipping %s: destination already in sync (%s)", dst, dstDigest)
+				mu.Unlock()
+				return nil
+			}
+
+			// Destination tag missing, or present with a different digest (e.g.
+			// the tag was moved to a new image at the source) — push to bring it
+			// in sync.
+			copyErr := crane.Copy(src, dst, pushOpts...)
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -452,9 +631,6 @@ func (r *Package) copyTagsIndividually(
 			case copyErr == nil:
 				res.migrated++
 				pterm.Success.Println(fmt.Sprintf("Copied %s to %s", src, dst))
-			case isAlreadyExistsErr(copyErr):
-				res.skipped++
-				logger.Info().Ctx(ctx).Msgf("Skipping %s: already exists at destination (no-clobber)", dst)
 			case isStaleSourceManifestErr(copyErr, srcHost):
 				// Orphaned/stale SOURCE manifest — the registry tag references a
 				// manifest digest that no longer exists at the source. Skip this
@@ -492,13 +668,14 @@ func (r *Package) copyTagsIndividually(
 	return res, nil
 }
 
-// isAlreadyExistsErr reports whether err is crane.Copy's no-clobber signal that
-// the destination tag already exists. crane returns a plain formatted error
-// ("refusing to clobber existing tag ...") for this case rather than a
-// transport.Error, so we match on that stable message. This is tied to the
-// crane version pinned in go.mod.
-func isAlreadyExistsErr(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "refusing to clobber")
+// withoutNoClobber returns craneOpts with no-clobber forced off, appended
+// last so it wins over any earlier WithNoClobber(true) in the slice. Used for
+// the actual push once the digest comparison in copyTagsIndividually has
+// already decided a push is needed — no-clobber must not then refuse it.
+func withoutNoClobber(craneOpts []crane.Option) []crane.Option {
+	out := make([]crane.Option, len(craneOpts), len(craneOpts)+1)
+	copy(out, craneOpts)
+	return append(out, crane.WithNoClobber(false))
 }
 
 // isStaleSourceManifestErr reports whether err indicates that the SOURCE
@@ -554,27 +731,32 @@ func (r *Package) migrateLegacyHelm(ctx context.Context) error {
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download helm chart %s", r.pkg.URL)
 		pterm.Error.Println(fmt.Sprintf("Failed to download helm chart %s", r.pkg.URL))
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 	defer file.Close()
 
 	tmp, err := os.CreateTemp("", "*.tgz")
 	if err != nil {
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 	defer os.Remove(tmp.Name())
 
 	_, err = io.Copy(tmp, file)
 	if err != nil {
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 
 	if err := tmp.Close(); err != nil {
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 
 	refStr, err := r.destAdapter.GetOCIImagePath(r.destRegistry, r.sourcePackageHostname, r.pkg.Name)
 	if err != nil {
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 	refStr += ":" + r.pkg.Version
@@ -594,12 +776,12 @@ func (r *Package) migrateLegacyHelm(ctx context.Context) error {
 		pterm.Error.Println(fmt.Sprintf("Failed to push helm chart %s to %s", r.pkg.Name, refStr))
 		stat.Error = err.Error()
 		stat.Status = types.StatusFail
-		r.stats.FileStats = append(r.stats.FileStats, stat)
+		r.stats.Add(stat)
 		return err
 	}
 
 	pterm.Success.Println(fmt.Sprintf("Successfully pushed helm chart %s to %s", r.pkg.Name, refStr))
-	r.stats.FileStats = append(r.stats.FileStats, stat)
+	r.stats.Add(stat)
 	return nil
 }
 
@@ -619,7 +801,7 @@ func (r *Package) migrateHelmHTTP(ctx context.Context) error {
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download helm chart %s", r.pkg.URL)
 		pterm.Error.Println(fmt.Sprintf("Failed to download helm chart %s", r.pkg.URL))
-		r.stats.FileStats = append(r.stats.FileStats, types.FileStat{
+		r.stats.Add(types.FileStat{
 			Name:     r.pkg.Name,
 			Registry: r.srcRegistry,
 			Uri:      r.pkg.URL,
@@ -659,20 +841,20 @@ func (r *Package) migrateHelmHTTP(ctx context.Context) error {
 		if errors.Is(err, types.ErrArtifactAlreadyExists) {
 			stat.Status = types.StatusSkip
 			pterm.Info.Println(fmt.Sprintf("%s already exists, skipping", title))
-			r.stats.FileStats = append(r.stats.FileStats, stat)
+			r.stats.Add(stat)
 			return nil
 		}
 		r.logger.Error().Err(err).Msg("Failed to upload helm chart")
 		stat.Status = types.StatusFail
 		stat.Error = err.Error()
 		pterm.Error.Println(title)
-		r.stats.FileStats = append(r.stats.FileStats, stat)
+		r.stats.Add(stat)
 		// Do not attempt the provenance upload if the chart failed — the server
 		// would reject a .prov with no chart (ErrChartNotFoundForProvenance).
 		return err
 	}
 	pterm.Success.Println(title)
-	r.stats.FileStats = append(r.stats.FileStats, stat)
+	r.stats.Add(stat)
 
 	// Provenance is best-effort and only attempted after a successful chart
 	// upload. A missing .prov is the normal case and must not be recorded as a
@@ -736,7 +918,7 @@ func (r *Package) migrateHelmHTTPProv(ctx context.Context) {
 	} else {
 		pterm.Success.Println(fmt.Sprintf("Successfully uploaded provenance %s", provName))
 	}
-	r.stats.FileStats = append(r.stats.FileStats, stat)
+	r.stats.Add(stat)
 }
 
 func (r *Package) migrateConda(ctx context.Context) error {
@@ -748,6 +930,7 @@ func (r *Package) migrateConda(ctx context.Context) error {
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download conda package %s", r.pkg.Path)
 		pterm.Error.Println(fmt.Sprintf("Failed to download conda package %s", r.pkg.Path))
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 	defer file.Close()
@@ -783,31 +966,32 @@ func (r *Package) migrateConda(ctx context.Context) error {
 	} else {
 		pterm.Success.Println(title)
 	}
-	r.stats.FileStats = append(r.stats.FileStats, stat)
+	r.stats.Add(stat)
 	return nil
 }
 
 func (r *Package) migrateRPM(ctx context.Context) error {
 	if r.config.DryRun {
-		log.Info().Ctx(ctx).Msgf("Dry-run: would migrate RPM package %s", r.pkg.URL)
+		log.Info().Ctx(ctx).Msgf("Dry-run: would migrate RPM package %s", r.pkg.URI)
 		return nil
 	}
-	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.URL)
+	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.URI)
 	if err != nil {
-		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download RPM package %s", r.pkg.URL)
-		pterm.Error.Println(fmt.Sprintf("Failed to download RPM package %s", r.pkg.URL))
+		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download RPM package %s", r.pkg.URI)
+		pterm.Error.Println(fmt.Sprintf("Failed to download RPM package %s", r.pkg.URI))
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 	defer file.Close()
 
 	title := fmt.Sprintf("%s (%s)", r.pkg.Name, common.GetSize(int64(r.pkg.Size)))
 	pterm.Info.Println(fmt.Sprintf("Copying file %s from %s to %s", r.pkg.Name, r.srcRegistry, r.destRegistry))
-	err = r.destAdapter.UploadFile(r.destRegistry, file, &types.File{Uri: r.pkg.URL}, header, r.pkg.Name, r.pkg.Name,
+	err = r.destAdapter.UploadFile(r.destRegistry, file, &types.File{Uri: r.pkg.URI}, header, r.pkg.Name, r.pkg.Name,
 		r.artifactType, nil)
 	stat := types.FileStat{
 		Name:     r.pkg.Name,
 		Registry: r.srcRegistry,
-		Uri:      r.pkg.URL,
+		Uri:      r.pkg.URI,
 		Size:     int64(r.pkg.Size),
 		Status:   types.StatusSuccess,
 	}
@@ -819,7 +1003,7 @@ func (r *Package) migrateRPM(ctx context.Context) error {
 	} else {
 		pterm.Success.Println(title)
 	}
-	r.stats.FileStats = append(r.stats.FileStats, stat)
+	r.stats.Add(stat)
 	return nil
 }
 
@@ -832,6 +1016,7 @@ func (r *Package) migrateDebian(ctx context.Context) error {
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download Debian package %s", r.pkg.URL)
 		pterm.Error.Println(fmt.Sprintf("Failed to download Debian package %s", r.pkg.URL))
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 	defer file.Close()
@@ -878,7 +1063,7 @@ func (r *Package) migrateDebian(ctx context.Context) error {
 	} else {
 		pterm.Success.Println(title)
 	}
-	r.stats.FileStats = append(r.stats.FileStats, stat)
+	r.stats.Add(stat)
 
 	// If this is a .dsc file and upload was successful, upload associated source files
 	if isDscFile && err == nil {
@@ -905,7 +1090,7 @@ func (r *Package) migrateDebian(ctx context.Context) error {
 				if err != nil {
 					log.Error().Ctx(ctx).Err(err).Msgf("Failed to download source file %s", srcFilePath)
 					pterm.Error.Println(fmt.Sprintf("Failed to download source file %s", srcFilePath))
-					r.stats.FileStats = append(r.stats.FileStats, types.FileStat{
+					r.stats.Add(types.FileStat{
 						Name:     srcFileName,
 						Registry: r.srcRegistry,
 						Uri:      srcFilePath,
@@ -958,7 +1143,7 @@ func (r *Package) migrateDebian(ctx context.Context) error {
 				} else {
 					pterm.Success.Println(srcTitle)
 				}
-				r.stats.FileStats = append(r.stats.FileStats, srcStat)
+				r.stats.Add(srcStat)
 			}
 		}
 	}
@@ -967,38 +1152,75 @@ func (r *Package) migrateDebian(ctx context.Context) error {
 }
 
 func (r *Package) migrateComposer(ctx context.Context) error {
-	if r.config.DryRun {
-		log.Info().Ctx(ctx).Msgf("Dry-run: would migrate Composer package %s", r.pkg.URL)
+	versions, err := r.srcAdapter.GetVersions(r.pkg, r.node, r.srcRegistry, r.pkg.Name, types.COMPOSER)
+	if err != nil {
+		log.Error().Ctx(ctx).Err(err).Msgf("Failed to get Composer versions for %s", r.pkg.Name)
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
+		return err
+	}
+	if len(versions) == 0 {
+		err := fmt.Errorf("no Composer versions found for package %s", r.pkg.Name)
+		log.Error().Ctx(ctx).Err(err).Msgf("No Composer versions for %s", r.pkg.Name)
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return nil
 	}
-	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.URL)
+
+	if r.config.DryRun {
+		for _, v := range versions {
+			log.Info().Ctx(ctx).Msgf("Dry-run: would migrate Composer package %s version %s at %s", r.pkg.Name, v.Name, v.Path)
+		}
+		return nil
+	}
+
+	for _, v := range versions {
+		_ = r.migrateComposerVersion(ctx, v)
+	}
+	return nil
+}
+
+func (r *Package) migrateComposerVersion(ctx context.Context, v types.Version) error {
+	zipName := util.ComposerZipBasename(v.Path)
+	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, v.Path)
 	if err != nil {
-		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download Composer package %s", r.pkg.URL)
-		pterm.Error.Println(fmt.Sprintf("Failed to download Composer package %s", r.pkg.URL))
-		return err
+		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download Composer package %s at %s", r.pkg.Name, v.Path)
+		pterm.Error.Println(fmt.Sprintf("Failed to download Composer package %s version %s", r.pkg.Name, v.Name))
+		r.stats.Add(types.FileStat{
+			Name:     zipName,
+			Registry: r.srcRegistry,
+			Uri:      v.Path,
+			Size:     int64(v.Size),
+			Status:   types.StatusFail,
+			Error:    err.Error(),
+		})
+		return nil
 	}
 	defer file.Close()
 
-	title := fmt.Sprintf("%s (%s)", r.pkg.Name, common.GetSize(int64(r.pkg.Size)))
-	pterm.Info.Println(fmt.Sprintf("Copying file %s from %s to %s", r.pkg.Name, r.srcRegistry, r.destRegistry))
-	err = r.destAdapter.UploadFile(r.destRegistry, file, &types.File{Uri: r.pkg.URL}, header, r.pkg.Name, r.pkg.Version,
+	title := fmt.Sprintf("%s@%s (%s)", r.pkg.Name, v.Name, common.GetSize(int64(v.Size)))
+	pterm.Info.Println(fmt.Sprintf("Copying file %s from %s to %s", zipName, r.srcRegistry, r.destRegistry))
+	err = r.destAdapter.UploadFile(r.destRegistry, file, &types.File{Uri: v.Path, Name: zipName}, header, r.pkg.Name, v.Name,
 		r.artifactType, nil)
 	stat := types.FileStat{
-		Name:     r.pkg.Name,
+		Name:     zipName,
 		Registry: r.srcRegistry,
-		Uri:      r.pkg.URL,
-		Size:     int64(r.pkg.Size),
+		Uri:      v.Path,
+		Size:     int64(v.Size),
 		Status:   types.StatusSuccess,
 	}
 	if err != nil {
-		r.logger.Error().Err(err).Msg("Failed to upload file")
-		stat.Status = types.StatusFail
-		stat.Error = err.Error()
-		pterm.Error.Println(title)
+		if errors.Is(err, types.ErrArtifactAlreadyExists) {
+			stat.Status = types.StatusSkip
+			pterm.Info.Println(fmt.Sprintf("%s already exists, skipping", title))
+		} else {
+			r.logger.Error().Err(err).Msg("Failed to upload file")
+			stat.Status = types.StatusFail
+			stat.Error = err.Error()
+			pterm.Error.Println(title)
+		}
 	} else {
 		pterm.Success.Println(title)
 	}
-	r.stats.FileStats = append(r.stats.FileStats, stat)
+	r.stats.Add(stat)
 	return nil
 }
 
@@ -1011,6 +1233,7 @@ func (r *Package) migrateSwift(ctx context.Context) error {
 	if err != nil {
 		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download Swift package %s", r.pkg.URL)
 		pterm.Error.Println(fmt.Sprintf("Failed to download Swift package %s", r.pkg.URL))
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
 	defer file.Close()
@@ -1034,7 +1257,7 @@ func (r *Package) migrateSwift(ctx context.Context) error {
 	} else {
 		pterm.Success.Println(title)
 	}
-	r.stats.FileStats = append(r.stats.FileStats, stat)
+	r.stats.Add(stat)
 	return nil
 }
 
@@ -1067,7 +1290,7 @@ func (r *Package) migrateConan(ctx context.Context) error {
 		if err != nil {
 			log.Error().Ctx(ctx).Err(err).Msgf("Failed to download Conan file %s", entry.Uri)
 			pterm.Error.Println(fmt.Sprintf("Failed to download Conan file %s", entry.Uri))
-			r.stats.FileStats = append(r.stats.FileStats, types.FileStat{
+			r.stats.Add(types.FileStat{
 				Name:     entry.FileName,
 				Registry: r.srcRegistry,
 				Uri:      entry.Uri,
@@ -1116,7 +1339,7 @@ func (r *Package) migrateConan(ctx context.Context) error {
 		} else {
 			pterm.Success.Println(title)
 		}
-		r.stats.FileStats = append(r.stats.FileStats, stat)
+		r.stats.Add(stat)
 	}
 
 	return nil
@@ -1242,7 +1465,7 @@ func (r *Package) pushChart(ctx context.Context, chartPath string, dstRef string
 
 	craneOpts := []remote.Option{
 		remote.WithContext(ctx),
-		remote.WithUserAgent("harness-cli"),
+		remote.WithUserAgent(config.UserAgent()),
 		remote.WithAuthFromKeychain(keyChain),
 	}
 

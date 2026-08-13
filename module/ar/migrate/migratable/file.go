@@ -24,6 +24,7 @@ import (
 	"github.com/harness/harness-cli/module/ar/migrate/engine"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 	"github.com/harness/harness-cli/module/ar/migrate/types/npm"
+	"github.com/harness/harness-cli/module/ar/migrate/util"
 	"github.com/harness/harness-cli/util/common"
 
 	"github.com/google/uuid"
@@ -134,7 +135,7 @@ func (r *File) Pre(ctx context.Context) error {
 				Size:     int64(r.file.Size),
 				Status:   types.StatusSkip,
 			}
-			r.stats.FileStats = append(r.stats.FileStats, stat)
+			r.stats.Add(stat)
 		}
 	}
 
@@ -173,11 +174,51 @@ func (r *File) Migrate(ctx context.Context) error {
 		return fmt.Errorf("OCI migrate file is not supported")
 	}
 
+	if r.artifactType == types.TERRAFORM {
+		downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.file.Uri)
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to download Terraform file")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
+			return fmt.Errorf("download terraform file failed: %w", err)
+		}
+		defer downloadFile.Close()
+
+		title := fmt.Sprintf("%s (%s)", r.file.Name, common.GetSize(int64(r.file.Size)))
+		pterm.Info.Println(fmt.Sprintf("Copying Terraform file %s from %s to %s", r.file.Name, r.srcRegistry, r.destRegistry))
+
+		err = r.destAdapter.UploadFile(r.destRegistry, downloadFile, r.file, header, r.pkg.Name, r.version.Name,
+			r.artifactType, nil)
+
+		stat := types.FileStat{
+			Name:     r.file.Name,
+			Registry: r.srcRegistry,
+			Uri:      r.file.Uri,
+			Size:     int64(r.file.Size),
+			Status:   types.StatusSuccess,
+		}
+		if err != nil {
+			if errors.Is(err, types.ErrArtifactAlreadyExists) {
+				stat.Status = types.StatusSkip
+				pterm.Info.Println(fmt.Sprintf("%s already exists, skipping", title))
+			} else {
+				logger.Error().Err(err).Msg("Failed to upload Terraform file")
+				stat.Status = types.StatusFail
+				stat.Error = err.Error()
+				pterm.Error.Println(fmt.Sprintf("%s — %v", title, err))
+			}
+		} else {
+			pterm.Success.Println(title)
+		}
+		r.stats.Add(stat)
+		return nil
+	}
+
 	if r.artifactType == types.GENERIC || r.artifactType == types.RAW || r.artifactType == types.MAVEN || r.artifactType == types.NUGET || r.artifactType == types.PUPPET {
 		downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.file.Uri)
 		defer downloadFile.Close()
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to download file")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("download file failed: %w", err)
 		}
 
@@ -201,19 +242,25 @@ func (r *File) Migrate(ctx context.Context) error {
 				logger.Error().Err(err).Msg("Failed to upload file")
 				stat.Status = types.StatusFail
 				stat.Error = err.Error()
-				pterm.Error.Println(title)
+				pterm.Error.Println(fmt.Sprintf("%s — %v", title, err))
 			}
 		} else {
 			pterm.Success.Println(title)
 		}
-		r.stats.FileStats = append(r.stats.FileStats, stat)
+		r.stats.Add(stat)
 	}
 
 	if r.artifactType == types.PYTHON {
 		downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.file.Uri)
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to download Python package file")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
+			return fmt.Errorf("failed to download Python package file: %w", err)
+		}
 		tempFile, err := os.CreateTemp("", fmt.Sprintf("python-pkg-%s-*", r.file.Name))
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to create temporary file")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to create temporary file: %w", err)
 		}
 		defer os.Remove(tempFile.Name()) // Clean up the temp file when done
@@ -222,11 +269,13 @@ func (r *File) Migrate(ctx context.Context) error {
 		_, err = io.Copy(tempFile, downloadFile)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to write to temporary file")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to write to temporary file: %w", err)
 		}
 		err = tempFile.Close()
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to close temporary file")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to close temporary file: %w", err)
 		}
 
@@ -242,12 +291,14 @@ func (r *File) Migrate(ctx context.Context) error {
 			metadata, err = r.extractTarGzMetadataFile(tempFile.Name())
 			if err != nil {
 				logger.Error().Err(err).Msg("Failed to extract metadata from tar.gz file")
+				util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 				return fmt.Errorf("failed to extract metadata from tar.gz file: %w", err)
 			}
 		} else if strings.HasSuffix(fileName, ".whl") {
 			metadata, err = r.extractWheelMetadataFile(tempFile.Name())
 			if err != nil {
 				logger.Error().Err(err).Msg("Failed to extract metadata from wheel file")
+				util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 				return fmt.Errorf("failed to extract metadata from wheel file: %w", err)
 			}
 		} else {
@@ -257,12 +308,14 @@ func (r *File) Migrate(ctx context.Context) error {
 		metadataMap, err := generatePythonMetadataMap(metadata, tempFile.Name())
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to generate metadata map")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to generate metadata map: %w", err)
 		}
 
 		tempFileReader, err := os.Open(tempFile.Name())
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to open temporary file")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to open temporary file: %w", err)
 		}
 		defer tempFileReader.Close()
@@ -281,17 +334,18 @@ func (r *File) Migrate(ctx context.Context) error {
 			logger.Error().Err(err).Msg("Failed to upload file")
 			stat.Status = types.StatusFail
 			stat.Error = err.Error()
-			pterm.Error.Println(title)
+			pterm.Error.Println(fmt.Sprintf("%s — %v", title, err))
 		} else {
 			pterm.Success.Println(title)
 		}
-		r.stats.FileStats = append(r.stats.FileStats, stat)
+		r.stats.Add(stat)
 	} else if r.artifactType == types.NPM {
 		tarFileURL := r.file.Uri
 		logger.Info().Msg("Downloading tar file from " + tarFileURL)
 		tarFileReader, _, err := r.srcAdapter.DownloadFile(r.srcRegistry, tarFileURL)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to fetch metadata")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to fetch metadata: %w", err)
 		}
 		pkgJSONBytes, readme, err := utils.ExtractPackageJSONAndReadmeFromTarball(tarFileReader)
@@ -300,12 +354,14 @@ func (r *File) Migrate(ctx context.Context) error {
 		}
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to extract package.json from tarball")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to extract package.json from tarball: %w", err)
 		}
 
 		tarFileReader, _, err = r.srcAdapter.DownloadFile(r.srcRegistry, tarFileURL)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to fetch metadata")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to fetch metadata: %w", err)
 		}
 		// Build NPM upload payload
@@ -313,12 +369,15 @@ func (r *File) Migrate(ctx context.Context) error {
 		payload, pkgName, version, err := utils.BuildNpmUploadFromPackageJSON(pkgJSONBytes, readme, tarFileReader)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to build NPM upload body")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to build NPM upload body: %w", err)
 		}
 
 		if pkgName == "" || version == "" {
 			logger.Error().Msg("Package.json must contain non-empty 'name' and 'version'")
-			return fmt.Errorf("package.json must contain non-empty 'name' and 'version'")
+			emptyFieldErr := fmt.Errorf("package.json must contain non-empty 'name' and 'version'")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, emptyFieldErr)
+			return emptyFieldErr
 		}
 
 		logger.Info().
@@ -355,7 +414,7 @@ func (r *File) Migrate(ctx context.Context) error {
 				Msg("Failed to upload NPM package")
 			stat.Status = types.StatusFail
 			stat.Error = err.Error()
-			pterm.Error.Println(title)
+			pterm.Error.Println(fmt.Sprintf("%s — %v", title, err))
 		} else {
 			logger.Info().
 				Str("npm_package", pkgName).
@@ -363,14 +422,20 @@ func (r *File) Migrate(ctx context.Context) error {
 				Msgf("Successfully uploaded NPM package %s@%s", pkgName, version)
 			pterm.Success.Println(title)
 		}
-		r.stats.FileStats = append(r.stats.FileStats, stat)
+		r.stats.Add(stat)
 	} else if r.artifactType == types.DART {
 		if r.file == nil {
+			r.stats.Add(types.FileStat{
+				Registry: r.srcRegistry,
+				Status:   types.StatusFail,
+				Error:    "no file provided for Dart migration",
+			})
 			return fmt.Errorf("no file provided for Dart migration")
 		}
 		downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.file.Uri)
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to download Dart package file")
+			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("failed to download Dart package file: %w", err)
 		}
 		defer downloadFile.Close()
@@ -402,12 +467,12 @@ func (r *File) Migrate(ctx context.Context) error {
 			logger.Error().Err(err).Msg("Failed to upload Dart package")
 			stat.Status = types.StatusFail
 			stat.Error = err.Error()
-			pterm.Error.Println(title)
+			pterm.Error.Println(fmt.Sprintf("%s — %v", title, err))
 		} else {
 			pterm.Success.Println(title)
 		}
 
-		r.stats.FileStats = append(r.stats.FileStats, stat)
+		r.stats.Add(stat)
 	}
 
 	logger.Info().
@@ -450,8 +515,9 @@ func generatePythonMetadataMap(metadata string, path string) (map[string]interfa
 
 		if len(h) == 1 {
 			mapData[lowerKey] = h[0]
+		} else {
+			mapData[lowerKey] = h
 		}
-		mapData[lowerKey] = h
 	}
 	all, err := io.ReadAll(msg.Body)
 	if err != nil {

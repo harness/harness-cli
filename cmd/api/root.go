@@ -76,6 +76,9 @@ Examples:
 				req.Header.Set("Harness-Account", config.Global.AccountID)
 			}
 
+			// Add User-Agent header
+			req.Header.Set("User-Agent", config.UserAgent())
+
 			// Add custom headers
 			for _, h := range headers {
 				parts := strings.SplitN(h, ":", 2)

@@ -249,7 +249,13 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			packages = append(packages, pkg)
 		}
 	} else if artifactType == types.PYTHON {
-
+		// The .pypi/simple.html index drives package enumeration. It is
+		// typically old (created once, rarely re-downloaded), so a
+		// downloadedAfter/createdAfter date filter would otherwise drop it from
+		// `root` and break enumeration entirely. The date filter deliberately
+		// preserves repository index files (see util.IsPackageIndexFile and
+		// registry.go), so the index is still present in `root` here and can be
+		// looked up from the tree like any other file.
 		node, err := tree.GetNodeForPath(root, "/.pypi/simple.html")
 		if err != nil {
 			return nil, fmt.Errorf("get node for path: %w", err)
@@ -274,33 +280,83 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 
 		return packages, nil
 	} else if artifactType == types.RPM {
-		node, err := tree.GetNodeForPath(root, "/repodata/repomd.xml")
+		// Find all repodata/repomd.xml files in the tree
+		// A single JFrog repo can contain multiple RPM repos at different paths
+		files, err := tree.GetAllFiles(root)
 		if err != nil {
-			return nil, fmt.Errorf("get node for path: %w", err)
-		}
-		file, _, err := a.DownloadFile(registry, node.File.Uri)
-		if err != nil {
-			return nil, fmt.Errorf("download repomd.xml: %w", err)
-		}
-		defer file.Close()
-
-		primaryLocation, err := extractPrimaryLocation(file)
-		if err != nil {
-			return nil, fmt.Errorf("extract primary location: %w", err)
+			return nil, fmt.Errorf("get all files: %w", err)
 		}
 
-		primaryFile, _, err := a.DownloadFile(registry, primaryLocation)
-		if err != nil {
-			return nil, fmt.Errorf("download primary file: %w", err)
-		}
-		defer primaryFile.Close()
+		var allPackages []types.Package
+		seenRepomdPaths := make(map[string]bool)
+		successfulRepos := 0
 
-		// Extract package URLs from primary.xml.gz
-		packages, err := extractRPMPackages(primaryFile, registry)
-		if err != nil {
-			return nil, fmt.Errorf("extract RPM package URLs: %w", err)
+		for _, file := range files {
+			if file.Folder {
+				continue
+			}
+			// Look for all repodata/repomd.xml files at any depth
+			if strings.HasSuffix(file.Uri, "/repodata/repomd.xml") {
+				if seenRepomdPaths[file.Uri] {
+					continue
+				}
+				seenRepomdPaths[file.Uri] = true
+
+				log.Info().Msgf("Found RPM repository metadata at: %s", file.Uri)
+
+				repomdFile, _, err := a.DownloadFile(registry, file.Uri)
+				if err != nil {
+					log.Warn().Msgf("Failed to download repomd.xml at %s: %v", file.Uri, err)
+					continue
+				}
+
+				primaryLocation, err := extractPrimaryLocation(repomdFile)
+				repomdFile.Close()
+				if err != nil {
+					log.Warn().Msgf("Failed to extract primary location from %s: %v", file.Uri, err)
+					continue
+				}
+
+				// Resolve relative primary location path against repomd.xml location
+				// The primary location in repomd.xml is relative to the RPM repo root
+				// (parent of repodata/), not to the repodata/ directory itself
+				repomdDir := path.Dir(file.Uri)    // e.g., "/repodata" or "/centos7/repodata"
+				rpmRepoRoot := path.Dir(repomdDir) // e.g., "/" or "/centos7"
+				primaryPath := primaryLocation
+				if !strings.HasPrefix(primaryLocation, "/") {
+					primaryPath = path.Join(rpmRepoRoot, primaryLocation)
+				}
+
+				primaryFile, _, err := a.DownloadFile(registry, primaryPath)
+				if err != nil {
+					log.Warn().Msgf("Failed to download primary file at %s: %v", primaryPath, err)
+					continue
+				}
+
+				// Extract package URLs from primary.xml.gz
+				rpmPackages, err := extractRPMPackages(primaryFile, registry, rpmRepoRoot)
+				primaryFile.Close()
+				if err != nil {
+					log.Warn().Msgf("Failed to extract RPM packages from %s: %v", primaryPath, err)
+					continue
+				}
+
+				log.Info().Msgf("Extracted %d packages from RPM repo at %s", len(rpmPackages), file.Uri)
+				allPackages = append(allPackages, rpmPackages...)
+				successfulRepos++
+			}
 		}
-		return packages, nil
+
+		if len(seenRepomdPaths) == 0 {
+			return nil, fmt.Errorf("no repodata/repomd.xml found in repository")
+		}
+
+		if successfulRepos == 0 && len(seenRepomdPaths) > 0 {
+			return nil, fmt.Errorf("all %d RPM repositories failed to process", len(seenRepomdPaths))
+		}
+
+		log.Info().Msgf("Found total of %d RPM packages across %d repositories", len(allPackages), len(seenRepomdPaths))
+		return allPackages, nil
 	} else if artifactType == types.DEBIAN {
 		// Get the dists node
 		distsNode, err := tree.GetNodeForPath(root, "/dists")
@@ -436,7 +492,7 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 		return packages, nil
 	} else if artifactType == types.COMPOSER {
 		leaves, _ := tree.GetAllFiles(root)
-		packageMap := make(map[string]bool)
+		packageMap := make(map[string]types.Package)
 		for _, leaf := range leaves {
 			if leaf.Folder {
 				continue
@@ -444,27 +500,24 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			if !strings.HasSuffix(leaf.Uri, ".zip") {
 				continue
 			}
-			// Extract package name from ZIP filename
-			// Composer packages are typically named: vendor-package-version.zip
-			filename := leaf.Name
-			nameWithoutExt := strings.TrimSuffix(filename, ".zip")
-
-			// For Composer, we'll use the full filename as package name
-			// since Composer packages can have complex naming patterns
-			pkgName := nameWithoutExt
-
-			path := "/"
-			if _, ok := packageMap[pkgName]; ok {
+			logicalName, ok := util.ComposerLogicalNameFromZipURI(leaf.Uri)
+			if !ok {
+				log.Warn().Msgf("Skipping Composer zip %q: cannot derive vendor/package name from URI", leaf.Uri)
 				continue
 			}
-			packageMap[pkgName] = true
-			packages = append(packages, types.Package{
+			if _, ok := packageMap[logicalName]; ok {
+				continue
+			}
+			packageMap[logicalName] = types.Package{
 				Registry: registry,
-				Path:     path,
-				Name:     pkgName,
+				Path:     "/",
+				Name:     logicalName,
 				Size:     leaf.Size,
 				URL:      leaf.Uri,
-			})
+			}
+		}
+		for _, pkg := range packageMap {
+			packages = append(packages, pkg)
 		}
 		return packages, nil
 	} else if artifactType == types.SWIFT {
@@ -572,6 +625,42 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 		}
 		packages = append(packages, util.GetConanPackages(files, registry)...)
 		log.Info().Msgf("Found %d CONAN packages", len(packages))
+	} else if artifactType == types.TERRAFORM {
+		// Terraform modules: /<ns>/<name>/<provider>/<ver>/<name>-<ver>.tar.gz
+		// Terraform providers: /<ns>/<type>/<ver>/terraform-provider-<type>_<os>_<arch>.zip
+		// One logical package per (ns/name/provider) for modules and (ns/type) for providers.
+		files, err := tree.GetAllFiles(root)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+
+		pkgMap := make(map[string]bool)
+		for _, file := range files {
+			if file.Folder {
+				continue
+			}
+			if util.IsTerraformModule(file.Uri) {
+				ns, name, provider, _, ok := util.ParseTerraformModulePath(file.Uri)
+				if ok {
+					pkgMap[ns+"/"+name+"/"+provider] = true
+				}
+			} else if util.IsTerraformProvider(file.Uri) {
+				ns, typeName, _, _, _, _, ok := util.ParseTerraformProviderPath(file.Uri)
+				if ok {
+					pkgMap[ns+"/"+typeName] = true
+				}
+			}
+		}
+
+		for pkgName := range pkgMap {
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     "/",
+				Name:     pkgName,
+				Size:     -1,
+			})
+		}
+		log.Info().Msgf("Found %d TERRAFORM packages", len(packages))
 	} else {
 		return []types.Package{}, errors.New("unknown artifact type")
 	}
@@ -731,7 +820,7 @@ func extractPrimaryLocation(file io.Reader) (string, error) {
 	return "", fmt.Errorf("primary.xml.gz location not found in repomd.xml")
 }
 
-func extractRPMPackages(file io.Reader, registry string) ([]types.Package, error) {
+func extractRPMPackages(file io.Reader, registry string, rpmRepoRoot string) ([]types.Package, error) {
 	gz, err := gzip.NewReader(file)
 	if err != nil {
 		return nil, fmt.Errorf("create gzip reader: %w", err)
@@ -766,6 +855,7 @@ func extractRPMPackages(file io.Reader, registry string) ([]types.Package, error
 				Path:     "/",
 				Name:     path.Base(pkg.Location.Href),
 				URL:      pkg.Location.Href,
+				URI:      strings.TrimPrefix(path.Join(rpmRepoRoot, pkg.Location.Href), "/"),
 				Size:     pkg.Size.Package,
 			})
 		}
@@ -850,6 +940,7 @@ func extractDebianPackages(file io.Reader, registry string, distribution string,
 				Path:     "/",
 				Name:     path.Base(filename),
 				URL:      filename,
+				URI:      strings.TrimPrefix(filename, "/"),
 				Size:     size,
 				Metadata: map[string]string{
 					"distribution": distribution,
@@ -957,6 +1048,7 @@ func extractDebianSourcePackages(file io.Reader, registry string, distribution s
 							Path:     "/",
 							Name:     filename,
 							URL:      filePath,
+							URI:      strings.TrimPrefix(filePath, "/"),
 							Size:     size,
 							Metadata: map[string]string{
 								"distribution": distribution,
@@ -1187,14 +1279,31 @@ func (a *adapter) GetVersions(
 		return versions, nil
 	}
 	if artifactType == types.COMPOSER {
+		if node == nil {
+			return nil, errors.New("node is nil")
+		}
+		files, err := tree.GetAllFiles(node)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
 		var versions []types.Version
-		versions = append(versions, types.Version{
-			Registry: registry,
-			Pkg:      pkg,
-			Path:     p.URL,
-			Name:     p.Name,
-			Size:     p.Size,
-		})
+		for _, file := range files {
+			if file.Folder || !strings.HasSuffix(file.Uri, ".zip") {
+				continue
+			}
+			logicalName, ok := util.ComposerLogicalNameFromZipURI(file.Uri)
+			if !ok || logicalName != pkg {
+				continue
+			}
+			versions = append(versions, types.Version{
+				Registry: registry,
+				Pkg:      pkg,
+				Path:     file.Uri,
+				Name:     util.ComposerVersionFromZipFilename(file.Name),
+				Size:     file.Size,
+			})
+		}
+		log.Info().Msgf("Found %d versions for COMPOSER package %s", len(versions), pkg)
 		return versions, nil
 	}
 	if artifactType == types.SWIFT {
@@ -1237,6 +1346,43 @@ func (a *adapter) GetVersions(
 			})
 		}
 		log.Info().Msgf("Found %d versions for PUPPET package %s", len(versions), pkg)
+		return versions, nil
+	}
+	if artifactType == types.TERRAFORM {
+		files, err := tree.GetAllFiles(node)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+
+		versionMap := make(map[string]bool)
+		for _, file := range files {
+			if file.Folder {
+				continue
+			}
+			if util.IsTerraformModule(file.Uri) {
+				ns, name, provider, version, ok := util.ParseTerraformModulePath(file.Uri)
+				if ok && ns+"/"+name+"/"+provider == pkg {
+					versionMap[version] = true
+				}
+			} else if util.IsTerraformProvider(file.Uri) {
+				ns, typeName, version, _, _, _, ok := util.ParseTerraformProviderPath(file.Uri)
+				if ok && ns+"/"+typeName == pkg {
+					versionMap[version] = true
+				}
+			}
+		}
+
+		var versions []types.Version
+		for version := range versionMap {
+			versions = append(versions, types.Version{
+				Registry: registry,
+				Pkg:      pkg,
+				Path:     "/",
+				Name:     version,
+				Size:     -1,
+			})
+		}
+		log.Info().Msgf("Found %d versions for TERRAFORM package %s", len(versions), pkg)
 		return versions, nil
 	}
 	return []types.Version{}, errors.New("unknown artifact type")
@@ -1323,11 +1469,12 @@ func (a *adapter) FileExists(
 	return false, fmt.Errorf("not implemented")
 }
 
-func (a *adapter) GetAllFilesForVersion(
+func (a *adapter) BuildExistingIndex(
 	ctx context.Context,
-	registryRef, pkg, version string,
-) ([]string, error) {
-	return nil, fmt.Errorf("not implemented")
+	registryName string,
+	concurrency int,
+) (*types.ExistingIndex, error) {
+	return nil, nil
 }
 
 type repomdData struct {

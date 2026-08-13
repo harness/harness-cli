@@ -10,6 +10,7 @@ import (
 
 	httputil "github.com/harness/harness-cli/module/ar/migrate/http"
 	"github.com/harness/harness-cli/module/ar/migrate/http/auth/basic"
+	"github.com/harness/harness-cli/module/ar/migrate/http/modifier/useragent"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
 )
 
@@ -28,6 +29,7 @@ func newClient(reg *types.RegistryConfig) *client {
 				Transport: httputil.GetHTTPTransport(httputil.WithInsecure(true)),
 			},
 			basic.NewAuthorizer(username, password),
+			useragent.NewModifier(),
 		),
 		url:      url,
 		insecure: true,

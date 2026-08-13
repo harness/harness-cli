@@ -1,0 +1,47 @@
+[
+  {
+    "Registry": "rpm-single-local",
+    "Name": "repodata",
+    "Uri": "/repodata",
+    "Folder": true,
+    "Size": 0,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": ""
+  },
+  {
+    "Registry": "rpm-single-local",
+    "Name": "repomd.xml",
+    "Uri": "/repodata/repomd.xml",
+    "Folder": false,
+    "Size": 1024,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80740"
+  },
+  {
+    "Registry": "rpm-single-local",
+    "Name": "primary.xml.gz",
+    "Uri": "/repodata/primary.xml.gz",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80741"
+  },
+  {
+    "Registry": "rpm-single-local",
+    "Name": "nginx-1.20.1-1.el7.x86_64.rpm",
+    "Uri": "/Packages/n/nginx-1.20.1-1.el7.x86_64.rpm",
+    "Folder": false,
+    "Size": 573000,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80742"
+  },
+  {
+    "Registry": "rpm-single-local",
+    "Name": "vim-enhanced-8.0.1-1.el7.x86_64.rpm",
+    "Uri": "/Packages/v/vim-enhanced-8.0.1-1.el7.x86_64.rpm",
+    "Folder": false,
+    "Size": 1432000,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80743"
+  }
+]

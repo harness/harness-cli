@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/util/common"
 	"github.com/harness/harness-cli/util/common/progress"
 
@@ -64,7 +65,8 @@ func requestLogHook(
 			))
 		}
 
-		if req.Body != nil && fileSize > 0 {
+		showBar := !config.Global.NoProgress && !progress.SuppressLog()
+		if req.Body != nil && fileSize > 0 && showBar {
 			title := fmt.Sprintf("%s (%s)", saveFilename, common.GetSize(fileSize))
 			bar := pterm.DefaultProgressbar.
 				WithTitle(title).

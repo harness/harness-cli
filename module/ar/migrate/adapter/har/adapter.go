@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"sync"
 
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
@@ -40,6 +41,13 @@ type adapter struct {
 	reg       types.RegistryConfig
 	logger    zerolog.Logger
 	pkgClient *pkgclient.ClientWithResponses
+
+	// registryURLMu guards registryURLCache, which maps registry name → the
+	// URL returned by getRegistry (e.g. "https://host/oci/helmoci"). Populated
+	// by GetRegistry during the pre-migration step and read by GetOCIImagePath
+	// to derive the correct OCI path prefix without a second API call.
+	registryURLMu    sync.Mutex
+	registryURLCache map[string]string
 }
 
 func (a *adapter) SearchFiles(registry string) ([]types.SearchedFile, error) {
@@ -63,10 +71,11 @@ func newAdapter(config2 types.RegistryConfig) (adp.Adapter, error) {
 		Str("adapter", "HAR").
 		Logger()
 	return &adapter{
-		client:    c,
-		pkgClient: pkgClient,
-		reg:       config2,
-		logger:    logger,
+		client:           c,
+		pkgClient:        pkgClient,
+		reg:              config2,
+		logger:           logger,
+		registryURLCache: make(map[string]string),
 	}, nil
 }
 
@@ -83,7 +92,24 @@ func (a *adapter) GetConfig() types.RegistryConfig {
 }
 func (a *adapter) ValidateCredentials() (bool, error) { return false, nil }
 func (a *adapter) GetRegistry(ctx context.Context, registry string) (types.RegistryInfo, error) {
-	return a.client.getRegistry(ctx, registry)
+	reg, err := a.client.resolveRegistry(ctx, registry)
+	if err != nil {
+		return types.RegistryInfo{}, fmt.Errorf("failed to get registry %q: %w", registry, err)
+	}
+	if reg.Url != "" {
+		a.registryURLMu.Lock()
+		a.registryURLCache[registry] = reg.Url
+		a.registryURLMu.Unlock()
+	}
+	path := ""
+	if reg.Path != nil {
+		path = *reg.Path
+	}
+	return types.RegistryInfo{
+		Type: string(reg.Type),
+		URL:  reg.Url,
+		Path: path,
+	}, nil
 }
 func (a *adapter) CreateRegistryIfDoesntExist(registryRef string) (bool, error) {
 	return false, nil
@@ -145,6 +171,8 @@ func (a *adapter) UploadFile(
 		err = a.client.uploadDartFile(registry, artifactName, version, f, file)
 	case types.PUPPET:
 		err = a.client.uploadPuppetFile(registry, f, file)
+	case types.TERRAFORM:
+		err = a.client.uploadTerraformFile(registry, f, artifactName, version, file)
 	case types.CONAN:
 		err = a.client.uploadConanFile(registry, file, metadata)
 	case types.RAW:
@@ -165,7 +193,41 @@ func (a *adapter) UploadFile(
 
 func (a *adapter) GetOCIImagePath(registry string, _ string, image string) (string, error) {
 	parse, _ := url.Parse(a.reg.Endpoint)
-	return util.GenOCIImagePath(parse.Host, strings.ToLower(config.Global.AccountID), registry, image), nil
+	host := parse.Host
+
+	prefix := a.ociPrefixFromCache(registry)
+	return util.GenOCIImagePath(host, prefix, registry, image), nil
+}
+
+// ociPrefixFromCache derives the OCI path prefix (e.g. "oci" or lowercased
+// accountID) from the registry URL cached by GetRegistry during the pre-step.
+//
+// Example: URL "https://ancestry.harness.io/oci/helmoci", registry "helmoci"
+// → strip scheme+host → "/oci/helmoci" → strip last segment → "/oci" → "oci"
+//
+// Falls back to the lowercased accountID when no cached URL is available,
+// which preserves the behaviour on environments where VanityURLRegistryEnabled
+// is off and the pre-step was skipped (e.g. dry-run).
+func (a *adapter) ociPrefixFromCache(registry string) string {
+	a.registryURLMu.Lock()
+	registryURL := a.registryURLCache[registry]
+	a.registryURLMu.Unlock()
+
+	if registryURL != "" {
+		parsed, err := url.Parse(registryURL)
+		if err == nil {
+			// path is e.g. "/oci/helmoci" — strip the last segment (registry name)
+			// to get the prefix segment(s).
+			p := strings.TrimSuffix(parsed.Path, "/"+registry)
+			p = strings.Trim(p, "/")
+			if p != "" {
+				return p
+			}
+		}
+	}
+
+	// Fallback: accountID-based prefix (FF disabled or pre-step not yet run).
+	return strings.ToLower(config.Global.AccountID)
 }
 
 func (a *adapter) AddNPMTag(registry string, name string, version string, uri string) error {
@@ -203,11 +265,10 @@ func (a *adapter) FileExists(
 	return a.client.artifactFileExists(ctx, registryRef, pkg, version, file, artifactType)
 }
 
-func (a *adapter) GetAllFilesForVersion(
-	ctx context.Context,
-	registryRef, pkg, version string,
-) ([]string, error) {
-	return a.client.artifactGetFilesForVersion(ctx, registryRef, pkg, version)
+func (a *adapter) BuildExistingIndex(
+	ctx context.Context, registryName string, concurrency int,
+) (*types.ExistingIndex, error) {
+	return a.client.buildExistingIndex(ctx, registryName, concurrency)
 }
 
 func (a *adapter) CreateVersion(

@@ -71,12 +71,11 @@ func TestGetVersionsSwiftMissesSiblingVersions(t *testing.T) {
 	}
 }
 
-// TestGetVersionsComposerMissesSiblingVersions documents ticket #18 for COMPOSER:
-// GetVersions returns a single entry built from Package fields instead of
-// discovering every .zip for the logical package. composer-local holds
-// vendor-package-1.0.0.zip and vendor-package-2.0.0.zip.
-func TestGetVersionsComposerMissesSiblingVersions(t *testing.T) {
-	const registry = "composer-local"
+// TestGetVersionsComposerFindsSiblingVersions verifies COMPOSER GetVersions scans
+// the tree for every version zip of a logical package. composer-logical-local holds
+// vendor-package-1.0.0.zip, vendor-package-2.0.0.zip, and vendor-package-3.0.0.zip.
+func TestGetVersionsComposerFindsSiblingVersions(t *testing.T) {
+	const registry = "composer-logical-local"
 	const logicalPkg = "vendor/package"
 
 	adapter := jfrog.NewAdapterWithClient(types.RegistryConfig{Type: types.MOCK_JFROG}, NewMockClient())
@@ -90,12 +89,14 @@ func TestGetVersionsComposerMissesSiblingVersions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPackages: %v", err)
 	}
-	if len(pkgs) != 2 {
-		t.Fatalf("registry fixture: expected 2 composer zips, got %d: %+v", len(pkgs), pkgs)
+	if len(pkgs) != 1 {
+		t.Fatalf("registry fixture: expected 1 logical composer package, got %d: %+v", len(pkgs), pkgs)
 	}
-	t.Logf("composer-local package rows (one per zip): %+v", pkgs)
+	if pkgs[0].Name != logicalPkg {
+		t.Fatalf("registry fixture: expected logical package %q, got %q", logicalPkg, pkgs[0].Name)
+	}
+	t.Logf("composer-logical-local package row: %+v", pkgs[0])
 
-	// One logical package row — what a version-scanning GetVersions should fan out from.
 	p := types.Package{
 		Registry: registry,
 		Name:     logicalPkg,
@@ -104,7 +105,7 @@ func TestGetVersionsComposerMissesSiblingVersions(t *testing.T) {
 		Size:     pkgs[0].Size,
 	}
 
-	wantVersions := []string{"1.0.0", "2.0.0"}
+	wantVersions := []string{"1.0.0", "2.0.0", "3.0.0"}
 	got, err := adapter.GetVersions(p, root, registry, logicalPkg, types.COMPOSER)
 	if err != nil {
 		t.Fatalf("GetVersions(%q): %v", logicalPkg, err)
@@ -120,11 +121,6 @@ func TestGetVersionsComposerMissesSiblingVersions(t *testing.T) {
 		if !slices.Contains(gotNames, want) {
 			t.Errorf("GetVersions missing version %q; got %v", want, gotNames)
 		}
-	}
-
-	// COMPOSER also sets Version.Name to the package name, not a semver string.
-	if len(got) == 1 && got[0].Name == logicalPkg {
-		t.Logf("COMPOSER GetVersions uses package name %q as version Name (not semver)", got[0].Name)
 	}
 }
 

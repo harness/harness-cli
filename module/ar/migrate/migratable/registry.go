@@ -3,6 +3,7 @@ package migratable
 import (
 	"context"
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/harness/harness-cli/module/ar/migrate/adapter"
@@ -12,6 +13,7 @@ import (
 	"github.com/harness/harness-cli/module/ar/migrate/util"
 
 	"github.com/google/uuid"
+	"github.com/pterm/pterm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -130,11 +132,19 @@ func (r *Registry) Migrate(ctx context.Context) error {
 
 	startTime := time.Now()
 
+	fetchProgress := startStage(fmt.Sprintf("Fetching file metadata from source registry %s", r.srcRegistry))
 	files, err2 := r.srcAdapter.GetFiles(r.srcRegistry)
 	if err2 != nil {
+		fetchProgress.fail(fmt.Sprintf("Failed to fetch file metadata from source registry %s", r.srcRegistry))
 		logger.Error().Msgf("Failed to get files from registry %s", r.srcRegistry)
 		return fmt.Errorf("get files from registry %s failed: %w", r.srcRegistry, err2)
 	}
+	pulledMsg := fmt.Sprintf("Pulled %d file(s) from registry %s", len(files), r.srcRegistry)
+	logger.Info().Msg(pulledMsg)
+	fetchProgress.success(pulledMsg)
+	// originalFiles is the pristine GetFiles listing, before date/pattern
+	// narrowing. Used to build the recovery tree for atomic-version types below.
+	originalFiles := files
 
 	// In dry-run mode, collect all files and initialize directory entry for this registry
 	if r.config.DryRun && r.dryRunStats != nil {
@@ -156,7 +166,16 @@ func (r *Registry) Migrate(ctx context.Context) error {
 		r.dryRunStats.EnsureRegistry(r.srcRegistry)
 	}
 
+	currArtifactType := r.artifactType
+
+	// dateFilteredFiles holds the date-filtered file list (may be empty/nil when nothing matches).
+	// For file-level artifact types it is also applied to the tree.
+	// For metadata-driven types (RPM, DEBIAN) it is used after GetPackages.
+	var dateFilteredFiles []types.File
+	dateFilterActive := false
+
 	if util.IsTimeBasedFilterPresent(r.mapping) {
+		dateFilterActive = true
 
 		df := r.mapping.DateFilter
 		if err := util.ValidateDateFilter(df); err != nil {
@@ -172,13 +191,36 @@ func (r *Registry) Migrate(ctx context.Context) error {
 		logger.Info().Msgf("Applying time based filter (match: %s)", df.Match)
 		filteredURIs := util.CreateMapOfFilteredFile(searchedFiles, r.mapping)
 		logger.Info().Msgf("Time-based filter include %d file(s): out of  %d", len(filteredURIs), len(searchedFiles))
-		originalCount := len(files)
-		files = util.FilterFilesByDate(files, filteredURIs)
-		logger.Info().Msgf("Count of filtered files by date filter out of: %d -> %d", originalCount, len(files))
+		// Always keep repository index/metadata files (e.g. PyPI's .pypi/*.html)
+		// regardless of the date filter: enumeration reads them to list packages
+		// and versions, and they are typically too old to survive a
+		// createdAfter/downloadedAfter cutoff. Dropping them would break
+		// enumeration for the whole registry.
+		indexCount := 0
+		for _, f := range files {
+			if util.IsPackageIndexFile(r.artifactType, f.Uri) {
+				if _, ok := filteredURIs[f.Uri]; !ok {
+					filteredURIs[f.Uri] = struct{}{}
+					indexCount++
+				}
+			}
+		}
+		if indexCount > 0 {
+			logger.Info().Msgf("Preserving %d index/metadata file(s) exempt from date filter", indexCount)
+		}
+
+		dateFilteredFiles = util.FilterFilesByDate(files, filteredURIs)
+		logger.Info().Msgf("Count of filtered files by date filter: %d -> %d", len(files), len(dateFilteredFiles))
+
+		// Narrow the tree for all types EXCEPT metadata-driven types (RPM, DEBIAN)
+		// which need full file trees to read metadata files (repomd.xml, Packages.gz, etc.).
+		// Date filtering for metadata-driven types is applied after GetPackages.
+		if !util.IsMetadataDrivenArtifact(currArtifactType) {
+			files = dateFilteredFiles
+		}
 	}
 
 	// Filter files based on include/exclude patterns
-	currArtifactType := r.artifactType
 	if util.IsFileLevelFilterableArtifact(currArtifactType) {
 		if len(r.mapping.IncludePatterns) > 0 || len(r.mapping.ExcludePatterns) > 0 {
 			originalCount := len(files)
@@ -189,6 +231,26 @@ func (r *Registry) Migrate(ctx context.Context) error {
 		}
 	}
 
+	skippedByFilter := len(originalFiles) - len(files)
+	skipMsg := fmt.Sprintf("Registry %s: %d file(s) pulled, %d under skip condition (date/pattern filters)",
+		r.srcRegistry, len(originalFiles), skippedByFilter)
+	logger.Info().Msg(skipMsg)
+	pterm.Info.Println(skipMsg)
+
+	// For atomic-version types (PyPI), a version is migrated in full if ANY of
+	// its files is in window. buildVersionJobs recovers a version's pruned
+	// distribution files from this unfiltered tree. It is pattern-filtered (never
+	// resurrect an explicitly excluded file) but NOT date-filtered.
+	var unfilteredRoot *types.TreeNode
+	if dateFilterActive && util.IsAtomicVersionArtifact(currArtifactType) {
+		recoveryFiles := originalFiles
+		if util.IsFileLevelFilterableArtifact(currArtifactType) &&
+			(len(r.mapping.IncludePatterns) > 0 || len(r.mapping.ExcludePatterns) > 0) {
+			recoveryFiles = util.FilterFilesByPatterns(originalFiles, r.mapping.IncludePatterns, r.mapping.ExcludePatterns)
+		}
+		unfilteredRoot = tree.TransformToTree(recoveryFiles)
+	}
+
 	root := tree.TransformToTree(files)
 
 	pkgs, err := r.srcAdapter.GetPackages(r.srcRegistry, r.artifactType, root)
@@ -197,7 +259,41 @@ func (r *Registry) Migrate(ctx context.Context) error {
 		return fmt.Errorf("get packages failed: %w", err)
 	}
 
+	// Guard: if the source registry had files but zero packages were resolved,
+	// the artifact type is likely misconfigured or unsupported for this source.
+	// Treat this as an error so the caller exits non-zero instead of silently
+	// reporting "Migration completed successfully" with 0 artifacts transferred.
+	// Only fire when no user-controlled filters are active: date filters, pattern
+	// filters, and packageFilters can legitimately reduce packages to zero, and we
+	// don't want to error on valid filtered runs.
+	noFiltersActive := !dateFilterActive &&
+		len(r.mapping.IncludePatterns) == 0 &&
+		len(r.mapping.ExcludePatterns) == 0 &&
+		len(r.mapping.PackageFilters) == 0
+	if len(pkgs) == 0 && len(originalFiles) > 0 && noFiltersActive {
+		return fmt.Errorf(
+			"registry %s: pulled %d file(s) from source but resolved 0 packages for artifactType %s — "+
+				"verify the registry contains %s artifacts and the artifactType is correct",
+			r.srcRegistry, len(originalFiles), r.artifactType, r.artifactType,
+		)
+	}
+
+	// For metadata-driven artifact types (RPM, DEBIAN), GetPackages reads a
+	// repository metadata file that lists every package regardless of the
+	// filtered tree.  Re-apply the date filter at the package level by
+	// matching each package's bare filename against the date-filtered file list.
+	if dateFilterActive && util.IsMetadataDrivenArtifact(currArtifactType) {
+		originalPkgCount := len(pkgs)
+		pkgs = util.FilterPackagesByFileName(pkgs, dateFilteredFiles)
+		logger.Info().Msgf("Date filter (post-GetPackages): %d -> %d packages for %s",
+			originalPkgCount, len(pkgs), currArtifactType)
+	}
+
 	// applying package level filter
+	composerPkgsBeforeFilters := 0
+	if r.artifactType == types.COMPOSER {
+		composerPkgsBeforeFilters = len(pkgs)
+	}
 	if util.IsPackageLevelFilterableArtifact(currArtifactType) {
 		if len(r.mapping.IncludePatterns) > 0 || len(r.mapping.ExcludePatterns) > 0 {
 			originalCount := len(pkgs)
@@ -208,6 +304,49 @@ func (r *Registry) Migrate(ctx context.Context) error {
 		}
 	}
 
+	// Apply the opt-in package selector allow-list (packageFilters). When set,
+	// only the named packages are migrated; runs before the destination index is
+	// built so the index only covers selected work. No-op when unset.
+	if len(r.mapping.PackageFilters) > 0 {
+		originalCount := len(pkgs)
+		pkgs = util.FilterPackagesBySelectors(pkgs, r.mapping.PackageFilters)
+		logger.Info().Msgf("Package selector filter: %d -> %d packages", originalCount, len(pkgs))
+	}
+
+	if r.artifactType == types.COMPOSER &&
+		composerPkgsBeforeFilters > 0 &&
+		len(pkgs) == 0 &&
+		(len(r.mapping.IncludePatterns) > 0 || len(r.mapping.ExcludePatterns) > 0 || len(r.mapping.PackageFilters) > 0) {
+		warnMsg := fmt.Sprintf(
+			"Registry %s: Composer package filters reduced %d package(s) to 0; nothing will be migrated — "+
+				"use vendor/package names (e.g. harness/migtest, acme/*), not zip basenames, in includePatterns, excludePatterns, and packageFilters",
+			r.srcRegistry, composerPkgsBeforeFilters,
+		)
+		logger.Warn().Msg(warnMsg)
+		pterm.Warning.Println(warnMsg)
+	}
+
+	// Build destination index once per registry when overwrite=false
+	var existingIndex *types.ExistingIndex
+	if !r.config.Overwrite && !r.config.DryRun && indexApplicable(r.artifactType) {
+		name := registryLeafName(r.destRegistry, r.registry.Path)
+		indexProgress := startStage(fmt.Sprintf("Indexing artifacts already in destination registry %s", name))
+		idx, err := r.destAdapter.BuildExistingIndex(ctx, name, r.config.Concurrency)
+		if err != nil {
+			indexProgress.warn(fmt.Sprintf(
+				"Could not index destination registry %s; falling back to per-version lookups", name))
+			logger.Warn().Err(err).Msg("Failed to build destination index; falling back to per-version lookups")
+		} else {
+			existingIndex = idx
+			indexedPkgs, indexedVersions, indexedFiles := idx.Stats()
+			indexedMsg := fmt.Sprintf(
+				"Indexed destination registry %s: %d package(s), %d version(s), %d existing file(s)",
+				name, indexedPkgs, indexedVersions, indexedFiles)
+			indexProgress.success(indexedMsg)
+			logger.Info().Msg(indexedMsg)
+		}
+	}
+
 	var jobs []engine.Job
 	for _, pkg := range pkgs {
 		treeNode, err2 := tree.GetNodeForPath(root, pkg.Path)
@@ -215,8 +354,8 @@ func (r *Registry) Migrate(ctx context.Context) error {
 			logger.Error().Msgf("Failed to get node for path %s", pkg.Path)
 			return fmt.Errorf("get node for path %s failed: %w", pkg.Path, err2)
 		}
-		job := NewPackageJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.sourcePackageHostname, r.destRegistry, r.artifactType, pkg, treeNode,
-			r.stats, r.mapping, r.config, r.registry, r.dryRunStats)
+		job := NewPackageJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.sourcePackageHostname, r.destRegistry, r.artifactType, pkg, treeNode, unfilteredRoot,
+			r.stats, r.mapping, r.config, r.registry, r.dryRunStats, existingIndex)
 		jobs = append(jobs, job)
 	}
 
@@ -249,4 +388,23 @@ func (r *Registry) Post(ctx context.Context) error {
 		Dur("duration", time.Since(startTime)).
 		Msg("Completed registry post-migration step")
 	return nil
+}
+
+// indexApplicable reports whether Version.Pre consults the file index for this type.
+// Must exactly equal the set Version.Pre checks today (version.go:109 exclusions).
+func indexApplicable(t types.ArtifactType) bool {
+	switch t {
+	case types.GENERIC, types.RAW, types.PYTHON, types.NUGET, types.DART, types.PUPPET, types.NPM, types.MAVEN:
+		return true
+	default:
+		return false
+	}
+}
+
+// registryLeafName extracts the registry leaf name for v3 API matching.
+func registryLeafName(destRegistry, regPath string) string {
+	if regPath != "" {
+		return path.Base(regPath)
+	}
+	return destRegistry
 }

@@ -1,5 +1,10 @@
 package config
 
+import (
+	"fmt"
+	"runtime"
+)
+
 // GlobalFlags contains common flags used across commands
 type GlobalFlags struct {
 	// Common authentication and connection flags
@@ -13,6 +18,9 @@ type GlobalFlags struct {
 
 	// Request timeout in seconds (0 means no timeout)
 	TimeoutSeconds int
+
+	// NoProgress suppresses interactive plan/step output (auto-enabled when CI env var is set)
+	NoProgress bool
 
 	// Command-specific configurations
 	Registry RegistryConfig
@@ -50,3 +58,11 @@ const DefaultTimeoutSeconds = 0
 
 // Global is the shared instance of GlobalFlags
 var Global = GlobalFlags{}
+
+// Version is the CLI version, set at startup from the ldflags-injected build version.
+var Version = "dev"
+
+// UserAgent returns the User-Agent string sent with outgoing HTTP requests.
+func UserAgent() string {
+	return fmt.Sprintf("harness-cli/%s (%s/%s)", Version, runtime.GOOS, runtime.GOARCH)
+}

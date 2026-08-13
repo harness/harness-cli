@@ -43,7 +43,7 @@ Example configuration file (config.yaml):
 
   source:
     endpoint: https://source-registry.example.com
-    type: JFROG                    # Supported: JFROG, NEXUS
+    type: JFROG                    # Supported: JFROG, NEXUS, HARBOR
     credentials:
       username: source_user
       password: source_password
@@ -64,6 +64,18 @@ Example configuration file (config.yaml):
     - artifactType: MAVEN
       sourceRegistry: maven-releases
       destinationRegistry: harness-maven
+      # MAVEN identity is derived from file paths, so filter via files (see note below).
+      packageFilters:
+        - files: [my-artifact-1.0.0.jar, my-artifact-1.1.0.pom]
+
+    - artifactType: PYTHON
+      sourceRegistry: pypi-local
+      destinationRegistry: harness-pypi
+      # PYTHON has real package identity, so all three granularities are meaningful.
+      packageFilters:
+        - package: requests
+          versions: [2.28.0, 2.29.0]
+          files: [requests-2.28.0-py3-none-any.whl]
 
     - artifactType: NPM
       sourceRegistry: npm-local
@@ -75,6 +87,20 @@ Example configuration file (config.yaml):
 
 Supported artifact types:
   DOCKER, HELM, HELM_LEGACY, HELM_HTTP, MAVEN, NPM, NUGET, PYTHON, GO, GENERIC, CONDA, COMPOSER, SWIFT, DEBIAN, PUPPET, DART, RPM, RAW, CONAN
+
+Note: HARBOR source supports OCI artifact types only (DOCKER, HELM).
+
+Package Filtering (opt-in):
+  The packageFilters field is an allow-list: when set, only the named packages (and
+  optionally specific versions/files) are migrated; when omitted, everything migrates.
+
+  Supported granularity by type:
+    - Package-level only: DOCKER, HELM, HELM_LEGACY, HELM_HTTP, RPM, DEBIAN, CONDA, COMPOSER, SWIFT, CONAN
+    - Package + version: GO
+    - Package + version + file: GENERIC, RAW, MAVEN, PYTHON, NUGET, NPM, DART, PUPPET
+
+  For synthetic-identity types (MAVEN, NPM, GENERIC, RAW), filter via the files field
+  rather than package names, as package/version names are derived from file paths.
 
 Environment variables can be used in the config file using ${VAR_NAME} syntax.
 
