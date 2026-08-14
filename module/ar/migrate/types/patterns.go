@@ -12,7 +12,7 @@ package types
 // applied to individual file URIs for this artifact type.
 func IsFileLevelPatternFilterable(t ArtifactType) bool {
 	switch t {
-	case GENERIC, RAW, PYTHON, MAVEN, NUGET, NPM, DART, GO:
+	case GENERIC, RAW, PYTHON, MAVEN, NUGET, NPM, DART, GO, RUBY:
 		return true
 	default:
 		return false

@@ -1,0 +1,37 @@
+[
+  {
+    "Registry": "gems-local",
+    "Name": "rails-8.0.2.gem",
+    "Uri": "/gems/rails-8.0.2.gem",
+    "Folder": false,
+    "Size": 1024,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80730"
+  },
+  {
+    "Registry": "gems-local",
+    "Name": "rails-8.0.2-x86_64-linux.gem",
+    "Uri": "/gems/rails-8.0.2-x86_64-linux.gem",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-01-02T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80731"
+  },
+  {
+    "Registry": "gems-local",
+    "Name": "nokogiri-1.15.0.gem",
+    "Uri": "/gems/nokogiri-1.15.0.gem",
+    "Folder": false,
+    "Size": 4096,
+    "LastModified": "2023-03-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80732"
+  },
+  {
+    "Registry": "gems-local",
+    "Name": "rails-8.0.2.gem.md5",
+    "Uri": "/gems/rails-8.0.2.gem.md5",
+    "Folder": false,
+    "Size": 32,
+    "LastModified": "2023-01-01T00:00:00.000Z"
+  }
+]

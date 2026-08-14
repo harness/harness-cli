@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+
 	"github.com/rs/zerolog"
 )
 
@@ -95,7 +96,7 @@ func TestRegistryMigrateComposerFiltersReducedToZero(t *testing.T) {
 func TestIndexApplicable(t *testing.T) {
 	applicable := []types.ArtifactType{
 		types.GENERIC, types.RAW, types.PYTHON, types.NUGET,
-		types.DART, types.PUPPET, types.NPM, types.MAVEN,
+		types.DART, types.PUPPET, types.RUBY, types.NPM, types.MAVEN,
 	}
 	for _, at := range applicable {
 		if !indexApplicable(at) {

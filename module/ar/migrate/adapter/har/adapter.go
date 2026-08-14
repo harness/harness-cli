@@ -171,6 +171,8 @@ func (a *adapter) UploadFile(
 		err = a.client.uploadDartFile(registry, artifactName, version, f, file)
 	case types.PUPPET:
 		err = a.client.uploadPuppetFile(registry, f, file)
+	case types.RUBY:
+		err = a.client.uploadRubyFile(registry, f, file)
 	case types.TERRAFORM:
 		err = a.client.uploadTerraformFile(registry, f, artifactName, version, file)
 	case types.CONAN:

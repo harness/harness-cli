@@ -24,6 +24,7 @@ func GetRootCmd(f *cmdutils.Factory) *cobra.Command {
 	rootCmd.AddCommand(command.NewCreateArtifactCmd(f))
 	rootCmd.AddCommand(command.NewDeleteArtifactCmd(f))
 	rootCmd.AddCommand(command.NewPullArtifactCmd(f))
+	rootCmd.AddCommand(command.NewDownloadByRegexCmd(f))
 	rootCmd.AddCommand(command.NewPushArtifactCmd(f))
 	rootCmd.AddCommand(command.NewMetadataCmd(f))
 	rootCmd.AddCommand(command.NewCopyArtifactCmd(f))

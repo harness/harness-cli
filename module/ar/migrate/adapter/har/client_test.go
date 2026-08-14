@@ -41,52 +41,52 @@ func TestUploadTerraformFile(t *testing.T) {
 		wantPathHas  string
 	}{
 		{
-			name: "module upload success",
+			name:     "module upload success",
 			fileName: "vpc-1.0.0.tar.gz", pkg: "hashicorp/vpc/aws", version: "1.0.0",
 			status: http.StatusCreated, wantPathHas: "/hashicorp/vpc/aws/1.0.0",
 		},
 		{
-			name: "module upload tgz extension",
+			name:     "module upload tgz extension",
 			fileName: "vpc-1.0.0.tgz", pkg: "hashicorp/vpc/aws", version: "1.0.0",
 			status: http.StatusCreated, wantPathHas: "/hashicorp/vpc/aws/1.0.0",
 		},
 		{
-			name: "module upload conflict",
+			name:     "module upload conflict",
 			fileName: "vpc-1.0.0.tar.gz", pkg: "hashicorp/vpc/aws", version: "1.0.0",
 			status: http.StatusConflict, wantConflict: true,
 		},
 		{
-			name: "module upload error",
+			name:     "module upload error",
 			fileName: "vpc-1.0.0.tar.gz", pkg: "hashicorp/vpc/aws", version: "1.0.0",
 			status: http.StatusBadRequest, wantErr: true,
 		},
 		{
-			name: "provider upload success",
+			name:     "provider upload success",
 			fileName: "terraform-provider-aws_2.0.0_linux_amd64.zip", pkg: "hashicorp/aws", version: "2.0.0",
 			status: http.StatusCreated, wantPathHas: "/hashicorp/aws/2.0.0",
 		},
 		{
-			name: "provider upload conflict",
+			name:     "provider upload conflict",
 			fileName: "terraform-provider-aws_2.0.0_linux_amd64.zip", pkg: "hashicorp/aws", version: "2.0.0",
 			status: http.StatusConflict, wantConflict: true,
 		},
 		{
-			name: "provider upload error",
+			name:     "provider upload error",
 			fileName: "terraform-provider-aws_2.0.0_linux_amd64.zip", pkg: "hashicorp/aws", version: "2.0.0",
 			status: http.StatusInternalServerError, wantErr: true,
 		},
 		{
-			name: "unsupported extension",
+			name:     "unsupported extension",
 			fileName: "terraform-something.txt", pkg: "hashicorp/aws", version: "2.0.0",
 			status: http.StatusCreated, wantErr: true,
 		},
 		{
-			name: "module bad pkg format",
+			name:     "module bad pkg format",
 			fileName: "vpc-1.0.0.tar.gz", pkg: "hashicorp", version: "1.0.0",
 			status: http.StatusCreated, wantErr: true,
 		},
 		{
-			name: "provider bad pkg format",
+			name:     "provider bad pkg format",
 			fileName: "terraform-provider-aws_2.0.0_linux_amd64.zip", pkg: "hashicorp", version: "2.0.0",
 			status: http.StatusCreated, wantErr: true,
 		},
@@ -261,6 +261,71 @@ func TestUploadComposerFile(t *testing.T) {
 				t.Errorf("method = %q, want POST", gotMethod)
 			}
 			wantPath := "/pkg/acct1/composer_mig/composer/upload"
+			if gotPath != wantPath {
+				t.Errorf("path = %q, want %q", gotPath, wantPath)
+			}
+			if !tt.wantErr && gotCT != "application/octet-stream" {
+				t.Errorf("content-type = %q, want application/octet-stream", gotCT)
+			}
+		})
+	}
+}
+
+// TestUploadRubyFile verifies Ruby gem uploads and maps HTTP 409 to
+// ErrArtifactAlreadyExists so re-runs are recorded as skips, not failures.
+func TestUploadRubyFile(t *testing.T) {
+	config.Global.AccountID = "acct1"
+
+	tests := []struct {
+		name         string
+		status       int
+		wantErr      bool
+		wantConflict bool
+	}{
+		{"success 201", http.StatusCreated, false, false},
+		{"success 200", http.StatusOK, false, false},
+		{"conflict surfaces ErrArtifactAlreadyExists", http.StatusConflict, false, true},
+		{"bad request surfaces error", http.StatusBadRequest, true, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotMethod, gotPath, gotCT string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotMethod = r.Method
+				gotPath = r.URL.Path
+				gotCT = r.Header.Get("Content-Type")
+				if tt.status >= 400 {
+					w.WriteHeader(tt.status)
+					_, _ = w.Write([]byte(`{"message":"gem already exists"}`))
+					return
+				}
+				w.WriteHeader(tt.status)
+			}))
+			defer srv.Close()
+
+			c := newTestClient(t, srv.URL)
+			body := io.NopCloser(strings.NewReader("gem-bytes"))
+			err := c.uploadRubyFile("ruby_mig", &types.File{Name: "rails-8.0.2.gem"}, body)
+
+			switch {
+			case tt.wantConflict:
+				if !errors.Is(err, types.ErrArtifactAlreadyExists) {
+					t.Fatalf("expected ErrArtifactAlreadyExists, got %v", err)
+				}
+			case tt.wantErr:
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+			default:
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			}
+			if gotMethod != http.MethodPost {
+				t.Errorf("method = %q, want POST", gotMethod)
+			}
+			wantPath := "/pkg/acct1/ruby_mig/ruby/api/v1/gems"
 			if gotPath != wantPath {
 				t.Errorf("path = %q, want %q", gotPath, wantPath)
 			}

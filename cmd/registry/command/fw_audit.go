@@ -612,6 +612,7 @@ func parsePackageLock(data []byte) ([]Dependency, error) {
 		} `json:"dependencies"`
 		Packages map[string]struct {
 			Version string `json:"version"`
+			Link    bool   `json:"link"`
 		} `json:"packages"`
 	}
 
@@ -626,7 +627,7 @@ func parsePackageLock(data []byte) ([]Dependency, error) {
 		// Build a version map for parent key resolution
 		versionMap := make(map[string]string)
 		for pkgPath, pkg := range lockFile.Packages {
-			if pkgPath == "" {
+			if pkgPath == "" || pkg.Link {
 				continue
 			}
 			name := extractPackageName(pkgPath)
@@ -636,7 +637,8 @@ func parsePackageLock(data []byte) ([]Dependency, error) {
 		}
 
 		for pkgPath, pkg := range lockFile.Packages {
-			if pkgPath == "" {
+			if pkgPath == "" || pkg.Link {
+				// link:true entries are local workspace symlinks, not registry packages
 				continue
 			}
 			name := extractPackageName(pkgPath)

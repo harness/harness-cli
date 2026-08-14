@@ -132,7 +132,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 
 	if r.artifactType == types.GENERIC || r.artifactType == types.RAW || r.artifactType == types.MAVEN || r.artifactType == types.PYTHON ||
 		r.artifactType == types.NUGET || r.artifactType == types.NPM || r.artifactType == types.DART || r.artifactType == types.PUPPET ||
-		r.artifactType == types.TERRAFORM {
+		r.artifactType == types.RUBY || r.artifactType == types.TERRAFORM {
 		// TERRAFORM versions are atomic multi-file versions (a provider version
 		// spans one zip per os/arch and a network mirror is only complete when
 		// ALL platform files are present). This version job only exists because
@@ -178,6 +178,19 @@ func (r *Version) Migrate(ctx context.Context) error {
 				if !ok || pkgName != r.pkg.Name || version != r.version.Name {
 					logger.Debug().Msgf("Skipping file %s (pkg=%s, ver=%s) - doesn't match current package %s version %s",
 						file.Name, pkgName, version, r.pkg.Name, r.version.Name)
+					continue
+				}
+			}
+			// For RUBY, skip files that don't match current gem and version
+			if r.artifactType == types.RUBY {
+				if !strings.HasSuffix(file.Name, ".gem") {
+					logger.Debug().Msgf("Skipping non-gem file %s for RUBY migration", file.Name)
+					continue
+				}
+				meta, ok := util.ParseRubyGemFileNameWithPath(file.Uri)
+				if !ok || meta.Name != r.pkg.Name || meta.Version != r.version.Name {
+					logger.Debug().Msgf("Skipping file %s (gem=%s, ver=%s) - doesn't match current package %s version %s",
+						file.Name, meta.Name, meta.Version, r.pkg.Name, r.version.Name)
 					continue
 				}
 			}

@@ -42,6 +42,7 @@ var (
 	RAW         ArtifactType = "RAW"
 	SWIFT       ArtifactType = "SWIFT"
 	PUPPET      ArtifactType = "PUPPET"
+	RUBY        ArtifactType = "RUBY"
 	CONAN       ArtifactType = "CONAN"
 	TERRAFORM   ArtifactType = "TERRAFORM"
 )
@@ -53,7 +54,7 @@ var (
 // whenever a new ArtifactType is introduced.
 var knownArtifactTypesList = []ArtifactType{
 	DOCKER, HELM, HELM_LEGACY, HELM_HTTP, GENERIC, PYTHON, MAVEN, NPM, NUGET,
-	RPM, DEBIAN, GO, CONDA, COMPOSER, DART, RAW, SWIFT, PUPPET, CONAN,
+	RPM, DEBIAN, GO, CONDA, COMPOSER, DART, RAW, SWIFT, PUPPET, RUBY, CONAN,
 	TERRAFORM,
 }
 
@@ -139,7 +140,7 @@ type RegistryMapping struct {
 	DestinationRegistry string       `yaml:"destinationRegistry"`
 	// IncludePatterns/ExcludePatterns are glob patterns (* and **) applied at
 	// file level for file-level-filterable types (GENERIC, RAW, PYTHON, MAVEN,
-	// NUGET, NPM, DART, GO) and at package-name level for
+	// NUGET, NPM, DART, GO, RUBY) and at package-name level for
 	// package-level-filterable types (DOCKER, HELM, HELM_LEGACY, HELM_HTTP,
 	// RPM, CONDA, COMPOSER, SWIFT, CONAN). Setting them for any other type
 	// (DEBIAN, TERRAFORM, PUPPET) is a config error — scope controls must
@@ -234,7 +235,7 @@ func validateConfig(config *Config) error {
 			return fmt.Errorf("mapping %d: includePatterns/excludePatterns are not supported for artifact type %s — "+
 				"patterns are applied at file level for %s and at package level for %s; use packageFilters for scoping where supported",
 				i, mapping.ArtifactType,
-				"GENERIC, RAW, PYTHON, MAVEN, NUGET, NPM, DART, GO",
+				"GENERIC, RAW, PYTHON, MAVEN, NUGET, NPM, DART, GO, RUBY",
 				"DOCKER, HELM, HELM_LEGACY, HELM_HTTP, RPM, CONDA, COMPOSER, SWIFT, CONAN")
 		}
 		// Date filtering for MAVEN relies on the source file listing rather than
