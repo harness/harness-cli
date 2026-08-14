@@ -7,7 +7,11 @@ Guidance for working in this repo (Harness CLI). Focused on the artifact-registr
 
 - `cmd/` — Cobra command trees (auth, registry, artifact, project, org, pkgmgr, …).
   `cmd/artifact/command/` holds per-ecosystem push commands (`push_maven.go`,
-  `push_npm.go`, `push_nuget.go`, …) and `utils/`.
+  `push_npm.go`, `push_nuget.go`, …) and `utils/`. `artifact delete` never
+  mutates under `--dry-run=true` (no prompt); real deletes require a TTY
+  confirmation or `--yes`, and are verified post-delete per coordinate
+  (SOFT_DELETED/HARD_DELETED/UNCHANGED/UNSUPPORTED, non-zero exit on
+  UNCHANGED/UNSUPPORTED).
 - `internal/api/ar/client_gen.go` + `internal/api/ar_pkg/client_gen.go` —
   **generated** OpenAPI clients (do not hand-edit). `ar` = HAR control-plane API
   (registries/artifacts/versions/files); `ar_pkg` = package upload/content API.
