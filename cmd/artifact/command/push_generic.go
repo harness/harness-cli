@@ -12,7 +12,6 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	"github.com/harness/harness-cli/util"
 	"github.com/harness/harness-cli/util/common/httpclient"
 	"github.com/harness/harness-cli/util/common/progress"
 	"github.com/harness/harness-cli/util/common/upload"
@@ -43,10 +42,8 @@ func NewPushGenericCmd(c *cmdutils.Factory) *cobra.Command {
 		Long: "Push one or more generic artifacts to a Harness Artifact Registry. " +
 			"Each <path> may be a file or a directory; directories are walked recursively.",
 		Args: cobra.MinimumNArgs(2),
-		PreRun: func(cmd *cobra.Command, args []string) {
-			if pkgURL != "" {
-				config.Global.Registry.PkgURL = util.GetPkgUrl(pkgURL)
-			}
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return cmdutils.ResolvePkgURL(cmd, pkgURL)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]

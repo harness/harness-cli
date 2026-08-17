@@ -14,7 +14,6 @@ import (
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	"github.com/harness/harness-cli/util"
 	"github.com/harness/harness-cli/util/common/errors"
 	p "github.com/harness/harness-cli/util/common/progress"
 
@@ -36,10 +35,8 @@ func NewPushCondaCmd(c *cmdutils.Factory) *cobra.Command {
 		Short: "Push Conda Artifacts",
 		Long:  "Push Conda Artifacts to Harness Artifact Registry",
 		Args:  cobra.ExactArgs(2),
-		PreRun: func(cmd *cobra.Command, args []string) {
-			if pkgURL != "" {
-				config.Global.Registry.PkgURL = util.GetPkgUrl(pkgURL)
-			}
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return cmdutils.ResolvePkgURL(cmd, pkgURL)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]

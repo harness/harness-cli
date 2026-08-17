@@ -634,8 +634,8 @@ func TestNewPushGenericCmd_PkgUrlFlagAppliesToConfig(t *testing.T) {
 	// panicking and that PreRun mutates the global config.
 	stdout, _ := runGenericCmd(t, "myreg", file,
 		"--name", "web", "--pkg-url", hostPort)
-	if !strings.Contains(stdout, "deprecated") {
-		t.Errorf("expected GetPkgUrl deprecation notice in stdout, got: %s", stdout)
+	if !strings.Contains(stdout, "remains supported") {
+		t.Errorf("expected GetPkgUrl support notice in stdout, got: %s", stdout)
 	}
 	if !strings.HasPrefix(config.Global.Registry.PkgURL, "https://") {
 		t.Errorf("expected config.Global.Registry.PkgURL to be normalised to https://, got %q",

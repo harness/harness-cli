@@ -14,7 +14,6 @@ import (
 	"github.com/harness/harness-cli/cmd/artifact/command/utils"
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
-	"github.com/harness/harness-cli/util"
 	p "github.com/harness/harness-cli/util/common/progress"
 
 	"github.com/spf13/cobra"
@@ -30,10 +29,8 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 		Short: "Push NPM package",
 		Long:  "Push an NPM .tgz package to Harness Artifact Registry (HAR)",
 		Args:  cobra.ExactArgs(2),
-		PreRun: func(cmd *cobra.Command, args []string) {
-			if pkgURL != "" {
-				config.Global.Registry.PkgURL = util.GetPkgUrl(pkgURL)
-			}
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return cmdutils.ResolvePkgURL(cmd, pkgURL)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]
