@@ -208,6 +208,19 @@ func AddPackageErrorToStat(stats *types.TransferStats, pkg types.Package, srcReg
 	}
 	stats.Add(stat)
 }
+
+// AddRegistryErrorToStat records a registry-scoped enumeration failure (e.g.
+// GetFiles/SearchFiles/GetPackages aborting the whole registry) so the failure
+// is counted in the Failed total instead of only surfacing as an engine error.
+func AddRegistryErrorToStat(stats *types.TransferStats, srcRegistry string, err error) {
+	stat := types.FileStat{
+		Name:     srcRegistry,
+		Registry: srcRegistry,
+		Status:   types.StatusFail,
+		Error:    err.Error(),
+	}
+	stats.Add(stat)
+}
 func AddFileErrorToStat(stats *types.TransferStats, file *types.File, srcRegistry string, err error) {
 	stat := types.FileStat{
 		Name:     file.Name,

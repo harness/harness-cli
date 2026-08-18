@@ -111,6 +111,28 @@ factory map (`adapter/adapter.go:72-101`); blank-imported in `migration.go:21-24
 - **Idempotency:** duplicate uploads return `types.ErrArtifactAlreadyExists`
   (mapped from HTTP 409); callers treat it as a Skip, not a failure. A cache/lookup
   miss therefore only causes a safe re-upload attempt, never data loss.
+- **Exit-code contract (2026-08-07):** `MigrationService.Run` returns a non-nil
+  aggregate error — and `runMigration` exits 1 — when (a) the engine collected
+  any job error (every nested engine now propagates: File→Version→Package→
+  Registry→Run) **or** (b) any `StatusFail` stat exists. No opt-out flag; dry-run
+  is exempt. Enumeration aborts (GetFiles/SearchFiles/GetPackages/GetVersions)
+  also record `StatusFail` stats (`util.AddRegistryErrorToStat` /
+  `AddPackageErrorToStat`) so Failed reconciles with the process result.
+- **Skip classes:** `types.FileStat.Reason` classifies `StatusSkip` rows
+  (`types.SkipReasonAlreadyExists` for index/HEAD/409 skips,
+  `types.SkipReasonNoContent` for e.g. tag-less OCI repos). `FileStat` now has
+  lowercase JSON tags; the `--summary=false` table maps the lowercase keys.
+- **Result file:** `--result-file <path>` (or `resultFile:` in the config) writes
+  one JSON-lines `FileStat` record per coordinate at the end of a non-dry-run
+  run — written even on failure; automation must consume this instead of
+  parsing tables.
+- **Config validation is the loud failure point:** unknown `artifactType`
+  (validated against `types.KnownArtifactTypes()` — the single source of truth
+  that also renders `--help`) is rejected at load, before any source call.
+- **Zero-package guard:** `Registry.Migrate` errors when the enumeration tree
+  has surviving files but `GetPackages` resolves zero packages (type mismatch),
+  regardless of filter settings; filters that starve the tree to zero files are
+  a valid empty result.
 - **Dry-run:** `--dry-run` skips all destination calls and emits
   `dry-run-output/{file_list,directory_structure}_*.json` (`migration.go:147`).
   Use a before/after diff of these as a **regression gate** for refactors.

@@ -45,6 +45,9 @@ type MigrateConfig struct {
 	Overwrite   bool
 	DryRun      bool
 	Summary     bool
+	// ResultFile is the optional path to a JSON-lines per-coordinate result
+	// file (the --result-file flag), empty when unset.
+	ResultFile string
 }
 
 // StatusConfig holds status command specific configurations

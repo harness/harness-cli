@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/pterm/pterm"
@@ -46,15 +47,42 @@ var (
 	TERRAFORM   ArtifactType = "TERRAFORM"
 )
 
-// knownArtifactTypes is the exhaustive set of valid ArtifactType values.
-// MUST be kept in sync with the var block above — add here whenever you add a new ArtifactType var.
-// TestValidateConfig_AllKnownArtifactTypesAccepted acts as a compile-time-like guard: update that test too.
-var knownArtifactTypes = map[ArtifactType]struct{}{
-	DOCKER: {}, HELM: {}, HELM_LEGACY: {}, HELM_HTTP: {},
-	GENERIC: {}, PYTHON: {}, MAVEN: {}, NPM: {}, NUGET: {},
-	RPM: {}, DEBIAN: {}, GO: {}, CONDA: {}, COMPOSER: {},
-	DART: {}, RAW: {}, SWIFT: {}, PUPPET: {}, RUBY: {}, CONAN: {},
-	TERRAFORM: {},
+// knownArtifactTypesList is the exhaustive, ordered list of valid ArtifactType
+// values and the SINGLE SOURCE OF TRUTH for "which types exist": config
+// validation, the validation error message, and the `migrate --help` text are
+// all derived from it. Add new types here (and to the var block above)
+// whenever a new ArtifactType is introduced.
+var knownArtifactTypesList = []ArtifactType{
+	DOCKER, HELM, HELM_LEGACY, HELM_HTTP, GENERIC, PYTHON, MAVEN, NPM, NUGET,
+	RPM, DEBIAN, GO, CONDA, COMPOSER, DART, RAW, SWIFT, PUPPET, RUBY, CONAN,
+	TERRAFORM,
+}
+
+// knownArtifactTypes is the lookup set derived from knownArtifactTypesList.
+var knownArtifactTypes = func() map[ArtifactType]struct{} {
+	m := make(map[ArtifactType]struct{}, len(knownArtifactTypesList))
+	for _, t := range knownArtifactTypesList {
+		m[t] = struct{}{}
+	}
+	return m
+}()
+
+// KnownArtifactTypes returns the ordered list of all valid ArtifactType
+// values. Safe to mutate by the caller (a fresh copy is returned each time).
+func KnownArtifactTypes() []ArtifactType {
+	out := make([]ArtifactType, len(knownArtifactTypesList))
+	copy(out, knownArtifactTypesList)
+	return out
+}
+
+// KnownArtifactTypesString returns the valid types as a single
+// comma-separated string for error messages and help text.
+func KnownArtifactTypesString() string {
+	parts := make([]string, len(knownArtifactTypesList))
+	for i, t := range knownArtifactTypesList {
+		parts[i] = string(t)
+	}
+	return strings.Join(parts, ", ")
 }
 
 // IsKnownArtifactType reports whether t is a recognised ArtifactType value.
@@ -65,14 +93,18 @@ func IsKnownArtifactType(t ArtifactType) bool {
 
 // Config represents the top-level configuration structure
 type Config struct {
-	Version     string            `yaml:"version"`
-	Concurrency int               `yaml:"concurrency"`
-	Overwrite   bool              `yaml:"overwrite"`
-	DryRun      bool              `yaml:"dryRun"`
-	Summary     bool              `yaml:"summary"`
-	Source      RegistryConfig    `yaml:"source"`
-	Dest        RegistryConfig    `yaml:"destination"`
-	Mappings    []RegistryMapping `yaml:"mappings"`
+	Version     string `yaml:"version"`
+	Concurrency int    `yaml:"concurrency"`
+	Overwrite   bool   `yaml:"overwrite"`
+	DryRun      bool   `yaml:"dryRun"`
+	Summary     bool   `yaml:"summary"`
+	// ResultFile is an optional path to a JSON-lines file that receives one
+	// per-coordinate result record (mirroring FileStat) at the end of a
+	// non-dry-run migration, so automation never has to parse human tables.
+	ResultFile string            `yaml:"resultFile,omitempty"`
+	Source     RegistryConfig    `yaml:"source"`
+	Dest       RegistryConfig    `yaml:"destination"`
+	Mappings   []RegistryMapping `yaml:"mappings"`
 }
 
 // RegistryConfig defines the source ar configuration
@@ -187,7 +219,7 @@ func validateConfig(config *Config) error {
 			return fmt.Errorf("mapping %d: destination registry cannot be empty", i)
 		}
 		if !IsKnownArtifactType(mapping.ArtifactType) {
-			return fmt.Errorf("mapping %d: unknown artifactType %q — valid values are: DOCKER, HELM, HELM_LEGACY, HELM_HTTP, GENERIC, PYTHON, MAVEN, NPM, NUGET, RPM, DEBIAN, GO, CONDA, COMPOSER, DART, RAW, SWIFT, PUPPET, RUBY, CONAN, TERRAFORM", i, mapping.ArtifactType)
+			return fmt.Errorf("mapping %d: unknown artifactType %q — valid values are: %s", i, mapping.ArtifactType, KnownArtifactTypesString())
 		}
 		// Date filtering for MAVEN relies on the source file listing rather than
 		// maven-metadata.xml, so the metadata file may end up out of sync with

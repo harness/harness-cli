@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+
 	"github.com/rs/zerolog"
 )
 
@@ -33,8 +34,8 @@ func (s *fileFakeSrc) DownloadFile(_ string, uri string) (io.ReadCloser, http.He
 // fileFakeDest records uploads and can be configured to return specific errors.
 type fileFakeDest struct {
 	noopAdapter
-	uploaded   []string
-	uploadErr  error
+	uploaded  []string
+	uploadErr error
 }
 
 func (d *fileFakeDest) UploadFile(

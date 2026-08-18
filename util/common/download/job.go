@@ -49,6 +49,7 @@ func resetSharedClientForTest() {
 //     headers from an unresponsive host so one stalled URL can't wedge a
 //     worker indefinitely. Body streaming stays uncapped so slow-but-
 //     progressing large artifact transfers aren't cut off.
+//
 // defaultResponseHeaderTimeoutSeconds is the fallback header-wait bound used
 // when config.Global.TimeoutSeconds is 0 (the default). Without a floor,
 // ResponseHeaderTimeout would be 0 (no timeout), letting an unresponsive

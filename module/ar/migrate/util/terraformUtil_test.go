@@ -15,19 +15,19 @@ func TestParseTerraformModulePath(t *testing.T) {
 		wantOK   bool
 	}{
 		{
-			name:     "happy path with leading slash",
-			path:     "/hashicorp/vpc/aws/1.0.0/vpc-1.0.0.tar.gz",
-			wantNS:   "hashicorp", wantName: "vpc", wantProv: "aws", wantVer: "1.0.0", wantOK: true,
+			name:   "happy path with leading slash",
+			path:   "/hashicorp/vpc/aws/1.0.0/vpc-1.0.0.tar.gz",
+			wantNS: "hashicorp", wantName: "vpc", wantProv: "aws", wantVer: "1.0.0", wantOK: true,
 		},
 		{
-			name:     "happy path without leading slash",
-			path:     "hashicorp/vpc/aws/1.0.0/vpc-1.0.0.tar.gz",
-			wantNS:   "hashicorp", wantName: "vpc", wantProv: "aws", wantVer: "1.0.0", wantOK: true,
+			name:   "happy path without leading slash",
+			path:   "hashicorp/vpc/aws/1.0.0/vpc-1.0.0.tar.gz",
+			wantNS: "hashicorp", wantName: "vpc", wantProv: "aws", wantVer: "1.0.0", wantOK: true,
 		},
 		{
-			name:     "tgz extension",
-			path:     "/hashicorp/vpc/aws/2.0.0/vpc-2.0.0.tgz",
-			wantNS:   "hashicorp", wantName: "vpc", wantProv: "aws", wantVer: "2.0.0", wantOK: true,
+			name:   "tgz extension",
+			path:   "/hashicorp/vpc/aws/2.0.0/vpc-2.0.0.tgz",
+			wantNS: "hashicorp", wantName: "vpc", wantProv: "aws", wantVer: "2.0.0", wantOK: true,
 		},
 		{
 			name:   "wrong extension",
@@ -55,20 +55,20 @@ func TestParseTerraformModulePath(t *testing.T) {
 			wantOK: false,
 		},
 		{
-			name:     "depth 6 (extra subdirectory)",
-			path:     "/hashicorp/vpc/aws/1.0.0/subdir/vpc-1.0.0.tar.gz",
-			wantNS:   "hashicorp", wantName: "vpc", wantProv: "aws", wantVer: "1.0.0", wantOK: true,
+			name:   "depth 6 (extra subdirectory)",
+			path:   "/hashicorp/vpc/aws/1.0.0/subdir/vpc-1.0.0.tar.gz",
+			wantNS: "hashicorp", wantName: "vpc", wantProv: "aws", wantVer: "1.0.0", wantOK: true,
 		},
 		// Layout B: flat zip, version = filename stem
 		{
-			name:     "layout B flat zip",
-			path:     "/myorg/s3module/aws/1.0.0.zip",
-			wantNS:   "myorg", wantName: "s3module", wantProv: "aws", wantVer: "1.0.0", wantOK: true,
+			name:   "layout B flat zip",
+			path:   "/myorg/s3module/aws/1.0.0.zip",
+			wantNS: "myorg", wantName: "s3module", wantProv: "aws", wantVer: "1.0.0", wantOK: true,
 		},
 		{
-			name:     "layout B flat zip without leading slash",
-			path:     "myorg/s3module/google/2.3.4.zip",
-			wantNS:   "myorg", wantName: "s3module", wantProv: "google", wantVer: "2.3.4", wantOK: true,
+			name:   "layout B flat zip without leading slash",
+			path:   "myorg/s3module/google/2.3.4.zip",
+			wantNS: "myorg", wantName: "s3module", wantProv: "google", wantVer: "2.3.4", wantOK: true,
 		},
 		{
 			name:   "layout B rejected: provider filename in 4-segment path",
@@ -108,20 +108,20 @@ func TestParseTerraformModulePath(t *testing.T) {
 
 func TestParseTerraformProviderPath(t *testing.T) {
 	tests := []struct {
-		name       string
-		path       string
-		wantNS     string
-		wantType   string
-		wantVer    string
-		wantFile   string
-		wantOS     string
-		wantArch   string
-		wantOK     bool
+		name     string
+		path     string
+		wantNS   string
+		wantType string
+		wantVer  string
+		wantFile string
+		wantOS   string
+		wantArch string
+		wantOK   bool
 	}{
 		{
-			name:     "happy path linux amd64",
-			path:     "/hashicorp/aws/2.0.0/terraform-provider-aws_2.0.0_linux_amd64.zip",
-			wantNS:   "hashicorp", wantType: "aws", wantVer: "2.0.0",
+			name:   "happy path linux amd64",
+			path:   "/hashicorp/aws/2.0.0/terraform-provider-aws_2.0.0_linux_amd64.zip",
+			wantNS: "hashicorp", wantType: "aws", wantVer: "2.0.0",
 			wantFile: "terraform-provider-aws_2.0.0_linux_amd64.zip",
 			wantOS:   "linux", wantArch: "amd64", wantOK: true,
 		},
@@ -131,16 +131,16 @@ func TestParseTerraformProviderPath(t *testing.T) {
 			wantOK: false,
 		},
 		{
-			name:     "darwin arm64",
-			path:     "/hashicorp/aws/2.0.0/terraform-provider-aws_2.0.0_darwin_arm64.zip",
-			wantNS:   "hashicorp", wantType: "aws", wantVer: "2.0.0",
+			name:   "darwin arm64",
+			path:   "/hashicorp/aws/2.0.0/terraform-provider-aws_2.0.0_darwin_arm64.zip",
+			wantNS: "hashicorp", wantType: "aws", wantVer: "2.0.0",
 			wantFile: "terraform-provider-aws_2.0.0_darwin_arm64.zip",
 			wantOS:   "darwin", wantArch: "arm64", wantOK: true,
 		},
 		{
-			name:     "with leading slash",
-			path:     "/hashicorp/google/3.1.0/terraform-provider-google_3.1.0_windows_386.zip",
-			wantNS:   "hashicorp", wantType: "google", wantVer: "3.1.0",
+			name:   "with leading slash",
+			path:   "/hashicorp/google/3.1.0/terraform-provider-google_3.1.0_windows_386.zip",
+			wantNS: "hashicorp", wantType: "google", wantVer: "3.1.0",
 			wantFile: "terraform-provider-google_3.1.0_windows_386.zip",
 			wantOS:   "windows", wantArch: "386", wantOK: true,
 		},

@@ -214,6 +214,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 					Uri:      file.Uri,
 					Size:     int64(file.Size),
 					Status:   types.StatusSkip,
+					Reason:   types.SkipReasonAlreadyExists,
 				}
 				r.stats.Add(stat)
 				continue
@@ -301,6 +302,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 	err := eng.Execute(ctx)
 	if err != nil {
 		logger.Error().Err(err).Msg("Engine execution saw following errors")
+		return fmt.Errorf("version %s/%s: file migration errors: %w", r.pkg.Name, r.version.Name, err)
 	}
 
 	logger.Info().

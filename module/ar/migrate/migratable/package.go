@@ -157,6 +157,7 @@ func (r *Package) Pre(ctx context.Context) error {
 				Uri:      r.pkg.URL,
 				Size:     int64(r.pkg.Size),
 				Status:   types.StatusSkip,
+				Reason:   types.SkipReasonAlreadyExists,
 			}
 			r.stats.Add(stat)
 			return nil
@@ -211,6 +212,7 @@ func (r *Package) Pre(ctx context.Context) error {
 					Uri:      r.pkg.Name + ":" + tag,
 					Size:     0,
 					Status:   types.StatusSkip,
+					Reason:   types.SkipReasonAlreadyExists,
 				}
 				r.stats.Add(stat)
 			}
@@ -276,6 +278,7 @@ func (r *Package) Migrate(ctx context.Context) error {
 		versions, err := r.srcAdapter.GetVersions(r.pkg, r.node, r.srcRegistry, r.pkg.Name, r.artifactType)
 		if err != nil {
 			logger.Error().Msg("Failed to get versions")
+			util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 			return fmt.Errorf("get versions failed: %w", err)
 		}
 
@@ -287,6 +290,7 @@ func (r *Package) Migrate(ctx context.Context) error {
 		err = eng.Execute(ctx)
 		if err != nil {
 			logger.Error().Err(err).Msg("Engine execution saw following errors")
+			return fmt.Errorf("package %s: version migration errors: %w", r.pkg.Name, err)
 		}
 	}
 
@@ -514,6 +518,7 @@ func (r *Package) finishOCICopy(
 		// Recording Success here would mask a source that resolved to an empty
 		// repository, so mark it Skip instead.
 		stat.Status = types.StatusSkip
+		stat.Reason = types.SkipReasonNoContent
 		pterm.Warning.Println(fmt.Sprintf("Repository %s had no tags to copy", srcImage))
 	case res.migrated == 0:
 		// Every tag was already in sync (or an orphaned source we skipped); the
@@ -840,6 +845,7 @@ func (r *Package) migrateHelmHTTP(ctx context.Context) error {
 	if err != nil {
 		if errors.Is(err, types.ErrArtifactAlreadyExists) {
 			stat.Status = types.StatusSkip
+			stat.Reason = types.SkipReasonAlreadyExists
 			pterm.Info.Println(fmt.Sprintf("%s already exists, skipping", title))
 			r.stats.Add(stat)
 			return nil
@@ -908,6 +914,7 @@ func (r *Package) migrateHelmHTTPProv(ctx context.Context) {
 	if err != nil {
 		if errors.Is(err, types.ErrArtifactAlreadyExists) {
 			stat.Status = types.StatusSkip
+			stat.Reason = types.SkipReasonAlreadyExists
 			pterm.Info.Println(fmt.Sprintf("Provenance %s already exists, skipping", provName))
 		} else {
 			r.logger.Error().Err(err).Msgf("Failed to upload provenance %s", provName)
@@ -1210,6 +1217,7 @@ func (r *Package) migrateComposerVersion(ctx context.Context, v types.Version) e
 	if err != nil {
 		if errors.Is(err, types.ErrArtifactAlreadyExists) {
 			stat.Status = types.StatusSkip
+			stat.Reason = types.SkipReasonAlreadyExists
 			pterm.Info.Println(fmt.Sprintf("%s already exists, skipping", title))
 		} else {
 			r.logger.Error().Err(err).Msg("Failed to upload file")
@@ -1329,6 +1337,7 @@ func (r *Package) migrateConan(ctx context.Context) error {
 		if err != nil {
 			if errors.Is(err, types.ErrArtifactAlreadyExists) {
 				stat.Status = types.StatusSkip
+				stat.Reason = types.SkipReasonAlreadyExists
 				pterm.Info.Println(fmt.Sprintf("%s already exists, skipping", title))
 			} else {
 				r.logger.Error().Err(err).Msgf("Failed to upload Conan file %s", entry.FileName)

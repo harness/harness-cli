@@ -1,6 +1,9 @@
 package types
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -90,5 +93,60 @@ func TestValidateConfig_EmptyArtifactTypeRejected(t *testing.T) {
 	err := validateConfig(config)
 	if err == nil {
 		t.Fatal("expected error for empty artifactType, got nil")
+	}
+}
+
+// TestLoadConfig_UnknownArtifactTypeFailsAtLoad verifies §1-W3: a typo'd
+// artifactType fails at config LOAD time — i.e. before NewMigrationService and
+// therefore before any source API call — and the error lists the valid values
+// (including TERRAFORM).
+func TestLoadConfig_UnknownArtifactTypeFailsAtLoad(t *testing.T) {
+	yaml := `
+version: 1.0.0
+concurrency: 1
+source:
+  endpoint: https://src.example
+  type: JFROG
+  credentials: {username: u, password: p}
+destination:
+  endpoint: https://dst.example
+  type: HAR
+  credentials: {username: u, password: p}
+mappings:
+  - artifactType: NOTAREALTYPE
+    sourceRegistry: src
+    destinationRegistry: dst
+`
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte(yaml), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadConfig(path)
+	if err == nil {
+		t.Fatal("expected LoadConfig to reject unknown artifactType, got nil")
+	}
+	if !strings.Contains(err.Error(), "NOTAREALTYPE") {
+		t.Errorf("error should name the offending type, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "TERRAFORM") {
+		t.Errorf("error should list valid values including TERRAFORM, got: %v", err)
+	}
+}
+
+// TestKnownArtifactTypesSingleSource verifies the exported list and the lookup
+// map stay in sync and both include TERRAFORM (§1-W1).
+func TestKnownArtifactTypesSingleSource(t *testing.T) {
+	list := KnownArtifactTypes()
+	if len(list) != len(knownArtifactTypes) {
+		t.Fatalf("KnownArtifactTypes() len %d != map len %d", len(list), len(knownArtifactTypes))
+	}
+	for _, at := range list {
+		if !IsKnownArtifactType(at) {
+			t.Errorf("KnownArtifactTypes() contains %q but IsKnownArtifactType says false", at)
+		}
+	}
+	if !strings.Contains(KnownArtifactTypesString(), "TERRAFORM") {
+		t.Errorf("KnownArtifactTypesString() must include TERRAFORM, got: %s", KnownArtifactTypesString())
 	}
 }

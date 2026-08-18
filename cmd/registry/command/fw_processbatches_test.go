@@ -16,10 +16,10 @@ import (
 // stubEvaluator implements Evaluator with controllable per-batch behavior.
 // Used to exercise the parallel batch runner without any HTTP layer.
 type stubEvaluator struct {
-	mode     string
-	max      int
-	call     int32                                          // parallel-safe call counter
-	handler  func(idx int32, batch []Dependency) (batchResult, error)
+	mode    string
+	max     int
+	call    int32 // parallel-safe call counter
+	handler func(idx int32, batch []Dependency) (batchResult, error)
 }
 
 func (s *stubEvaluator) MaxBatchSize() int { return s.max }

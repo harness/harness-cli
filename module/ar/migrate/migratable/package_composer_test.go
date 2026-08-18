@@ -15,9 +15,9 @@ import (
 
 type composerFakeSrc struct {
 	noopAdapter
-	content       map[string][]byte
-	failURI       string
-	versions      []types.Version
+	content        map[string][]byte
+	failURI        string
+	versions       []types.Version
 	getVersionsErr error
 }
 

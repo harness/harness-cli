@@ -14,7 +14,8 @@ import (
 //   <repo>/<namespace>/<type>/<version>/terraform-provider-<type>_<version>_<os>_<arch>.zip
 
 // terraformProviderFilenameRegex matches the standard convention:
-//   terraform-provider-{type}_{version}_{os}_{arch}.zip
+//
+//	terraform-provider-{type}_{version}_{os}_{arch}.zip
 var terraformProviderFilenameRegex = regexp.MustCompile(
 	`^terraform-provider-([a-zA-Z0-9-]+)_(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)_([a-z0-9]+)_([a-z0-9]+)\.zip$`,
 )
