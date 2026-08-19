@@ -16,6 +16,7 @@ import (
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/cmd/iacm"
 	"github.com/harness/harness-cli/cmd/registry"
+	"github.com/harness/harness-cli/cmd/rt"
 	"github.com/harness/harness-cli/config"
 	"github.com/harness/harness-cli/util/templates"
 
@@ -174,6 +175,7 @@ func main() {
 	rootCmd.AddCommand(registry.GetRootCmd(factory))
 	rootCmd.AddCommand(artifact.GetRootCmd(factory))
 	rootCmd.AddCommand(iacm.GetRootCmd())
+	rootCmd.AddCommand(rt.GetRootCmd())
 	//rootCmd.AddCommand(project.GetRootCmd())
 	//rootCmd.AddCommand(organisation.GetRootCmd())
 	//rootCmd.AddCommand(api.GetRootCmd())

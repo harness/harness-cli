@@ -1,0 +1,56 @@
+{
+  "identity": "checkout-locust",
+  "name": "Checkout load (Locust)",
+  "description": "Authenticated browse-and-checkout journey from a locustfile",
+  "toolType": "Locust",
+  "infraIdentifier": "perf-cluster",
+  "environmentIdentifier": "staging",
+  "targetType": "kubernetes",
+  "tags": ["nightly", "checkout"],
+  "cleanupPolicy": "delete",
+
+  "resources": {
+    "requests": { "cpu": "500m", "memory": "1Gi" },
+    "limits": { "cpu": "2", "memory": "2Gi" }
+  },
+
+  "variables": [
+    {
+      "name": "baseUrl",
+      "value": "https://staging.example.com",
+      "type": "string",
+      "description": "Host the simulated users drive"
+    },
+    {
+      "name": "perfPassword",
+      "value": "account.perfPassword",
+      "type": "secret",
+      "description": "Harness secret reference, resolved at run time"
+    }
+  ],
+
+  "toolConfig": {
+    "locust": {
+      "mode": "script",
+      "script": {
+        "source": "inline"
+      },
+
+      "tunables": {
+        "targetUrl": "<+variable.baseUrl>",
+        "targetUsers": 300,
+
+        "spawnRate": 7.5,
+        "rampUpTimeSec": 40,
+        "durationSeconds": 900,
+        "workerCount": 1,
+        "maxDurationSec": 3600
+      },
+
+      "envVars": [
+        { "key": "PERF_USER", "value": "perf" },
+        { "key": "PERF_PASSWORD", "value": "<+variable.perfPassword>", "secret": true }
+      ]
+    }
+  }
+}

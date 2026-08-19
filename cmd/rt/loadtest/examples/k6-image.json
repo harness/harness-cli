@@ -1,0 +1,58 @@
+{
+  "identity": "checkout-k6-image",
+  "name": "Checkout load (k6 image)",
+  "description": "Fixed-iteration run from a prebuilt k6 image that carries its own modules",
+  "toolType": "K6",
+  "infraIdentifier": "perf-cluster",
+  "environmentIdentifier": "staging",
+  "targetType": "kubernetes",
+  "tags": ["release-gate"],
+  "cleanupPolicy": "delete",
+
+  "resources": {
+    "requests": { "cpu": "1", "memory": "2Gi" },
+    "limits": { "cpu": "4", "memory": "4Gi" }
+  },
+
+  "toolConfig": {
+    "k6": {
+      "mode": "image",
+
+      "script": {
+        "source": "image",
+        "image": "ghcr.io/example/k6-suite:1.4.0",
+        "entrypoint": "k6",
+        "runArgs": ["run", "/suite/checkout.js", "--summary-export", "/results/summary.json"],
+        "imagePullSecret": "ghcr-pull"
+      },
+
+      "tunables": {
+        "hostUrl": "https://staging.example.com",
+        "targetUsers": 50,
+        "rampUpTimeSec": 30,
+
+        "durationSeconds": 600,
+        "iterations": 5000,
+        "rpsLimit": 200,
+        "workerCount": 1,
+        "maxDurationSec": 1800
+      },
+
+      "envVars": [
+        { "key": "K6_LOG_FORMAT", "value": "json" },
+        { "key": "API_TOKEN", "value": "account.perfApiToken", "secret": true }
+      ],
+
+      "options": {
+        "insecureSkipTLSVerify": true,
+        "noConnectionReuse": false,
+        "dnsStrategy": "round-robin"
+      },
+
+      "thresholds": [
+        { "metric": "http_req_failed", "operator": "<", "value": 0.005, "abortOnFail": true },
+        { "metric": "http_req_duration", "stat": "p99", "operator": "<", "value": 1200 }
+      ]
+    }
+  }
+}

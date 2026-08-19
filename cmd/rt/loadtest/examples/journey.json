@@ -1,0 +1,27 @@
+{
+  "config": {
+    "host": "https://api.staging.example.com",
+    "min_wait": 1,
+    "max_wait": 3
+  },
+
+  "endpoints": [
+    {
+      "name": "login",
+      "method": "POST",
+      "path": "/v1/auth/login",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "user": "perf", "password": "<+variable.perfPassword>" },
+      "assertions": { "status_code": 200, "max_response_time_ms": 800 },
+      "extract": { "variable_name": "token", "json_path": "$.data.accessToken" }
+    },
+    {
+      "name": "list-orders",
+      "method": "GET",
+      "path": "/v1/orders",
+      "query_params": { "limit": "20" },
+      "headers": { "Authorization": "Bearer {{token}}" },
+      "assertions": { "status_code": 200, "max_response_time_ms": 500 }
+    }
+  ]
+}

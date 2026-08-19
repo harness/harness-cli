@@ -1,0 +1,65 @@
+{
+  "identity": "checkout-k6",
+  "name": "Checkout load (k6)",
+  "description": "Sustained browse-and-checkout load, driven by a k6 script",
+  "toolType": "K6",
+  "infraIdentifier": "perf-cluster",
+  "environmentIdentifier": "staging",
+  "targetType": "kubernetes",
+  "tags": ["nightly", "checkout"],
+  "cleanupPolicy": "delete",
+
+  "resources": {
+    "requests": { "cpu": "500m", "memory": "1Gi" },
+    "limits": { "cpu": "2", "memory": "2Gi" }
+  },
+
+  "variables": [
+    {
+      "name": "baseUrl",
+      "value": "https://staging.example.com",
+      "type": "string",
+      "description": "Reachable from the script as __ENV.baseUrl"
+    }
+  ],
+
+  "toolConfig": {
+    "k6": {
+      "mode": "script",
+      "script": {
+        "source": "inline"
+      },
+
+      "tunables": {
+        "hostUrl": "<+variable.baseUrl>",
+        "targetUsers": "<+input>",
+        "rampUpTimeSec": 60,
+        "durationSeconds": 900,
+        "workerCount": 1,
+        "maxDurationSec": 3600
+      },
+
+      "envVars": [
+        { "key": "REGION", "value": "us-east-1" },
+        { "key": "baseUrl", "value": "<+variable.baseUrl>" }
+      ],
+
+      "metricTags": {
+        "service": "checkout",
+        "build": "<+input>"
+      },
+
+      "options": {
+        "userAgent": "harness-loadtest/1.0",
+        "batchConcurrent": 20,
+        "batchPerHost": 6,
+        "discardResponseBodies": false
+      },
+
+      "thresholds": [
+        { "metric": "http_req_failed", "operator": "<", "value": 0.01, "abortOnFail": true },
+        { "metric": "http_req_duration", "stat": "p95", "operator": "<", "value": 500 }
+      ]
+    }
+  }
+}

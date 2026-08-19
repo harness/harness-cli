@@ -1,0 +1,59 @@
+{
+  "identity": "checkout-jmeter",
+  "name": "Checkout load (JMeter)",
+  "description": "Thread-group load from a .jmx plan whose thread counts read JMeter properties",
+  "toolType": "JMeter",
+  "infraIdentifier": "perf-cluster",
+  "environmentIdentifier": "staging",
+  "targetType": "kubernetes",
+  "tags": ["nightly", "checkout"],
+  "cleanupPolicy": "delete",
+
+  "resources": {
+    "requests": { "cpu": "500m", "memory": "1Gi" },
+    "limits": { "cpu": "2", "memory": "2Gi" }
+  },
+
+  "variables": [
+    {
+      "name": "baseUrl",
+      "value": "https://staging.example.com",
+      "type": "string",
+      "description": "Read by the plan as ${__P(baseUrl)}"
+    }
+  ],
+
+  "toolConfig": {
+    "jmeter": {
+      "mode": "script",
+      "script": {
+        "source": "inline"
+      },
+
+      "tunables": {
+        "targetUrl": "<+variable.baseUrl>",
+        "targetUsers": 200,
+        "rampUpTimeSec": 60,
+        "durationSeconds": 900,
+        "workerCount": 1,
+        "maxDurationSec": 3600
+      },
+
+      "properties": [
+        { "key": "baseUrl", "value": "<+variable.baseUrl>", "sendToEngines": true },
+        { "key": "threads", "value": 200, "sendToEngines": true },
+        { "key": "rampup", "value": 60, "sendToEngines": true },
+        { "key": "duration", "value": 900, "sendToEngines": true }
+      ],
+
+      "envVars": [
+        { "key": "JVM_ARGS", "value": "-Xms1g -Xmx2g" }
+      ],
+
+      "thresholds": [
+        { "metric": "error_rate_pct", "operator": "<", "value": 1, "abortOnFail": true },
+        { "metric": "response_time_ms", "stat": "p95", "operator": "<", "value": 500 }
+      ]
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "identity": "checkout-jmeter-distributed",
+  "name": "Checkout load (JMeter, distributed)",
+  "description": "Three injectors driving a shared plan baked into an image",
+  "toolType": "JMeter",
+  "infraIdentifier": "perf-cluster",
+  "environmentIdentifier": "staging",
+  "targetType": "kubernetes",
+  "tags": ["capacity"],
+  "cleanupPolicy": "retain",
+
+  "resources": {
+    "requests": { "cpu": "1", "memory": "2Gi" },
+    "limits": { "cpu": "4", "memory": "4Gi" }
+  },
+
+  "toolConfig": {
+    "jmeter": {
+      "mode": "image",
+
+      "script": {
+        "source": "image",
+        "image": "ghcr.io/example/jmeter-suite:2.1.0",
+        "entrypoint": "jmeter",
+        "runArgs": ["-n", "-t", "/suite/checkout.jmx", "-l", "/results/result.jtl"],
+        "imagePullSecret": "ghcr-pull"
+      },
+
+      "tunables": {
+        "targetUrl": "https://staging.example.com",
+
+        "targetUsers": 1500,
+        "rampUpTimeSec": 300,
+        "durationSeconds": 1800,
+
+        "workerCount": 3,
+        "maxDurationSec": 7200
+      },
+
+      "properties": [
+        { "key": "threads", "value": 500, "sendToEngines": true },
+        { "key": "summariser.interval", "value": 30, "sendToEngines": false }
+      ],
+
+      "thresholds": [
+        { "metric": "error_rate_pct", "operator": "<", "value": 2, "abortOnFail": true },
+        { "metric": "response_time_ms", "stat": "p90", "operator": "<", "value": 800 }
+      ]
+    }
+  }
+}

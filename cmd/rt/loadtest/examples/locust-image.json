@@ -1,0 +1,46 @@
+{
+  "identity": "checkout-locust-image",
+  "name": "Checkout load (Locust image)",
+  "description": "Distributed Locust run from an image bundling the locustfile and its dependencies",
+  "toolType": "Locust",
+  "infraIdentifier": "perf-cluster",
+  "environmentIdentifier": "staging",
+  "targetType": "kubernetes",
+  "tags": ["capacity"],
+  "cleanupPolicy": "delete",
+
+  "resources": {
+    "requests": { "cpu": "1", "memory": "2Gi" },
+    "limits": { "cpu": "4", "memory": "4Gi" }
+  },
+
+  "toolConfig": {
+    "locust": {
+      "mode": "image",
+
+      "script": {
+        "source": "image",
+        "image": "ghcr.io/example/locust-suite:1.2.0",
+        "entrypoint": "locust",
+        "runArgs": ["-f", "/suite/locustfile.py", "--headless"],
+        "imagePullSecret": "ghcr-pull"
+      },
+
+      "tunables": {
+        "targetUrl": "https://staging.example.com",
+        "targetUsers": 2000,
+        "spawnRate": 25,
+        "rampUpTimeSec": 120,
+        "durationSeconds": 1800,
+
+        "workerCount": 4,
+        "maxDurationSec": 7200
+      },
+
+      "envVars": [
+        { "key": "PERF_USER", "value": "perf" },
+        { "key": "PERF_PASSWORD", "value": "account.perfPassword", "secret": true }
+      ]
+    }
+  }
+}

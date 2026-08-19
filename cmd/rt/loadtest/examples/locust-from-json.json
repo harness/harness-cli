@@ -1,0 +1,74 @@
+{
+  "identity": "api-journey",
+  "name": "API journey",
+  "description": "Log in, then list and place orders as an authenticated user",
+  "toolType": "Locust",
+  "infraIdentifier": "perf-cluster",
+  "environmentIdentifier": "staging",
+  "targetType": "kubernetes",
+  "tags": ["api", "smoke"],
+
+  "variables": [
+    {
+      "name": "perfPassword",
+      "value": "account.perfPassword",
+      "type": "secret",
+      "description": "Referenced from the login body as <+variable.perfPassword>"
+    }
+  ],
+
+  "toolConfig": {
+    "locust": {
+      "tunables": {
+        "targetUsers": 100,
+        "spawnRate": 5,
+        "rampUpTimeSec": 30,
+        "durationSeconds": 600,
+        "workerCount": 1,
+        "maxDurationSec": 3600
+      }
+    }
+  },
+
+  "jsonSpec": {
+    "config": {
+      "host": "https://api.staging.example.com",
+
+      "min_wait": 1,
+      "max_wait": 3
+    },
+
+    "endpoints": [
+      {
+        "name": "login",
+        "method": "POST",
+        "path": "/v1/auth/login",
+        "headers": { "Content-Type": "application/json" },
+        "body": { "user": "perf", "password": "<+variable.perfPassword>" },
+        "assertions": { "status_code": 200, "max_response_time_ms": 800 },
+
+        "extract": { "variable_name": "token", "json_path": "$.data.accessToken" }
+      },
+      {
+        "name": "list-orders",
+        "method": "GET",
+        "path": "/v1/orders",
+        "query_params": { "limit": "20" },
+
+        "headers": { "Authorization": "Bearer {{token}}" },
+        "assertions": { "status_code": 200, "max_response_time_ms": 500 }
+      },
+      {
+        "name": "create-order",
+        "method": "POST",
+        "path": "/v1/orders",
+        "headers": {
+          "Authorization": "Bearer {{token}}",
+          "Content-Type": "application/json"
+        },
+        "body": { "sku": "SKU-1001", "quantity": 1 },
+        "assertions": { "status_code": 201, "max_response_time_ms": 1000 }
+      }
+    ]
+  }
+}
