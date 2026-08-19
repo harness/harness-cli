@@ -102,6 +102,69 @@ func TestCreateRunRetriesADuplicateIdentity(t *testing.T) {
 	}
 }
 
+// Retrying forever against a service rejecting everything would hang the
+// terminal, so it gives up and says how many names it tried.
+func TestCreateRunGivesUpAfterRepeatedCollisions(t *testing.T) {
+	var mu sync.Mutex
+	var attempts int
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		attempts++
+		mu.Unlock()
+
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"write exception: [E11000 duplicate key error]"}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL})
+	_, err := client.CreateRun(context.Background(), "checkout-load", CreateRunRequest{})
+	if err == nil {
+		t.Fatal("a run was reported as started against a service rejecting every identity")
+	}
+	if !strings.Contains(err.Error(), "checkout-load") {
+		t.Errorf("the error does not name the load test: %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if attempts != runIdentityAttempts {
+		t.Errorf("made %d attempts, want it to stop at %d", attempts, runIdentityAttempts)
+	}
+}
+
+// Only a name clash is worth another name. Retrying a rejected infrastructure
+// or a bad payload would turn one clear failure into five.
+func TestCreateRunDoesNotRetryARealFailure(t *testing.T) {
+	var mu sync.Mutex
+	var attempts int
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		attempts++
+		mu.Unlock()
+
+		http.Error(w, `{"error":"infrastructure perf-cluster is not connected"}`, http.StatusBadRequest)
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL})
+	_, err := client.CreateRun(context.Background(), "checkout-load", CreateRunRequest{})
+	if err == nil {
+		t.Fatal("a rejected run was reported as started")
+	}
+	if !strings.Contains(err.Error(), "not connected") {
+		t.Errorf("the rejection was replaced by a retry message: %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if attempts != 1 {
+		t.Errorf("made %d attempts, want the rejection to stand after 1", attempts)
+	}
+}
+
 // An identity supplied by the caller is theirs to own: pinning it and having
 // it silently replaced would make the flag a lie.
 func TestCreateRunKeepsAnExplicitIdentity(t *testing.T) {
@@ -195,6 +258,77 @@ func TestGetRunSurvivesAnUnresolvableParent(t *testing.T) {
 	}
 	if run.LoadTestIdentity != uniqueID {
 		t.Fatalf("parent became %q, want it left as the unresolvable id", run.LoadTestIdentity)
+	}
+}
+
+// A run identity is typed by hand from a listing, so a wrong one is ordinary.
+// It must fail rather than return an empty run that prints as blank columns.
+func TestGetRunSurfacesAMissingRun(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"error":"run not found"}`, http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL})
+	run, err := client.GetRun(context.Background(), "checkout-load-zzz")
+	if err == nil {
+		t.Fatalf("a missing run was returned as %+v", run)
+	}
+	if !IsNotFound(err) {
+		t.Errorf("the 404 did not survive as one: %v", err)
+	}
+}
+
+// Retuning a run that has already finished is refused. Reading the run back
+// over a refused change would report success and the old figures.
+func TestUpdateRunSurfacesARejectedRetune(t *testing.T) {
+	var mu sync.Mutex
+	var reads int
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			mu.Lock()
+			reads++
+			mu.Unlock()
+			_ = json.NewEncoder(w).Encode(Run{Identity: "checkout-load-71f", Status: "Finished"})
+			return
+		}
+		http.Error(w, `{"error":"Can only update running tests"}`, http.StatusBadRequest)
+	}))
+	defer server.Close()
+
+	targetUsers := 500
+	client := NewClient(Config{Server: server.URL})
+	_, err := client.UpdateRun(context.Background(), "checkout-load-71f", UpdateRunRequest{TargetUsers: &targetUsers})
+	if err == nil {
+		t.Fatal("a refused retune was reported as applied")
+	}
+	if !strings.Contains(err.Error(), "Can only update running tests") {
+		t.Errorf("the refusal was replaced: %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if reads != 0 {
+		t.Errorf("read the run back %d times after a refused change", reads)
+	}
+}
+
+// The lookup walks the listing because no route takes a unique id. A listing
+// that fails part-way is not the same answer as "no such load test".
+func TestFindLoadTestByUniqueIDSurfacesAFailedListing(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"error":"scope not found"}`, http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL})
+	found, err := client.FindLoadTestByUniqueID(context.Background(), "3f8e0a8b-66d2-4951-af3a-df0d77654c3b")
+	if err == nil {
+		t.Fatalf("a failed listing was reported as a clean miss: %+v", found)
+	}
+	if found != nil {
+		t.Errorf("returned a load test alongside the error: %+v", found)
 	}
 }
 

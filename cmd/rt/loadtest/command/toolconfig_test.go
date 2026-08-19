@@ -307,6 +307,235 @@ func TestApplyRuntimeInputs(t *testing.T) {
 	}
 }
 
+// The k6 options are a fixed table so a misspelt one is caught here rather
+// than accepted and ignored by the runner. Each has a natural type, and the
+// flag cannot state it, so the table decides.
+func TestK6OptionsAreWrittenWithTheTypeTheTableGivesThem(t *testing.T) {
+	root := map[string]any{}
+	writer := writerFor(t, api.ToolK6, root)
+
+	set := map[string]bool{
+		"k6-user-agent":               true,
+		"k6-batch-per-host":           true,
+		"k6-no-connection-reuse":      true,
+		"k6-insecure-skip-tls-verify": true,
+	}
+	text := func(string) string { return "hc-loadtest/1.0" }
+	number := func(string) int { return 12 }
+	flag := func(name string) bool { return name == "k6-no-connection-reuse" }
+
+	if err := writer.applyK6Options(set, text, number, flag); err != nil {
+		t.Fatalf("applyK6Options: %v", err)
+	}
+
+	for path, want := range map[string]any{
+		"k6.options.userAgent":             "hc-loadtest/1.0",
+		"k6.options.batchPerHost":          12,
+		"k6.options.noConnectionReuse":     true,
+		"k6.options.insecureSkipTLSVerify": false,
+	} {
+		if got, _ := api.GetPath(root, path); got != want {
+			t.Errorf("%s = %#v, want %#v", path, got, want)
+		}
+	}
+
+	// An option nobody asked for must not appear: writing a zero value would
+	// pin a setting the user never chose.
+	if _, found := api.GetPath(root, "k6.options.dnsStrategy"); found {
+		t.Error("an option that was not set was written anyway")
+	}
+}
+
+// A k6 option on a JMeter test would be dropped silently by the runner, so it
+// is refused with the engine it belongs to named.
+func TestK6OptionsAreRejectedForOtherEngines(t *testing.T) {
+	for _, tool := range []api.ToolType{api.ToolJMeter, api.ToolLocust} {
+		writer := writerFor(t, tool, nil)
+		err := writer.applyK6Options(
+			map[string]bool{"k6-dns-strategy": true},
+			func(string) string { return "round-robin" },
+			func(string) int { return 0 },
+			func(string) bool { return false },
+		)
+		if err == nil {
+			t.Fatalf("--k6-dns-strategy was accepted for %s", tool)
+		}
+		if !strings.Contains(err.Error(), string(tool)) {
+			t.Errorf("the error does not name %s: %v", tool, err)
+		}
+	}
+}
+
+// script and image are the two shapes the runner knows. Anything else has to
+// be named as unsupported rather than written through for it to reject.
+func TestSetModeRejectsAModeThatIsNotOne(t *testing.T) {
+	err := writerFor(t, api.ToolK6, nil).setMode("debug")
+	if err == nil {
+		t.Fatal("an unknown mode was accepted")
+	}
+	if !strings.Contains(err.Error(), "script") || !strings.Contains(err.Error(), "image") {
+		t.Errorf("the error does not say what is supported: %v", err)
+	}
+}
+
+// A config file that already states the mode settles it, so --mode does not
+// have to be repeated on every later edit.
+func TestCurrentModeReadsWhatTheBlockAlreadyHolds(t *testing.T) {
+	writer := writerFor(t, api.ToolK6, map[string]any{
+		"k6": map[string]any{"mode": "image"},
+	})
+
+	if got := writer.currentMode(); got != api.ModeImage {
+		t.Errorf("currentMode = %q, want the mode the block already carries", got)
+	}
+	if got := writerFor(t, api.ToolK6, nil).currentMode(); got != "" {
+		t.Errorf("an empty block reported mode %q", got)
+	}
+}
+
+// --spawn-rate is the one fractional tunable, so it is the one that has to
+// reject text without falling back to storing it as a string.
+func TestATunableThatWantsANumberRejectsText(t *testing.T) {
+	writer := writerFor(t, api.ToolLocust, nil)
+
+	err := writer.applyTunables(
+		map[string]bool{"spawn-rate": true},
+		func(string) string { return "quickly" },
+	)
+	if err == nil {
+		t.Fatal("--spawn-rate quickly was accepted")
+	}
+	if !strings.Contains(err.Error(), "spawn-rate") || !strings.Contains(err.Error(), api.RuntimeInput) {
+		t.Errorf("the error names neither the flag nor the runtime-input alternative: %v", err)
+	}
+}
+
+// A config file may put a scalar where the flag then wants a block. Writing
+// through it would replace a value the user set with a map they did not.
+func TestATunableWillNotWriteThroughAScalar(t *testing.T) {
+	writer := writerFor(t, api.ToolK6, map[string]any{
+		"k6": map[string]any{"tunables": "everything"},
+	})
+
+	err := writer.applyTunables(
+		map[string]bool{"target-users": true},
+		func(string) string { return "500" },
+	)
+	if err == nil {
+		t.Fatal("a tunable was written through a scalar")
+	}
+	if !strings.Contains(err.Error(), "tunables") {
+		t.Errorf("the error does not name the offending segment: %v", err)
+	}
+}
+
+// The same rule for the escape hatch, which names its own path and so is the
+// most likely to collide with one.
+func TestApplySetFlagsReportsAMalformedAssignmentAndABlockedPath(t *testing.T) {
+	writer := writerFor(t, api.ToolK6, nil)
+
+	for _, assignment := range []string{"tunables.targetUsers", "=500"} {
+		if err := writer.applySetFlags([]string{assignment}); err == nil {
+			t.Errorf("--set %q was accepted", assignment)
+		}
+	}
+
+	blocked := writerFor(t, api.ToolK6, map[string]any{
+		"k6": map[string]any{"tunables": "everything"},
+	})
+	if err := blocked.applySetFlags([]string{"tunables.targetUsers=500"}); err == nil {
+		t.Error("--set wrote through a scalar")
+	}
+}
+
+// --runtime-input names a path and nothing else. An empty one would mark the
+// whole tool block as supplied at run time.
+func TestApplyRuntimeInputsRejectsAnEmptyPath(t *testing.T) {
+	if err := writerFor(t, api.ToolK6, nil).applyRuntimeInputs([]string{"  "}); err == nil {
+		t.Error("an empty --runtime-input was accepted")
+	}
+}
+
+// Both merge into a keyed collection, so both have to agree on what a pair is.
+func TestPropertiesAndMetricTagsRejectMalformedPairs(t *testing.T) {
+	if err := writerFor(t, api.ToolJMeter, nil).applyProperties([]string{"NOEQUALS"}); err == nil ||
+		!strings.Contains(err.Error(), "KEY=VALUE") {
+		t.Errorf("--property NOEQUALS: got %v, want a KEY=VALUE hint", err)
+	}
+	if err := writerFor(t, api.ToolK6, nil).applyMetricTags([]string{"=checkout"}); err == nil ||
+		!strings.Contains(err.Error(), "KEY=VALUE") {
+		t.Errorf("--metric-tag =checkout: got %v, want a KEY=VALUE hint", err)
+	}
+}
+
+// applyThresholds keeps whatever is already there, so a bad spec has to stop
+// before the good ones in the same invocation are written.
+func TestApplyThresholdsSurfacesABadSpec(t *testing.T) {
+	root := map[string]any{}
+	writer := writerFor(t, api.ToolK6, root)
+
+	err := writer.applyThresholds([]string{
+		"metric=http_req_duration,operator=<,value=500",
+		"metric=http_req_failed,operator=~,value=0.01",
+	})
+	if err == nil {
+		t.Fatal("an unsupported operator was accepted")
+	}
+	if _, found := api.GetPath(root, "k6.thresholds"); found {
+		t.Error("the valid threshold was written even though the batch failed")
+	}
+}
+
+// A config file is free-form JSON, so a field the flags treat as a list may
+// arrive as something else. Reading it as empty loses the user's value, but
+// keeps the flag working rather than panicking on the type assertion.
+func TestListIgnoresAFieldThatIsNotAList(t *testing.T) {
+	writer := writerFor(t, api.ToolK6, map[string]any{
+		"k6": map[string]any{"thresholds": "all of them"},
+	})
+
+	if got := writer.list("thresholds"); got != nil {
+		t.Errorf("list read %#v out of a scalar", got)
+	}
+	if got := writer.list("envVars"); got != nil {
+		t.Errorf("list invented %#v for a field that is absent", got)
+	}
+}
+
+// The shorthand is split on commas, so a trailing one leaves an empty part
+// that is skipped rather than reported as a nameless field.
+func TestShorthandSkipsEmptyPartsButNeedsAtLeastOne(t *testing.T) {
+	fields, err := parseShorthand("threshold", "metric=m,operator=<,value=1,")
+	if err != nil {
+		t.Fatalf("a trailing comma was rejected: %v", err)
+	}
+	if len(fields) != 3 {
+		t.Errorf("parsed %v, want the empty part skipped", fields)
+	}
+
+	if _, err := parseShorthand("threshold", " , , "); err == nil {
+		t.Error("a spec of nothing but separators was accepted")
+	}
+}
+
+// The collection being merged into came from a config file, so an entry may
+// not be a map at all. It is stepped over rather than matched or dropped.
+func TestUpsertStepsOverAnEntryThatIsNotAMap(t *testing.T) {
+	items := []any{"not a map", map[string]any{"key": "REGION", "value": "us-east-1"}}
+
+	got := upsertByField(items, "key", "REGION", map[string]any{"key": "REGION", "value": "eu-west-1"})
+
+	if len(got) != 2 {
+		t.Fatalf("got %d entries, want the existing one replaced in place: %#v", len(got), got)
+	}
+	if got[0] != "not a map" {
+		t.Errorf("the unrecognised entry was altered: %#v", got[0])
+	}
+	if value := got[1].(map[string]any)["value"]; value != "eu-west-1" {
+		t.Errorf("REGION = %v, want it overridden", value)
+	}
+}
+
 func TestMergeVariablesOverridesByName(t *testing.T) {
 	existing := []api.Variable{
 		{Name: "buildId", Value: "1000"},

@@ -91,6 +91,37 @@ func TestLoadConfigSectionReportsADocumentThatHasNoSection(t *testing.T) {
 	}
 }
 
+// A file has to be readable as a document before a section can be looked for
+// in it, and the complaint has to name the file: a hand-edited config with a
+// trailing comma is the common case, and it is not obvious which one broke.
+func TestLoadConfigSectionReportsAFileThatIsNotJSON(t *testing.T) {
+	path := writeConfig(t, `{"jsonSpec": {"host": "https://api.example.com",}}`)
+
+	var spec endpointSpec
+	err := LoadConfigSection(path, "jsonSpec", &spec)
+	if err == nil {
+		t.Fatal("a malformed document was accepted")
+	}
+	if !strings.Contains(err.Error(), path) {
+		t.Fatalf("the error does not name the file: %v", err)
+	}
+}
+
+// decodeHint only rewrites the unknown-field message. Anything else has to
+// survive untouched, or a type mismatch would lose its explanation.
+func TestDecodeHintLeavesAnErrorItDoesNotRecogniseAlone(t *testing.T) {
+	path := writeConfig(t, `{"host": 42}`)
+
+	var spec endpointSpec
+	err := LoadConfigFile(path, &spec)
+	if err == nil {
+		t.Fatal("a string field given a number was accepted")
+	}
+	if !strings.Contains(err.Error(), "host") {
+		t.Fatalf("the type mismatch lost its detail: %v", err)
+	}
+}
+
 // LoadConfigFile is the strict path, used where the file is the whole request.
 func TestLoadConfigFileRejectsAnUnknownField(t *testing.T) {
 	path := writeConfig(t, `{"host": "https://api.example.com", "hosts": []}`)

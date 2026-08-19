@@ -57,6 +57,32 @@ func TestErrorMessageFallsBackToTheErrorField(t *testing.T) {
 	}
 }
 
+// "HTTP 403: Forbidden" tells the user nothing they can act on. The three
+// statuses that have a known cause say what to check, and the rest say nothing
+// rather than guessing.
+func TestErrorSuggestsWhatToCheckForTheStatusesWithAKnownCause(t *testing.T) {
+	cases := map[int]string{
+		http.StatusUnauthorized: "not expired",
+		http.StatusForbidden:    "load_loadtest_view",
+		http.StatusNotFound:     "--account",
+	}
+
+	for status, want := range cases {
+		got := newAPIError("GET", "/load-tests", status, nil).Error()
+		if !strings.Contains(got, want) {
+			t.Errorf("HTTP %d does not mention %q:\n%s", status, want, got)
+		}
+	}
+
+	// A 500 is the service's problem, not a scope or credential mistake, so
+	// pointing at --account would send the user the wrong way.
+	unexplained := newAPIError("POST", "/load-tests", http.StatusInternalServerError,
+		[]byte(`{"error":"boom"}`))
+	if strings.Contains(unexplained.Error(), "--account") {
+		t.Errorf("a server error was blamed on the scope:\n%s", unexplained.Error())
+	}
+}
+
 // A response that is not JSON at all still has to say something. A gateway
 // returning HTML for a 502 is the usual case.
 func TestErrorFallsBackToTheBodyThenTheStatus(t *testing.T) {

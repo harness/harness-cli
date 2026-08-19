@@ -68,6 +68,17 @@ func TestSetPathRejectsWritingThroughAScalar(t *testing.T) {
 	}
 }
 
+// "--set =200" parses into an empty path. Writing it would put a value under
+// the empty key, where nothing reads it and nothing reports it missing.
+func TestSetPathRejectsAnEmptyPath(t *testing.T) {
+	for _, path := range []string{"", ".targetUsers"} {
+		root := map[string]any{}
+		if err := SetPath(root, path, 200); err == nil {
+			t.Errorf("SetPath(%q) was accepted, writing %v", path, root)
+		}
+	}
+}
+
 func TestGetPathMissingSegment(t *testing.T) {
 	root := map[string]any{"k6": map[string]any{}}
 
@@ -76,6 +87,36 @@ func TestGetPathMissingSegment(t *testing.T) {
 	}
 	if _, found := GetPath(root, "locust"); found {
 		t.Error("GetPath reported a tool block that was never written")
+	}
+}
+
+// Reading through a leaf is a miss, not a value. Returning the scalar itself
+// would let "k6.mode.nested" resolve to whatever "k6.mode" holds.
+func TestGetPathThroughAScalar(t *testing.T) {
+	root := map[string]any{"k6": map[string]any{"mode": "script"}}
+
+	if value, found := GetPath(root, "k6.mode.nested"); found {
+		t.Errorf("GetPath read %v through a scalar segment", value)
+	}
+}
+
+// The skeleton suggests an image per tool. A tool it does not know gets no
+// suggestion rather than one borrowed from whichever case fell through.
+func TestImageExampleIsPerToolAndOtherwiseEmpty(t *testing.T) {
+	seen := map[string]bool{}
+	for _, tool := range SupportedToolTypes {
+		example := imageExample(tool)
+		if example == "" {
+			t.Errorf("%s has no example image, so the skeleton suggests nothing", tool)
+		}
+		if seen[example] {
+			t.Errorf("%s reuses the example image %q of another tool", tool, example)
+		}
+		seen[example] = true
+	}
+
+	if got := imageExample(ToolType("Gatling")); got != "" {
+		t.Errorf("an unsupported tool was given the image %q", got)
 	}
 }
 
@@ -219,6 +260,28 @@ func TestJSONSpecValidate(t *testing.T) {
 			name:    "unsupported method",
 			mutate:  func(s *JSONSpec) { s.Endpoints[0].Method = "FETCH" },
 			wantErr: `unsupported method "FETCH"`,
+		},
+		{
+			// Results are grouped by name, so an unnamed endpoint has nothing to
+			// report under. The complaint has to carry the index, since there is
+			// no name to quote back.
+			name:    "no name",
+			mutate:  func(s *JSONSpec) { s.Endpoints[0].Name = "" },
+			wantErr: "endpoints[0]: name is required",
+		},
+		{
+			// A name of spaces looks named until it is trimmed, so it is quoted
+			// back rather than reported as absent.
+			name:    "name of spaces",
+			mutate:  func(s *JSONSpec) { s.Endpoints[0].Name = "  " },
+			wantErr: `endpoints[0] ("  "): name is required`,
+		},
+		{
+			// An absent method is a different mistake from a misspelt one, so it
+			// lists what is accepted rather than quoting back an empty string.
+			name:    "no method",
+			mutate:  func(s *JSONSpec) { s.Endpoints[0].Method = "" },
+			wantErr: "method is required, one of",
 		},
 		{
 			name:    "missing path",

@@ -93,3 +93,39 @@ func TestGetScriptRevisionNamesTheRevisionsThatExist(t *testing.T) {
 		t.Fatalf("the error does not say which revisions exist: %v", err)
 	}
 }
+
+// A test whose script has never been updated has no revisions at all. Listing
+// the ones that exist would print an empty list, so it says there are none.
+func TestGetScriptRevisionSaysWhenThereAreNoRevisions(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode([]ScriptRevision{})
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL})
+	_, err := client.GetScriptRevision(context.Background(), "checkout-load", "1")
+	if err == nil {
+		t.Fatal("a revision was returned for a test that has none")
+	}
+	if !strings.Contains(err.Error(), "no script revisions") {
+		t.Fatalf("the error reads as a missing revision rather than an empty history: %v", err)
+	}
+}
+
+// The listing is only fetched to turn an ordinal into an identity. A failure
+// reading it must surface rather than be reported as a missing revision.
+func TestGetScriptRevisionSurfacesAFailedListing(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"error":"scope not found"}`, http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL})
+	_, err := client.GetScriptRevision(context.Background(), "checkout-load", "1")
+	if err == nil {
+		t.Fatal("a failed listing was reported as success")
+	}
+	if !strings.Contains(err.Error(), "scope not found") {
+		t.Fatalf("the listing failure was swallowed: %v", err)
+	}
+}

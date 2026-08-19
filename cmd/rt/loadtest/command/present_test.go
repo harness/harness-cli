@@ -42,6 +42,17 @@ func TestScriptIsDecodedForDisplay(t *testing.T) {
 	}
 }
 
+// Tidying the payload is a presentation step. A value it cannot walk comes
+// back as it arrived, since failing the whole command over the display of a
+// response the service already returned successfully would be worse.
+func TestAValueThatCannotBeWalkedIsPrintedAsItArrived(t *testing.T) {
+	unwalkable := make(chan int)
+
+	if got := readable(unwalkable); got != any(unwalkable) {
+		t.Errorf("readable rewrote a value it could not decode: %v", got)
+	}
+}
+
 // A tunable deferred to run time is a literal, not base64, and must survive
 // untouched or the config stops round-tripping.
 func TestRuntimeInputIsLeftAlone(t *testing.T) {
