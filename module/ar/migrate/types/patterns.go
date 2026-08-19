@@ -12,7 +12,7 @@ package types
 // applied to individual file URIs for this artifact type.
 func IsFileLevelPatternFilterable(t ArtifactType) bool {
 	switch t {
-	case GENERIC, RAW, PYTHON, MAVEN, NUGET, NPM, DART, GO, RUBY:
+	case GENERIC, RAW, PYTHON, MAVEN, NUGET, NPM, DART, GO, RUBY, PUPPET, TERRAFORM:
 		return true
 	default:
 		return false
@@ -23,7 +23,7 @@ func IsFileLevelPatternFilterable(t ArtifactType) bool {
 // applied to package names for this artifact type.
 func IsPackageLevelPatternFilterable(t ArtifactType) bool {
 	switch t {
-	case DOCKER, HELM, HELM_LEGACY, HELM_HTTP, RPM, CONDA, COMPOSER, SWIFT, CONAN:
+	case DOCKER, HELM, HELM_LEGACY, HELM_HTTP, RPM, CONDA, COMPOSER, SWIFT, CONAN, DEBIAN:
 		return true
 	default:
 		return false

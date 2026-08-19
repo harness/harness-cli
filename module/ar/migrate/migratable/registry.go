@@ -238,8 +238,11 @@ func (r *Registry) Migrate(ctx context.Context) error {
 	// its files is in window. buildVersionJobs recovers a version's pruned
 	// distribution files from this unfiltered tree. It is pattern-filtered (never
 	// resurrect an explicitly excluded file) but NOT date-filtered.
+	// TERRAFORM also gets the unfiltered tree: its provider versions are atomic
+	// multi-file versions too (all platform zips per version), but discovery
+	// happens inside Version.Migrate, which swaps to this tree — see version.go.
 	var unfilteredRoot *types.TreeNode
-	if dateFilterActive && util.IsAtomicVersionArtifact(currArtifactType) {
+	if dateFilterActive && (util.IsAtomicVersionArtifact(currArtifactType) || currArtifactType == types.TERRAFORM) {
 		recoveryFiles := originalFiles
 		if util.IsFileLevelFilterableArtifact(currArtifactType) &&
 			(len(r.mapping.IncludePatterns) > 0 || len(r.mapping.ExcludePatterns) > 0) {

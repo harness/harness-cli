@@ -128,6 +128,8 @@ func TestIsFileLevelFilterableArtifact(t *testing.T) {
 	}{
 		{"RUBY is file-level filterable", types.RUBY, true},
 		{"DART is file-level filterable", types.DART, true},
+		{"TERRAFORM is file-level filterable", types.TERRAFORM, true},
+		{"PUPPET is file-level filterable", types.PUPPET, true},
 		{"DOCKER is not file-level filterable", types.DOCKER, false},
 		{"COMPOSER is not file-level filterable", types.COMPOSER, false},
 	}

@@ -135,10 +135,12 @@ mappings:
 }
 
 // TestValidateConfig_PatternsRejectedForNonFilterableTypes verifies §6-W1:
-// include/exclude patterns on types with no pattern support (DEBIAN,
-// TERRAFORM, PUPPET) are a config error, not a silent no-op.
+// include/exclude patterns on types with no pattern support are a config
+// error, not a silent no-op. DEBIAN is package-level filterable;
+// TERRAFORM and PUPPET are file-level filterable — all three now accept
+// patterns and are covered by TestValidateConfig_PatternsAcceptedForFilterableTypes.
 func TestValidateConfig_PatternsRejectedForNonFilterableTypes(t *testing.T) {
-	for _, at := range []ArtifactType{DEBIAN, TERRAFORM, PUPPET} {
+	for _, at := range []ArtifactType{} {
 		config := baseValidConfig()
 		config.Mappings[0].ArtifactType = at
 		config.Mappings[0].IncludePatterns = []string{"foo/**"}
@@ -162,11 +164,11 @@ func TestValidateConfig_PatternsRejectedForNonFilterableTypes(t *testing.T) {
 }
 
 // TestValidateConfig_PatternsAcceptedForFilterableTypes verifies §6-W1 does
-// not over-reject: file-level (GENERIC) and package-level (CONDA) filterable
-// types still accept patterns.
+// not over-reject: file-level (GENERIC, RUBY, PUPPET, TERRAFORM) and
+// package-level (CONDA, DEBIAN) filterable types still accept patterns.
 func TestValidateConfig_PatternsAcceptedForFilterableTypes(t *testing.T) {
-	for _, at := range []ArtifactType{GENERIC, RAW, PYTHON, MAVEN, NUGET, NPM, DART, GO,
-		DOCKER, HELM, HELM_LEGACY, HELM_HTTP, RPM, CONDA, COMPOSER, SWIFT, CONAN} {
+	for _, at := range []ArtifactType{GENERIC, RAW, PYTHON, MAVEN, NUGET, NPM, DART, GO, RUBY, PUPPET, TERRAFORM,
+		DOCKER, HELM, HELM_LEGACY, HELM_HTTP, RPM, CONDA, COMPOSER, SWIFT, CONAN, DEBIAN} {
 		config := baseValidConfig()
 		config.Mappings[0].ArtifactType = at
 		config.Mappings[0].IncludePatterns = []string{"foo/**"}

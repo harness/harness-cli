@@ -136,6 +136,10 @@ factory map (`adapter/adapter.go:72-101`); blank-imported in `migration.go:21-24
   has surviving files but `GetPackages` resolves zero packages (type mismatch),
   regardless of filter settings; filters that starve the tree to zero files are
   a valid empty result.
+- **Atomic versions:** PYTHON (entry-level recovery in `buildVersionJobs`) and
+  TERRAFORM (tree-swap in `Version.Migrate`: an in-scope provider version
+  migrates ALL platform zips from the unfiltered tree) never publish partial
+  versions under date filters.
 - **Dry-run:** `--dry-run` skips all destination calls and emits
   `dry-run-output/{file_list,directory_structure}_*.json` (`migration.go:147`).
   Use a before/after diff of these as a **regression gate** for refactors.

@@ -1,0 +1,36 @@
+{
+  "results": [
+    {
+      "repo": "terraform-local",
+      "path": "hashicorp/vpc/aws/1.0.0",
+      "name": "vpc-1.0.0.tar.gz",
+      "created": "2024-01-01T00:00:00.000Z",
+      "modified": "2024-01-01T00:00:00.000Z",
+      "stats": []
+    },
+    {
+      "repo": "terraform-local",
+      "path": "hashicorp/vpc/aws/1.1.0",
+      "name": "vpc-1.1.0.tar.gz",
+      "created": "2024-02-01T00:00:00.000Z",
+      "modified": "2024-02-01T00:00:00.000Z",
+      "stats": []
+    },
+    {
+      "repo": "terraform-local",
+      "path": "hashicorp/aws/2.0.0",
+      "name": "terraform-provider-aws_2.0.0_linux_amd64.zip",
+      "created": "2026-06-01T00:00:00.000Z",
+      "modified": "2026-06-01T00:00:00.000Z",
+      "stats": []
+    },
+    {
+      "repo": "terraform-local",
+      "path": "hashicorp/aws/2.0.0",
+      "name": "terraform-provider-aws_2.0.0_darwin_arm64.zip",
+      "created": "2024-01-15T00:00:00.000Z",
+      "modified": "2024-01-15T00:00:00.000Z",
+      "stats": []
+    }
+  ]
+}

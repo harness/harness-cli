@@ -394,7 +394,7 @@ func (r *Package) buildVersionJobs(versions []types.Version, logger zerolog.Logg
 			}
 			jobs = append(jobs, NewVersionJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry,
 				r.artifactType, r.pkg, e.version, node, r.stats, r.mapping, r.config, r.registry,
-				r.dryRunStats, r.existingIndex))
+				r.dryRunStats, r.existingIndex, r.unfilteredNode))
 		case e.node == nil:
 			// Non-atomic type, this specific file pruned but the version has other
 			// surviving files (distinct Names collapse here); nothing to migrate for
@@ -402,7 +402,7 @@ func (r *Package) buildVersionJobs(versions []types.Version, logger zerolog.Logg
 		default:
 			jobs = append(jobs, NewVersionJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.destRegistry,
 				r.artifactType, r.pkg, e.version, e.node, r.stats, r.mapping, r.config, r.registry,
-				r.dryRunStats, r.existingIndex))
+				r.dryRunStats, r.existingIndex, r.unfilteredNode))
 		}
 	}
 
