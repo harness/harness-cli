@@ -277,6 +277,56 @@ func TestRunSkipReasonAlreadyExists(t *testing.T) {
 	}
 }
 
+// TestRunFileLevelIncludePatterns verifies §6-W3 (file-level): includePatterns
+// narrow a NUGET run to the matching files only.
+func TestRunFileLevelIncludePatterns(t *testing.T) {
+	cfg := &types.Config{
+		Concurrency: 1,
+		Overwrite:   true,
+		Mappings: []types.RegistryMapping{{
+			ArtifactType:        types.NUGET,
+			SourceRegistry:      "nuget-local",
+			DestinationRegistry: "dst-reg",
+			IncludePatterns:     []string{"foo/company.grpc.pkg/1.0.0/**"},
+		}},
+	}
+	dest := &fakeDestAdapter{}
+	svc := newMockBackedService(cfg, dest)
+
+	if err := svc.Run(context.Background()); err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+	uploads := dest.uploadedURIs()
+	if len(uploads) != 1 || uploads[0] != "/foo/company.grpc.pkg/1.0.0/company.grpc.pkg.1.0.0.nupkg" {
+		t.Fatalf("expected only the 1.0.0 nupkg to upload, got: %v", uploads)
+	}
+}
+
+// TestRunPackageLevelExcludePatterns verifies §6-W3 (package-level):
+// excludePatterns narrow an RPM run by package name.
+func TestRunPackageLevelExcludePatterns(t *testing.T) {
+	cfg := &types.Config{
+		Concurrency: 1,
+		Overwrite:   true,
+		Mappings: []types.RegistryMapping{{
+			ArtifactType:        types.RPM,
+			SourceRegistry:      "rpm-single-local",
+			DestinationRegistry: "dst-reg",
+			ExcludePatterns:     []string{"nginx*"},
+		}},
+	}
+	dest := &fakeDestAdapter{}
+	svc := newMockBackedService(cfg, dest)
+
+	if err := svc.Run(context.Background()); err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+	uploads := dest.uploadedURIs()
+	if len(uploads) != 1 || !strings.Contains(uploads[0], "vim-enhanced") {
+		t.Fatalf("expected only vim-enhanced to upload, got: %v", uploads)
+	}
+}
+
 func readResultFile(t *testing.T, path string) []types.FileStat {
 	t.Helper()
 	data, err := os.ReadFile(path)

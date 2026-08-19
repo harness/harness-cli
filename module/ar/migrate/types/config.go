@@ -138,7 +138,13 @@ type RegistryMapping struct {
 	ArtifactType        ArtifactType `yaml:"artifactType"`
 	SourceRegistry      string       `yaml:"sourceRegistry"`
 	DestinationRegistry string       `yaml:"destinationRegistry"`
-	// NOT IMPLEMENTED YET
+	// IncludePatterns/ExcludePatterns are glob patterns (* and **) applied at
+	// file level for file-level-filterable types (GENERIC, RAW, PYTHON, MAVEN,
+	// NUGET, NPM, DART, GO) and at package-name level for
+	// package-level-filterable types (DOCKER, HELM, HELM_LEGACY, HELM_HTTP,
+	// RPM, CONDA, COMPOSER, SWIFT, CONAN). Setting them for any other type
+	// (DEBIAN, TERRAFORM, PUPPET) is a config error — scope controls must
+	// never be silent no-ops. Only one of the two may be set per mapping.
 	IncludePatterns []string `yaml:"includePatterns"`
 	ExcludePatterns []string `yaml:"excludePatterns"`
 	//Optional
@@ -233,9 +239,55 @@ func validateConfig(config *Config) error {
 		if err := ValidatePackageFilters(mapping.PackageFilters, mapping.ArtifactType); err != nil {
 			return fmt.Errorf("mapping %d: %w", i, err)
 		}
+		// Scope controls must never be silent no-ops: include/exclude patterns
+		// only take effect for pattern-filterable types (file-level or
+		// package-level); for every other type they would be ignored entirely.
+		if (len(mapping.IncludePatterns) > 0 || len(mapping.ExcludePatterns) > 0) &&
+			!IsPatternFilterable(mapping.ArtifactType) {
+			return fmt.Errorf("mapping %d: includePatterns/excludePatterns are not supported for artifact type %s — "+
+				"patterns are applied at file level for %s and at package level for %s; use packageFilters for scoping where supported",
+				i, mapping.ArtifactType,
+				"GENERIC, RAW, PYTHON, MAVEN, NUGET, NPM, DART, GO , RUBY",
+				"DOCKER, HELM, HELM_LEGACY, HELM_HTTP, RPM, CONDA, COMPOSER, SWIFT, CONAN")
+		}
+		// includePatterns and excludePatterns are mutually exclusive: applying
+		// both would silently discard excludePatterns (FilterFilesByPatterns uses
+		// else-if). Catch this at config validation time so it never reaches the
+		// migration step.
+		if len(mapping.IncludePatterns) > 0 && len(mapping.ExcludePatterns) > 0 {
+			return fmt.Errorf("mapping %d: includePatterns and excludePatterns are mutually exclusive — only one may be set per mapping", i)
+		}
+		// Index-seeded / metadata-driven types seed enumeration from a
+		// repository index (PyPI's .pypi HTML, Conda's repodata, RPM's
+		// repomd/primary) rather than from the raw file listing, so a
+		// date-filtered run can silently omit in-scope content: the filter
+		// narrows which files migrate, but the index decides what exists.
+		// A full no-filter run with overwrite:false is the completeness path.
+		if mapping.DateFilter != nil && isIndexSeededArtifact(mapping.ArtifactType) {
+			msg := fmt.Sprintf("mapping %d: date filter is enabled for %s — "+
+				"date-filtered runs of index-seeded types can omit in-scope content; "+
+				"a full run with overwrite:false is the completeness path", i, mapping.ArtifactType)
+			log.Warn().Msg(msg)
+			pterm.Warning.Println(msg)
+		}
 	}
 
 	return nil
+}
+
+// isIndexSeededArtifact reports whether the type's package/version enumeration
+// is seeded from a repository index or metadata file (PyPI's .pypi HTML,
+// Conda's repodata.json, RPM's repomd/primary.xml) rather than purely from the
+// raw file listing — the set of types for which a date-filtered run can
+// under-migrate in-scope content (see the date-filter warning in
+// validateConfig).
+func isIndexSeededArtifact(t ArtifactType) bool {
+	switch t {
+	case PYTHON, CONDA, RPM:
+		return true
+	default:
+		return false
+	}
 }
 
 func validateCredentials(registry RegistryConfig) error {

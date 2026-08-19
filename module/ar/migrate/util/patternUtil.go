@@ -143,23 +143,18 @@ func FilterFilesByPatternsPackageName(packages []types.Package, includePatterns,
 	return filteredPackages
 }
 
+// IsFileLevelFilterableArtifact reports whether include/exclude patterns are
+// applied to individual file URIs for this type. The classification lives in
+// the types package (types.IsFileLevelPatternFilterable) so config validation
+// can reject no-op patterns without an import cycle.
 func IsFileLevelFilterableArtifact(artifactType types.ArtifactType) bool {
-	switch artifactType {
-	case types.GENERIC, types.RAW, types.PYTHON, types.MAVEN, types.NUGET, types.NPM, types.DART, types.GO, types.RUBY:
-		return true
-	default:
-		return false
-	}
+	return types.IsFileLevelPatternFilterable(artifactType)
 }
 
+// IsPackageLevelFilterableArtifact reports whether include/exclude patterns
+// are applied to package names for this type. See types.IsPackageLevelPatternFilterable.
 func IsPackageLevelFilterableArtifact(artifactType types.ArtifactType) bool {
-
-	switch artifactType {
-	case types.DOCKER, types.HELM, types.HELM_LEGACY, types.HELM_HTTP, types.RPM, types.CONDA, types.COMPOSER, types.SWIFT, types.CONAN:
-		return true
-	default:
-		return false
-	}
+	return types.IsPackageLevelPatternFilterable(artifactType)
 }
 
 // IsAtomicVersionArtifact reports whether a single logical version of this

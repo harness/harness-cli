@@ -128,7 +128,10 @@ factory map (`adapter/adapter.go:72-101`); blank-imported in `migration.go:21-24
   parsing tables.
 - **Config validation is the loud failure point:** unknown `artifactType`
   (validated against `types.KnownArtifactTypes()` — the single source of truth
-  that also renders `--help`) is rejected at load, before any source call.
+  that also renders `--help`), and include/exclude patterns on non-filterable
+  types (DEBIAN/TERRAFORM/PUPPET — classification lives in `types/patterns.go`,
+  `util/patternUtil.go` delegates) are rejected at load, before any source call.
+  Date filters on index-seeded types (PYTHON/CONDA/RPM) warn at load.
 - **Zero-package guard:** `Registry.Migrate` errors when the enumeration tree
   has surviving files but `GetPackages` resolves zero packages (type mismatch),
   regardless of filter settings; filters that starve the tree to zero files are

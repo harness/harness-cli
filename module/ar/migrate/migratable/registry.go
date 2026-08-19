@@ -125,11 +125,6 @@ func (r *Registry) Migrate(ctx context.Context) error {
 
 	logger.Info().Msg("Starting registry migration step")
 
-	if len(r.mapping.IncludePatterns) > 0 && len(r.mapping.ExcludePatterns) > 0 {
-		logger.Error().Msgf("Either include or Exclude Pattern is supported at a time for %s", r.artifactType)
-		return fmt.Errorf("failed in validating config file for %s ", r.artifactType)
-	}
-
 	startTime := time.Now()
 
 	fetchProgress := startStage(fmt.Sprintf("Fetching file metadata from source registry %s", r.srcRegistry))

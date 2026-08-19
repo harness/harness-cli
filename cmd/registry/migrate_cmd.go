@@ -103,6 +103,22 @@ Package Filtering (opt-in):
   For synthetic-identity types (MAVEN, NPM, GENERIC, RAW), filter via the files field
   rather than package names, as package/version names are derived from file paths.
 
+Include/Exclude Patterns (includePatterns / excludePatterns, mutually exclusive):
+  Glob patterns (* and ** wildcards) applied at a type-dependent granularity:
+    - File level:   GENERIC, RAW, PYTHON, MAVEN, NUGET, NPM, DART, GO
+    - Package level: DOCKER, HELM, HELM_LEGACY, HELM_HTTP, RPM, CONDA, COMPOSER, SWIFT, CONAN
+  Setting them for any other type (DEBIAN, TERRAFORM, PUPPET) is rejected at
+  config load — scope controls are never silently ignored.
+
+Date filter caveat (createdAfter / downloadedAfter):
+  For index-seeded types (PYTHON, CONDA, RPM) a date-filtered run can omit
+  in-scope content, because enumeration is seeded from the repository index,
+  not the raw file listing. The completeness path is a full run with no date
+  filter and overwrite:false; for RPM repeat runs, ensure every nested
+  repodata/repomd.xml seed falls inside the window first (see the operational
+  rule in the hc open-issues register; scripts/art-touch-rpm-seeds.sh can help
+  poll seed freshness).
+
 Environment variables can be used in the config file using ${VAR_NAME} syntax.
 
 Usage example:

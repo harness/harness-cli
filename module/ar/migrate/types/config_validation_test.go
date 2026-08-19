@@ -134,6 +134,84 @@ mappings:
 	}
 }
 
+// TestValidateConfig_PatternsRejectedForNonFilterableTypes verifies §6-W1:
+// include/exclude patterns on types with no pattern support (DEBIAN,
+// TERRAFORM, PUPPET) are a config error, not a silent no-op.
+func TestValidateConfig_PatternsRejectedForNonFilterableTypes(t *testing.T) {
+	for _, at := range []ArtifactType{DEBIAN, TERRAFORM, PUPPET} {
+		config := baseValidConfig()
+		config.Mappings[0].ArtifactType = at
+		config.Mappings[0].IncludePatterns = []string{"foo/**"}
+
+		err := validateConfig(config)
+		if err == nil {
+			t.Errorf("expected error for includePatterns on %s, got nil", at)
+			continue
+		}
+		if !strings.Contains(err.Error(), "not supported for artifact type") {
+			t.Errorf("%s: error should call out unsupported patterns, got: %v", at, err)
+		}
+
+		config = baseValidConfig()
+		config.Mappings[0].ArtifactType = at
+		config.Mappings[0].ExcludePatterns = []string{"foo/**"}
+		if err := validateConfig(config); err == nil {
+			t.Errorf("expected error for excludePatterns on %s, got nil", at)
+		}
+	}
+}
+
+// TestValidateConfig_PatternsAcceptedForFilterableTypes verifies §6-W1 does
+// not over-reject: file-level (GENERIC) and package-level (CONDA) filterable
+// types still accept patterns.
+func TestValidateConfig_PatternsAcceptedForFilterableTypes(t *testing.T) {
+	for _, at := range []ArtifactType{GENERIC, RAW, PYTHON, MAVEN, NUGET, NPM, DART, GO,
+		DOCKER, HELM, HELM_LEGACY, HELM_HTTP, RPM, CONDA, COMPOSER, SWIFT, CONAN} {
+		config := baseValidConfig()
+		config.Mappings[0].ArtifactType = at
+		config.Mappings[0].IncludePatterns = []string{"foo/**"}
+		if err := validateConfig(config); err != nil {
+			t.Errorf("expected patterns on %s to pass, got: %v", at, err)
+		}
+	}
+}
+
+// TestValidateConfig_BothPatternsRejected verifies that setting both
+// includePatterns and excludePatterns on a filterable type is a config error,
+// not a silent no-op where excludePatterns would be ignored.
+func TestValidateConfig_BothPatternsRejected(t *testing.T) {
+	for _, at := range []ArtifactType{NUGET, GENERIC, MAVEN, DOCKER} {
+		config := baseValidConfig()
+		config.Mappings[0].ArtifactType = at
+		config.Mappings[0].IncludePatterns = []string{"foo/**"}
+		config.Mappings[0].ExcludePatterns = []string{"bar/**"}
+
+		err := validateConfig(config)
+		if err == nil {
+			t.Errorf("expected error for both includePatterns and excludePatterns on %s, got nil", at)
+			continue
+		}
+		if !strings.Contains(err.Error(), "mutually exclusive") {
+			t.Errorf("%s: error should mention mutual exclusivity, got: %v", at, err)
+		}
+	}
+}
+
+// TestValidateConfig_IndexSeededDateFilterWarnsButPasses verifies §7-W1:
+// date filters on index-seeded types (PYTHON, CONDA, RPM) pass validation
+// (with a printed warning), mirroring the existing MAVEN behavior.
+func TestValidateConfig_IndexSeededDateFilterWarnsButPasses(t *testing.T) {
+	after := time.Unix(0, 0)
+	for _, at := range []ArtifactType{PYTHON, CONDA, RPM} {
+		config := baseValidConfig()
+		config.Mappings[0].ArtifactType = at
+		config.Mappings[0].DateFilter = &DateFilter{Match: DateFilterMatchAny, CreatedAfter: &after}
+		if err := validateConfig(config); err != nil {
+			t.Errorf("expected date filter on %s to pass with warning, got: %v", at, err)
+		}
+	}
+}
+
 // TestKnownArtifactTypesSingleSource verifies the exported list and the lookup
 // map stay in sync and both include TERRAFORM (§1-W1).
 func TestKnownArtifactTypesSingleSource(t *testing.T) {
