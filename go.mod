@@ -6,6 +6,7 @@ require (
 	github.com/BurntSushi/toml v1.5.0
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/Masterminds/semver/v3 v3.3.0
+	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/getkin/kin-openapi v0.132.0
 	github.com/go-resty/resty/v2 v2.17.1
 	github.com/gobwas/glob v0.2.3
@@ -130,7 +131,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/vbatts/tar-split v0.12.1 // indirect
 	golang.org/x/mod v0.28.0
-	golang.org/x/sync v0.17.0 // indirect
+	golang.org/x/sync v0.17.0
 	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
 	gopkg.in/ini.v1 v1.67.0
