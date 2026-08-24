@@ -533,50 +533,20 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 		leaves, _ := tree.GetAllFiles(root)
 		packageMap := make(map[string]bool)
 		for _, leaf := range leaves {
-			if leaf.Folder {
-				continue
-			}
-			if !strings.HasSuffix(leaf.Uri, ".zip") {
-				continue
-			}
-
-			// Swift packages in JFrog have two possible URI formats:
-			// 4-segment: /<scope>/<name>/<version>/<name>-<version>.zip (Publish API)
-			// 3-segment: /<scope>/<name>/<name>-<version>.zip (direct deploy)
-			uriPath := strings.TrimPrefix(leaf.Uri, "/")
-			parts := strings.Split(uriPath, "/")
-
-			var scope, name, version string
-			if len(parts) >= 4 {
-				scope = parts[0]
-				name = parts[1]
-				version = parts[2]
-			} else if len(parts) == 3 {
-				scope = parts[0]
-				name = parts[1]
-				// Extract version from filename: <name>-<version>.zip
-				filename := strings.TrimSuffix(parts[2], ".zip")
-				if strings.HasPrefix(filename, name+"-") {
-					version = strings.TrimPrefix(filename, name+"-")
-				} else {
-					continue
-				}
-			} else {
+			scope, name, version, ok := swiftParseZipURI(leaf.Uri)
+			if !ok || leaf.Folder {
 				continue
 			}
 
-			// Package name in scope.name format
 			pkgName := scope + "." + name
 			pkgKey := pkgName + "-" + version
-
-			path := "/"
-			if _, ok := packageMap[pkgKey]; ok {
+			if packageMap[pkgKey] {
 				continue
 			}
 			packageMap[pkgKey] = true
 			packages = append(packages, types.Package{
 				Registry: registry,
-				Path:     path,
+				Path:     "/",
 				Name:     pkgName,
 				Version:  version,
 				Size:     leaf.Size,
@@ -1348,14 +1318,28 @@ func (a *adapter) GetVersions(
 		return versions, nil
 	}
 	if artifactType == types.SWIFT {
+		if node == nil {
+			return nil, errors.New("node is nil")
+		}
+		files, err := tree.GetAllFiles(node)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
 		var versions []types.Version
-		versions = append(versions, types.Version{
-			Registry: registry,
-			Pkg:      pkg,
-			Path:     p.URL,
-			Name:     p.Version,
-			Size:     p.Size,
-		})
+		for _, file := range files {
+			version, ok := swiftMatchingVersion(file, pkg)
+			if !ok {
+				continue
+			}
+			versions = append(versions, types.Version{
+				Registry: registry,
+				Pkg:      pkg,
+				Path:     file.Uri,
+				Name:     version,
+				Size:     file.Size,
+			})
+		}
+		log.Info().Msgf("Found %d versions for SWIFT package %s", len(versions), pkg)
 		return versions, nil
 	}
 	if artifactType == types.PUPPET {
@@ -1669,4 +1653,43 @@ func (a *adapter) getPythonVersionsFromTree(
 
 	log.Info().Msgf("Found %d versions for package %s from file tree", len(versions), pkg)
 	return versions, nil
+}
+
+// swiftParseZipURI extracts scope, name, and version from a Swift package .zip URI.
+// Supports two layouts:
+//   - 4-segment: /<scope>/<name>/<version>/<name>-<version>.zip
+//   - 3-segment: /<scope>/<name>/<name>-<version>.zip
+func swiftParseZipURI(uri string) (scope, name, version string, ok bool) {
+	if !strings.HasSuffix(uri, ".zip") {
+		return "", "", "", false
+	}
+	uriPath := strings.TrimPrefix(uri, "/")
+	parts := strings.Split(uriPath, "/")
+
+	switch {
+	case len(parts) >= 4:
+		return parts[0], parts[1], parts[2], true
+	case len(parts) == 3:
+		n := parts[1]
+		filename := strings.TrimSuffix(parts[2], ".zip")
+		if v, found := strings.CutPrefix(filename, n+"-"); found {
+			return parts[0], n, v, true
+		}
+		return "", "", "", false
+	default:
+		return "", "", "", false
+	}
+}
+
+// swiftMatchingVersion returns the version string if the file belongs to the
+// given logical package (scope.name), or ("", false) otherwise.
+func swiftMatchingVersion(file *types.File, pkg string) (string, bool) {
+	if file == nil || file.Folder {
+		return "", false
+	}
+	scope, name, version, ok := swiftParseZipURI(file.Uri)
+	if !ok || scope+"."+name != pkg {
+		return "", false
+	}
+	return version, true
 }

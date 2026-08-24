@@ -1233,35 +1233,72 @@ func (r *Package) migrateComposerVersion(ctx context.Context, v types.Version) e
 }
 
 func (r *Package) migrateSwift(ctx context.Context) error {
-	if r.config.DryRun {
-		log.Info().Ctx(ctx).Msgf("Dry-run: would migrate Swift package %s", r.pkg.URL)
-		return nil
-	}
-	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.pkg.URL)
+	versions, err := r.srcAdapter.GetVersions(r.pkg, r.node, r.srcRegistry, r.pkg.Name, types.SWIFT)
 	if err != nil {
-		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download Swift package %s", r.pkg.URL)
-		pterm.Error.Println(fmt.Sprintf("Failed to download Swift package %s", r.pkg.URL))
+		log.Error().Ctx(ctx).Err(err).Msgf("Failed to get Swift versions for %s", r.pkg.Name)
 		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
 		return err
 	}
+	if len(versions) == 0 {
+		err := fmt.Errorf("no Swift versions found for package %s", r.pkg.Name)
+		log.Error().Ctx(ctx).Err(err).Msgf("No Swift versions for %s", r.pkg.Name)
+		util.AddPackageErrorToStat(r.stats, r.pkg, r.srcRegistry, err)
+		return nil
+	}
+
+	if r.config.DryRun {
+		for _, v := range versions {
+			log.Info().Ctx(ctx).Msgf("Dry-run: would migrate Swift package %s version %s at %s", r.pkg.Name, v.Name, v.Path)
+		}
+		return nil
+	}
+
+	for _, v := range versions {
+		_ = r.migrateSwiftVersion(ctx, v)
+	}
+	return nil
+}
+
+func (r *Package) migrateSwiftVersion(ctx context.Context, v types.Version) error {
+	zipName := path.Base(v.Path)
+	file, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, v.Path)
+	if err != nil {
+		log.Error().Ctx(ctx).Err(err).Msgf("Failed to download Swift package %s at %s", r.pkg.Name, v.Path)
+		pterm.Error.Println(fmt.Sprintf("Failed to download Swift package %s version %s", r.pkg.Name, v.Name))
+		r.stats.Add(types.FileStat{
+			Name:     zipName,
+			Registry: r.srcRegistry,
+			Uri:      v.Path,
+			Size:     int64(v.Size),
+			Status:   types.StatusFail,
+			Error:    err.Error(),
+		})
+		return nil
+	}
 	defer file.Close()
 
-	title := fmt.Sprintf("%s (%s)", r.pkg.Name, common.GetSize(int64(r.pkg.Size)))
-	pterm.Info.Println(fmt.Sprintf("Copying file %s from %s to %s", r.pkg.Name, r.srcRegistry, r.destRegistry))
-	err = r.destAdapter.UploadFile(r.destRegistry, file, &types.File{Uri: r.pkg.URL}, header, r.pkg.Name, r.pkg.Version,
+	title := fmt.Sprintf("%s@%s (%s)", r.pkg.Name, v.Name, common.GetSize(int64(v.Size)))
+	pterm.Info.Println(fmt.Sprintf("Copying file %s from %s to %s", zipName, r.srcRegistry, r.destRegistry))
+	err = r.destAdapter.UploadFile(r.destRegistry, file, &types.File{Uri: v.Path, Name: zipName}, header, r.pkg.Name, v.Name,
 		r.artifactType, nil)
 	stat := types.FileStat{
-		Name:     r.pkg.Name,
+		Name:     zipName,
 		Registry: r.srcRegistry,
-		Uri:      r.pkg.URL,
-		Size:     int64(r.pkg.Size),
+		Uri:      v.Path,
+		Size:     int64(v.Size),
 		Status:   types.StatusSuccess,
 	}
 	if err != nil {
-		r.logger.Error().Err(err).Msg("Failed to upload file")
-		stat.Status = types.StatusFail
-		stat.Error = err.Error()
-		pterm.Error.Println(title)
+		if errors.Is(err, types.ErrArtifactAlreadyExists) {
+			stat.Status = types.StatusSkip
+			stat.Reason = types.SkipReasonAlreadyExists
+			pterm.Info.Println(fmt.Sprintf("%s already exists, skipping", title))
+		} else {
+			r.logger.Error().Err(err).Msg("Failed to upload file")
+			stat.Status = types.StatusFail
+			stat.Error = err.Error()
+			pterm.Error.Println(title)
+		}
 	} else {
 		pterm.Success.Println(title)
 	}
