@@ -33,16 +33,8 @@ func TestUploadStats_Accumulate(t *testing.T) {
 
 // ── Pusher interface compliance ───────────────────────────────────────────────
 
-// Compile-time checks: both uploaders must satisfy Pusher.
-var _ Pusher = (*GenericUploader)(nil)
+// Compile-time check: RawUploader must satisfy Pusher.
 var _ Pusher = (*RawUploader)(nil)
-
-func TestPusher_GenericUploaderImplementsInterface(t *testing.T) {
-	var p Pusher = &GenericUploader{}
-	if p == nil {
-		t.Fatal("GenericUploader should satisfy Pusher")
-	}
-}
 
 func TestPusher_RawUploaderImplementsInterface(t *testing.T) {
 	var p Pusher = &RawUploader{}
@@ -71,6 +63,10 @@ func (m *mockPusher) GetRegistryAndPath(_ string) (string, error) {
 func (m *mockPusher) GetFiles() ([]commonupload.FileUploadJob, UploadStats, error) {
 	m.getFilesCallCount++
 	return m.fileResult, m.statsResult, m.errResult
+}
+
+func (m *mockPusher) PreUpload(_ []commonupload.FileUploadJob) (bool, error) {
+	return false, m.errResult
 }
 
 func (m *mockPusher) PushFiles(_ context.Context, _ []commonupload.FileUploadJob) error {

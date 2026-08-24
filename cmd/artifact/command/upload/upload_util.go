@@ -112,6 +112,21 @@ func validatePatterns(includes, excludes []string) error {
 	return nil
 }
 
+// matchesIncludeExcludePattern reports whether relPath matches pattern.
+// When pattern contains no '/', it is matched against the file's basename only
+// (like `find -name`), so patterns such as "*uploader*" work intuitively for
+// files found inside sub-directories.  Patterns that contain '/' are matched
+// against the full slash-separated relative path.
+func matchesIncludeExcludePattern(pattern, relPath string) bool {
+	if !strings.Contains(pattern, "/") {
+		base := relPath[strings.LastIndex(relPath, "/")+1:]
+		matched, _ := doublestar.Match(pattern, base)
+		return matched
+	}
+	matched, _ := doublestar.Match(pattern, relPath)
+	return matched
+}
+
 // applyIncludeExcludeFilter filters jobs according to include/exclude glob patterns.
 // Patterns are guaranteed valid already verified before
 func applyIncludeExcludeFilter(jobs []upload.FileUploadJob, includes, excludes []string) []upload.FileUploadJob {
@@ -122,7 +137,7 @@ func applyIncludeExcludeFilter(jobs []upload.FileUploadJob, includes, excludes [
 		for _, j := range jobs {
 			p := filepath.ToSlash(j.GetID())
 			for _, pattern := range includes {
-				if matched, _ := doublestar.Match(pattern, p); matched {
+				if matchesIncludeExcludePattern(pattern, p) {
 					kept = append(kept, j)
 					break
 				}
@@ -138,7 +153,7 @@ func applyIncludeExcludeFilter(jobs []upload.FileUploadJob, includes, excludes [
 			p := filepath.ToSlash(j.GetID())
 			excluded := false
 			for _, pattern := range excludes {
-				if matched, _ := doublestar.Match(pattern, p); matched {
+				if matchesIncludeExcludePattern(pattern, p) {
 					excluded = true
 					break
 				}
