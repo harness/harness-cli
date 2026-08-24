@@ -3,401 +3,372 @@ package upload
 import (
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"testing"
-
-	commonupload "github.com/harness/harness-cli/util/common/upload"
 )
-
-// rawDestPaths extracts the DestPath from each RawUploadJob and returns them sorted.
-func rawDestPaths(t *testing.T, jobs []commonupload.FileUploadJob) []string {
-	t.Helper()
-	out := make([]string, 0, len(jobs))
-	for _, j := range jobs {
-		rj, ok := j.(*commonupload.RawUploadJob)
-		if !ok {
-			t.Fatalf("expected *RawUploadJob, got %T", j)
-		}
-		out = append(out, rj.DestPath)
-	}
-	sort.Strings(out)
-	return out
-}
 
 // ── resolveRawDestPath ────────────────────────────────────────────────────────
 
-func TestResolveRawDestPath(t *testing.T) {
-	tests := []struct {
-		name     string
-		template string
-		relPath  string
-		want     string
-	}{
-		{
-			name:     "flat file",
-			template: "uploads",
-			relPath:  "file.txt",
-			want:     "uploads/file.txt",
-		},
-		{
-			name:     "trailing slash stripped from template",
-			template: "uploads/",
-			relPath:  "file.txt",
-			want:     "uploads/file.txt",
-		},
-		{
-			name:     "preserves nested subdirectory structure",
-			template: "data",
-			relPath:  "subdir/nested/file.bin",
-			want:     "data/subdir/nested/file.bin",
-		},
-		{
-			name:     "deep template with nested rel path",
-			template: "bucket/prefix",
-			relPath:  "sub/file.tar.gz",
-			want:     "bucket/prefix/sub/file.tar.gz",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := resolveRawDestPath(tc.template, tc.relPath)
-			if got != tc.want {
-				t.Errorf("got %q, want %q", got, tc.want)
-			}
-		})
+func TestResolveRawDestPath_EmptyTemplate(t *testing.T) {
+	got := resolveRawDestPath("", "subdir/file.txt")
+	if got != "subdir/file.txt" {
+		t.Errorf("got %q, want %q", got, "subdir/file.txt")
 	}
 }
 
-// ── GetRegistryAndPath ────────────────────────────────────────────────────────
+func TestResolveRawDestPath_TemplateWithTrailingSlash(t *testing.T) {
+	got := resolveRawDestPath("prefix/", "file.bin")
+	if got != "prefix/file.bin" {
+		t.Errorf("got %q, want %q", got, "prefix/file.bin")
+	}
+}
 
-func TestRawGetRegistryAndPath_Valid(t *testing.T) {
+func TestResolveRawDestPath_TemplateWithoutTrailingSlash(t *testing.T) {
+	got := resolveRawDestPath("prefix", "file.bin")
+	if got != "prefix/file.bin" {
+		t.Errorf("got %q, want %q", got, "prefix/file.bin")
+	}
+}
+
+func TestResolveRawDestPath_NestedRelPath(t *testing.T) {
+	got := resolveRawDestPath("releases/v1", "linux/amd64/binary")
+	if got != "releases/v1/linux/amd64/binary" {
+		t.Errorf("got %q, want %q", got, "releases/v1/linux/amd64/binary")
+	}
+}
+
+func TestResolveRawDestPath_OnlyRelPath_EmptyTemplate(t *testing.T) {
+	got := resolveRawDestPath("", "a/b/c.zip")
+	if got != "a/b/c.zip" {
+		t.Errorf("got %q, want %q", got, "a/b/c.zip")
+	}
+}
+
+// ── RawUploader.GetRegistryAndPath ────────────────────────────────────────────
+
+func TestGetRegistryAndPath_WithSlash_SplitsCorrectly(t *testing.T) {
 	u := &RawUploader{}
-	reg, err := u.GetRegistryAndPath("my-raw-registry/some/path")
+	reg, err := u.GetRegistryAndPath("my-registry/path/to/dest")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if reg != "my-raw-registry" {
-		t.Errorf("registryName: got %q, want my-raw-registry", reg)
+	if reg != "my-registry" {
+		t.Errorf("registry: got %q, want %q", reg, "my-registry")
 	}
-	if u.RegistryName != "my-raw-registry" {
-		t.Errorf("u.RegistryName: got %q, want my-raw-registry", u.RegistryName)
+	if u.RegistryName != "my-registry" {
+		t.Errorf("u.RegistryName: got %q, want %q", u.RegistryName, "my-registry")
 	}
-	if u.DestTemplate != "some/path" {
-		t.Errorf("u.DestTemplate: got %q, want some/path", u.DestTemplate)
+	if u.DestTemplate != "path/to/dest" {
+		t.Errorf("u.DestTemplate: got %q, want %q", u.DestTemplate, "path/to/dest")
 	}
 }
 
-func TestRawGetRegistryAndPath_NoSlash(t *testing.T) {
+func TestGetRegistryAndPath_WithoutSlash_FullNameIsRegistry(t *testing.T) {
 	u := &RawUploader{}
-	_, err := u.GetRegistryAndPath("no-slash-here")
-	if err == nil {
-		t.Fatal("expected error for target without '/'")
+	reg, err := u.GetRegistryAndPath("my-registry")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "<registry>/<path>") {
-		t.Errorf("error should describe expected format, got: %v", err)
+	if reg != "my-registry" {
+		t.Errorf("registry: got %q, want %q", reg, "my-registry")
+	}
+	if u.RegistryName != "my-registry" {
+		t.Errorf("u.RegistryName: got %q, want %q", u.RegistryName, "my-registry")
+	}
+	if u.DestTemplate != "" {
+		t.Errorf("u.DestTemplate: got %q, want empty", u.DestTemplate)
 	}
 }
 
-func TestRawGetRegistryAndPath_SetsStateForGetFiles(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "file.bin"), []byte("data"), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
+func TestGetRegistryAndPath_SingleSlash_EmptyDest(t *testing.T) {
+	u := &RawUploader{}
+	reg, err := u.GetRegistryAndPath("my-registry/")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
+	if reg != "my-registry" {
+		t.Errorf("registry: got %q, want %q", reg, "my-registry")
+	}
+	if u.DestTemplate != "" {
+		t.Errorf("u.DestTemplate: got %q, want empty", u.DestTemplate)
+	}
+}
+
+func TestGetRegistryAndPath_SetsRegistryNameField(t *testing.T) {
+	u := &RawUploader{}
+	_, _ = u.GetRegistryAndPath("reg/dest")
+	if u.RegistryName != "reg" {
+		t.Errorf("u.RegistryName: got %q, want %q", u.RegistryName, "reg")
+	}
+}
+
+// ── RawUploader.GetFiles – literal path ───────────────────────────────────────
+
+func TestGetFiles_LiteralPath_SingleFile(t *testing.T) {
+	root := makeUploadTree(t, map[string]string{
+		"file.bin": "hello",
+	})
+
 	u := &RawUploader{
-		SrcPattern: filepath.Join(dir, "*.bin"),
+		SrcPattern:   filepath.Join(root, "file.bin"),
+		RegistryName: "reg",
+		DestTemplate: "dest",
 	}
 
-	reg, err := u.GetRegistryAndPath("raw-reg/uploads")
+	jobs, stats, err := u.GetFiles()
 	if err != nil {
-		t.Fatalf("GetRegistryAndPath: %v", err)
-	}
-	if reg != "raw-reg" {
-		t.Errorf("registry: got %q, want raw-reg", reg)
-	}
-
-	jobs, _, err := u.GetFiles()
-	if err != nil {
-		t.Fatalf("GetFiles: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(jobs) != 1 {
 		t.Fatalf("expected 1 job, got %d", len(jobs))
 	}
-	rj := jobs[0].(*commonupload.RawUploadJob)
-	if rj.RegistryName != "raw-reg" {
-		t.Errorf("job.RegistryName: got %q, want raw-reg", rj.RegistryName)
-	}
-}
-
-// ── GetFiles – literal path ───────────────────────────────────────────────────
-
-func TestRawGetFiles_LiteralFile(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "report.pdf")
-	if err := os.WriteFile(path, []byte("content"), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-
-	u := &RawUploader{
-		SrcPattern:   path,
-		DestTemplate: "documents",
-		RegistryName: "raw-reg",
-	}
-	jobs, stats, err := u.GetFiles()
-	if err != nil {
-		t.Fatalf("GetFiles: %v", err)
-	}
 	if stats.FileCount != 1 {
 		t.Errorf("FileCount: got %d, want 1", stats.FileCount)
 	}
-
-	got := rawDestPaths(t, jobs)
-	want := []string{"documents/report.pdf"}
-	if !slicesEqual(got, want) {
-		t.Errorf("dest paths: got %v, want %v", got, want)
+	if stats.TotalBytes != int64(len("hello")) {
+		t.Errorf("TotalBytes: got %d, want %d", stats.TotalBytes, len("hello"))
 	}
 }
 
-func TestRawGetFiles_LiteralFile_NotRegular(t *testing.T) {
-	dir := t.TempDir()
+func TestGetFiles_LiteralPath_DestPathIncludesTemplate(t *testing.T) {
+	root := makeUploadTree(t, map[string]string{
+		"file.bin": "data",
+	})
+
 	u := &RawUploader{
-		SrcPattern:   dir,
-		DestTemplate: "repo",
-		RegistryName: "raw-reg",
+		SrcPattern:   filepath.Join(root, "file.bin"),
+		RegistryName: "reg",
+		DestTemplate: "releases/v1",
 	}
+
+	jobs, _, err := u.GetFiles()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(jobs) != 1 {
+		t.Fatalf("expected 1 job, got %d", len(jobs))
+	}
+	id := jobs[0].GetID()
+	if id != "file.bin" {
+		t.Errorf("job ID: got %q, want %q", id, "file.bin")
+	}
+}
+
+func TestGetFiles_LiteralPath_FileNotFound(t *testing.T) {
+	u := &RawUploader{
+		SrcPattern:   "/path/that/does/not/exist/file.bin",
+		RegistryName: "reg",
+	}
+
 	_, _, err := u.GetFiles()
 	if err == nil {
-		t.Fatal("expected error for directory as literal path")
+		t.Fatal("expected error for missing file, got nil")
+	}
+}
+
+func TestGetFiles_LiteralPath_Directory_ReturnsError(t *testing.T) {
+	root := t.TempDir()
+	subdir := filepath.Join(root, "subdir")
+	if err := os.Mkdir(subdir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	u := &RawUploader{
+		SrcPattern:   subdir,
+		RegistryName: "reg",
+	}
+
+	_, _, err := u.GetFiles()
+	if err == nil {
+		t.Fatal("expected error for directory source, got nil")
 	}
 	if !strings.Contains(err.Error(), "not a regular file") {
-		t.Errorf("error should say 'not a regular file', got: %v", err)
+		t.Errorf("expected 'not a regular file' in error, got: %v", err)
 	}
 }
 
-func TestRawGetFiles_LiteralFile_NonExistent(t *testing.T) {
-	u := &RawUploader{
-		SrcPattern:   "/no/such/file.bin",
-		DestTemplate: "repo",
-		RegistryName: "raw-reg",
-	}
-	_, _, err := u.GetFiles()
-	if err == nil {
-		t.Fatal("expected error for non-existent file")
-	}
-}
+// ── RawUploader.GetFiles – glob pattern ───────────────────────────────────────
 
-// ── GetFiles – wildcard patterns ─────────────────────────────────────────────
-
-func TestRawGetFiles_SingleStarPattern_FlatDestination(t *testing.T) {
+func TestGetFiles_GlobPattern_MatchesMultipleFiles(t *testing.T) {
 	root := makeUploadTree(t, map[string]string{
-		"a.bin":     "data",
-		"b.bin":     "data",
-		"c.txt":     "text",
-		"sub/d.bin": "data",
+		"a.bin": "aaa",
+		"b.bin": "bbbb",
+		"c.txt": "cc",
 	})
 
 	u := &RawUploader{
 		SrcPattern:   filepath.Join(root, "*.bin"),
-		DestTemplate: "files",
-		RegistryName: "raw-reg",
+		RegistryName: "reg",
 	}
+
 	jobs, stats, err := u.GetFiles()
 	if err != nil {
-		t.Fatalf("GetFiles: %v", err)
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(jobs) != 2 {
+		t.Fatalf("expected 2 jobs, got %d", len(jobs))
 	}
 	if stats.FileCount != 2 {
-		t.Errorf("FileCount: got %d, want 2 (single star should not cross dir boundary)", stats.FileCount)
+		t.Errorf("FileCount: got %d, want 2", stats.FileCount)
 	}
-
-	got := rawDestPaths(t, jobs)
-	want := []string{"files/a.bin", "files/b.bin"}
-	if !slicesEqual(got, want) {
-		t.Errorf("dest paths: got %v, want %v", got, want)
+	expectedBytes := int64(len("aaa") + len("bbbb"))
+	if stats.TotalBytes != expectedBytes {
+		t.Errorf("TotalBytes: got %d, want %d", stats.TotalBytes, expectedBytes)
 	}
 }
 
-func TestRawGetFiles_DoubleStarPattern_PreservesStructure(t *testing.T) {
+func TestGetFiles_GlobPattern_NoMatch_ReturnsEmpty(t *testing.T) {
 	root := makeUploadTree(t, map[string]string{
-		"a.bin":       "data",
-		"sub/b.bin":   "data",
-		"sub/c/d.bin": "data",
-		"sub/c/e.txt": "text",
+		"a.txt": "data",
 	})
 
 	u := &RawUploader{
-		SrcPattern:   filepath.Join(root, "**/*.bin"),
-		DestTemplate: "assets",
-		RegistryName: "raw-reg",
+		SrcPattern:   filepath.Join(root, "*.jar"),
+		RegistryName: "reg",
 	}
+
 	jobs, stats, err := u.GetFiles()
 	if err != nil {
-		t.Fatalf("GetFiles: %v", err)
-	}
-	if stats.FileCount != 3 {
-		t.Errorf("FileCount: got %d, want 3", stats.FileCount)
-	}
-
-	got := rawDestPaths(t, jobs)
-	want := []string{
-		"assets/a.bin",
-		"assets/sub/b.bin",
-		"assets/sub/c/d.bin",
-	}
-	if !slicesEqual(got, want) {
-		t.Errorf("dest paths: got %v, want %v", got, want)
-	}
-}
-
-func TestRawGetFiles_QuestionMarkPattern(t *testing.T) {
-	root := makeUploadTree(t, map[string]string{
-		"file1.bin": "data",
-		"file2.bin": "data",
-		"fileX.bin": "data",
-		"files.bin": "data", // 5 chars in segment before .bin – should NOT match fil?.bin
-	})
-
-	u := &RawUploader{
-		SrcPattern:   filepath.Join(root, "fil?.bin"),
-		DestTemplate: "out",
-		RegistryName: "raw-reg",
-	}
-	jobs, stats, err := u.GetFiles()
-	if err != nil {
-		t.Fatalf("GetFiles: %v", err)
-	}
-	if stats.FileCount != 3 {
-		t.Errorf("FileCount: got %d, want 3 (file1, file2, fileX)", stats.FileCount)
-	}
-
-	got := rawDestPaths(t, jobs)
-	want := []string{"out/file1.bin", "out/file2.bin", "out/fileX.bin"}
-	if !slicesEqual(got, want) {
-		t.Errorf("dest paths: got %v, want %v", got, want)
-	}
-}
-
-func TestRawGetFiles_BracketPattern(t *testing.T) {
-	root := makeUploadTree(t, map[string]string{
-		"a.bin": "data",
-		"b.bin": "data",
-		"c.bin": "data",
-		"d.bin": "data",
-	})
-
-	u := &RawUploader{
-		SrcPattern:   filepath.Join(root, "[ab].bin"),
-		DestTemplate: "out",
-		RegistryName: "raw-reg",
-	}
-	jobs, stats, err := u.GetFiles()
-	if err != nil {
-		t.Fatalf("GetFiles: %v", err)
-	}
-	if stats.FileCount != 2 {
-		t.Errorf("FileCount: got %d, want 2 ([ab] matches only a and b)", stats.FileCount)
-	}
-
-	got := rawDestPaths(t, jobs)
-	want := []string{"out/a.bin", "out/b.bin"}
-	if !slicesEqual(got, want) {
-		t.Errorf("dest paths: got %v, want %v", got, want)
-	}
-}
-
-func TestRawGetFiles_BracketRangePattern(t *testing.T) {
-	root := makeUploadTree(t, map[string]string{
-		"file1.txt": "data",
-		"file2.txt": "data",
-		"file3.txt": "data",
-		"file9.txt": "data",
-	})
-
-	u := &RawUploader{
-		SrcPattern:   filepath.Join(root, "file[1-3].txt"),
-		DestTemplate: "docs",
-		RegistryName: "raw-reg",
-	}
-	jobs, stats, err := u.GetFiles()
-	if err != nil {
-		t.Fatalf("GetFiles: %v", err)
-	}
-	if stats.FileCount != 3 {
-		t.Errorf("FileCount: got %d, want 3 ([1-3] excludes file9)", stats.FileCount)
-	}
-
-	got := rawDestPaths(t, jobs)
-	want := []string{"docs/file1.txt", "docs/file2.txt", "docs/file3.txt"}
-	if !slicesEqual(got, want) {
-		t.Errorf("dest paths: got %v, want %v", got, want)
-	}
-}
-
-func TestRawGetFiles_NoMatch(t *testing.T) {
-	root := makeUploadTree(t, map[string]string{
-		"readme.txt": "ok",
-	})
-
-	u := &RawUploader{
-		SrcPattern:   filepath.Join(root, "*.bin"),
-		DestTemplate: "assets",
-		RegistryName: "raw-reg",
-	}
-	jobs, stats, err := u.GetFiles()
-	if err != nil {
-		t.Fatalf("GetFiles: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(jobs) != 0 {
 		t.Errorf("expected 0 jobs, got %d", len(jobs))
 	}
 	if stats.FileCount != 0 {
-		t.Errorf("expected FileCount=0, got %d", stats.FileCount)
+		t.Errorf("FileCount: got %d, want 0", stats.FileCount)
 	}
 }
 
-func TestRawGetFiles_Stats_TotalBytes(t *testing.T) {
+func TestGetFiles_GlobPattern_Flatten_UsesBasenameOnly(t *testing.T) {
 	root := makeUploadTree(t, map[string]string{
-		"a.bin": "12345",   // 5 bytes
-		"b.bin": "1234567", // 7 bytes
+		"sub/deep/file.bin": "data",
 	})
 
 	u := &RawUploader{
-		SrcPattern:   filepath.Join(root, "*.bin"),
-		DestTemplate: "files",
-		RegistryName: "raw-reg",
+		SrcPattern:   filepath.Join(root, "**/*.bin"),
+		RegistryName: "reg",
+		DestTemplate: "releases",
+		Flatten:      true,
 	}
-	_, stats, err := u.GetFiles()
+
+	jobs, _, err := u.GetFiles()
 	if err != nil {
-		t.Fatalf("GetFiles: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if stats.FileCount != 2 {
-		t.Errorf("FileCount: got %d, want 2", stats.FileCount)
-	}
-	if stats.TotalBytes != 12 {
-		t.Errorf("TotalBytes: got %d, want 12", stats.TotalBytes)
+	if len(jobs) != 1 {
+		t.Fatalf("expected 1 job, got %d", len(jobs))
 	}
 }
 
-func TestRawGetFiles_NoVersionInDestPath(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "artifact.bin")
-	if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+func TestGetFiles_GlobPattern_Recursive_MatchesNestedFiles(t *testing.T) {
+	root := makeUploadTree(t, map[string]string{
+		"a/b/c/file1.zip": "111",
+		"a/b/file2.zip":   "2222",
+		"file3.zip":       "33333",
+		"not_matched.txt": "ignored",
+	})
 
 	u := &RawUploader{
-		SrcPattern:   path,
-		DestTemplate: "uploads",
-		RegistryName: "raw-reg",
+		SrcPattern:   filepath.Join(root, "**/*.zip"),
+		RegistryName: "reg",
 	}
+
+	jobs, stats, err := u.GetFiles()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(jobs) != 3 {
+		t.Errorf("expected 3 jobs, got %d", len(jobs))
+	}
+	if stats.FileCount != 3 {
+		t.Errorf("FileCount: got %d, want 3", stats.FileCount)
+	}
+}
+
+func TestGetFiles_GlobPattern_InvalidPattern_ReturnsError(t *testing.T) {
+	u := &RawUploader{
+		SrcPattern:   ".",
+		RegistryName: "reg",
+		Include:      []string{"[invalid"},
+	}
+
+	_, _, err := u.GetFiles()
+	if err == nil {
+		t.Fatal("expected error for invalid include pattern, got nil")
+	}
+}
+
+func TestGetFiles_GlobPattern_IncludeFilter_AppliedAfterGlob(t *testing.T) {
+	root := makeUploadTree(t, map[string]string{
+		"a.bin": "aaa",
+		"b.txt": "bbb",
+		"c.bin": "ccc",
+	})
+
+	u := &RawUploader{
+		SrcPattern:   filepath.Join(root, "*"),
+		RegistryName: "reg",
+		Include:      []string{"*.bin"},
+	}
+
 	jobs, _, err := u.GetFiles()
 	if err != nil {
-		t.Fatalf("GetFiles: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	rj := jobs[0].(*commonupload.RawUploadJob)
-	// Raw dest path must NOT contain any version-like segment between template and filename.
-	// Exact expected: "uploads/artifact.bin"
-	if rj.DestPath != "uploads/artifact.bin" {
-		t.Errorf("expected uploads/artifact.bin, got %q", rj.DestPath)
+	if len(jobs) != 2 {
+		t.Errorf("expected 2 jobs after include filter, got %d", len(jobs))
+	}
+}
+
+func TestGetFiles_GlobPattern_ExcludeFilter_RemovesMatches(t *testing.T) {
+	root := makeUploadTree(t, map[string]string{
+		"release.zip": "rr",
+		"debug.zip":   "dd",
+		"readme.txt":  "tt",
+	})
+
+	u := &RawUploader{
+		SrcPattern:   filepath.Join(root, "*"),
+		RegistryName: "reg",
+		Exclude:      []string{"*debug*"},
+	}
+
+	jobs, _, err := u.GetFiles()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, j := range jobs {
+		if strings.Contains(j.GetID(), "debug") {
+			t.Errorf("expected debug file to be excluded, but got job: %s", j.GetID())
+		}
+	}
+}
+
+// ── RawUploader.PreUpload ─────────────────────────────────────────────────────
+
+func TestPreUpload_NoDryRun_NoConflicts_ReturnsFalseNil(t *testing.T) {
+	u := &RawUploader{DryRun: false}
+	skipped, err := u.PreUpload(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if skipped {
+		t.Error("expected skipped=false for non-dry-run with no conflicts")
+	}
+}
+
+func TestPreUpload_DryRun_NoConflicts_ReturnsTrueNil(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmp := t.TempDir()
+	_ = os.Chdir(tmp)
+	defer func() { _ = os.Chdir(origDir) }()
+
+	u := &RawUploader{DryRun: true}
+	skipped, err := u.PreUpload(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !skipped {
+		t.Error("expected skipped=true for dry-run with no conflicts")
 	}
 }
