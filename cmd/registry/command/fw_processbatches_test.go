@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -131,12 +132,19 @@ func TestProcessBatches_AsyncForcesSerial(t *testing.T) {
 
 func TestProcessBatches_BatchSizeCapAtMax(t *testing.T) {
 	// Requesting batch-size=100 for a max-50 evaluator should clamp to 50.
-	var seenBatchSizes []int
+	// Sync mode runs workers in parallel, so batch completion order is
+	// nondeterministic — assert the multiset of sizes, not sequence.
+	var (
+		mu             sync.Mutex
+		seenBatchSizes []int
+	)
 	stub := &stubEvaluator{
 		mode: "sync",
 		max:  50,
 		handler: func(idx int32, batch []Dependency) (batchResult, error) {
+			mu.Lock()
 			seenBatchSizes = append(seenBatchSizes, len(batch))
+			mu.Unlock()
 			return batchResult{Results: make([]ScanResult, len(batch))}, nil
 		},
 	}
@@ -148,7 +156,7 @@ func TestProcessBatches_BatchSizeCapAtMax(t *testing.T) {
 	_, err := processBatches(ctx, makeDeps(120), "r")
 	assert.NoError(t, err)
 	// 120 / 50 = 2 batches of 50 + 1 of 20
-	assert.Equal(t, []int{50, 50, 20}, seenBatchSizes)
+	assert.ElementsMatch(t, []int{50, 50, 20}, seenBatchSizes)
 }
 
 // TestV3DetailsToScanDetails checks the adapter used by fw explain when

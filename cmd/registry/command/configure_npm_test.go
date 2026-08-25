@@ -42,6 +42,7 @@ func TestBackupNpmrc(t *testing.T) {
 
 	t.Run("existing npmrc gets backed up", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Setenv("HOME", tmpDir)
 		npmrcPath := filepath.Join(tmpDir, ".npmrc")
 		content := "registry=https://registry.npmjs.org/\n"
 		require.NoError(t, os.WriteFile(npmrcPath, []byte(content), 0600))

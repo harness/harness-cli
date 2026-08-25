@@ -181,7 +181,7 @@ func (r *Version) Migrate(ctx context.Context) error {
 					continue
 				}
 			}
-			// For RUBY, skip files that don't match current gem and version
+			// For RUBY, skip files that don't match current gem and version.
 			if r.artifactType == types.RUBY {
 				if !strings.HasSuffix(file.Name, ".gem") {
 					logger.Debug().Msgf("Skipping non-gem file %s for RUBY migration", file.Name)
@@ -215,11 +215,9 @@ func (r *Version) Migrate(ctx context.Context) error {
 					continue
 				}
 			}
-			// Check if file already exists in destination. The index is built
-			// once per registry only when overwrite=false && !dry-run for the
-			// indexable types (registry.go), so a non-nil index already encodes
-			// that gating; HasFile lowercases the name for matching.
-			if r.existingIndex != nil && r.existingIndex.HasFile(r.pkg.Name, r.version.Name, file.Uri, r.artifactType) {
+			// Skip files already in destination index.
+			checkPath := file.Uri
+			if r.existingIndex != nil && r.existingIndex.HasFile(r.pkg.Name, r.version.Name, checkPath, r.artifactType) {
 				util.GetSkipPrinter().Println(fmt.Sprintf("Registry [%s], Package [%s/%s], File [%s] already exists",
 					r.destRegistry,
 					r.pkg.Name, r.version.Name, file.Name))

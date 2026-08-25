@@ -73,3 +73,6 @@ mappings:
   - artifactType: PUPPET
     sourceRegistry: src
     destinationRegistry: dst
+  - artifactType: CRAN
+    sourceRegistry: src
+    destinationRegistry: dst

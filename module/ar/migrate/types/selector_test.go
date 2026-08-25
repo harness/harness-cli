@@ -30,6 +30,7 @@ func TestSupportedSelectorGranularity(t *testing.T) {
 		{COMPOSER, GranularityPackage},
 		{SWIFT, GranularityPackage},
 		{CONAN, GranularityPackage},
+		{CRAN, GranularityPackage},
 	}
 
 	for _, tt := range tests {

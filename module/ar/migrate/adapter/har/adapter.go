@@ -177,7 +177,7 @@ func (a *adapter) UploadFile(
 		err = a.client.uploadTerraformFile(registry, f, artifactName, version, file)
 	case types.CONAN:
 		err = a.client.uploadConanFile(registry, file, metadata)
-	case types.RAW:
+	case types.RAW, types.CRAN:
 		err = a.client.uploadRawFile(registry, f, file)
 	default:
 		return fmt.Errorf("unsupported artifact type: %s", artifactType)
@@ -261,7 +261,7 @@ func (a *adapter) FileExists(
 	file *types.File,
 	artifactType types.ArtifactType,
 ) (bool, error) {
-	if artifactType == types.RAW {
+	if artifactType == types.RAW || artifactType == types.CRAN {
 		return a.client.headRawFile(registryRef, file.Uri)
 	}
 	return a.client.artifactFileExists(ctx, registryRef, pkg, version, file, artifactType)

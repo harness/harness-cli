@@ -23,7 +23,7 @@ func IsFileLevelPatternFilterable(t ArtifactType) bool {
 // applied to package names for this artifact type.
 func IsPackageLevelPatternFilterable(t ArtifactType) bool {
 	switch t {
-	case DOCKER, HELM, HELM_LEGACY, HELM_HTTP, RPM, CONDA, COMPOSER, SWIFT, CONAN, DEBIAN:
+	case DOCKER, HELM, HELM_LEGACY, HELM_HTTP, RPM, CONDA, COMPOSER, SWIFT, CONAN, DEBIAN, CRAN:
 		return true
 	default:
 		return false

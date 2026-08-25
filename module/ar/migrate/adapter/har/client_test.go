@@ -12,6 +12,8 @@ import (
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
 	migratehttp "github.com/harness/harness-cli/module/ar/migrate/http"
 	"github.com/harness/harness-cli/module/ar/migrate/types"
+
+	"github.com/rs/zerolog"
 )
 
 // newTestClient builds a har client whose generated pkg client points at the
@@ -203,6 +205,88 @@ func TestUploadRawFile(t *testing.T) {
 	}
 }
 
+
+// TestUploadFileCRAN covers the CRAN adapter path, which routes through uploadRawFile
+// (/files PUT). Paths are already remapped to flat contrib by the migrator before upload.
+func TestUploadFileCRAN(t *testing.T) {
+	config.Global.AccountID = "acct1"
+
+	tests := []struct {
+		name         string
+		status       int
+		fileUri      string
+		wantErr      bool
+		wantConflict bool
+		wantPathHas  string
+	}{
+		{"source contrib", http.StatusCreated, "src/contrib/jsonlite_1.8.0.tar.gz", false, false,
+			"/files/src/contrib/jsonlite_1.8.0.tar.gz"},
+		{"remapped archive source", http.StatusCreated, "src/contrib/jsonlite_1.7.0.tar.gz", false, false,
+			"/files/src/contrib/jsonlite_1.7.0.tar.gz"},
+		{"windows binary", http.StatusCreated, "bin/windows/contrib/4.4/jsonlite_1.8.0.zip", false, false,
+			"/files/bin/windows/contrib/4.4/jsonlite_1.8.0.zip"},
+		{"leading slash trimmed", http.StatusCreated, "/src/contrib/jsonlite_1.8.0.tar.gz", false, false,
+			"/files/src/contrib/jsonlite_1.8.0.tar.gz"},
+		{"conflict", http.StatusConflict, "src/contrib/jsonlite_1.8.0.tar.gz", false, true,
+			"/files/src/contrib/jsonlite_1.8.0.tar.gz"},
+		{"bad request", http.StatusBadRequest, "src/contrib/jsonlite_1.8.0.tar.gz", true, false,
+			"/files/src/contrib/jsonlite_1.8.0.tar.gz"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotMethod, gotPath string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotMethod = r.Method
+				gotPath = r.URL.Path
+				w.WriteHeader(tt.status)
+				if tt.status >= 400 {
+					_, _ = w.Write([]byte("upload rejected"))
+				}
+			}))
+			defer srv.Close()
+
+			a := &adapter{
+				client: newTestClient(t, srv.URL),
+				logger: zerolog.Nop(),
+			}
+			body := io.NopCloser(strings.NewReader("cran-bytes"))
+			err := a.UploadFile(
+				"reg1",
+				body,
+				&types.File{Name: "jsonlite_1.8.0.tar.gz", Uri: tt.fileUri},
+				nil,
+				"jsonlite",
+				"1.8.0",
+				types.CRAN,
+				nil,
+			)
+
+			switch {
+			case tt.wantConflict:
+				if !errors.Is(err, types.ErrArtifactAlreadyExists) {
+					t.Fatalf("expected ErrArtifactAlreadyExists, got %v", err)
+				}
+			case tt.wantErr:
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+			default:
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			}
+			if gotMethod != http.MethodPut {
+				t.Errorf("method = %q, want PUT", gotMethod)
+			}
+			if !strings.HasSuffix(gotPath, tt.wantPathHas) {
+				t.Errorf("path = %q, want suffix %q", gotPath, tt.wantPathHas)
+			}
+		})
+	}
+}
+
+
 // TestUploadComposerFile verifies composer uploads and maps HTTP 409 to
 // ErrArtifactAlreadyExists so re-runs are recorded as skips, not failures.
 func TestUploadComposerFile(t *testing.T) {
@@ -331,6 +415,72 @@ func TestUploadRubyFile(t *testing.T) {
 			}
 			if !tt.wantErr && gotCT != "application/octet-stream" {
 				t.Errorf("content-type = %q, want application/octet-stream", gotCT)
+			}
+		})
+	}
+}
+
+// TestFileExistsCRAN ensures CRAN existence checks use HEAD on /files (same as RAW).
+func TestFileExistsCRAN(t *testing.T) {
+	config.Global.AccountID = "acct1"
+
+	tests := []struct {
+		name       string
+		status     int
+		wantExists bool
+		wantErr    bool
+		fileUri    string
+		wantPath   string
+	}{
+		{"exists", http.StatusOK, true, false, "src/contrib/jsonlite_1.8.0.tar.gz",
+			"/pkg/acct1/reg1/files/src/contrib/jsonlite_1.8.0.tar.gz"},
+		{"missing", http.StatusNotFound, false, false, "src/contrib/jsonlite_1.8.0.tar.gz",
+			"/pkg/acct1/reg1/files/src/contrib/jsonlite_1.8.0.tar.gz"},
+		{"leading slash trimmed", http.StatusOK, true, false, "/src/contrib/jsonlite_1.8.0.tar.gz",
+			"/pkg/acct1/reg1/files/src/contrib/jsonlite_1.8.0.tar.gz"},
+		{"server error", http.StatusInternalServerError, false, true, "src/contrib/jsonlite_1.8.0.tar.gz",
+			"/pkg/acct1/reg1/files/src/contrib/jsonlite_1.8.0.tar.gz"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotMethod, gotPath string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotMethod = r.Method
+				gotPath = r.URL.Path
+				w.WriteHeader(tt.status)
+			}))
+			defer srv.Close()
+
+			a := &adapter{
+				client: newTestClient(t, srv.URL),
+				logger: zerolog.Nop(),
+			}
+			exists, err := a.FileExists(
+				nil,
+				"reg1",
+				"jsonlite",
+				"1.8.0",
+				&types.File{Name: "jsonlite_1.8.0.tar.gz", Uri: tt.fileUri},
+				types.CRAN,
+			)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if exists != tt.wantExists {
+				t.Errorf("exists = %v, want %v", exists, tt.wantExists)
+			}
+			if gotMethod != http.MethodHead {
+				t.Errorf("method = %q, want HEAD", gotMethod)
+			}
+			if gotPath != tt.wantPath {
+				t.Errorf("path = %q, want %q", gotPath, tt.wantPath)
 			}
 		})
 	}

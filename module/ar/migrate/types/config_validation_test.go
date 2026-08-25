@@ -75,7 +75,7 @@ func TestValidateConfig_AllKnownArtifactTypesAccepted(t *testing.T) {
 	known := []ArtifactType{
 		DOCKER, HELM, HELM_LEGACY, HELM_HTTP, GENERIC, PYTHON, MAVEN,
 		NPM, NUGET, RPM, DEBIAN, GO, CONDA, COMPOSER, DART, RAW,
-		SWIFT, PUPPET, RUBY, CONAN, TERRAFORM,
+		SWIFT, PUPPET, CRAN, RUBY, CONAN, TERRAFORM,
 	}
 	for _, at := range known {
 		config := baseValidConfig()

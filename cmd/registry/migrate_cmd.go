@@ -95,10 +95,10 @@ Package Filtering (opt-in):
   The packageFilters field is an allow-list: when set, only the named packages (and
   optionally specific versions/files) are migrated; when omitted, everything migrates.
 
-  Supported granularity by type:
-    - Package-level only: DOCKER, HELM, HELM_LEGACY, HELM_HTTP, RPM, DEBIAN, CONDA, COMPOSER, SWIFT, CONAN
-    - Package + version: GO
-    - Package + version + file: GENERIC, RAW, MAVEN, PYTHON, NUGET, NPM, DART, PUPPET
+  Supported packageFilters granularity by type:
+    - package name only: DOCKER, HELM, HELM_LEGACY, HELM_HTTP, RPM, DEBIAN, CONDA, COMPOSER, SWIFT, CONAN, CRAN
+    - package name + versions: GO
+    - package name + versions + files: GENERIC, RAW, MAVEN, PYTHON, NUGET, NPM, DART, PUPPET
 
   For synthetic-identity types (MAVEN, NPM, GENERIC, RAW), filter via the files field
   rather than package names, as package/version names are derived from file paths.

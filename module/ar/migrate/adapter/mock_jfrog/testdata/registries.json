@@ -90,6 +90,13 @@
     "description": "Mock Puppet Local Repository",
     "packageType": "puppet"
   },
+  "cran-local": {
+    "key": "cran-local",
+    "type": "LOCAL",
+    "url": "http://localhost:8081/artifactory/cran-local",
+    "description": "Mock CRAN Local Repository",
+    "packageType": "cran"
+  },
   "gems-local": {
     "key": "gems-local",
     "type": "LOCAL",

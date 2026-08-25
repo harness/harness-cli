@@ -354,14 +354,22 @@ func (r *Registry) Migrate(ctx context.Context) error {
 	}
 
 	var jobs []engine.Job
+	var filesByPkg map[string][]types.File
+	if r.artifactType == types.CRAN {
+		filesByPkg = util.BuildCranPackageFilesMap(files)
+	}
 	for _, pkg := range pkgs {
 		treeNode, err2 := tree.GetNodeForPath(root, pkg.Path)
 		if err2 != nil {
 			logger.Error().Msgf("Failed to get node for path %s", pkg.Path)
 			return fmt.Errorf("get node for path %s failed: %w", pkg.Path, err2)
 		}
+		var pkgFiles []types.File
+		if filesByPkg != nil {
+			pkgFiles = filesByPkg[pkg.Name]
+		}
 		job := NewPackageJob(r.srcAdapter, r.destAdapter, r.srcRegistry, r.sourcePackageHostname, r.destRegistry, r.artifactType, pkg, treeNode, unfilteredRoot,
-			r.stats, r.mapping, r.config, r.registry, r.dryRunStats, existingIndex)
+			r.stats, r.mapping, r.config, r.registry, r.dryRunStats, existingIndex, pkgFiles)
 		jobs = append(jobs, job)
 	}
 
@@ -403,7 +411,7 @@ func (r *Registry) Post(ctx context.Context) error {
 // Must exactly equal the set Version.Pre checks today (version.go:109 exclusions).
 func indexApplicable(t types.ArtifactType) bool {
 	switch t {
-	case types.GENERIC, types.RAW, types.PYTHON, types.NUGET, types.DART, types.PUPPET, types.RUBY, types.NPM, types.MAVEN:
+	case types.GENERIC, types.RAW, types.PYTHON, types.NUGET, types.DART, types.PUPPET, types.NPM, types.MAVEN, types.RUBY:
 		return true
 	default:
 		return false

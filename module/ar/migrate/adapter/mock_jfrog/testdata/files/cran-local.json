@@ -1,0 +1,74 @@
+[
+  {
+    "Registry": "cran-local",
+    "Name": "jsonlite_1.8.0.tar.gz",
+    "Uri": "/src/contrib/jsonlite_1.8.0.tar.gz",
+    "Folder": false,
+    "Size": 1024,
+    "LastModified": "2023-01-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80730"
+  },
+  {
+    "Registry": "cran-local",
+    "Name": "jsonlite_1.7.0.tar.gz",
+    "Uri": "/src/contrib/Archive/jsonlite/jsonlite_1.7.0.tar.gz",
+    "Folder": false,
+    "Size": 900,
+    "LastModified": "2022-06-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80731"
+  },
+  {
+    "Registry": "cran-local",
+    "Name": "data.table_1.14.8.tar.gz",
+    "Uri": "/src/contrib/data.table_1.14.8.tar.gz",
+    "Folder": false,
+    "Size": 2048,
+    "LastModified": "2023-03-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80732"
+  },
+  {
+    "Registry": "cran-local",
+    "Name": "jsonlite_1.8.0.zip",
+    "Uri": "/bin/windows/contrib/4.4/jsonlite_1.8.0.zip",
+    "Folder": false,
+    "Size": 1500,
+    "LastModified": "2023-04-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80733"
+  },
+  {
+    "Registry": "cran-local",
+    "Name": "jsonlite_1.8.0.tgz",
+    "Uri": "/bin/macosx/big-sur-arm64/contrib/4.4/jsonlite_1.8.0.tgz",
+    "Folder": false,
+    "Size": 1600,
+    "LastModified": "2023-04-05T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80736"
+  },
+  {
+    "Registry": "cran-local",
+    "Name": "data.table_1.14.8.tgz",
+    "Uri": "/bin/big-sur-arm64/contrib/4.4/data.table_1.14.8.tgz",
+    "Folder": false,
+    "Size": 2200,
+    "LastModified": "2023-04-06T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80737"
+  },
+  {
+    "Registry": "cran-local",
+    "Name": "PACKAGES",
+    "Uri": "/src/contrib/PACKAGES",
+    "Folder": false,
+    "Size": 128,
+    "LastModified": "2023-05-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80734"
+  },
+  {
+    "Registry": "cran-local",
+    "Name": "PACKAGES.gz",
+    "Uri": "/src/contrib/PACKAGES.gz",
+    "Folder": false,
+    "Size": 64,
+    "LastModified": "2023-05-01T00:00:00.000Z",
+    "SHA1": "da39a3ee5e6b4b0d3255bfef95601890afd80735"
+  }
+]

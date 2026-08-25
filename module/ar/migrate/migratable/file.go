@@ -119,14 +119,15 @@ func (r *File) Pre(ctx context.Context) error {
 	logger.Info().Msg("Starting file pre-migration step")
 	startTime := time.Now()
 
-	// For RAW artifacts, use HEAD to check if file already exists at destination
+	// For RAW artifacts, use HEAD to check if file already exists at destination.
 	if r.artifactType == types.RAW && !r.config.Overwrite && !r.config.DryRun {
-		exists, err := r.destAdapter.FileExists(ctx, r.registry.Path, r.pkg.Name, r.version.Name, r.file,
+		checkFile := r.file
+		exists, err := r.destAdapter.FileExists(ctx, r.registry.Path, r.pkg.Name, r.version.Name, checkFile,
 			r.artifactType)
 		if err != nil {
-			logger.Warn().Err(err).Msgf("Failed to HEAD raw file %s, will proceed with migration", r.file.Uri)
+			logger.Warn().Err(err).Msgf("Failed to HEAD file %s, will proceed with migration", checkFile.Uri)
 		} else if exists {
-			logger.Info().Msgf("Skipping raw file %s as it already exists in destination (HEAD 200)", r.file.Uri)
+			logger.Info().Msgf("Skipping file %s as it already exists in destination (HEAD 200)", checkFile.Uri)
 			r.skipMigration = true
 			stat := types.FileStat{
 				Name:     r.file.Name,
@@ -215,19 +216,23 @@ func (r *File) Migrate(ctx context.Context) error {
 		return nil
 	}
 
-	if r.artifactType == types.GENERIC || r.artifactType == types.RAW || r.artifactType == types.MAVEN || r.artifactType == types.NUGET || r.artifactType == types.PUPPET || r.artifactType == types.RUBY {
+	if r.artifactType == types.GENERIC || r.artifactType == types.RAW || r.artifactType == types.MAVEN ||
+		r.artifactType == types.NUGET || r.artifactType == types.PUPPET ||
+		r.artifactType == types.RUBY {
 		downloadFile, header, err := r.srcAdapter.DownloadFile(r.srcRegistry, r.file.Uri)
-		defer downloadFile.Close()
 		if err != nil {
 			logger.Error().Err(err).Msg("Failed to download file")
 			util.AddFileErrorToStat(r.stats, r.file, r.srcRegistry, err)
 			return fmt.Errorf("download file failed: %w", err)
 		}
+		defer downloadFile.Close()
+
+		uploadFile := r.file
 
 		//readCloser := progress.ReadCloser(int64(r.file.Size), downloadFile, r.file.Name)
 		title := fmt.Sprintf("%s (%s)", r.file.Name, common.GetSize(int64(r.file.Size)))
 		pterm.Info.Println(fmt.Sprintf("Copying file %s from %s to %s", r.file.Name, r.srcRegistry, r.destRegistry))
-		err = r.destAdapter.UploadFile(r.destRegistry, downloadFile, r.file, header, r.pkg.Name, r.version.Name,
+		err = r.destAdapter.UploadFile(r.destRegistry, downloadFile, uploadFile, header, r.pkg.Name, r.version.Name,
 			r.artifactType, nil)
 		stat := types.FileStat{
 			Name:     r.file.Name,

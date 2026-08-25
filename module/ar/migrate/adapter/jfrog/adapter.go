@@ -672,6 +672,41 @@ func (a *adapter) GetPackages(registry string, artifactType types.ArtifactType, 
 			})
 		}
 		log.Info().Msgf("Found %d TERRAFORM packages", len(packages))
+	} else if artifactType == types.CRAN {
+		files, err := tree.GetAllFiles(root)
+		if err != nil {
+			return nil, fmt.Errorf("get all files: %w", err)
+		}
+
+		pkgMap := make(map[string]bool)
+		skippedUnrecognized := 0
+		for _, file := range files {
+			if file.Folder {
+				continue
+			}
+			if util.IsCranIndexFile(file.Uri) {
+				continue
+			}
+			pkgName, _, ok := util.ParseCranFileNameWithPath(file.Uri)
+			if !ok {
+				skippedUnrecognized++
+				continue
+			}
+			pkgMap[pkgName] = true
+		}
+
+		for pkgName := range pkgMap {
+			packages = append(packages, types.Package{
+				Registry: registry,
+				Path:     "/",
+				Name:     pkgName,
+				Size:     -1,
+			})
+		}
+		if skippedUnrecognized > 0 {
+			log.Warn().Msgf("Skipped %d unrecognized CRAN paths in %s", skippedUnrecognized, registry)
+		}
+		log.Info().Msgf("Found %d CRAN packages", len(packages))
 	} else {
 		return []types.Package{}, errors.New("unknown artifact type")
 	}

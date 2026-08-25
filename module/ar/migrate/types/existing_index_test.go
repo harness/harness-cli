@@ -205,3 +205,18 @@ func TestHarToSourcePath(t *testing.T) {
 		})
 	}
 }
+
+// TestExistingIndex_HasFile_CRANLeadingSlash documents that ListFilesV3 stores
+// CRAN/RAW paths with a leading slash, so lookups remapped via CranHarUploadPath
+// (no leading slash) must be prefixed before HasFile or the O(1) hit misses.
+func TestExistingIndex_HasFile_CRANLeadingSlash(t *testing.T) {
+	idx := NewExistingIndex()
+	idx.AddFile("jsonlite", "1.7.0", "/src/contrib/jsonlite_1.7.0.tar.gz")
+
+	if !idx.HasFile("jsonlite", "1.7.0", "/src/contrib/jsonlite_1.7.0.tar.gz", CRAN) {
+		t.Error("expected leading-slash query to hit ListFilesV3-shaped index key")
+	}
+	if idx.HasFile("jsonlite", "1.7.0", "src/contrib/jsonlite_1.7.0.tar.gz", CRAN) {
+		t.Error("query without leading slash must not match a slash-prefixed index key")
+	}
+}

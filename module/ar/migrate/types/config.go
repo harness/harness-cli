@@ -42,6 +42,7 @@ var (
 	RAW         ArtifactType = "RAW"
 	SWIFT       ArtifactType = "SWIFT"
 	PUPPET      ArtifactType = "PUPPET"
+	CRAN        ArtifactType = "CRAN"
 	RUBY        ArtifactType = "RUBY"
 	CONAN       ArtifactType = "CONAN"
 	TERRAFORM   ArtifactType = "TERRAFORM"
@@ -54,7 +55,7 @@ var (
 // whenever a new ArtifactType is introduced.
 var knownArtifactTypesList = []ArtifactType{
 	DOCKER, HELM, HELM_LEGACY, HELM_HTTP, GENERIC, PYTHON, MAVEN, NPM, NUGET,
-	RPM, DEBIAN, GO, CONDA, COMPOSER, DART, RAW, SWIFT, PUPPET, RUBY, CONAN,
+	RPM, DEBIAN, GO, CONDA, COMPOSER, DART, RAW, SWIFT, PUPPET, CRAN, RUBY, CONAN,
 	TERRAFORM,
 }
 
