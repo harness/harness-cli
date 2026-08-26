@@ -119,6 +119,11 @@ func (u *RawUploader) GetFiles() ([]upload.FileUploadJob, UploadStats, error) {
 
 	jobs = applyIncludeExcludeFilter(jobs, u.Include, u.Exclude)
 	stats.FileCount = len(jobs)
+	var total int64
+	for _, j := range jobs {
+		total += j.GetFileSize()
+	}
+	stats.TotalBytes = total
 	return jobs, stats, nil
 }
 

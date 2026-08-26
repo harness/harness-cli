@@ -17,22 +17,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewUploadArtifactCmd uploads files to a Harness Artifact Registry using
+// NewUploadArtifactCmd uploads files to a Harness Artifact Registry.
 // SRC_PATTERN supports:
 //
-//   - match any characters within one path segment
-//     **         match any characters across path segments (recursive)
-//     (*)        capture one path segment → referenced as {1}, {2}, … in DEST_PATH
-//     (**)       capture the entire remaining path → referenced as {1}, {2}, …
-//     ?          match exactly one character
+//   - *   match any characters within one path segment
+//   - **  match any characters across path segments (recursive)
+//   - ?   match exactly one character
 //
 // Examples:
 //
-//	hc artifact upload "*.jar"               my-repo/libs/
-//	hc artifact upload "**/*.jar"            my-repo/libs/
-//	hc artifact upload "dist/(*)/*.zip"      my-repo/releases/{1}/
-//	hc artifact upload "build/(*)/(*).jar"   my-repo/libs/{1}/{2}.jar
-//	hc artifact upload "target/(**)"         my-repo/releases/{1}
+//	hc artifact upload "*.jar"      my-repo/libs/
+//	hc artifact upload "**/*.jar"   my-repo/libs/
 func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 	const expectedArgumentCount = 2
 	var packageVersion string
@@ -45,8 +40,7 @@ func NewUploadArtifactCmd(c *cmdutils.Factory) *cobra.Command {
 		Use:   "upload <SRC_PATH_PATTERN> <REGISTRY/DEST_PATH>",
 		Short: "Upload artifact files to a registry using wildcard patterns",
 		Long: "Upload one or more artifact files to a Harness Artifact Registry.\n" +
-			"SRC_PATH_PATTERN supports wildcards (* ** ? (*) (**)).\n" +
-			"Capture groups (*)/(** ) in the source can be referenced as {1}, {2}, … in DEST_PATH.",
+			"SRC_PATH_PATTERN supports wildcards: * (single segment), ** (recursive), ? (single character).",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != expectedArgumentCount {
 				return fmt.Errorf(
