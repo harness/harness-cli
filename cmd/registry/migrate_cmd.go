@@ -30,7 +30,7 @@ func getMigrateCmd(*cmdutils.Factory) *cobra.Command {
 	migrateCmd := &cobra.Command{
 		Use:   "migrate",
 		Short: "Start a migration based on configuration",
-		Long: `Migrate artifacts from a source registry to a Harness Artifact Registry.
+		Long: fmt.Sprintf(`Migrate artifacts from a source registry to a Harness Artifact Registry.
 
 This command reads a YAML configuration file that defines the source and destination
 registries, credentials, and artifact mappings.
@@ -86,7 +86,7 @@ Example configuration file (config.yaml):
       destinationRegistry: harness-helm
 
 Supported artifact types:
-  DOCKER, HELM, HELM_LEGACY, HELM_HTTP, MAVEN, NPM, NUGET, PYTHON, GO, GENERIC, CONDA, COMPOSER, SWIFT, DEBIAN, PUPPET, DART, RPM, RAW, CONAN
+  %s
 
 Note: HARBOR source supports OCI artifact types only (DOCKER, HELM).
 
@@ -105,7 +105,7 @@ Package Filtering (opt-in):
 Environment variables can be used in the config file using ${VAR_NAME} syntax.
 
 Usage example:
-  hc registry migrate -c config.yaml`,
+  hc registry migrate -c config.yaml`, types.GetKnownArtifactTypesList()),
 		Run: runMigration,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			// Sync local flags to global config

@@ -3,6 +3,8 @@ package types
 import (
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/pterm/pterm"
@@ -61,6 +63,18 @@ var knownArtifactTypes = map[ArtifactType]struct{}{
 func IsKnownArtifactType(t ArtifactType) bool {
 	_, ok := knownArtifactTypes[t]
 	return ok
+}
+
+// GetKnownArtifactTypesList returns a sorted, comma-separated list of all valid
+// ArtifactType values. Used by validation errors and CLI help text.
+func GetKnownArtifactTypesList() string {
+	types := make([]string, 0, len(knownArtifactTypes))
+	for t := range knownArtifactTypes {
+		types = append(types, string(t))
+	}
+	// Sort for deterministic output
+	sort.Strings(types)
+	return strings.Join(types, ", ")
 }
 
 // Config represents the top-level configuration structure
@@ -187,7 +201,7 @@ func validateConfig(config *Config) error {
 			return fmt.Errorf("mapping %d: destination registry cannot be empty", i)
 		}
 		if !IsKnownArtifactType(mapping.ArtifactType) {
-			return fmt.Errorf("mapping %d: unknown artifactType %q — valid values are: DOCKER, HELM, HELM_LEGACY, HELM_HTTP, GENERIC, PYTHON, MAVEN, NPM, NUGET, RPM, DEBIAN, GO, CONDA, COMPOSER, DART, RAW, SWIFT, PUPPET, RUBY, CONAN, TERRAFORM", i, mapping.ArtifactType)
+			return fmt.Errorf("mapping %d: unknown artifactType %q — valid values are: %s", i, mapping.ArtifactType, GetKnownArtifactTypesList())
 		}
 		// Date filtering for MAVEN relies on the source file listing rather than
 		// maven-metadata.xml, so the metadata file may end up out of sync with
