@@ -36,6 +36,7 @@ const (
 func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 	var pkgURL string
 	var maxConcurrentUploads int = upload.DefaultUploadWorker
+	var postMetadata string
 	cmd := &cobra.Command{
 		Use:   "python <registry_name> <file/folder_path>",
 		Short: "Push Python Artifacts",
@@ -89,11 +90,19 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Step("Preparing python upload jobs")
 			jobs := make([]upload.FileUploadJob, 0, len(pythonPkgFiles))
+			type pkgCoord struct{ name, version string }
+			seen := make(map[pkgCoord]struct{})
+			var pkgCoords []pkgCoord
 			for _, fileNameWithPath := range pythonPkgFiles {
 				progress.Step(fmt.Sprintf("Processing job for %s ", filepath.Base(fileNameWithPath)))
 				metadata, err := extractPythonPackageMetadata(fileNameWithPath)
 				if err != nil {
 					return fmt.Errorf("failed to extract metadata from %s: %w", filepath.Base(fileNameWithPath), err)
+				}
+				coord := pkgCoord{metadata.Name, metadata.Version}
+				if _, ok := seen[coord]; !ok {
+					seen[coord] = struct{}{}
+					pkgCoords = append(pkgCoords, coord)
 				}
 
 				fileInfo, err := os.Stat(fileNameWithPath)
@@ -135,6 +144,9 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 
 			progress.Success(fmt.Sprintf("Successfully uploaded package %s", filePath))
+			for _, coord := range pkgCoords {
+				applyPostPushMetadata(c, postMetadata, registryName, coord.name, coord.version)
+			}
 			return nil
 
 		},
@@ -142,6 +154,7 @@ func NewPushPythonCmd(c *cmdutils.Factory) *cobra.Command {
 
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
 	cmd.Flags().IntVar(&maxConcurrentUploads, "max-concurrent-uploads", upload.DefaultUploadWorker, "Maximum number of concurrent file uploads, 1 for sequential")
+	cmd.Flags().StringVar(&postMetadata, "metadata", "", "Metadata key-value pairs to attach after push (format: key:value,key2:value2)")
 
 	return cmd
 }

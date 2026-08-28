@@ -37,6 +37,7 @@ func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 	var pkgURL string
 	var pomPath string
 	var maxConcurrentUploads int = upload.DefaultUploadWorker
+	var postMetadata string
 	const expectedNumberOfArgument = 2
 	cmd := &cobra.Command{
 		Use:   "maven <registry_name> <file_path>",
@@ -221,7 +222,7 @@ func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Success("maven-metadata.xml uploaded successfully")
 			progress.Success("Successfully uploaded package")
-
+			applyPostPushMetadata(c, postMetadata, registryName, coordsFromPom.GroupID+":"+coordsFromPom.ArtifactID, coordsFromPom.Version)
 			return nil
 
 		},
@@ -230,6 +231,7 @@ func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 	cmd.Flags().StringVar(&pomPath, "pom-file", "", "pom file path")
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
 	cmd.Flags().IntVar(&maxConcurrentUploads, "max-concurrent-uploads", upload.DefaultUploadWorker, "Maximum number of concurrent file uploads, 1 for sequential")
+	cmd.Flags().StringVar(&postMetadata, "metadata", "", "Metadata key-value pairs to attach after push (format: key:value,key2:value2)")
 	cmd.MarkFlagRequired("pom-file")
 
 	return cmd

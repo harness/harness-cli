@@ -23,6 +23,7 @@ import (
 // Command example: hc artifact push npm <registry_name> <npm_tgz_path>
 func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 	var pkgURL string
+	var postMetadata string
 
 	cmd := &cobra.Command{
 		Use:   "npm <registry_name> <npm_tgz_path>",
@@ -258,11 +259,13 @@ func NewPushNpmCmd(f *cmdutils.Factory) *cobra.Command {
 			}
 
 			progress.Success(fmt.Sprintf("Successfully uploaded NPM package '%s@%s' to registry '%s'", pkgName, version, registryName))
+			applyPostPushMetadata(f, postMetadata, registryName, pkgName, version)
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages service")
+	cmd.Flags().StringVar(&postMetadata, "metadata", "", "Metadata key-value pairs to attach after push (format: key:value,key2:value2)")
 
 	return cmd
 }

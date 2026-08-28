@@ -729,7 +729,7 @@ func TestPushTerraformModule_ChecksumError(t *testing.T) {
 	factory := &cmdutils.Factory{}
 	nop := p.NewNopReporter()
 	ctx := t.Context()
-	err = pushTerraformModule(ctx, factory, nop, "reg", path, info, "ns", "mod", "aws", "1.0.0")
+	err = pushTerraformModule(ctx, factory, nop, "reg", path, info, "ns", "mod", "aws", "1.0.0", "")
 	if err == nil || !strings.Contains(err.Error(), "failed to compute checksums") {
 		t.Fatalf("expected checksum error, got: %v", err)
 	}
@@ -750,7 +750,7 @@ func TestPushTerraformProvider_ChecksumError(t *testing.T) {
 	factory := &cmdutils.Factory{}
 	nop := p.NewNopReporter()
 	ctx := t.Context()
-	err = pushTerraformProvider(ctx, factory, nop, "reg", path, info, "ns")
+	err = pushTerraformProvider(ctx, factory, nop, "reg", path, info, "ns", "")
 	if err == nil || !strings.Contains(err.Error(), "failed to compute checksums") {
 		t.Fatalf("expected checksum error, got: %v", err)
 	}
@@ -761,7 +761,7 @@ func TestPushTerraformModule_MissingName(t *testing.T) {
 	nop := p.NewNopReporter()
 	ctx := t.Context()
 	info, _ := os.Stat(os.TempDir())
-	err := pushTerraformModule(ctx, factory, nop, "reg", "/tmp/mod.tar.gz", info, "ns", "", "aws", "1.0.0")
+	err := pushTerraformModule(ctx, factory, nop, "reg", "/tmp/mod.tar.gz", info, "ns", "", "aws", "1.0.0", "")
 	if err == nil || !strings.Contains(err.Error(), "--name is required") {
 		t.Fatalf("expected --name error, got: %v", err)
 	}
@@ -772,7 +772,7 @@ func TestPushTerraformModule_BadSemver(t *testing.T) {
 	nop := p.NewNopReporter()
 	ctx := t.Context()
 	info, _ := os.Stat(os.TempDir())
-	err := pushTerraformModule(ctx, factory, nop, "reg", "/tmp/mod.tar.gz", info, "ns", "mod", "aws", "not-semver")
+	err := pushTerraformModule(ctx, factory, nop, "reg", "/tmp/mod.tar.gz", info, "ns", "mod", "aws", "not-semver", "")
 	if err == nil || !strings.Contains(err.Error(), "SemVer") {
 		t.Fatalf("expected SemVer error, got: %v", err)
 	}

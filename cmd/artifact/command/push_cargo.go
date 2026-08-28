@@ -31,6 +31,7 @@ const (
 
 func NewPushCargoCmd(f *cmdutils.Factory) *cobra.Command {
 	var pkgURL string
+	var postMetadata string
 	cmd := &cobra.Command{
 		Use:   "cargo <registry_name> <file_path>",
 		Short: "Push Cargo Artifacts",
@@ -157,11 +158,13 @@ func NewPushCargoCmd(f *cmdutils.Factory) *cobra.Command {
 			}
 
 			progress.Success(fmt.Sprintf("Successfully uploaded package %s", filePath))
+			applyPostPushMetadata(f, postMetadata, registryName, packageName, version)
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
+	cmd.Flags().StringVar(&postMetadata, "metadata", "", "Metadata key-value pairs to attach after push (format: key:value,key2:value2)")
 	return cmd
 }
 

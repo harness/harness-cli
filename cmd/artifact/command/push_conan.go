@@ -40,6 +40,7 @@ func NewPushConanCmd(c *cmdutils.Factory) *cobra.Command {
 	var packageDir string
 	var packageID string
 	var packageRevision string
+	var postMetadata string
 
 	cmd := &cobra.Command{
 		Use:   "conan <registry_name> <reference> <recipe_dir>",
@@ -156,6 +157,7 @@ func NewPushConanCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 
 			progress.Success(fmt.Sprintf("Successfully uploaded Conan package %s to registry '%s'", ref.Display(), registryName))
+			applyPostPushMetadata(c, postMetadata, registryName, ref.Name, ref.Version)
 			return nil
 		},
 	}
@@ -164,6 +166,7 @@ func NewPushConanCmd(c *cmdutils.Factory) *cobra.Command {
 	cmd.Flags().StringVar(&packageDir, "package-dir", "", "Directory containing package-layer files (conaninfo.txt, conanmanifest.txt, conan_package.tgz)")
 	cmd.Flags().StringVar(&packageID, "package-id", "", "Conan package id (PKGID); required with --package-dir")
 	cmd.Flags().StringVar(&packageRevision, "package-revision", "", "Package revision (PREV). Defaults to the MD5 of the package's conanmanifest.txt")
+	cmd.Flags().StringVar(&postMetadata, "metadata", "", "Metadata key-value pairs to attach after push (format: key:value,key2:value2)")
 
 	return cmd
 }

@@ -31,6 +31,7 @@ type rubyUploadResponse struct {
 
 func NewPushRubyCmd(c *cmdutils.Factory) *cobra.Command {
 	const expectedNumberOfArgument = 2
+	var postMetadata string
 	cmd := &cobra.Command{
 		Use:   "ruby <registry_name> <file_path>",
 		Short: "Push Ruby gem",
@@ -98,9 +99,12 @@ func NewPushRubyCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 
 			successMsg := fmt.Sprintf("Successfully uploaded package %s", filePath)
+			var uploadedPkgName, uploadedPkgVersion string
 			if len(resp.Body) > 0 {
 				var uploadResp rubyUploadResponse
 				if err := json.Unmarshal(resp.Body, &uploadResp); err == nil && uploadResp.Name != "" && uploadResp.Version != "" {
+					uploadedPkgName = uploadResp.Name
+					uploadedPkgVersion = uploadResp.Version
 					if uploadResp.Platform != "" {
 						successMsg = fmt.Sprintf("Successfully uploaded %s@%s (%s)", uploadResp.Name, uploadResp.Version, uploadResp.Platform)
 					} else {
@@ -110,9 +114,11 @@ func NewPushRubyCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 
 			progress.Success(successMsg)
+			applyPostPushMetadata(c, postMetadata, registryName, uploadedPkgName, uploadedPkgVersion)
 			return nil
 		},
 	}
 
+	cmd.Flags().StringVar(&postMetadata, "metadata", "", "Metadata key-value pairs to attach after push (format: key:value,key2:value2)")
 	return cmd
 }

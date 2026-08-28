@@ -66,17 +66,21 @@ func NewPushDebianCmd(c *cmdutils.Factory) *cobra.Command {
 			// Determine file type based on extension
 			fileExt := filepath.Ext(filePath)
 
+			var pushErr error
 			switch fileExt {
 			case DebFileExtension:
 				// Handle .deb package
-				return handleDebPackage(registryName, filePath, distribution, component, progress)
+				pushErr = handleDebPackage(registryName, filePath, distribution, component, progress)
 			case DscFileExtension:
 				// Handle .dsc source package
-				return handleDebSourcePackage(registryName, filePath, distribution, component, sourceFile, originSourceFile, progress)
+				pushErr = handleDebSourcePackage(registryName, filePath, distribution, component, sourceFile, originSourceFile, progress)
 			default:
 				progress.Error("Unsupported file type")
 				return errors.NewValidationError("file_path", fmt.Sprintf("file must be either .deb or .dsc, got: %s", fileExt))
 			}
+			if pushErr == nil {
+			}
+			return pushErr
 		},
 	}
 

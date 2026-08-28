@@ -28,6 +28,7 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 
 	var metadataPath string
 	var customHeaders map[string]string
+	var postMetadata string
 	const expectedNumberOfArgument = 3
 	cmd := &cobra.Command{
 		Use:   "swift  <registry_name> <file_path> <SCOPE>/<NAME>/<VERSION>",
@@ -159,11 +160,13 @@ func NewPushSwiftCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 
 			progress.Success(fmt.Sprintf("Successfully uploaded package %s", filePath))
+			applyPostPushMetadata(c, postMetadata, registryName, packageName, version)
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&metadataPath, "metadata-path", "", "Path to metadata file")
+	cmd.Flags().StringVar(&postMetadata, "metadata", "", "Metadata key-value pairs to attach after push (format: key:value,key2:value2)")
 	return cmd
 }
 

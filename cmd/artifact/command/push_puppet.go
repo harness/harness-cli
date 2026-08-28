@@ -42,6 +42,7 @@ type puppetMetadata struct {
 // Command example: hc artifact push puppet <registry_name> <module_tar_gz_path>
 func NewPushPuppetCmd(c *cmdutils.Factory) *cobra.Command {
 	const expectedNumberOfArgument = 2
+	var postMetadata string
 	cmd := &cobra.Command{
 		Use:   "puppet <registry_name> <module_tar_gz_path>",
 		Short: "Push Puppet module",
@@ -158,10 +159,12 @@ func NewPushPuppetCmd(c *cmdutils.Factory) *cobra.Command {
 				"Successfully uploaded Puppet module '%s@%s' to registry '%s'",
 				metadata.Name, metadata.Version, registryName,
 			))
+			applyPostPushMetadata(c, postMetadata, registryName, metadata.Name, metadata.Version)
 			return nil
 		},
 	}
 
+	cmd.Flags().StringVar(&postMetadata, "metadata", "", "Metadata key-value pairs to attach after push (format: key:value,key2:value2)")
 	return cmd
 }
 

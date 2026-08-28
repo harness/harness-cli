@@ -27,6 +27,7 @@ import (
 // Command example: hc artifact push dart <registry_name> <dart_tar_gz_path>
 func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 	var pkgURL string
+	var postMetadata string
 
 	cmd := &cobra.Command{
 		Use:   "dart <registry_name> <dart_tar_gz_path>",
@@ -183,11 +184,13 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 			}
 
 			progress.Success(fmt.Sprintf("Successfully uploaded Dart package '%s@%s' to registry '%s'", pubspec.Name, pubspec.Version, registryName))
+			applyPostPushMetadata(f, postMetadata, registryName, pubspec.Name, pubspec.Version)
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages service")
+	cmd.Flags().StringVar(&postMetadata, "metadata", "", "Metadata key-value pairs to attach after push (format: key:value,key2:value2)")
 
 	return cmd
 }
