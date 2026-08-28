@@ -1,6 +1,15 @@
 # Harness CLI Tool (hc)
 
 A powerful command-line interface tool for interacting with Harness services
+> **⚠️ Deprecation Notice**
+>
+> This CLI will be **deprecated soon** and is no longer the recommended Harness CLI for new usage.
+>
+> The new **official Harness CLI** is available here:
+> **https://github.com/harness/cli**
+>
+> We recommend migrating to the new CLI. Please use the new repository for future development, updates, and support.
+> 
 
 ## Overview
 
