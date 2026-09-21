@@ -106,14 +106,14 @@ func NewPushMavenCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 
 			//reading  project detail from package war/jar file
-			coordsFromPackage, err := parseMavenArtifact(pkgFilePath)
+			coordsFromPackage, err := parseMavenArtifact(pkgFilePath, coordsFromPom.GroupID, coordsFromPom.ArtifactID)
 
 			if err != nil {
 				return errors.NewValidationError("PACKAGE_ERROR", fmt.Sprintf("failed to parse provided package file: %v", err))
 			}
 
 			//verify that package and pom is of same project and versionß
-			if err := compareMavenCoordinates(coordsFromPom, coordsFromPackage); err != nil {
+			if err := compareMavenCoordinates(coordsFromPackage, coordsFromPom); err != nil {
 				return errors.NewValidationError("ERROR", fmt.Sprintf("failed to match package and POM parameters: %v", err))
 
 			}
@@ -339,7 +339,14 @@ func parseMavenProjectLevelPom(filePath string) (*mavenPackageMetadata, error) {
 	return parsePomXMLData(data)
 }
 
-func parseMavenArtifact(filePath string) (*mavenPackageMetadata, error) {
+// parseMavenArtifact reads the Maven coordinates embedded in a jar/war's
+// META-INF/maven/ metadata. A jar built with maven-assembly-plugin's
+// jar-with-dependencies (or similar fat-jar tooling) bundles each dependency's
+// own META-INF/maven/**/pom.properties alongside the project's own, so
+// expectedGroupID/expectedArtifactID (the coordinates read from --pom-file)
+// are used to pick the entry belonging to the artifact actually being pushed,
+// rather than whichever entry happens to appear first in the archive.
+func parseMavenArtifact(filePath, expectedGroupID, expectedArtifactID string) (*mavenPackageMetadata, error) {
 	ext := strings.ToLower(filepath.Ext(filePath))
 	if ext != jarFileExtension && ext != warFileExtension {
 		return nil, fmt.Errorf("unsupported file type %q, only .jar or .war allowed", ext)
@@ -352,86 +359,113 @@ func parseMavenArtifact(filePath string) (*mavenPackageMetadata, error) {
 	defer r.Close()
 
 	// reading  pom.properties
-	if coords, err := readPomPropertiesFromPackageFile(r.File); err == nil {
+	if coords, err := readPomPropertiesFromPackageFile(r.File, expectedGroupID, expectedArtifactID); err == nil {
 		return coords, nil
 	}
 
 	// if above file is not available then read  pom.xml
-	if coords, err := readPomXMLFromPackageFile(r.File); err == nil {
+	if coords, err := readPomXMLFromPackageFile(r.File, expectedGroupID, expectedArtifactID); err == nil {
 		return coords, nil
 	}
 
 	return nil, fmt.Errorf("maven metadata not found in provided  %q package ", ext)
 }
 
-func readPomPropertiesFromPackageFile(files []*zip.File) (*mavenPackageMetadata, error) {
+func readPomPropertiesFromPackageFile(files []*zip.File, expectedGroupID, expectedArtifactID string) (*mavenPackageMetadata, error) {
+	var fallback *mavenPackageMetadata
+
 	for _, f := range files {
-		if strings.HasSuffix(f.Name, "pom.properties") &&
-			strings.Contains(f.Name, "META-INF/maven/") {
-
-			rc, err := f.Open()
-			if err != nil {
-				return nil, err
-			}
-			defer rc.Close()
-
-			propertiesMap := make(map[string]string)
-			data, err := io.ReadAll(rc)
-			if err != nil {
-				return nil, err
-			}
-
-			for _, line := range strings.Split(string(data), "\n") {
-				line = strings.TrimSpace(line)
-				if line == "" || strings.HasPrefix(line, "#") {
-					continue
-				}
-				kv := strings.SplitN(line, "=", 2)
-				if len(kv) == 2 {
-					propertiesMap[kv[0]] = kv[1]
-				}
-			}
-
-			groupID := propertiesMap["groupId"]
-			artifactID := propertiesMap["artifactId"]
-			version := propertiesMap["version"]
-
-			if groupID == "" || artifactID == "" || version == "" {
-				return nil, fmt.Errorf("invalid pom.properties content present in provided Package ")
-			}
-
-			return &mavenPackageMetadata{
-				GroupID:    groupID,
-				ArtifactID: artifactID,
-				Version:    version,
-				Name:       "", // not present in properties
-			}, nil
+		if !strings.HasSuffix(f.Name, "pom.properties") || !strings.Contains(f.Name, "META-INF/maven/") {
+			continue
 		}
+
+		rc, err := f.Open()
+		if err != nil {
+			return nil, err
+		}
+
+		propertiesMap := make(map[string]string)
+		data, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			kv := strings.SplitN(line, "=", 2)
+			if len(kv) == 2 {
+				propertiesMap[kv[0]] = kv[1]
+			}
+		}
+
+		groupID := propertiesMap["groupId"]
+		artifactID := propertiesMap["artifactId"]
+		version := propertiesMap["version"]
+
+		if groupID == "" || artifactID == "" || version == "" {
+			continue
+		}
+
+		coords := &mavenPackageMetadata{
+			GroupID:    groupID,
+			ArtifactID: artifactID,
+			Version:    version,
+			Name:       "", // not present in properties
+		}
+
+		if groupID == expectedGroupID && artifactID == expectedArtifactID {
+			return coords, nil
+		}
+		if fallback == nil {
+			fallback = coords
+		}
+	}
+
+	if fallback != nil {
+		return fallback, nil
 	}
 	return nil, fmt.Errorf("pom.properties not found in provided Package ")
-
 }
 
-func readPomXMLFromPackageFile(files []*zip.File) (*mavenPackageMetadata, error) {
+func readPomXMLFromPackageFile(files []*zip.File, expectedGroupID, expectedArtifactID string) (*mavenPackageMetadata, error) {
+	var fallback *mavenPackageMetadata
+
 	for _, f := range files {
-		if strings.HasSuffix(f.Name, "pom.xml") &&
-			strings.Contains(f.Name, "META-INF/maven/") {
+		if !strings.HasSuffix(f.Name, "pom.xml") || !strings.Contains(f.Name, "META-INF/maven/") {
+			continue
+		}
 
-			rc, err := f.Open()
-			if err != nil {
-				return nil, err
-			}
-			defer rc.Close()
+		rc, err := f.Open()
+		if err != nil {
+			return nil, err
+		}
 
-			data, err := io.ReadAll(rc)
-			if err != nil {
-				return nil, err
-			}
+		data, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			return nil, err
+		}
 
-			return parsePomXMLData(data)
+		coords, err := parsePomXMLData(data)
+		if err != nil {
+			continue
+		}
+
+		if coords.GroupID == expectedGroupID && coords.ArtifactID == expectedArtifactID {
+			return coords, nil
+		}
+		if fallback == nil {
+			fallback = coords
 		}
 	}
 
+	if fallback != nil {
+		return fallback, nil
+	}
 	return nil, fmt.Errorf("pom.xml not found in provided package")
 }
 

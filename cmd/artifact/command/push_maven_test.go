@@ -84,6 +84,54 @@ func createTestJarFile(t *testing.T, groupID, artifactID, version string) string
 	return jarPath
 }
 
+// createFatTestJarFile creates a jar embedding META-INF/maven metadata for
+// two artifacts, mimicking maven-assembly-plugin's jar-with-dependencies:
+// the dependency's own pom.properties is bundled alongside the main
+// artifact's, with the dependency's entry appearing first in the archive.
+func createFatTestJarFile(t *testing.T, mainGroupID, mainArtifactID, mainVersion, depGroupID, depArtifactID, depVersion string) string {
+	t.Helper()
+	dir := t.TempDir()
+	jarPath := filepath.Join(dir, mainArtifactID+"-"+mainVersion+".jar")
+
+	zipFile, err := os.Create(jarPath)
+	if err != nil {
+		t.Fatalf("failed to create jar file: %v", err)
+	}
+	defer zipFile.Close()
+
+	zipWriter := zip.NewWriter(zipFile)
+	defer zipWriter.Close()
+
+	writePomProperties := func(groupID, artifactID, version string) {
+		path := "META-INF/maven/" + groupID + "/" + artifactID + "/pom.properties"
+		content := "groupId=" + groupID + "\n" +
+			"artifactId=" + artifactID + "\n" +
+			"version=" + version + "\n"
+
+		w, err := zipWriter.Create(path)
+		if err != nil {
+			t.Fatalf("failed to create pom.properties in jar: %v", err)
+		}
+		if _, err := w.Write([]byte(content)); err != nil {
+			t.Fatalf("failed to write pom.properties: %v", err)
+		}
+	}
+
+	// Dependency's metadata is bundled first, as in a real fat jar.
+	writePomProperties(depGroupID, depArtifactID, depVersion)
+	writePomProperties(mainGroupID, mainArtifactID, mainVersion)
+
+	classFile, err := zipWriter.Create("com/example/Main.class")
+	if err != nil {
+		t.Fatalf("failed to create class file: %v", err)
+	}
+	if _, err := classFile.Write([]byte("dummy class content")); err != nil {
+		t.Fatalf("failed to write class file: %v", err)
+	}
+
+	return jarPath
+}
+
 // createTestPomFile creates a minimal valid POM file
 func createTestPomFile(t *testing.T, groupID, artifactID, version, name string) string {
 	t.Helper()
@@ -291,6 +339,33 @@ func TestNewPushMavenCmd_CoordinatesMismatch(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "mismatch") {
 		t.Errorf("expected 'mismatch' error, got: %v", err)
+	}
+}
+
+// TestNewPushMavenCmd_FatJarBundledDependencyMetadata reproduces a jar built
+// with maven-assembly-plugin's jar-with-dependencies, which bundles a
+// dependency's META-INF/maven/**/pom.properties ahead of the main
+// artifact's own. The push must succeed by matching the main artifact's
+// coordinates from --pom-file, not the dependency's, which happens to come
+// first in the archive.
+func TestNewPushMavenCmd_FatJarBundledDependencyMetadata(t *testing.T) {
+	srv := withMavenServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "maven-metadata.xml") && r.Method == http.MethodGet {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+	})
+	defer srv.Close()
+
+	jarFile := createFatTestJarFile(t,
+		"com.example", "greeter-app", "1.0.0",
+		"com.example", "greeter-core", "1.0.0")
+	pomFile := createTestPomFile(t, "com.example", "greeter-app", "1.0.0", "Greeter App")
+
+	err := runMavenCmd(t, "test-registry", jarFile, "--pom-file", pomFile)
+	if err != nil {
+		t.Fatalf("expected success, got error: %v", err)
 	}
 }
 
