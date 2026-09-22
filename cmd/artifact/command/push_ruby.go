@@ -45,6 +45,9 @@ func NewPushRubyCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 			return nil
 		},
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return cmdutils.ResolvePkgURL(cmd, "")
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]
 			filePath := args[1]

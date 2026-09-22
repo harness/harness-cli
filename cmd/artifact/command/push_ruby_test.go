@@ -141,6 +141,21 @@ func TestNewPushRubyCmd_WrongArgCount(t *testing.T) {
 	}
 }
 
+func TestNewPushRubyCmd_MissingPkgURL(t *testing.T) {
+	origPkg := config.Global.Registry.PkgURL
+	config.Global.Registry.PkgURL = ""
+	t.Cleanup(func() { config.Global.Registry.PkgURL = origPkg })
+
+	path := writeGemFile(t, "test gem content")
+	err := runRubyCmd(t, "test-registry", path)
+	if err == nil {
+		t.Fatal("expected error when pkg-url is not set")
+	}
+	if !strings.Contains(err.Error(), "pkg-url must be set") {
+		t.Errorf("error should mention pkg-url requirement, got: %v", err)
+	}
+}
+
 func TestNewPushRubyCmd_NoChecksumHeaders(t *testing.T) {
 	withRubyServer(t, func(w http.ResponseWriter, r *http.Request) {
 		for _, header := range []string{

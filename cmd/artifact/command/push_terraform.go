@@ -63,11 +63,11 @@ func NewPushTerraformCmd(c *cmdutils.Factory) *cobra.Command {
 		Long: "Push a Terraform module (.tar.gz/.tgz) or provider binary (.zip) to Harness Artifact Registry (HAR).\n\n" +
 			"Modules require --namespace, --name, --provider and --version.\n" +
 			"Providers require only --namespace; type/version/os/arch are parsed from the filename\n" +
-			"(terraform-provider-{type}_{version}_{os}_{arch}.zip).\n\n" +
-			"Note: hc is unsupported for Terraform bridge pushes with explicit credentials\n" +
-			"(this command has no --pkg-url override). Use 'hc auth login' (saved config),\n" +
-			"or scripts/art-tf-provider-migrate.sh, which remains the supported path.",
+			"(terraform-provider-{type}_{version}_{os}_{arch}.zip).",
 		Args: cobra.ExactArgs(2),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return cmdutils.ResolvePkgURL(cmd, "")
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registryName := args[0]
 			inputPath := args[1]

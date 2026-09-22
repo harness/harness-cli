@@ -307,6 +307,21 @@ func TestNewPushTerraformCmd_WrongArgCount(t *testing.T) {
 	}
 }
 
+func TestNewPushTerraformCmd_MissingPkgURL(t *testing.T) {
+	origPkg := config.Global.Registry.PkgURL
+	config.Global.Registry.PkgURL = ""
+	t.Cleanup(func() { config.Global.Registry.PkgURL = origPkg })
+
+	path := writeTempFile(t, "terraform-provider-demo_1.0.0_linux_amd64.zip", []byte("fake zip content"))
+	err := runTerraformCmd(t, "test-registry", path, "--namespace", "demo")
+	if err == nil {
+		t.Fatal("expected error when pkg-url is not set")
+	}
+	if !strings.Contains(err.Error(), "pkg-url must be set") {
+		t.Errorf("error should mention pkg-url requirement, got: %v", err)
+	}
+}
+
 func TestNewPushTerraformCmd_ModuleFromDirectory(t *testing.T) {
 	var gotPath string
 	var gotBody []byte
