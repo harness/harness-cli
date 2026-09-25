@@ -5,7 +5,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
@@ -52,6 +54,49 @@ func TestRunFirewallExplainEmptyArtifacts(t *testing.T) {
 	counts, err := RunFirewallExplain(f, uuid.New(), nil, "org", "project", progress)
 	assert.NoError(t, err)
 	assert.Equal(t, ScanStatusCounts{}, counts)
+}
+
+// Batch 1 succeeds, batch 2 fails: the tally from batch 1 must survive alongside the error.
+func TestRunFirewallExplainPartialBatchFailure(t *testing.T) {
+	maxRetries, retryInterval = 1, 0
+	t.Cleanup(func() { maxRetries, retryInterval = 3, 30*time.Second })
+
+	config.Global = config.GlobalFlags{AccountID: "test-account"}
+
+	const statusBody = `{"data":{"status":"SUCCESS","scans":[
+		{"packageName":"a","version":"1.0.0","scanStatus":"ALLOWED"},
+		{"packageName":"b","version":"1.0.0","scanStatus":"BLOCKED"}]}}`
+
+	initiates := 0
+	v3Client, err := ar_v3.NewClientWithResponses("http://test", ar_v3.WithHTTPClient(&http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			body, status := statusBody, http.StatusOK
+			if req.Method == http.MethodPost {
+				initiates++
+				if initiates == 1 {
+					body = `{"data":{"evaluationId":"eval-1"}}`
+					status = http.StatusAccepted
+				} else {
+					body = `{"error":{"message":"upstream proxy not found"}}`
+					status = http.StatusNotFound
+				}
+			}
+			return &http.Response{
+				StatusCode: status,
+				Body:       io.NopCloser(strings.NewReader(body)),
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+			}, nil
+		}),
+	}))
+	require.NoError(t, err)
+
+	// 51 artifacts => two batches, so the second (failing) batch is reached.
+	artifacts := make([]ar_v3.ArtifactScanInput, 51)
+	f := &cmdutils.Factory{RegistryV3HttpClient: func() *ar_v3.ClientWithResponses { return v3Client }}
+
+	counts, err := RunFirewallExplain(f, uuid.New(), artifacts, "org", "project", p.NewConsoleReporter())
+	require.Error(t, err)
+	assert.Equal(t, ScanStatusCounts{Allowed: 1, Blocked: 1}, counts)
 }
 
 func TestDisplayScanDetails(t *testing.T) {

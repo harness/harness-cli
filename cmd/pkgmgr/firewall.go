@@ -16,10 +16,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const (
-	maxBulkScanBatchSize = 50
-	maxRetries           = 3
-	retryInterval        = 30 * time.Second
+const maxBulkScanBatchSize = 50
+
+// Overridable in tests so partial-batch failure does not sleep 30s between retries.
+var (
+	maxRetries    = 3
+	retryInterval = 30 * time.Second
 )
 
 // ScanStatusCounts is the Allowed / Warn / Blocked / Unknown tally from a firewall evaluation.
