@@ -22,12 +22,25 @@ const (
 	retryInterval        = 30 * time.Second
 )
 
+// ScanStatusCounts is the Allowed / Warn / Blocked / Unknown tally from a firewall evaluation.
+type ScanStatusCounts struct {
+	Allowed int
+	Warn    int
+	Blocked int
+	Unknown int
+}
+
+// Total returns the number of packages included in the tally.
+func (c ScanStatusCounts) Total() int {
+	return c.Allowed + c.Warn + c.Blocked + c.Unknown
+}
+
 // RunFirewallExplain evaluates artifacts against firewall policies and displays results.
 // Automatically batches into chunks of 50 (API limit).
-// Returns the number of scan results and any error.
-func RunFirewallExplain(f *cmdutils.Factory, registryUUID uuid.UUID, artifacts []ar_v3.ArtifactScanInput, org, project string, progress p.Reporter) (int, error) {
+// Returns the status tally (used by the caller for the final error and build-info upload).
+func RunFirewallExplain(f *cmdutils.Factory, registryUUID uuid.UUID, artifacts []ar_v3.ArtifactScanInput, org, project string, progress p.Reporter) (ScanStatusCounts, error) {
 	if len(artifacts) == 0 {
-		return 0, nil
+		return ScanStatusCounts{}, nil
 	}
 
 	var allScans []ar_v3.BulkScanResultItem
@@ -58,13 +71,17 @@ func RunFirewallExplain(f *cmdutils.Factory, registryUUID uuid.UUID, artifacts [
 			}
 		}
 		if err != nil {
-			return 0, fmt.Errorf("evaluation failed after %d attempts: %w", maxRetries, err)
+			if len(allScans) == 0 {
+				return ScanStatusCounts{}, fmt.Errorf("evaluation failed after %d attempts: %w", maxRetries, err)
+			}
+			progress.Error(fmt.Sprintf("Evaluation failed after %d attempts: %s; showing %d package(s) evaluated so far", maxRetries, err, len(allScans)))
+			return DisplayBlockedScanResults(f, allScans, progress, len(artifacts), true), fmt.Errorf("evaluation failed after %d attempts: %w", maxRetries, err)
 		}
 		allScans = append(allScans, scans...)
 	}
 
 	progress.Success(fmt.Sprintf("Firewall evaluation completed (%d packages)", len(allScans)))
-	return len(allScans), DisplayBlockedScanResults(f, allScans, progress)
+	return DisplayBlockedScanResults(f, allScans, progress, len(artifacts), false), nil
 }
 
 // runBulkEvaluation initiates a single bulk scan evaluation and polls until completion.
@@ -162,8 +179,10 @@ func runBulkEvaluation(f *cmdutils.Factory, registryUUID uuid.UUID, artifacts []
 	return nil, fmt.Errorf("timeout waiting for firewall evaluation to complete")
 }
 
-// DisplayBlockedScanResults shows detailed scan info for each blocked/warned package.
-func DisplayBlockedScanResults(f *cmdutils.Factory, scans []ar_v3.BulkScanResultItem, progress p.Reporter) error {
+// DisplayBlockedScanResults shows detailed scan info for each package, then a consolidated tally.
+// resolved is the number of dependencies submitted for evaluation (may exceed len(scans) on partial failure).
+// Printed with fmt so the summary is visible even when ConsoleReporter suppresses CI logs.
+func DisplayBlockedScanResults(f *cmdutils.Factory, scans []ar_v3.BulkScanResultItem, progress p.Reporter, resolved int, partial bool) ScanStatusCounts {
 	fmt.Println()
 	fmt.Println(strings.Repeat("=", 60))
 	fmt.Printf("FIREWALL EVALUATION: %d package(s) evaluated\n", len(scans))
@@ -221,9 +240,52 @@ func DisplayBlockedScanResults(f *cmdutils.Factory, scans []ar_v3.BulkScanResult
 		}
 	}
 
+	counts := countScanStatuses(scans)
+	printFirewallEvaluationSummary(counts, resolved, partial)
+	return counts
+}
+
+func countScanStatuses(scans []ar_v3.BulkScanResultItem) ScanStatusCounts {
+	var counts ScanStatusCounts
+	for _, scan := range scans {
+		if scan.ScanStatus == nil {
+			counts.Unknown++
+			continue
+		}
+		switch string(*scan.ScanStatus) {
+		case string(ar_v3.BulkScanResultItemScanStatusBLOCKED):
+			counts.Blocked++
+		case string(ar_v3.BulkScanResultItemScanStatusWARN):
+			counts.Warn++
+		case string(ar_v3.BulkScanResultItemScanStatusALLOWED):
+			counts.Allowed++
+		default:
+			counts.Unknown++
+		}
+	}
+	return counts
+}
+
+func printFirewallEvaluationSummary(counts ScanStatusCounts, resolved int, partial bool) {
 	fmt.Println()
 	fmt.Println(strings.Repeat("=", 60))
-	return nil
+	fmt.Println("FIREWALL EVALUATION SUMMARY")
+	evaluated := counts.Total()
+	if resolved > 0 && evaluated != resolved {
+		fmt.Printf("  Evaluated: %d of %d resolved dependencies\n", evaluated, resolved)
+	} else {
+		fmt.Printf("  Evaluated: %d\n", evaluated)
+	}
+	if partial {
+		fmt.Println("  (incomplete — some batches failed)")
+	}
+	fmt.Printf("  Allowed: %d\n", counts.Allowed)
+	fmt.Printf("  Warn: %d\n", counts.Warn)
+	fmt.Printf("  Blocked: %d\n", counts.Blocked)
+	if counts.Unknown > 0 {
+		fmt.Printf("  Unknown: %d\n", counts.Unknown)
+	}
+	fmt.Println(strings.Repeat("=", 60))
 }
 
 // DisplayScanDetails shows policy violations for a single scan result.
