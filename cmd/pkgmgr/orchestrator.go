@@ -108,17 +108,20 @@ func ExecuteWithFirewall(
 	}
 
 	progress.Start("Fetching firewall evaluation info")
-	scanCount, evalErr := RunFirewallExplain(f, registryUUID, artifacts, org, project, progress)
+	counts, evalErr := RunFirewallExplain(f, registryUUID, artifacts, org, project, progress)
 	if evalErr != nil {
 		log.Error().Err(evalErr).Msg("Firewall evaluation failed")
 		progress.Error(fmt.Sprintf("Firewall evaluation failed: %s", evalErr))
 	}
 
 	// Upload build info only if firewall returned results
-	if scanCount > 0 {
+	if counts.Total() > 0 {
 		uploadBuildInfo(f, client, registryUUID, depResult.Dependencies, progress)
 	}
 
+	if counts.Blocked > 0 {
+		return fmt.Errorf("%s %s failed: %d package(s) blocked by firewall", clientName, command, counts.Blocked)
+	}
 	return fmt.Errorf("%s %s failed", clientName, command)
 }
 
