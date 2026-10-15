@@ -1,8 +1,10 @@
 package command
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +16,7 @@ import (
 	"github.com/harness/harness-cli/cmd/cmdutils"
 	"github.com/harness/harness-cli/config"
 	pkgclient "github.com/harness/harness-cli/internal/api/ar_pkg"
+	"github.com/harness/harness-cli/internal/api/ar_v2"
 	"github.com/harness/harness-cli/util/common/auth"
 )
 
@@ -360,6 +363,213 @@ func TestUploadNugetPackageDirect(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf("uploadNugetPackageDirect failed: %v", err)
+	}
+}
+
+type zipEntry struct{ name, body string }
+
+func writeNupkg(t *testing.T, entries ...zipEntry) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "pkg.nupkg")
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("create nupkg: %v", err)
+	}
+	zw := zip.NewWriter(f)
+	for _, e := range entries {
+		w, err := zw.Create(e.name)
+		if err != nil {
+			t.Fatalf("zip entry %s: %v", e.name, err)
+		}
+		if _, err := w.Write([]byte(e.body)); err != nil {
+			t.Fatalf("zip write %s: %v", e.name, err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("zip close: %v", err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatalf("file close: %v", err)
+	}
+	return path
+}
+
+func nuspec(id, version string) string {
+	return `<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata><id>` + id + `</id><version>` + version + `</version></metadata>
+</package>`
+}
+
+func TestNormalizeNugetVersion(t *testing.T) {
+	tests := []struct {
+		in      string
+		want    string
+		wantErr bool
+	}{
+		{in: "1.0", want: "1.0.0"},
+		{in: "1.2.3", want: "1.2.3"},
+		{in: "1.2.3.0", want: "1.2.3"},
+		{in: "1.2.3.4", want: "1.2.3.4"},
+		{in: "v2.0.1", want: "2.0.1"},
+		{in: "01.002.3", want: "1.2.3"},
+		{in: "1.0.0-Beta.1", want: "1.0.0-beta.1"},
+		{in: "1.0.0+build.5", want: "1.0.0"},
+		{in: "1.0.0-rc1+sha.abc", want: "1.0.0-rc1"},
+		{in: "1.2.3.4.5", wantErr: true},
+		{in: "not-a-version", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			got, err := normalizeNugetVersion(tt.in)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got %q", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReadNugetIdentity(t *testing.T) {
+	tests := []struct {
+		name        string
+		entries     []zipEntry
+		wantID      string
+		wantVersion string
+		wantErr     bool
+	}{
+		{
+			name:        "root nuspec with namespace",
+			entries:     []zipEntry{{"My.Pkg.nuspec", nuspec("My.Pkg", "1.0")}, {"lib/net8.0/My.Pkg.dll", "x"}},
+			wantID:      "my.pkg",
+			wantVersion: "1.0.0",
+		},
+		{
+			name:        "nested nuspec counts",
+			entries:     []zipEntry{{"content/Other.nuspec", nuspec("Other", "1.0.0")}},
+			wantID:      "other",
+			wantVersion: "1.0.0",
+		},
+		{
+			name:        "last nuspec wins",
+			entries:     []zipEntry{{"First.nuspec", nuspec("First", "1.0.0")}, {"content/Second.nuspec", nuspec("Second", "2.0.0")}},
+			wantID:      "second",
+			wantVersion: "2.0.0",
+		},
+		{
+			name:    "uppercase extension is not a nuspec",
+			entries: []zipEntry{{"My.Pkg.NUSPEC", nuspec("My.Pkg", "1.0.0")}},
+			wantErr: true,
+		},
+		{
+			name:    "any malformed nuspec fails",
+			entries: []zipEntry{{"My.Pkg.nuspec", nuspec("My.Pkg", "1.0.0")}, {"content/Bad.nuspec", "<package><metadata>"}},
+			wantErr: true,
+		},
+		{
+			name:    "missing version",
+			entries: []zipEntry{{"My.Pkg.nuspec", nuspec("My.Pkg", "")}},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			id, version, err := readNugetIdentity(writeNupkg(t, tt.entries...))
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got %q@%q", id, version)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if id != tt.wantID || version != tt.wantVersion {
+				t.Errorf("got %q@%q, want %q@%q", id, version, tt.wantID, tt.wantVersion)
+			}
+		})
+	}
+}
+
+func TestNewPushNugetCmd_PublishesMetadata(t *testing.T) {
+	withNugetServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+	})
+
+	var metadataCalls int
+	var body ar_v2.UpdateMetadataJSONRequestBody
+	metaSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		metadataCalls++
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode metadata body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"SUCCESS","data":{"metadata":[]}}`))
+	}))
+	t.Cleanup(metaSrv.Close)
+
+	factory := &cmdutils.Factory{
+		RegistryV2HttpClient: func() *ar_v2.ClientWithResponses {
+			client, err := ar_v2.NewClientWithResponses(metaSrv.URL)
+			if err != nil {
+				t.Fatalf("v2 client: %v", err)
+			}
+			return client
+		},
+	}
+
+	path := writeNupkg(t, zipEntry{"My.Pkg.nuspec", nuspec("My.Pkg", "2.1-Preview")})
+	cmd := NewPushNugetCmd(factory)
+	cmd.SetArgs([]string{"test-registry", path, "--metadata", "owner:team-a"})
+	cmd.SetOut(new(bytes.Buffer))
+	cmd.SetErr(new(bytes.Buffer))
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if metadataCalls != 1 {
+		t.Fatalf("metadata endpoint called %d times, want 1", metadataCalls)
+	}
+	if body.RegistryIdentifier != "test-registry" {
+		t.Errorf("registry = %q, want test-registry", body.RegistryIdentifier)
+	}
+	if body.Package == nil || *body.Package != "my.pkg" {
+		t.Errorf("package = %v, want my.pkg", body.Package)
+	}
+	if body.Version == nil || *body.Version != "2.1.0-preview" {
+		t.Errorf("version = %v, want 2.1.0-preview", body.Version)
+	}
+	if len(body.Metadata) != 1 || body.Metadata[0].Key != "owner" || body.Metadata[0].Value != "team-a" {
+		t.Errorf("metadata = %+v, want [owner:team-a]", body.Metadata)
+	}
+}
+
+func TestNewPushNugetCmd_UnreadablePackageSkipsMetadata(t *testing.T) {
+	withNugetServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	factory := &cmdutils.Factory{
+		RegistryV2HttpClient: func() *ar_v2.ClientWithResponses {
+			t.Fatal("metadata endpoint must not be called when the nuspec cannot be read")
+			return nil
+		},
+	}
+
+	path := writeNugetFile(t, "not a zip")
+	cmd := NewPushNugetCmd(factory)
+	cmd.SetArgs([]string{"test-registry", path, "--metadata", "owner:team-a"})
+	cmd.SetOut(new(bytes.Buffer))
+	cmd.SetErr(new(bytes.Buffer))
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("push should succeed even when metadata is skipped: %v", err)
 	}
 }
 
