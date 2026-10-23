@@ -43,6 +43,7 @@ type puppetMetadata struct {
 func NewPushPuppetCmd(c *cmdutils.Factory) *cobra.Command {
 	const expectedNumberOfArgument = 2
 	var postMetadata string
+	var autoMetadata string
 	cmd := &cobra.Command{
 		Use:   "puppet <registry_name> <module_tar_gz_path>",
 		Short: "Push Puppet module",
@@ -160,11 +161,13 @@ func NewPushPuppetCmd(c *cmdutils.Factory) *cobra.Command {
 				metadata.Name, metadata.Version, registryName,
 			))
 			applyPostPushMetadata(c, postMetadata, registryName, metadata.Name, metadata.Version)
+			applyPostPushAutoMetadata(c, autoMetadata, registryName, metadata.Name, metadata.Version)
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&postMetadata, "metadata", "", "Metadata key-value pairs to attach after push (format: key:value,key2:value2)")
+	registerAutoMetadataFlag(cmd, &autoMetadata)
 	return cmd
 }
 

@@ -42,6 +42,7 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 	var pkgURL string
 	var path string
 	var postMetadata string
+	var autoMetadata string
 	cmd := &cobra.Command{
 		Use:   "nuget <registry_name> <file_path>",
 		Short: "Push Nuget Artifacts",
@@ -175,13 +176,14 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 			}
 
 			progress.Success(fmt.Sprintf("Successfully uploaded package %s", filePath))
-			if postMetadata != "" {
+			if postMetadata != "" || autoMetadata != "" {
 				id, version, err := readNugetIdentity(filePath)
 				if err != nil {
 					logrus.Warnf("Skipping metadata publish for %s: %v", fileName, err)
 					return nil
 				}
 				applyPostPushMetadata(c, postMetadata, registryName, id, version)
+				applyPostPushAutoMetadata(c, autoMetadata, registryName, id, version)
 			}
 			return nil
 		},
@@ -190,6 +192,7 @@ func NewPushNugetCmd(c *cmdutils.Factory) *cobra.Command {
 	cmd.Flags().StringVar(&path, "path", "", "Nested directory")
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
 	cmd.Flags().StringVar(&postMetadata, "metadata", "", "Metadata key-value pairs to attach after push (format: key:value,key2:value2)")
+	registerAutoMetadataFlag(cmd, &autoMetadata)
 
 	return cmd
 }

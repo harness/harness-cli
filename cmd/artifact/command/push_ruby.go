@@ -32,6 +32,7 @@ type rubyUploadResponse struct {
 func NewPushRubyCmd(c *cmdutils.Factory) *cobra.Command {
 	const expectedNumberOfArgument = 2
 	var postMetadata string
+	var autoMetadata string
 	cmd := &cobra.Command{
 		Use:   "ruby <registry_name> <file_path>",
 		Short: "Push Ruby gem",
@@ -118,10 +119,12 @@ func NewPushRubyCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Success(successMsg)
 			applyPostPushMetadata(c, postMetadata, registryName, uploadedPkgName, uploadedPkgVersion)
+			applyPostPushAutoMetadata(c, autoMetadata, registryName, uploadedPkgName, uploadedPkgVersion)
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&postMetadata, "metadata", "", "Metadata key-value pairs to attach after push (format: key:value,key2:value2)")
+	registerAutoMetadataFlag(cmd, &autoMetadata)
 	return cmd
 }

@@ -339,6 +339,26 @@ type ArtifactScanInput struct {
 	Version string `json:"version"`
 }
 
+// AutoMetadataRequestInput System-generated (AUTO) metadata to upsert. Target is chosen from the
+// fields that are set: package+version (version), package alone (package),
+// or neither (registry).
+type AutoMetadataRequestInput struct {
+	// ArtifactKeyFilters Extra coordinates that disambiguate a version for some package types
+	ArtifactKeyFilters *map[string]string `json:"artifactKeyFilters,omitempty"`
+
+	// Metadata Metadata key-value pairs to upsert as AUTO metadata
+	Metadata []MetadataItemInput `json:"metadata"`
+
+	// Package Package name. Required when version is set
+	Package *string `json:"package,omitempty"`
+
+	// RegistryName Name of the registry the metadata applies to
+	RegistryName string `json:"registryName"`
+
+	// Version Version name
+	Version *string `json:"version,omitempty"`
+}
+
 // BuildInfoNode Node in the dependency graph
 type BuildInfoNode struct {
 	// NodeKey package@version
@@ -505,6 +525,15 @@ type Meta struct {
 
 	// DeletedCount Count of soft-deleted entities
 	DeletedCount int64 `json:"deletedCount"`
+}
+
+// MetadataItemInput Metadata key-value pair for create/update operations
+type MetadataItemInput struct {
+	// Key The metadata key name (case-sensitive)
+	Key string `json:"key"`
+
+	// Value The metadata value
+	Value string `json:"value"`
 }
 
 // Package Package Metadata
@@ -996,6 +1025,11 @@ type ListVersionResponse struct {
 	Size int64 `json:"size"`
 }
 
+// AutoMetadataRequest System-generated (AUTO) metadata to upsert. Target is chosen from the
+// fields that are set: package+version (version), package alone (package),
+// or neither (registry).
+type AutoMetadataRequest = AutoMetadataRequestInput
+
 // BuildInfoRequest Request to add build info
 type BuildInfoRequest = BuildInfoRequestInput
 
@@ -1119,6 +1153,12 @@ type SearchRegistryFilesV3Params struct {
 	//
 	// Examples: `name:asc`, `modifiedAt:desc`
 	Sort *SortParam `form:"sort,omitempty" json:"sort,omitempty"`
+}
+
+// UpsertAutoMetadataV3Params defines parameters for UpsertAutoMetadataV3.
+type UpsertAutoMetadataV3Params struct {
+	// AccountIdentifier Unique identifier for the Harness account.
+	AccountIdentifier AccountIdentifier `form:"account_identifier" json:"account_identifier"`
 }
 
 // ListPackagesV3Params defines parameters for ListPackagesV3.
@@ -1482,6 +1522,9 @@ type BulkDeleteArtifactsJSONRequestBody = BulkDeleteRequest
 // SearchRegistryFilesV3JSONRequestBody defines body for SearchRegistryFilesV3 for application/json ContentType.
 type SearchRegistryFilesV3JSONRequestBody = SearchRegistryFilesRequest
 
+// UpsertAutoMetadataV3JSONRequestBody defines body for UpsertAutoMetadataV3 for application/json ContentType.
+type UpsertAutoMetadataV3JSONRequestBody = AutoMetadataRequestInput
+
 // InitiateBulkScanEvaluationJSONRequestBody defines body for InitiateBulkScanEvaluation for application/json ContentType.
 type InitiateBulkScanEvaluationJSONRequestBody = BulkScanEvaluationRequest
 
@@ -1764,6 +1807,11 @@ type ClientInterface interface {
 
 	SearchRegistryFilesV3(ctx context.Context, params *SearchRegistryFilesV3Params, body SearchRegistryFilesV3JSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// UpsertAutoMetadataV3WithBody request with any body
+	UpsertAutoMetadataV3WithBody(ctx context.Context, params *UpsertAutoMetadataV3Params, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpsertAutoMetadataV3(ctx context.Context, params *UpsertAutoMetadataV3Params, body UpsertAutoMetadataV3JSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListPackagesV3 request
 	ListPackagesV3(ctx context.Context, params *ListPackagesV3Params, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -1875,6 +1923,30 @@ func (c *Client) SearchRegistryFilesV3WithBody(ctx context.Context, params *Sear
 
 func (c *Client) SearchRegistryFilesV3(ctx context.Context, params *SearchRegistryFilesV3Params, body SearchRegistryFilesV3JSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSearchRegistryFilesV3Request(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpsertAutoMetadataV3WithBody(ctx context.Context, params *UpsertAutoMetadataV3Params, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpsertAutoMetadataV3RequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpsertAutoMetadataV3(ctx context.Context, params *UpsertAutoMetadataV3Params, body UpsertAutoMetadataV3JSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpsertAutoMetadataV3Request(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2533,6 +2605,64 @@ func NewSearchRegistryFilesV3RequestWithBody(server string, params *SearchRegist
 				}
 			}
 
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUpsertAutoMetadataV3Request calls the generic UpsertAutoMetadataV3 builder with application/json body
+func NewUpsertAutoMetadataV3Request(server string, params *UpsertAutoMetadataV3Params, body UpsertAutoMetadataV3JSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpsertAutoMetadataV3RequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewUpsertAutoMetadataV3RequestWithBody generates requests for UpsertAutoMetadataV3 with any type of body
+func NewUpsertAutoMetadataV3RequestWithBody(server string, params *UpsertAutoMetadataV3Params, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/metadata")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "account_identifier", runtime.ParamLocationQuery, params.AccountIdentifier); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
 		}
 
 		queryURL.RawQuery = queryValues.Encode()
@@ -4024,6 +4154,11 @@ type ClientWithResponsesInterface interface {
 
 	SearchRegistryFilesV3WithResponse(ctx context.Context, params *SearchRegistryFilesV3Params, body SearchRegistryFilesV3JSONRequestBody, reqEditors ...RequestEditorFn) (*SearchRegistryFilesV3Resp, error)
 
+	// UpsertAutoMetadataV3WithBodyWithResponse request with any body
+	UpsertAutoMetadataV3WithBodyWithResponse(ctx context.Context, params *UpsertAutoMetadataV3Params, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpsertAutoMetadataV3Resp, error)
+
+	UpsertAutoMetadataV3WithResponse(ctx context.Context, params *UpsertAutoMetadataV3Params, body UpsertAutoMetadataV3JSONRequestBody, reqEditors ...RequestEditorFn) (*UpsertAutoMetadataV3Resp, error)
+
 	// ListPackagesV3WithResponse request
 	ListPackagesV3WithResponse(ctx context.Context, params *ListPackagesV3Params, reqEditors ...RequestEditorFn) (*ListPackagesV3Resp, error)
 
@@ -4146,6 +4281,28 @@ func (r SearchRegistryFilesV3Resp) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r SearchRegistryFilesV3Resp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpsertAutoMetadataV3Resp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSONDefault  *V3Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpsertAutoMetadataV3Resp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpsertAutoMetadataV3Resp) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -4442,6 +4599,23 @@ func (c *ClientWithResponses) SearchRegistryFilesV3WithResponse(ctx context.Cont
 	return ParseSearchRegistryFilesV3Resp(rsp)
 }
 
+// UpsertAutoMetadataV3WithBodyWithResponse request with arbitrary body returning *UpsertAutoMetadataV3Resp
+func (c *ClientWithResponses) UpsertAutoMetadataV3WithBodyWithResponse(ctx context.Context, params *UpsertAutoMetadataV3Params, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpsertAutoMetadataV3Resp, error) {
+	rsp, err := c.UpsertAutoMetadataV3WithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpsertAutoMetadataV3Resp(rsp)
+}
+
+func (c *ClientWithResponses) UpsertAutoMetadataV3WithResponse(ctx context.Context, params *UpsertAutoMetadataV3Params, body UpsertAutoMetadataV3JSONRequestBody, reqEditors ...RequestEditorFn) (*UpsertAutoMetadataV3Resp, error) {
+	rsp, err := c.UpsertAutoMetadataV3(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpsertAutoMetadataV3Resp(rsp)
+}
+
 // ListPackagesV3WithResponse request returning *ListPackagesV3Resp
 func (c *ClientWithResponses) ListPackagesV3WithResponse(ctx context.Context, params *ListPackagesV3Params, reqEditors ...RequestEditorFn) (*ListPackagesV3Resp, error) {
 	rsp, err := c.ListPackagesV3(ctx, params, reqEditors...)
@@ -4669,6 +4843,32 @@ func ParseSearchRegistryFilesV3Resp(rsp *http.Response) (*SearchRegistryFilesV3R
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest V3Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpsertAutoMetadataV3Resp parses an HTTP response from a UpsertAutoMetadataV3WithResponse call
+func ParseUpsertAutoMetadataV3Resp(rsp *http.Response) (*UpsertAutoMetadataV3Resp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpsertAutoMetadataV3Resp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
 		var dest V3Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

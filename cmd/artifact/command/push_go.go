@@ -24,6 +24,7 @@ func NewPushGoCmd(c *cmdutils.Factory) *cobra.Command {
 	var pkgURL string
 	var version string
 	var postMetadata string
+	var autoMetadata string
 	cmd := &cobra.Command{
 		Use:   "go <registry_name> <folder_path>",
 		Short: "Push Go Artifacts",
@@ -138,6 +139,7 @@ func NewPushGoCmd(c *cmdutils.Factory) *cobra.Command {
 
 			progress.Success(fmt.Sprintf("Successfully uploaded package %s", packageName))
 			applyPostPushMetadata(c, postMetadata, registryName, packageName, version)
+			applyPostPushAutoMetadata(c, autoMetadata, registryName, packageName, version)
 			return nil
 		},
 	}
@@ -145,5 +147,6 @@ func NewPushGoCmd(c *cmdutils.Factory) *cobra.Command {
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages")
 	cmd.Flags().StringVar(&version, "version", "", "Version for the package")
 	cmd.Flags().StringVar(&postMetadata, "metadata", "", "Metadata key-value pairs to attach after push (format: key:value,key2:value2)")
+	registerAutoMetadataFlag(cmd, &autoMetadata)
 	return cmd
 }

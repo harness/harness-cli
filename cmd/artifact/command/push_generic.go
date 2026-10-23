@@ -36,6 +36,7 @@ func NewPushGenericCmd(c *cmdutils.Factory) *cobra.Command {
 	var packageName, packageVersion, description, pkgURL string
 	var includeHidden bool
 	var postMetadata string
+	var autoMetadata string
 
 	cmd := &cobra.Command{
 		Use:   "generic <registry> <path> [<path>...]",
@@ -95,6 +96,7 @@ func NewPushGenericCmd(c *cmdutils.Factory) *cobra.Command {
 				return fmt.Errorf("%d of %d file(s) failed to upload", failed, len(results))
 			}
 			applyPostPushMetadata(c, postMetadata, registryName, packageName, version)
+			applyPostPushAutoMetadata(c, autoMetadata, registryName, packageName, version)
 			return nil
 		},
 	}
@@ -107,6 +109,7 @@ func NewPushGenericCmd(c *cmdutils.Factory) *cobra.Command {
 	cmd.Flags().BoolVar(&includeHidden, "include-hidden", false,
 		"Include hidden files and directories (names starting with '.') when walking directory inputs")
 	cmd.Flags().StringVar(&postMetadata, "metadata", "", "Metadata key-value pairs to attach after push (format: key:value,key2:value2)")
+	registerAutoMetadataFlag(cmd, &autoMetadata)
 
 	cmd.MarkFlagRequired("name")
 

@@ -56,6 +56,7 @@ var terraformProviderFilenameRegex = regexp.MustCompile(
 func NewPushTerraformCmd(c *cmdutils.Factory) *cobra.Command {
 	var namespace, moduleName, moduleProvider, moduleVersion string
 	var postMetadata string
+	var autoMetadata string
 
 	cmd := &cobra.Command{
 		Use:   "terraform <registry_name> <file_path>",
@@ -98,7 +99,7 @@ func NewPushTerraformCmd(c *cmdutils.Factory) *cobra.Command {
 					progress.Error("Failed to access packaged module archive")
 					return fmt.Errorf("failed to access packaged module archive: %w", statErr)
 				}
-				return pushTerraformModule(ctx, c, progress, registryName, archivePath, archiveInfo, namespace, moduleName, moduleProvider, moduleVersion, postMetadata)
+				return pushTerraformModule(ctx, c, progress, registryName, archivePath, archiveInfo, namespace, moduleName, moduleProvider, moduleVersion, postMetadata, autoMetadata)
 			}
 
 			files, err := utils.ResolveFilePath(inputPath)
@@ -128,9 +129,9 @@ func NewPushTerraformCmd(c *cmdutils.Factory) *cobra.Command {
 
 			switch {
 			case isTerraformModule(filePath):
-				return pushTerraformModule(ctx, c, progress, registryName, filePath, fileInfo, namespace, moduleName, moduleProvider, moduleVersion, postMetadata)
+				return pushTerraformModule(ctx, c, progress, registryName, filePath, fileInfo, namespace, moduleName, moduleProvider, moduleVersion, postMetadata, autoMetadata)
 			case isTerraformProvider(filePath):
-				return pushTerraformProvider(ctx, c, progress, registryName, filePath, fileInfo, namespace, postMetadata)
+				return pushTerraformProvider(ctx, c, progress, registryName, filePath, fileInfo, namespace, postMetadata, autoMetadata)
 			default:
 				progress.Error("Unsupported file type")
 				return fmt.Errorf("package file must be a module (%s/%s) or provider (%s), got: %s",
@@ -145,6 +146,7 @@ func NewPushTerraformCmd(c *cmdutils.Factory) *cobra.Command {
 	cmd.Flags().StringVar(&moduleVersion, "version", "", "Module version, SemVer 2.0.0 (required for module uploads)")
 	cmd.MarkFlagRequired("namespace")
 	cmd.Flags().StringVar(&postMetadata, "metadata", "", "Metadata key-value pairs to attach after push (format: key:value,key2:value2)")
+	registerAutoMetadataFlag(cmd, &autoMetadata)
 
 	return cmd
 }
@@ -322,6 +324,7 @@ func pushTerraformModule(
 	fileInfo os.FileInfo,
 	namespace, name, moduleProvider, version string,
 	postMetadata string,
+	autoMetadata string,
 ) error {
 	if name == "" {
 		progress.Error("--name is required for module uploads")
@@ -382,6 +385,7 @@ func pushTerraformModule(
 		namespace, name, moduleProvider, version, registryName,
 	))
 	applyPostPushMetadata(c, postMetadata, registryName, name, version)
+	applyPostPushAutoMetadata(c, autoMetadata, registryName, name, version)
 	return nil
 }
 
@@ -397,6 +401,7 @@ func pushTerraformProvider(
 	fileInfo os.FileInfo,
 	namespace string,
 	postMetadata string,
+	autoMetadata string,
 ) error {
 	filename := filepath.Base(filePath)
 	typeName, version, osName, arch, err := parseProviderFilename(filename)
@@ -451,6 +456,7 @@ func pushTerraformProvider(
 		namespace, typeName, version, osName, arch, registryName,
 	))
 	applyPostPushMetadata(c, postMetadata, registryName, typeName, version)
+	applyPostPushAutoMetadata(c, autoMetadata, registryName, typeName, version)
 	return nil
 }
 

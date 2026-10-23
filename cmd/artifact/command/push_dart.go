@@ -28,6 +28,7 @@ import (
 func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 	var pkgURL string
 	var postMetadata string
+	var autoMetadata string
 
 	cmd := &cobra.Command{
 		Use:   "dart <registry_name> <dart_tar_gz_path>",
@@ -185,12 +186,14 @@ func NewPushDartCmd(f *cmdutils.Factory) *cobra.Command {
 
 			progress.Success(fmt.Sprintf("Successfully uploaded Dart package '%s@%s' to registry '%s'", pubspec.Name, pubspec.Version, registryName))
 			applyPostPushMetadata(f, postMetadata, registryName, pubspec.Name, pubspec.Version)
+			applyPostPushAutoMetadata(f, autoMetadata, registryName, pubspec.Name, pubspec.Version)
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&pkgURL, "pkg-url", "", "Base URL for the Packages service")
 	cmd.Flags().StringVar(&postMetadata, "metadata", "", "Metadata key-value pairs to attach after push (format: key:value,key2:value2)")
+	registerAutoMetadataFlag(cmd, &autoMetadata)
 
 	return cmd
 }

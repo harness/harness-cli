@@ -179,6 +179,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/V3Error"
           description: Error response.
+  /internal/metadata:
+    post:
+      x-internal: true
+      summary: Upsert AUTO metadata
+      description: |
+        Upserts system-generated (AUTO) metadata on a registry, package, or version.
+        Not part of the public API.
+      operationId: UpsertAutoMetadataV3
+      tags:
+        - Registry V3
+      parameters:
+        - $ref: "#/components/parameters/AccountIdentifier"
+      requestBody:
+        $ref: "#/components/requestBodies/AutoMetadataRequest"
+      responses:
+        "200":
+          description: AUTO metadata upserted successfully
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/V3Error"
+          description: Error response.
   /system/info:
     get:
       x-internal: false
@@ -393,6 +416,13 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/BuildInfoRequestInput"
+    AutoMetadataRequest:
+      description: Request body containing AUTO metadata and the entity it attaches to
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/AutoMetadataRequestInput"
     ArtifactScanEvaluateRequest:
       description: request to re-evaluate artifact scan
       content:
@@ -570,6 +600,55 @@ components:
                 items:
                   $ref: "#/components/schemas/ArtifactScanDetailsV3"
   schemas:
+    AutoMetadataRequestInput:
+      description: |
+        System-generated (AUTO) metadata to upsert. Target is chosen from the
+        fields that are set: package+version (version), package alone (package),
+        or neither (registry).
+      type: object
+      required:
+        - registryName
+        - metadata
+      properties:
+        registryName:
+          description: Name of the registry the metadata applies to
+          type: string
+          minLength: 1
+        package:
+          description: Package name. Required when version is set
+          type: string
+        version:
+          description: Version name
+          type: string
+        artifactKeyFilters:
+          description: Extra coordinates that disambiguate a version for some package types
+          type: object
+          additionalProperties:
+            type: string
+        metadata:
+          description: Metadata key-value pairs to upsert as AUTO metadata
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/MetadataItemInput"
+    MetadataItemInput:
+      description: Metadata key-value pair for create/update operations
+      type: object
+      required:
+        - key
+        - value
+      properties:
+        key:
+          description: The metadata key name (case-sensitive)
+          type: string
+          minLength: 1
+          maxLength: 128
+        value:
+          description: The metadata value
+          type: string
+          minLength: 1
+          maxLength: 256
     BuildInfoRequestInput:
       type: object
       description: Request to add build info
