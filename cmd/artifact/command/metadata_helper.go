@@ -8,6 +8,7 @@ import (
 	"github.com/harness/harness-cli/internal/api/ar_v2"
 	"github.com/harness/harness-cli/internal/api/ar_v3"
 	"github.com/harness/harness-cli/util/metadata"
+	"github.com/rs/zerolog/log"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -55,19 +56,19 @@ func applyPostPushMetadata(f *cmdutils.Factory, metadataStr, registry, pkg, vers
 // applyPostPushAutoMetadata attaches system-generated metadata to an artifact version after a
 // successful push via the internal AUTO metadata API. metadataStr uses the same
 // "key:value,key2:value2" format as --metadata. It is a no-op when metadataStr is empty or pkg
-// is unknown. Failures are logged as warnings and do not fail the push. User-facing messages
-// must not mention the internal endpoint.
+// is unknown. Failures are logged only when verbose logging is enabled and do not fail the
+// push. User-facing messages must not mention the internal endpoint.
 func applyPostPushAutoMetadata(f *cmdutils.Factory, metadataStr, registry, pkg, version string) {
 	if metadataStr == "" {
 		return
 	}
 	if pkg == "" {
-		logrus.Warnf("Skipping pipeline metadata publish: package name is unknown for this package type")
+		log.Warn().Msg("Skipping pipeline metadata publish: package name is unknown for this package type")
 		return
 	}
 	items, err := metadata.ParseMetadataString(metadataStr)
 	if err != nil {
-		logrus.Warnf("Failed to parse pipeline metadata for %s/%s@%s: %v", registry, pkg, version, err)
+		log.Warn().Msgf("Failed to parse pipeline metadata for %s/%s@%s: %v", registry, pkg, version, err)
 		return
 	}
 	v3Items := make([]ar_v3.MetadataItemInput, len(items))
@@ -87,11 +88,11 @@ func applyPostPushAutoMetadata(f *cmdutils.Factory, metadataStr, registry, pkg, 
 	}
 	resp, err := f.RegistryV3HttpClient().UpsertAutoMetadataV3WithResponse(context.Background(), params, body)
 	if err != nil {
-		logrus.Warnf("Failed to attach pipeline metadata for %s/%s@%s: %v", registry, pkg, version, err)
+		log.Warn().Msgf("Failed to attach pipeline metadata for %s/%s@%s: %v", registry, pkg, version, err)
 		return
 	}
 	if resp.StatusCode() >= 400 {
-		logrus.Warnf("Failed to attach pipeline metadata for %s/%s@%s: status %d", registry, pkg, version, resp.StatusCode())
+		log.Warn().Msgf("Failed to attach pipeline metadata for %s/%s@%s: status %d", registry, pkg, version, resp.StatusCode())
 		return
 	}
 }
