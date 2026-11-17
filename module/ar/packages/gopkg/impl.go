@@ -46,13 +46,13 @@ func NewDefaultGenerator() *DefaultGenerator {
 type defaultModuleValidator struct{}
 
 // ValidateVersion checks if the version string follows semantic versioning format.
-// The version must be in the form vX.Y.Z where X, Y, and Z are non-negative integers.
-// For example: v1.0.0, v2.1.3
+// The version must be in the form vX.Y.Z or vX.Y.Z-prerelease where X, Y, and Z are non-negative integers.
+// For example: v1.0.0, v2.1.3, v3.24.0-rc1, v3.24.0-beta.1
 // Returns a validation error if the format is invalid.
 func (v *defaultModuleValidator) ValidateVersion(version string) error {
-	re := regexp.MustCompile(`^v(\d+)\.(\d+)\.(\d+)$`)
+	re := regexp.MustCompile(`^v(\d+)\.(\d+)\.(\d+)(-[a-zA-Z0-9][a-zA-Z0-9.\-]*)?$`)
 	if !re.MatchString(version) {
-		return errors.NewValidationError("version", "must be in form vX.Y.Z")
+		return errors.NewValidationError("version", "must be in form vX.Y.Z or vX.Y.Z-prerelease")
 	}
 	return nil
 }

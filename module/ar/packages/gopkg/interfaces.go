@@ -18,7 +18,7 @@ type PackageGenerator interface {
 // and module paths according to Go module conventions.
 type ModuleValidator interface {
 	// ValidateVersion validates the package version format.
-	// The version must be in the form vX.Y.Z where X, Y, and Z are non-negative integers.
+	// The version must be in the form vX.Y.Z or vX.Y.Z-prerelease where X, Y, and Z are non-negative integers.
 	// Returns an error if the version format is invalid.
 	ValidateVersion(version string) error
 
