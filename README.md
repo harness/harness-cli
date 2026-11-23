@@ -3,7 +3,7 @@
 A powerful command-line interface tool for interacting with Harness services
 > **⚠️ Deprecation Notice**
 >
-> This CLI will be **deprecated soon** and is no longer the recommended Harness CLI for new usage.
+> This CLI is **deprecated** and is no longer the recommended Harness CLI for new usage.
 >
 > The new **official Harness CLI** is available here:
 > **https://github.com/harness/cli**
